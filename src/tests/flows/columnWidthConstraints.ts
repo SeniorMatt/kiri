@@ -9,7 +9,7 @@ tests.register("column width constraints on window added", 5, () => {
         clients[1].maxSize = new MockQmlSize(300, 9999);
 
         workspaceMock.activeWindow = clients[1];
-        qtMock.fireShortcut("karousel-window-move-left");
+        qtMock.fireShortcut("kniri-window-move-left");
 
         Assert.equal(clients[0].getActualFrameGeometry().width, 300, assertOpt);
         Assert.equal(clients[1].getActualFrameGeometry().width, 300, assertOpt);
@@ -25,7 +25,7 @@ tests.register("column width constraints on window added", 5, () => {
         clients[1].minSize = new MockQmlSize(400, 100);
 
         workspaceMock.activeWindow = clients[1];
-        qtMock.fireShortcut("karousel-window-move-left");
+        qtMock.fireShortcut("kniri-window-move-left");
 
         Assert.equal(clients[0].getActualFrameGeometry().width, 400, assertOpt);
         Assert.equal(clients[1].getActualFrameGeometry().width, 400, assertOpt);

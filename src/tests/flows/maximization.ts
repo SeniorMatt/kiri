@@ -118,7 +118,7 @@
                 const { qtMock, workspaceMock, world } = init(config);
 
                 const clients = workspaceMock.createClientsWithWidths(300, 400, 400);
-                qtMock.fireShortcut("karousel-window-move-left");
+                qtMock.fireShortcut("kniri-window-move-left");
 
                 assertWindowed(config, clients);
 
@@ -130,17 +130,17 @@
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[0]; },
-                    () => { qtMock.fireShortcut("karousel-focus-1"); },
-                    () => { qtMock.fireShortcut("karousel-focus-left"); },
-                    () => { qtMock.fireShortcut("karousel-focus-start"); },
+                    () => { qtMock.fireShortcut("kniri-focus-1"); },
+                    () => { qtMock.fireShortcut("kniri-focus-left"); },
+                    () => { qtMock.fireShortcut("kniri-focus-start"); },
                 );
                 assertWindowed(config, clients);
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[2]; },
-                    () => { qtMock.fireShortcut("karousel-focus-2"); },
-                    () => { qtMock.fireShortcut("karousel-focus-right"); },
-                    () => { qtMock.fireShortcut("karousel-focus-end"); },
+                    () => { qtMock.fireShortcut("kniri-focus-2"); },
+                    () => { qtMock.fireShortcut("kniri-focus-right"); },
+                    () => { qtMock.fireShortcut("kniri-focus-end"); },
                 );
                 assertWindowed(config, clients);
 
@@ -152,13 +152,13 @@
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[1]; },
-                    () => { qtMock.fireShortcut("karousel-focus-up"); },
+                    () => { qtMock.fireShortcut("kniri-focus-up"); },
                 );
                 assertWindowed(config, clients);
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[2]; },
-                    () => { qtMock.fireShortcut("karousel-focus-down"); },
+                    () => { qtMock.fireShortcut("kniri-focus-down"); },
                 );
                 assertWindowed(config, clients);
             });
@@ -169,7 +169,7 @@
                 const { qtMock, workspaceMock, world } = init(config);
 
                 const clients = workspaceMock.createClientsWithWidths(300, 400, 400);
-                qtMock.fireShortcut("karousel-window-move-left");
+                qtMock.fireShortcut("kniri-window-move-left");
 
                 assertWindowed(config, clients);
 
@@ -181,29 +181,29 @@
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[0]; },
-                    () => { qtMock.fireShortcut("karousel-focus-1"); },
-                    () => { qtMock.fireShortcut("karousel-focus-left"); },
-                    () => { qtMock.fireShortcut("karousel-focus-start"); },
+                    () => { qtMock.fireShortcut("kniri-focus-1"); },
+                    () => { qtMock.fireShortcut("kniri-focus-left"); },
+                    () => { qtMock.fireShortcut("kniri-focus-start"); },
                 );
                 assertWindowed(config, clients);
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[2]; },
-                    () => { qtMock.fireShortcut("karousel-focus-2"); },
-                    () => { qtMock.fireShortcut("karousel-focus-right"); },
-                    () => { qtMock.fireShortcut("karousel-focus-end"); },
+                    () => { qtMock.fireShortcut("kniri-focus-2"); },
+                    () => { qtMock.fireShortcut("kniri-focus-right"); },
+                    () => { qtMock.fireShortcut("kniri-focus-end"); },
                 );
                 assertFullScreenOrMaximized(clients);
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[1]; },
-                    () => { qtMock.fireShortcut("karousel-focus-up"); },
+                    () => { qtMock.fireShortcut("kniri-focus-up"); },
                 );
                 assertWindowed(config, clients);
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[2]; },
-                    () => { qtMock.fireShortcut("karousel-focus-down"); },
+                    () => { qtMock.fireShortcut("kniri-focus-down"); },
                 );
                 assertFullScreenOrMaximized(clients);
             });
@@ -236,7 +236,7 @@
             Assert.equal(Workspace.activeWindow, fullScreenClient);
 
             {
-                qtMock.fireShortcut("karousel-focus-left");
+                qtMock.fireShortcut("kniri-focus-left");
                 const opts = { message: "fullScreenClient is not in the grid, so we can't move focus directionally" };
                 Assert.assert(!windowedClient.fullScreen);
                 Assert.equal(windowedClient.keepBelow, shouldKeepBelow(true));
@@ -250,7 +250,7 @@
             }
 
             {
-                qtMock.fireShortcut("karousel-focus-1");
+                qtMock.fireShortcut("kniri-focus-1");
                 const opts = { message: "fullScreenClient is not in grid, so it should stay full-screen" };
                 Assert.assert(!windowedClient.fullScreen);
                 Assert.equal(windowedClient.keepBelow, shouldKeepBelow(true));
@@ -300,7 +300,7 @@
                     expectedActiveWindow = fullScreenClient;
                 },
                 () => {
-                    qtMock.fireShortcut("karousel-focus-left");
+                    qtMock.fireShortcut("kniri-focus-left");
                     expectedColumn2Width = tilingArea.width;
                     expectedActiveWindow = windowedClient;
                 },
@@ -322,6 +322,8 @@
         const config = getDefaultConfig();
         config.tiledKeepBelow = !floatingKeepAbove;
         config.floatingKeepAbove = floatingKeepAbove;
+        config.tileFullScreen = false;
+        config.tileMaximized = false;
         return config;
     }
 

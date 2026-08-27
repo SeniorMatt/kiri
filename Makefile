@@ -23,10 +23,10 @@ install: build
 	kpackagetool6 --type=KWin/Script --install=./package || kpackagetool6 --type=KWin/Script --upgrade=./package
 
 uninstall:
-	kpackagetool6 --type=KWin/Script --remove=karousel
+	kpackagetool6 --type=KWin/Script --remove=kniri
 
 package: build
-	tar -czf ./karousel_${subst .,_,${VERSION}}.tar.gz ./package --transform s/package/karousel/
+	tar -czf ./kniri_${subst .,_,${VERSION}}.tar.gz ./package --transform s/package/kniri/
 
 docs-key-bindings-bbcode:
 	@./run-ts.sh ./src/generators/docs/keyBindingsBbcode

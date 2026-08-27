@@ -12,7 +12,7 @@ tests.register("columns squeeze side", 5, () => {
     const testCasesLeft = baseTestCases.map((baseTestCase, i) => ({
         ...baseTestCase,
         name: "left " + i,
-        action: "karousel-columns-squeeze-left",
+        action: "kniri-columns-squeeze-left",
         focus: baseTestCase.widths.length-1,
     }));
 
@@ -21,7 +21,7 @@ tests.register("columns squeeze side", 5, () => {
         widths: baseTestCase.widths.slice().reverse(),
         blocked: baseTestCase.blocked.slice().reverse(),
         name: "right " + i,
-        action: "karousel-columns-squeeze-right",
+        action: "kniri-columns-squeeze-right",
         focus: 0,
     }));
 
@@ -70,7 +70,7 @@ tests.register("columns squeeze side (just scroll)", 5, () => {
     const testCasesLeft = baseTestCases.map((baseTestCase, i) => ({
         ...baseTestCase,
         name: "left " + i,
-        action: "karousel-columns-squeeze-left",
+        action: "kniri-columns-squeeze-left",
         scrollStart: false,
     }));
 
@@ -79,7 +79,7 @@ tests.register("columns squeeze side (just scroll)", 5, () => {
         startVisible: baseTestCase.startVisible.slice().reverse(),
         endVisible: baseTestCase.endVisible.slice().reverse(),
         name: "right " + i,
-        action: "karousel-columns-squeeze-right",
+        action: "kniri-columns-squeeze-right",
         scrollStart: true,
     }));
 
@@ -106,7 +106,7 @@ tests.register("columns squeeze side (just scroll)", 5, () => {
             client.minSize = new MockQmlSize(300, 100);
         }
         if (testCase.scrollStart) {
-            qtMock.fireShortcut("karousel-grid-scroll-start");
+            workspaceMock.activeWindow = clients[0];
         }
         workspaceMock.activeWindow = clients[testCase.focus];
         assertVisible(clients, testCase.startVisible);

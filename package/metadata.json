@@ -1,18 +1,20 @@
 {
     "KPackageStructure": "KWin/Script",
     "KPlugin": {
-        "Name": "Karousel",
-        "Description": "Scrollable tiling extension for KWin",
+        "Name": "kniri",
+        "Description": "niri-style scrollable tiling for KWin, based on Karousel",
         "Icon": "preferences-system-windows",
         "Authors": [{
             "Email": "peter.fajdiga@gmail.com",
             "Name": "Peter Fajdiga"
+        }, {
+            "Name": "Senior Matthew"
         }],
-        "Id": "karousel",
-        "Version": "0.17",
+        "Id": "kniri",
+        "Version": "0.18",
         "License": "GPLv3",
-        "Website": "https://github.com/peterfajdiga/karousel",
-        "BugReportUrl": "https://github.com/peterfajdiga/karousel/issues"
+        "Website": "https://github.com/SeniorMatt/kniri",
+        "BugReportUrl": "https://github.com/SeniorMatt/kniri/issues"
     },
     "X-Plasma-API": "declarativescript",
     "X-Plasma-API-Minimum-Version": "6.0",

@@ -20,8 +20,8 @@ class ShortcutAction {
             `import QtQuick 6.0
 import org.kde.kwin 3.0
 ShortcutHandler {
-    name: "karousel-${keyBinding.name}";
-    text: "Karousel: ${keyBinding.description}";
+    name: "kniri-${keyBinding.name}";
+    text: "kniri: ${keyBinding.description}";
 ${sequenceLine}}`,
             qmlBase,
         ) as ShortcutHandler;

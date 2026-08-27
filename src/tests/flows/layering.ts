@@ -13,7 +13,7 @@ tests.register("tiledKeepBelow", 10, () => {
     Assert.assert(client.keepBelow);
     Assert.assert(!client.keepAbove);
 
-    qtMock.fireShortcut("karousel-window-toggle-floating");
+    qtMock.fireShortcut("kniri-window-toggle-floating");
     world.do((clientManager, desktopManager) => {
         Assert.assert(clientManager.findTiledWindow(client) === null);
     });
@@ -34,7 +34,7 @@ tests.register("tiledKeepBelow", 10, () => {
     Assert.assert(!client.keepBelow);
     Assert.assert(!client.keepAbove);
 
-    qtMock.fireShortcut("karousel-window-toggle-floating");
+    qtMock.fireShortcut("kniri-window-toggle-floating");
     world.do((clientManager, desktopManager) => {
         Assert.assert(clientManager.findTiledWindow(client) !== null);
     });
@@ -48,7 +48,7 @@ tests.register("tiledKeepBelow", 10, () => {
     Assert.assert(!client.keepBelow);
     Assert.assert(!client.keepAbove);
 
-    qtMock.fireShortcut("karousel-window-toggle-floating");
+    qtMock.fireShortcut("kniri-window-toggle-floating");
     world.do((clientManager, desktopManager) => {
         Assert.assert(clientManager.findTiledWindow(client) !== null);
     });
@@ -71,7 +71,7 @@ tests.register("floatingKeepAbove", 10, () => {
     Assert.assert(!client.keepBelow);
     Assert.assert(!client.keepAbove);
 
-    qtMock.fireShortcut("karousel-window-toggle-floating");
+    qtMock.fireShortcut("kniri-window-toggle-floating");
     world.do((clientManager, desktopManager) => {
         Assert.assert(clientManager.findTiledWindow(client) === null);
     });
@@ -92,7 +92,7 @@ tests.register("floatingKeepAbove", 10, () => {
     Assert.assert(!client.keepBelow);
     Assert.assert(client.keepAbove);
 
-    qtMock.fireShortcut("karousel-window-toggle-floating");
+    qtMock.fireShortcut("kniri-window-toggle-floating");
     world.do((clientManager, desktopManager) => {
         Assert.assert(clientManager.findTiledWindow(client) !== null);
     });
@@ -106,7 +106,7 @@ tests.register("floatingKeepAbove", 10, () => {
     Assert.assert(!client.keepBelow);
     Assert.assert(client.keepAbove);
 
-    qtMock.fireShortcut("karousel-window-toggle-floating");
+    qtMock.fireShortcut("kniri-window-toggle-floating");
     world.do((clientManager, desktopManager) => {
         Assert.assert(clientManager.findTiledWindow(client) !== null);
     });
@@ -145,7 +145,7 @@ tests.register("No layering", 10, () => {
         Assert.equal(client.keepBelow, testCase.keepBelow, assertOptions);
         Assert.equal(client.keepAbove, testCase.keepAbove, assertOptions);
 
-        qtMock.fireShortcut("karousel-window-toggle-floating");
+        qtMock.fireShortcut("kniri-window-toggle-floating");
         world.do((clientManager, desktopManager) => {
             Assert.assert(clientManager.findTiledWindow(client) === null, assertOptions);
         });
@@ -166,7 +166,7 @@ tests.register("No layering", 10, () => {
         Assert.equal(client.keepBelow, testCase.keepBelow, assertOptions);
         Assert.equal(client.keepAbove, testCase.keepAbove, assertOptions);
 
-        qtMock.fireShortcut("karousel-window-toggle-floating");
+        qtMock.fireShortcut("kniri-window-toggle-floating");
         world.do((clientManager, desktopManager) => {
             Assert.assert(clientManager.findTiledWindow(client) !== null, assertOptions);
         });
@@ -181,7 +181,7 @@ tests.register("No layering", 10, () => {
         Assert.equal(client.keepBelow, testCase.keepBelow, assertOptions);
         Assert.equal(client.keepAbove, testCase.keepAbove, assertOptions);
 
-        qtMock.fireShortcut("karousel-window-toggle-floating");
+        qtMock.fireShortcut("kniri-window-toggle-floating");
         world.do((clientManager, desktopManager) => {
             Assert.assert(clientManager.findTiledWindow(client) !== null, assertOptions);
         });

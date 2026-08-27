@@ -252,7 +252,7 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         },
         {
             name: "screen-switch",
-            description: "Move Karousel grid to the current screen",
+            description: "Move kniri grid to the current screen",
             defaultKeySequence: "Meta+Ctrl+Return",
             action: () => world.do(actions.screenSwitch),
         },

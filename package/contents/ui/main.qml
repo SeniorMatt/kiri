@@ -20,8 +20,8 @@ Item {
         id: notificationInvalidTiledDesktops
         componentName: "plasma_workspace"
         eventId: "notification"
-        title: "Karousel"
-        text: "Your Tiled Desktops regex is malformed, please review your Karousel configuration"
+        title: "kniri"
+        text: "Your Tiled Desktops regex is malformed, please review your kniri configuration"
         flags: Notification.Persistent
         urgency: Notification.HighUrgency
     }
@@ -30,8 +30,8 @@ Item {
         id: notificationInvalidWindowRules
         componentName: "plasma_workspace"
         eventId: "notification"
-        title: "Karousel"
-        text: "Your Window Rules JSON is malformed, please review your Karousel configuration"
+        title: "kniri"
+        text: "Your Window Rules JSON is malformed, please review your kniri configuration"
         flags: Notification.Persistent
         urgency: Notification.HighUrgency
     }
@@ -40,8 +40,8 @@ Item {
         id: notificationInvalidPresetWidths
         componentName: "plasma_workspace"
         eventId: "notification"
-        title: "Karousel"
-        text: "Your preset widths are malformed, please review your Karousel configuration"
+        title: "kniri"
+        text: "Your preset widths are malformed, please review your kniri configuration"
         flags: Notification.Persistent
         urgency: Notification.HighUrgency
     }

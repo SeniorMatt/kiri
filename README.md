@@ -1,4 +1,15 @@
-# Karousel
+# kniri
+
+kniri is a scrollable tiling script for KDE Plasma (KWin) that aims to work like [niri](https://github.com/YaLTeR/niri).
+
+It is based on [Karousel](https://github.com/peterfajdiga/karousel) by Peter Fajdiga, and keeps its GPLv3 license. Most of the work here is his; kniri adds niri-style behavior on top. kniri uses its own script ID, so it can be installed next to Karousel (only enable one of them at a time).
+
+Differences from Karousel so far:
+- Full-screen and maximized windows stay in the grid, like in niri (on by default).
+
+The rest of this README comes from Karousel and still applies.
+
+## Karousel
 Scrollable tiling Kwin script. Works especially well with ultrawide screens.
 Use with [this](https://github.com/peterfajdiga/kwin4_effect_geometry_change) for animations.
 

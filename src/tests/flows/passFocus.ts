@@ -4,9 +4,9 @@ tests.register("Pass focus", 100, () => {
 
     const [client0, client1a, client1b, client1c, client4, client5, client6] = workspaceMock.createClients(7);
     workspaceMock.activeWindow = client1b;
-    qtMock.fireShortcut("karousel-window-move-left");
+    qtMock.fireShortcut("kniri-window-move-left");
     workspaceMock.activeWindow = client1c;
-    qtMock.fireShortcut("karousel-window-move-left");
+    qtMock.fireShortcut("kniri-window-move-left");
     workspaceMock.activeWindow = client1b;
     workspaceMock.activeWindow = client5;
 
@@ -20,7 +20,7 @@ tests.register("Pass focus", 100, () => {
     removeWindow(client5);
     Assert.equal(workspaceMock.activeWindow, client4);
 
-    qtMock.fireShortcut("karousel-column-move-to-desktop-2");
+    qtMock.fireShortcut("kniri-column-move-to-desktop-2");
     Assert.equal(workspaceMock.activeWindow, client1b);
 
     removeWindow(client1b);
