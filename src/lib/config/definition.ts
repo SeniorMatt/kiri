@@ -82,12 +82,12 @@ const configDef = [
     {
         name: "gapsInnerHorizontal",
         type: "UInt",
-        default: 8,
+        default: 16,
     },
     {
         name: "gapsInnerVertical",
         type: "UInt",
-        default: 8,
+        default: 16,
     },
     {
         name: "stackOffsetX",
@@ -107,7 +107,7 @@ const configDef = [
     {
         name: "presetWidths",
         type: "String",
-        default: "50%, 100%",
+        default: "33.333%, 50%, 66.667%",
     },
     {
         name: "verticalResizeStep",
@@ -177,7 +177,7 @@ const configDef = [
     {
         name: "gestureScroll",
         type: "Bool",
-        default: false,
+        default: true,
     },
     {
         name: "gestureScrollInvert",

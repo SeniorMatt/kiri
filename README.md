@@ -6,6 +6,7 @@ Kiri is a fork of [Karousel](https://github.com/peterfajdiga/karousel) by Peter 
 
 What's different so far:
 - Full-screen and maximized windows stay in the grid, like in niri.
+- niri's defaults: 16px gaps, column widths of 1/3, 1/2 and 2/3, and three-finger swipe to scroll.
 
 Kiri has its own script ID, so it can be installed next to Karousel. Only enable one of them.
 
@@ -38,6 +39,8 @@ They're in System Settings > Shortcuts > Kiri, and the defaults follow niri's, e
     Meta+V                         toggle floating
     Meta+Q                         close window
     Meta+O                         overview
+
+To use the keys from your niri config, run `tools/niri2kiri.py ~/.config/niri/config.kdl` and paste what it prints over the `[kiri]` section of `~/.config/kglobalshortcutsrc`, then log in again. Kiri has to have been enabled once before.
 
 While Kiri is running, Plasma shortcuts on the same keys are switched off. Nothing is changed in your settings, they work again as soon as Kiri is disabled.
 
