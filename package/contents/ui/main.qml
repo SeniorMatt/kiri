@@ -20,8 +20,8 @@ Item {
         id: notificationInvalidTiledDesktops
         componentName: "plasma_workspace"
         eventId: "notification"
-        title: "kniri"
-        text: "Your Tiled Desktops regex is malformed, please review your kniri configuration"
+        title: "Kiri"
+        text: "Your Tiled Desktops regex is malformed, please review your Kiri configuration"
         flags: Notification.Persistent
         urgency: Notification.HighUrgency
     }
@@ -30,8 +30,8 @@ Item {
         id: notificationInvalidWindowRules
         componentName: "plasma_workspace"
         eventId: "notification"
-        title: "kniri"
-        text: "Your Window Rules JSON is malformed, please review your kniri configuration"
+        title: "Kiri"
+        text: "Your Window Rules JSON is malformed, please review your Kiri configuration"
         flags: Notification.Persistent
         urgency: Notification.HighUrgency
     }
@@ -40,11 +40,12 @@ Item {
         id: notificationInvalidPresetWidths
         componentName: "plasma_workspace"
         eventId: "notification"
-        title: "kniri"
-        text: "Your preset widths are malformed, please review your kniri configuration"
+        title: "Kiri"
+        text: "Your preset widths are malformed, please review your Kiri configuration"
         flags: Notification.Persistent
         urgency: Notification.HighUrgency
     }
+
 
     SwipeGestureHandler {
         direction: SwipeGestureHandler.Direction.Left
@@ -60,6 +61,10 @@ Item {
         onActivated: qmlBase.karouselInstance.gestureScrollFinish()
         onCancelled: qmlBase.karouselInstance.gestureScrollFinish()
         onProgressChanged: qmlBase.karouselInstance.gestureScroll(progress)
+    }
+
+    KGlobalAccelBridge {
+        id: kglobalaccel
     }
 
     DBusCall {

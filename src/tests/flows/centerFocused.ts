@@ -12,32 +12,32 @@ tests.register("Center focused", 5, () => {
     Assert.columnsFillTilingArea([client0, client1, client2]);
 
     // center client2
-    qtMock.fireShortcut("kniri-grid-scroll-focused");
+    qtMock.fireShortcut("grid-scroll-focused");
     Assert.centered(config, tilingArea, client2);
     Assert.fullyVisible(client1.getActualFrameGeometry());
     Assert.fullyVisible(client2.getActualFrameGeometry());
 
     // undo center client2
-    qtMock.fireShortcut("kniri-grid-scroll-focused");
+    qtMock.fireShortcut("grid-scroll-focused");
     Assert.columnsFillTilingArea([client0, client1, client2]);
 
     // center client2
-    qtMock.fireShortcut("kniri-grid-scroll-focused");
+    qtMock.fireShortcut("grid-scroll-focused");
     Assert.centered(config, tilingArea, client2);
     Assert.fullyVisible(client1.getActualFrameGeometry());
     Assert.fullyVisible(client2.getActualFrameGeometry());
 
     // focus client1 (no scrolling should occur)
-    qtMock.fireShortcut("kniri-focus-left");
+    qtMock.fireShortcut("focus-left");
     Assert.centered(config, tilingArea, client2, { message: "No scrolling should have occured" });
     Assert.fullyVisible(client1.getActualFrameGeometry());
     Assert.fullyVisible(client2.getActualFrameGeometry());
 
     // center client1
-    qtMock.fireShortcut("kniri-grid-scroll-focused");
+    qtMock.fireShortcut("grid-scroll-focused");
     Assert.columnsFillTilingArea([client0, client1, client2]);
 
     // undo center client1 (no scrolling should occur, because all clients are already visible and centered)
-    qtMock.fireShortcut("kniri-grid-scroll-focused");
+    qtMock.fireShortcut("grid-scroll-focused");
     Assert.columnsFillTilingArea([client0, client1, client2]);
 });

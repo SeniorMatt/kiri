@@ -118,7 +118,7 @@
                 const { qtMock, workspaceMock, world } = init(config);
 
                 const clients = workspaceMock.createClientsWithWidths(300, 400, 400);
-                qtMock.fireShortcut("kniri-window-move-left");
+                qtMock.fireShortcut("window-move-left");
 
                 assertWindowed(config, clients);
 
@@ -130,17 +130,17 @@
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[0]; },
-                    () => { qtMock.fireShortcut("kniri-focus-1"); },
-                    () => { qtMock.fireShortcut("kniri-focus-left"); },
-                    () => { qtMock.fireShortcut("kniri-focus-start"); },
+                    () => { qtMock.fireShortcut("focus-1"); },
+                    () => { qtMock.fireShortcut("focus-left"); },
+                    () => { qtMock.fireShortcut("focus-start"); },
                 );
                 assertWindowed(config, clients);
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[2]; },
-                    () => { qtMock.fireShortcut("kniri-focus-2"); },
-                    () => { qtMock.fireShortcut("kniri-focus-right"); },
-                    () => { qtMock.fireShortcut("kniri-focus-end"); },
+                    () => { qtMock.fireShortcut("focus-2"); },
+                    () => { qtMock.fireShortcut("focus-right"); },
+                    () => { qtMock.fireShortcut("focus-end"); },
                 );
                 assertWindowed(config, clients);
 
@@ -152,13 +152,13 @@
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[1]; },
-                    () => { qtMock.fireShortcut("kniri-focus-up"); },
+                    () => { qtMock.fireShortcut("focus-up"); },
                 );
                 assertWindowed(config, clients);
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[2]; },
-                    () => { qtMock.fireShortcut("kniri-focus-down"); },
+                    () => { qtMock.fireShortcut("focus-down"); },
                 );
                 assertWindowed(config, clients);
             });
@@ -169,7 +169,7 @@
                 const { qtMock, workspaceMock, world } = init(config);
 
                 const clients = workspaceMock.createClientsWithWidths(300, 400, 400);
-                qtMock.fireShortcut("kniri-window-move-left");
+                qtMock.fireShortcut("window-move-left");
 
                 assertWindowed(config, clients);
 
@@ -181,29 +181,29 @@
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[0]; },
-                    () => { qtMock.fireShortcut("kniri-focus-1"); },
-                    () => { qtMock.fireShortcut("kniri-focus-left"); },
-                    () => { qtMock.fireShortcut("kniri-focus-start"); },
+                    () => { qtMock.fireShortcut("focus-1"); },
+                    () => { qtMock.fireShortcut("focus-left"); },
+                    () => { qtMock.fireShortcut("focus-start"); },
                 );
                 assertWindowed(config, clients);
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[2]; },
-                    () => { qtMock.fireShortcut("kniri-focus-2"); },
-                    () => { qtMock.fireShortcut("kniri-focus-right"); },
-                    () => { qtMock.fireShortcut("kniri-focus-end"); },
+                    () => { qtMock.fireShortcut("focus-2"); },
+                    () => { qtMock.fireShortcut("focus-right"); },
+                    () => { qtMock.fireShortcut("focus-end"); },
                 );
                 assertFullScreenOrMaximized(clients);
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[1]; },
-                    () => { qtMock.fireShortcut("kniri-focus-up"); },
+                    () => { qtMock.fireShortcut("focus-up"); },
                 );
                 assertWindowed(config, clients);
 
                 runOneOf(
                     () => { workspaceMock.activeWindow = clients[2]; },
-                    () => { qtMock.fireShortcut("kniri-focus-down"); },
+                    () => { qtMock.fireShortcut("focus-down"); },
                 );
                 assertFullScreenOrMaximized(clients);
             });
@@ -236,7 +236,7 @@
             Assert.equal(Workspace.activeWindow, fullScreenClient);
 
             {
-                qtMock.fireShortcut("kniri-focus-left");
+                qtMock.fireShortcut("focus-left");
                 const opts = { message: "fullScreenClient is not in the grid, so we can't move focus directionally" };
                 Assert.assert(!windowedClient.fullScreen);
                 Assert.equal(windowedClient.keepBelow, shouldKeepBelow(true));
@@ -250,7 +250,7 @@
             }
 
             {
-                qtMock.fireShortcut("kniri-focus-1");
+                qtMock.fireShortcut("focus-1");
                 const opts = { message: "fullScreenClient is not in grid, so it should stay full-screen" };
                 Assert.assert(!windowedClient.fullScreen);
                 Assert.equal(windowedClient.keepBelow, shouldKeepBelow(true));
@@ -300,7 +300,7 @@
                     expectedActiveWindow = fullScreenClient;
                 },
                 () => {
-                    qtMock.fireShortcut("kniri-focus-left");
+                    qtMock.fireShortcut("focus-left");
                     expectedColumn2Width = tilingArea.width;
                     expectedActiveWindow = windowedClient;
                 },

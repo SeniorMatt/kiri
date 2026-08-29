@@ -14,7 +14,7 @@ tests.register("User resize", 10, () => {
     {
         const { qtMock, workspaceMock, world } = init(config);
         [clientLeft, clientRightTop, clientRightBottom] = workspaceMock.createClientsWithWidths(300, 300, 200);
-        qtMock.fireShortcut("kniri-window-move-left");
+        qtMock.fireShortcut("window-move-left");
         assertSizes(300, 300, h, h);
 
         workspaceMock.resizeWindow(clientLeft, false, false, false, new MockQmlSize(10, 20));
@@ -36,7 +36,7 @@ tests.register("User resize", 10, () => {
     {
         const { qtMock, workspaceMock, world } = init(config);
         [clientLeft, clientRightTop, clientRightBottom] = workspaceMock.createClientsWithWidths(300, 300, 200);
-        qtMock.fireShortcut("kniri-window-move-left");
+        qtMock.fireShortcut("window-move-left");
         assertSizes(300, 300, h, h);
 
         workspaceMock.resizeWindow(clientLeft, true, false, false, new MockQmlSize(10, 20));
@@ -59,7 +59,7 @@ tests.register("User resize", 10, () => {
         const { qtMock, workspaceMock, world } = init(config);
         [clientLeft, clientRightTop, clientRightBottom] = workspaceMock.createClientsWithWidths(300, 300, 200);
         clientRightBottom.minSize = new MockQmlSize(295, h-20);
-        qtMock.fireShortcut("kniri-window-move-left");
+        qtMock.fireShortcut("window-move-left");
         assertSizes(300, 300, h, h);
 
         workspaceMock.resizeWindow(clientLeft, true, false, false, new MockQmlSize(10, 20));
@@ -95,7 +95,7 @@ tests.register("User resize", 10, () => {
         }
 
         workspaceMock.activeWindow = clientLeftBottom;
-        qtMock.fireShortcut("kniri-window-move-left");
+        qtMock.fireShortcut("window-move-left");
         assertSizes(300, 300, h, h);
 
         workspaceMock.resizeWindow(clientLeftTop, true, false, false, new MockQmlSize(-10, 0));

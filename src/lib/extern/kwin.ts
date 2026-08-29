@@ -9,7 +9,7 @@ interface Workspace {
 
     readonly activities: string[];
     readonly desktops: KwinDesktop[];
-    readonly currentDesktop: KwinDesktop;
+    currentDesktop: KwinDesktop;
     readonly currentActivity: string;
     readonly activeScreen: Output;
     readonly windows: KwinClient[];
@@ -66,6 +66,7 @@ interface KwinClient {
     readonly moveable: boolean;
     readonly resizeable: boolean;
     readonly fullScreenable: boolean;
+    closeWindow(): void;
     readonly maximizable: boolean;
     readonly output: Output;
     readonly resourceClass: string;

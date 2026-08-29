@@ -3,7 +3,7 @@ class World {
     private readonly clientManager: ClientManager;
     private readonly pinManager: PinManager;
     private readonly workspaceSignalManager: SignalManager;
-    private readonly shortcutActions: ShortcutAction[];
+    private readonly keyBindings: KeyBindings;
     private readonly screenResizedDelayer: Delayer;
 
     constructor(config: Config) {
@@ -22,7 +22,7 @@ class World {
             log("failed to parse presetWidths:", error);
         }
 
-        this.shortcutActions = registerKeyBindings(this, {
+        this.keyBindings = new KeyBindings(this, {
             manualScrollStep: config.manualScrollStep,
             presetWidths: presetWidths,
             verticalResizeStep: config.verticalResizeStep,
@@ -154,9 +154,7 @@ class World {
 
     public destroy() {
         this.workspaceSignalManager.destroy();
-        for (const shortcutAction of this.shortcutActions) {
-            shortcutAction.destroy();
-        }
+        this.keyBindings.destroy();
         this.clientManager.destroy();
         this.desktopManager.destroy();
     }

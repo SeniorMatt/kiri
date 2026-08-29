@@ -34,8 +34,8 @@
 
             runOneOf(
                 () => { workspaceMock.activeWindow = left; },
-                () => { qtMock.fireShortcut("kniri-focus-left"); },
-                () => { qtMock.fireShortcut("kniri-focus-1"); },
+                () => { qtMock.fireShortcut("focus-left"); },
+                () => { qtMock.fireShortcut("focus-1"); },
             );
             Assert.equal(Workspace.activeWindow, left);
             Assert.assert(middle.fullScreen, { message: "full-screen window should stay full-screen when unfocused" });
@@ -48,20 +48,20 @@
 
             runOneOf(
                 () => { workspaceMock.activeWindow = middle; },
-                () => { qtMock.fireShortcut("kniri-focus-right"); },
-                () => { qtMock.fireShortcut("kniri-focus-2"); },
+                () => { qtMock.fireShortcut("focus-right"); },
+                () => { qtMock.fireShortcut("focus-2"); },
             );
             Assert.equal(Workspace.activeWindow, middle);
             Assert.equalRects(middle.getActualFrameGeometry(), screen);
             Assert.equal(middle.keepBelow, false);
 
-            qtMock.fireShortcut("kniri-focus-right");
+            qtMock.fireShortcut("focus-right");
             Assert.equal(Workspace.activeWindow, right);
             Assert.assert(middle.fullScreen);
             Assert.fullyVisible(right.getActualFrameGeometry());
             assertNeighbors(config, left, middle, right);
 
-            qtMock.fireShortcut("kniri-focus-left");
+            qtMock.fireShortcut("focus-left");
             middle.fullScreen = false;
             Assert.assert(!middle.fullScreen);
             Assert.equal(middle.keepBelow, !floatingKeepAbove);
@@ -73,7 +73,7 @@
             const { qtMock, workspaceMock, world } = init(config);
 
             const clients = workspaceMock.createClientsWithWidths(300, 300, 300);
-            qtMock.fireShortcut("kniri-window-move-left");
+            qtMock.fireShortcut("window-move-left");
             Assert.grid(config, tilingArea, 300, [[clients[0]], [clients[1], clients[2]]], true);
 
             runOneOf(
@@ -98,13 +98,13 @@
             Assert.equal(middle.keepAbove, false);
             assertNeighbors(config, left, middle, right);
 
-            qtMock.fireShortcut("kniri-focus-left");
+            qtMock.fireShortcut("focus-left");
             Assert.equal(Workspace.activeWindow, left);
             Assert.fullyVisible(left.getActualFrameGeometry());
             Assert.equal(middle.getActualFrameGeometry().width, screen.width, { message: "maximized window should stay maximized when unfocused" });
             assertNeighbors(config, left, middle, right);
 
-            qtMock.fireShortcut("kniri-focus-right");
+            qtMock.fireShortcut("focus-right");
             Assert.equalRects(middle.getActualFrameGeometry(), screen);
 
             middle.setMaximize(false, true);
@@ -137,7 +137,7 @@
             Assert.equal(fullScreenClient.keepBelow, false);
             Assert.equal(fullScreenClient.keepAbove, false);
 
-            qtMock.fireShortcut("kniri-focus-left");
+            qtMock.fireShortcut("focus-left");
             Assert.equal(Workspace.activeWindow, windowedClient);
             Assert.assert(fullScreenClient.fullScreen);
             Assert.equal(fullScreenClient.keepBelow, !floatingKeepAbove);

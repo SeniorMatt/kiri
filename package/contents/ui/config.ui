@@ -3,7 +3,7 @@
     <class>KWin::KarouselConfigForm</class>
     <widget class="QWidget" name="KWin::KarouselConfigForm">
         <property name="windowTitle">
-            <string>kniri</string>
+            <string>Kiri</string>
         </property>
         <property name="autoFillBackground">
             <bool>false</bool>
@@ -546,7 +546,7 @@
          <item>
             <widget class="QLabel" name="label">
                 <property name="text">
-                    <string>kniri needs to be restarted for changes to take effect.</string>
+                    <string>Kiri needs to be restarted for changes to take effect.</string>
                 </property>
             </widget>
         </item>

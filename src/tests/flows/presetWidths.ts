@@ -18,32 +18,32 @@ tests.register("Preset Widths default", 5, () => {
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(300));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-increase"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(halfWidth));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-increase"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(maxWidth));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-decrease"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(halfWidth));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-increase"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(maxWidth));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-decrease"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(halfWidth));
 });
@@ -69,44 +69,44 @@ tests.register("Preset Widths custom", 5, () => {
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(200));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-increase"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(250));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-increase"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(halfWidth));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-increase"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(500));
 
-    qtMock.fireShortcut("kniri-cycle-preset-widths");
+    qtMock.fireShortcut("cycle-preset-widths");
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(100));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-increase"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(250));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths-reverse"),
-        () => qtMock.fireShortcut("kniri-column-width-decrease"),
+        () => qtMock.fireShortcut("cycle-preset-widths-reverse"),
+        () => qtMock.fireShortcut("column-width-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(100));
 
-    qtMock.fireShortcut("kniri-cycle-preset-widths-reverse");
+    qtMock.fireShortcut("cycle-preset-widths-reverse");
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(500));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths-reverse"),
-        () => qtMock.fireShortcut("kniri-column-width-decrease"),
+        () => qtMock.fireShortcut("cycle-preset-widths-reverse"),
+        () => qtMock.fireShortcut("column-width-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(halfWidth));
 });
@@ -134,44 +134,44 @@ tests.register("Preset Widths custom percentages", 5, () => {
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(200));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-increase"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width50));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-increase"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width75));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths"),
-        () => qtMock.fireShortcut("kniri-column-width-increase"),
+        () => qtMock.fireShortcut("cycle-preset-widths"),
+        () => qtMock.fireShortcut("column-width-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width100));
 
-    qtMock.fireShortcut("kniri-cycle-preset-widths");
+    qtMock.fireShortcut("cycle-preset-widths");
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width25));
 
-    qtMock.fireShortcut("kniri-cycle-preset-widths-reverse");
+    qtMock.fireShortcut("cycle-preset-widths-reverse");
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width100));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths-reverse"),
-        () => qtMock.fireShortcut("kniri-column-width-decrease"),
+        () => qtMock.fireShortcut("cycle-preset-widths-reverse"),
+        () => qtMock.fireShortcut("column-width-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width75));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths-reverse"),
-        () => qtMock.fireShortcut("kniri-column-width-decrease"),
+        () => qtMock.fireShortcut("cycle-preset-widths-reverse"),
+        () => qtMock.fireShortcut("column-width-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width50));
 
     runOneOf(
-        () => qtMock.fireShortcut("kniri-cycle-preset-widths-reverse"),
-        () => qtMock.fireShortcut("kniri-column-width-decrease"),
+        () => qtMock.fireShortcut("cycle-preset-widths-reverse"),
+        () => qtMock.fireShortcut("column-width-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width25));
 });
@@ -191,7 +191,7 @@ tests.register("Preset Widths fill screen uniform", 1, () => {
             if (i === nColumns-1) {
                 lastClient = kwinClient;
             }
-            qtMock.fireShortcut("kniri-cycle-preset-widths");
+            qtMock.fireShortcut("cycle-preset-widths");
         }
 
         const left = tilingArea.x;
@@ -209,13 +209,13 @@ tests.register("Preset Widths fill screen non-uniform", 1, () => {
     const { qtMock, workspaceMock, world } = init(config);
 
     const [clientThin1] = workspaceMock.createClientsWithWidths(100);
-    qtMock.fireShortcut("kniri-cycle-preset-widths");
+    qtMock.fireShortcut("cycle-preset-widths");
 
     const [clientThin2] = workspaceMock.createClientsWithWidths(100);
-    qtMock.fireShortcut("kniri-cycle-preset-widths");
+    qtMock.fireShortcut("cycle-preset-widths");
 
     const [clientWide] = workspaceMock.createClientsWithWidths(300);
-    qtMock.fireShortcut("kniri-cycle-preset-widths");
+    qtMock.fireShortcut("cycle-preset-widths");
 
     const maxWidth = tilingArea.width;
     const halfWidth = maxWidth/2 - config.gapsInnerHorizontal/2;

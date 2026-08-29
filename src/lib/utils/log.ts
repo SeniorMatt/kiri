@@ -1,3 +1,3 @@
 function log(...args: any[]) {
-    console.log("kniri:", ...args);
+    console.log("Kiri:", ...args);
 }

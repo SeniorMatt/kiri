@@ -26,5 +26,5 @@ jobs:
           CI: "true"
       - uses: actions/upload-artifact@v4
         with:
-          name: kniri-package
-          path: kniri_*.tar.gz
+          name: kiri-package
+          path: kiri_*.tar.gz

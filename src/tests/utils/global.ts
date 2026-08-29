@@ -6,6 +6,7 @@ let notificationInvalidTiledDesktops: Notification;
 let notificationInvalidWindowRules: Notification;
 let notificationInvalidPresetWidths: Notification;
 let moveCursorToFocus: DBusCall;
+let kglobalaccel: MockKGlobalAccel;
 
 let screen: MockQmlRect;
 let tilingArea: MockQmlRect;
@@ -30,6 +31,7 @@ function init(config: Config) {
 
     Qt = qtMock;
     Workspace = workspaceMock;
+    kglobalaccel = new MockKGlobalAccel();
     moveCursorToFocus = {
         __brand: "QmlObject",
         call: () => {

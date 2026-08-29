@@ -17,30 +17,30 @@ tests.register("LazyScroller", 20, () => {
 
     runOneOf(
         () => { workspaceMock.activeWindow = client2; },
-        () => { qtMock.fireShortcut("kniri-focus-2"); },
-        () => { qtMock.fireShortcut("kniri-focus-left"); },
+        () => { qtMock.fireShortcut("focus-2"); },
+        () => { qtMock.fireShortcut("focus-left"); },
     );
     Assert.grid(config, tilingArea, 300, [[client1], [client2], [client3]], false);
     Assert.equal(rectRight(client3.getActualFrameGeometry()), rectRight(tilingArea));
 
     runOneOf(
         () => { workspaceMock.activeWindow = client1; },
-        () => { qtMock.fireShortcut("kniri-focus-1"); },
-        () => { qtMock.fireShortcut("kniri-focus-left"); },
-        () => { qtMock.fireShortcut("kniri-focus-start"); },
+        () => { qtMock.fireShortcut("focus-1"); },
+        () => { qtMock.fireShortcut("focus-left"); },
+        () => { qtMock.fireShortcut("focus-start"); },
     );
     workspaceMock.activeWindow = client1;
     Assert.grid(config, tilingArea, 300, [[client1], [client2], [client3]], false);
     Assert.equal(client1.getActualFrameGeometry().x, tilingArea.x);
 
-    qtMock.fireShortcut("kniri-grid-scroll-focused");
+    qtMock.fireShortcut("grid-scroll-focused");
     Assert.grid(config, tilingArea, 300, [[client1], [client2], [client3]], false);
     Assert.grid(config, tilingArea, 300, [[client1]], true);
 
     runOneOf(
         () => { workspaceMock.activeWindow = client2; },
-        () => { qtMock.fireShortcut("kniri-focus-2"); },
-        () => { qtMock.fireShortcut("kniri-focus-right"); },
+        () => { qtMock.fireShortcut("focus-2"); },
+        () => { qtMock.fireShortcut("focus-right"); },
     );
     Assert.grid(config, tilingArea, 300, [[client1], [client2], [client3]], false);
     Assert.equal(client1.getActualFrameGeometry().x, tilingArea.x);

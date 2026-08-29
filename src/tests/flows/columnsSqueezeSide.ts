@@ -12,7 +12,7 @@ tests.register("columns squeeze side", 5, () => {
     const testCasesLeft = baseTestCases.map((baseTestCase, i) => ({
         ...baseTestCase,
         name: "left " + i,
-        action: "kniri-columns-squeeze-left",
+        action: "columns-squeeze-left",
         focus: baseTestCase.widths.length-1,
     }));
 
@@ -21,7 +21,7 @@ tests.register("columns squeeze side", 5, () => {
         widths: baseTestCase.widths.slice().reverse(),
         blocked: baseTestCase.blocked.slice().reverse(),
         name: "right " + i,
-        action: "kniri-columns-squeeze-right",
+        action: "columns-squeeze-right",
         focus: 0,
     }));
 
@@ -70,7 +70,7 @@ tests.register("columns squeeze side (just scroll)", 5, () => {
     const testCasesLeft = baseTestCases.map((baseTestCase, i) => ({
         ...baseTestCase,
         name: "left " + i,
-        action: "kniri-columns-squeeze-left",
+        action: "columns-squeeze-left",
         scrollStart: false,
     }));
 
@@ -79,7 +79,7 @@ tests.register("columns squeeze side (just scroll)", 5, () => {
         startVisible: baseTestCase.startVisible.slice().reverse(),
         endVisible: baseTestCase.endVisible.slice().reverse(),
         name: "right " + i,
-        action: "kniri-columns-squeeze-right",
+        action: "columns-squeeze-right",
         scrollStart: true,
     }));
 

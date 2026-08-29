@@ -10,7 +10,7 @@ tests.register("Cursor follows focus", 10, () => {
 
     runOneOf(
         () => { Workspace.activeWindow = client1; },
-        () => { qtMock.fireShortcut("kniri-focus-1"); },
+        () => { qtMock.fireShortcut("focus-1"); },
     );
     Assert.assert(rectContainsPoint(client1.getActualFrameGeometry(), Workspace.cursorPos));
     Assert.assert(!rectContainsPoint(client2.getActualFrameGeometry(), Workspace.cursorPos));
@@ -18,14 +18,14 @@ tests.register("Cursor follows focus", 10, () => {
 
     runOneOf(
         () => { Workspace.activeWindow = client2; },
-        () => { qtMock.fireShortcut("kniri-focus-2"); },
+        () => { qtMock.fireShortcut("focus-2"); },
     );
     Assert.assert(!rectContainsPoint(client1.getActualFrameGeometry(), Workspace.cursorPos));
     Assert.assert(rectContainsPoint(client2.getActualFrameGeometry(), Workspace.cursorPos));
 
     runOneOf(
         () => { Workspace.activeWindow = client1; },
-        () => { qtMock.fireShortcut("kniri-focus-1"); },
+        () => { qtMock.fireShortcut("focus-1"); },
     );
     Assert.assert(rectContainsPoint(client1.getActualFrameGeometry(), Workspace.cursorPos));
     Assert.assert(!rectContainsPoint(client2.getActualFrameGeometry(), Workspace.cursorPos));

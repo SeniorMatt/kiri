@@ -5,26 +5,26 @@ tests.register("Stacked", 5, () => {
     const [leftTop, leftBottom, rightTop, rightBottom] = workspaceMock.createClients(4);
     const grid = [[leftTop, leftBottom], [rightTop, rightBottom]];
     workspaceMock.activeWindow = rightBottom;
-    qtMock.fireShortcut("kniri-window-move-left");
+    qtMock.fireShortcut("window-move-left");
     workspaceMock.activeWindow = leftBottom;
-    qtMock.fireShortcut("kniri-window-move-left");
+    qtMock.fireShortcut("window-move-left");
     Assert.grid(config, tilingArea, 100, grid, true);
 
-    qtMock.fireShortcut("kniri-column-toggle-stacked");
+    qtMock.fireShortcut("column-toggle-stacked");
     Assert.grid(config, tilingArea, 100, grid, true, [0]);
 
-    qtMock.fireShortcut("kniri-focus-up");
+    qtMock.fireShortcut("focus-up");
     Assert.grid(config, tilingArea, 100, grid, true, [0]);
 
-    qtMock.fireShortcut("kniri-focus-down");
+    qtMock.fireShortcut("focus-down");
     Assert.grid(config, tilingArea, 100, grid, true, [0]);
 
-    qtMock.fireShortcut("kniri-window-move-up");
+    qtMock.fireShortcut("window-move-up");
     Assert.grid(config, tilingArea, 100, [[leftBottom, leftTop], [rightTop, rightBottom]], true, [0]);
 
-    qtMock.fireShortcut("kniri-window-move-down");
+    qtMock.fireShortcut("window-move-down");
     Assert.grid(config, tilingArea, 100, grid, true, [0]);
 
-    qtMock.fireShortcut("kniri-column-toggle-stacked");
+    qtMock.fireShortcut("column-toggle-stacked");
     Assert.grid(config, tilingArea, 100, grid, true);
 });

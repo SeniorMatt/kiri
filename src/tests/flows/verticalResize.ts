@@ -12,12 +12,12 @@ tests.register("Vertical resize", 10, () => {
     {
         const { qtMock, workspaceMock, world } = init(config);
         [client1] = workspaceMock.createClientsWithWidths(300);
-        qtMock.fireShortcut("kniri-focus-start");
+        qtMock.fireShortcut("focus-start");
         const g1 = client1.getActualFrameGeometry();
         Assert.equal(g1.height, h1);
         Assert.equal(g1.width, 300);
 
-        qtMock.fireShortcut("kniri-window-height-increase-up"); // no-op
+        qtMock.fireShortcut("window-height-increase-up"); // no-op
         const g1n = client1.getActualFrameGeometry();
         Assert.equal(g1, g1n);
     }
@@ -26,7 +26,7 @@ tests.register("Vertical resize", 10, () => {
     {
         const { qtMock, workspaceMock, world } = init(config);
         [client1, client2] = workspaceMock.createClientsWithWidths(300, 300);
-        qtMock.fireShortcut("kniri-window-move-left");
+        qtMock.fireShortcut("window-move-left");
         // Verify the layout
         {
             const g1 = client1.getActualFrameGeometry();
@@ -41,13 +41,13 @@ tests.register("Vertical resize", 10, () => {
         {
             const g1 = client1.getActualFrameGeometry();
             const g2 = client2.getActualFrameGeometry();
-            qtMock.fireShortcut("kniri-focus-up");
-            qtMock.fireShortcut("kniri-window-height-increase-up"); // no-op
+            qtMock.fireShortcut("focus-up");
+            qtMock.fireShortcut("window-height-increase-up"); // no-op
             const g1n1 = client1.getActualFrameGeometry();
             const g2n1 = client2.getActualFrameGeometry();
             Assert.equal(g1.height, g1n1.height);
             Assert.equal(g2.height, g2n1.height);
-            qtMock.fireShortcut("kniri-window-height-increase-down");
+            qtMock.fireShortcut("window-height-increase-down");
             const g1n2 = client1.getActualFrameGeometry();
             const g2n2 = client2.getActualFrameGeometry();
             Assert.equal(g1.height + stepSize, g1n2.height);
@@ -58,13 +58,13 @@ tests.register("Vertical resize", 10, () => {
         {
             const g1 = client1.getActualFrameGeometry();
             const g2 = client2.getActualFrameGeometry();
-            qtMock.fireShortcut("kniri-focus-down");
-            qtMock.fireShortcut("kniri-window-height-increase-down"); // no-op
+            qtMock.fireShortcut("focus-down");
+            qtMock.fireShortcut("window-height-increase-down"); // no-op
             const g1n1 = client1.getActualFrameGeometry();
             const g2n1 = client2.getActualFrameGeometry();
             Assert.equal(g1.height, g1n1.height);
             Assert.equal(g2.height, g2n1.height);
-            qtMock.fireShortcut("kniri-window-height-increase-up");
+            qtMock.fireShortcut("window-height-increase-up");
             const g1n2 = client1.getActualFrameGeometry();
             const g2n2 = client2.getActualFrameGeometry();
             Assert.equal(g1.height - stepSize, g1n2.height);
@@ -76,12 +76,12 @@ tests.register("Vertical resize", 10, () => {
     {
         const { qtMock, workspaceMock, world } = init(config);
         [client1, client2, client3] = workspaceMock.createClientsWithWidths(300, 300, 300);
-        qtMock.fireShortcut("kniri-focus-left");
-        qtMock.fireShortcut("kniri-window-move-left");
-        qtMock.fireShortcut("kniri-focus-right");
-        qtMock.fireShortcut("kniri-window-move-left");
-        qtMock.fireShortcut("kniri-focus-up");
-        qtMock.fireShortcut("kniri-focus-up");
+        qtMock.fireShortcut("focus-left");
+        qtMock.fireShortcut("window-move-left");
+        qtMock.fireShortcut("focus-right");
+        qtMock.fireShortcut("window-move-left");
+        qtMock.fireShortcut("focus-up");
+        qtMock.fireShortcut("focus-up");
         // Verify the layout
         {
             const g1 = client1.getActualFrameGeometry();
@@ -102,14 +102,14 @@ tests.register("Vertical resize", 10, () => {
             const g1 = client1.getActualFrameGeometry();
             const g2 = client2.getActualFrameGeometry();
             const g3 = client3.getActualFrameGeometry();
-            qtMock.fireShortcut("kniri-window-height-increase-up"); // no-op
+            qtMock.fireShortcut("window-height-increase-up"); // no-op
             const g1n1 = client1.getActualFrameGeometry();
             const g2n1 = client2.getActualFrameGeometry();
             const g3n1 = client3.getActualFrameGeometry();
             Assert.equal(g1.height, g1n1.height);
             Assert.equal(g2.height, g2n1.height);
             Assert.equal(g3.height, g3n1.height);
-            qtMock.fireShortcut("kniri-window-height-increase-down");
+            qtMock.fireShortcut("window-height-increase-down");
             const g1n2 = client1.getActualFrameGeometry();
             const g2n2 = client2.getActualFrameGeometry();
             const g3n2 = client3.getActualFrameGeometry();
@@ -120,18 +120,18 @@ tests.register("Vertical resize", 10, () => {
 
         // Middle window
         {
-            qtMock.fireShortcut("kniri-focus-down");
+            qtMock.fireShortcut("focus-down");
             const g1 = client1.getActualFrameGeometry();
             const g2 = client2.getActualFrameGeometry();
             const g3 = client3.getActualFrameGeometry();
-            qtMock.fireShortcut("kniri-window-height-increase-up");
+            qtMock.fireShortcut("window-height-increase-up");
             const g1n1 = client1.getActualFrameGeometry();
             const g2n1 = client2.getActualFrameGeometry();
             const g3n1 = client3.getActualFrameGeometry();
             Assert.equal(g1.height - stepSize, g1n1.height);
             Assert.equal(g2.height + stepSize, g2n1.height);
             Assert.equal(g3.height, g3n1.height);
-            qtMock.fireShortcut("kniri-window-height-increase-down");
+            qtMock.fireShortcut("window-height-increase-down");
             const g1n2 = client1.getActualFrameGeometry();
             const g2n2 = client2.getActualFrameGeometry();
             const g3n2 = client3.getActualFrameGeometry();
@@ -142,18 +142,18 @@ tests.register("Vertical resize", 10, () => {
 
         // Lower window
         {
-            qtMock.fireShortcut("kniri-focus-down");
+            qtMock.fireShortcut("focus-down");
             const g1 = client1.getActualFrameGeometry();
             const g2 = client2.getActualFrameGeometry();
             const g3 = client3.getActualFrameGeometry();
-            qtMock.fireShortcut("kniri-window-height-increase-up");
+            qtMock.fireShortcut("window-height-increase-up");
             const g1n1 = client1.getActualFrameGeometry();
             const g2n1 = client2.getActualFrameGeometry();
             const g3n1 = client3.getActualFrameGeometry();
             Assert.equal(g1.height, g1n1.height);
             Assert.equal(g2.height - stepSize, g2n1.height);
             Assert.equal(g3.height + stepSize, g3n1.height);
-            qtMock.fireShortcut("kniri-window-height-increase-down"); // no-op
+            qtMock.fireShortcut("window-height-increase-down"); // no-op
             const g1n2 = client1.getActualFrameGeometry();
             const g2n2 = client2.getActualFrameGeometry();
             const g3n2 = client3.getActualFrameGeometry();

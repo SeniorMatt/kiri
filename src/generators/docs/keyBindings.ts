@@ -59,10 +59,10 @@ const empty: any = {};
 const keyBindings: DocsKeyBinding[] = Array.prototype.concat(
     getKeyBindings(empty, empty).map(binding => ({
         description: formatDescription(binding),
-        keySequence: binding.defaultKeySequence || "(unassigned)",
+        keySequence: binding.defaultKeys?.join(", ") || "(unassigned)",
     })),
     getNumKeyBindings(empty, empty).map(binding => ({
         description: formatDescription(binding),
-        keySequence: `${binding.defaultModifiers}+${binding.fKeys ? "F" : ""}[N]`,
+        keySequence: binding.defaultModifiers === undefined ? "(unassigned)" : `${binding.defaultModifiers}+[N]`,
     })),
 );

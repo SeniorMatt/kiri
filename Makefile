@@ -23,10 +23,10 @@ install: build
 	kpackagetool6 --type=KWin/Script --install=./package || kpackagetool6 --type=KWin/Script --upgrade=./package
 
 uninstall:
-	kpackagetool6 --type=KWin/Script --remove=kniri
+	kpackagetool6 --type=KWin/Script --remove=kiri
 
 package: build
-	tar -czf ./kniri_${subst .,_,${VERSION}}.tar.gz ./package --transform s/package/kniri/
+	tar -czf ./kiri_${subst .,_,${VERSION}}.tar.gz ./package --transform s/package/kiri/
 
 docs-key-bindings-bbcode:
 	@./run-ts.sh ./src/generators/docs/keyBindingsBbcode

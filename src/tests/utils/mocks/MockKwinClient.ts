@@ -251,6 +251,8 @@ class MockKwinClient {
         this.tile = null;
     }
 
+    public closeWindow() {}
+
     public getFrameGeometryCopy() {
         return this._frameGeometry.clone();
     }
