@@ -46,7 +46,7 @@ You need pnpm.
 
     make package
 
-Tests run with `make test`. `make build` only compiles.
+`make test` runs the tests, `make build` also lints.
 
 Kiri has to be started in a real session or a nested KWin to try it out. If nothing gets tiled in a nested one, start kactivitymanagerd first.
 
