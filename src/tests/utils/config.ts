@@ -3,6 +3,7 @@ function getDefaultConfig(): Config {
     for (const prop of configDef) {
         config[prop.name] = prop.default;
     }
+    config.shortcutKeys = {};
     // the tests were written for Karousel's defaults
     config.gapsInnerHorizontal = 8;
     config.gapsInnerVertical = 8;

@@ -196,8 +196,8 @@ class Actions {
         grid.moveColumn(column, grid.getLastColumn());
     };
 
-    public readonly columnToggleStacked = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        column.toggleStacked();
+    public readonly columnToggleTabbed = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        column.toggleTabbed();
     };
 
     public readonly columnWidthIncrease = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
@@ -225,6 +225,50 @@ class Actions {
     public readonly cyclePresetWidthsReverse = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         const nextWidth = this.config.presetWidths.prev(column.getWidth(), column.getMinWidth(), column.getMaxWidth(), grid.desktop.tilingArea.width);
         column.setWidth(nextWidth, true);
+    };
+
+    // niri's expand-column-to-available-width: the column takes the screen space that no other visible column uses
+    public readonly columnWidthExpand = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const desktop = grid.desktop;
+        const visibleRange = desktop.getCurrentVisibleRange();
+        if (!Range.contains(visibleRange, column)) {
+            return;
+        }
+        const left = grid.getLeftmostVisibleColumn(visibleRange);
+        const right = grid.getRightmostVisibleColumn(visibleRange);
+        if (left === null || right === null) {
+            return;
+        }
+        const freeSpace = visibleRange.getWidth() - (right.getRight() - left.getLeft());
+        column.setWidth(column.getWidth() + freeSpace, true);
+        desktop.scrollCenterVisible(column);
+    };
+
+    public readonly windowHeightCyclePresets = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        this.cycleHeight(window, column, grid, false);
+    };
+
+    public readonly windowHeightCyclePresetsReverse = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        this.cycleHeight(window, column, grid, true);
+    };
+
+    private cycleHeight(window: Window, column: Column, grid: Grid, reverse: boolean) {
+        const nWindows = column.getWindowCount();
+        if (nWindows < 2) {
+            return;
+        }
+        const tilingHeight = grid.desktop.tilingArea.height;
+        const totalHeight = tilingHeight - (nWindows-1) * grid.config.gapsInnerVertical;
+        const presets = this.config.presetHeights;
+        const newHeight = reverse ?
+            presets.prev(window.height, 1, totalHeight, tilingHeight) :
+            presets.next(window.height, 1, totalHeight, tilingHeight);
+        column.setWindowHeight(window, newHeight);
+    }
+
+    // niri's reset-window-height: all windows of the column get the same height again
+    public readonly windowHeightReset = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        column.resizeWindows();
     };
 
     public readonly columnsWidthEqualize = (cm: ClientManager, dm: DesktopManager) => {
@@ -533,6 +577,10 @@ namespace Actions {
             prev: (currentWidth: number, minWidth: number, maxWidth: number, tilingAreaWidth: number) => number
         };
         verticalResizeStep: number;
+        presetHeights: {
+            next: (currentHeight: number, minHeight: number, maxHeight: number, tilingAreaHeight: number) => number;
+            prev: (currentHeight: number, minHeight: number, maxHeight: number, tilingAreaHeight: number) => number;
+        };
         columnResizer: ColumnResizer;
     }
 

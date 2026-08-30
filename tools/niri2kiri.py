@@ -39,11 +39,12 @@ ACTIONS = {
     "fullscreen-window": "window-toggle-fullscreen",
     "center-column": "grid-scroll-focused",
     "toggle-window-floating": "window-toggle-floating",
-    "toggle-column-tabbed-display": "column-toggle-stacked",
+    "toggle-column-tabbed-display": "column-toggle-tabbed",
     "close-window": "window-close",
     "toggle-overview": "overview",
-    "expand-column-to-available-width": "column-expand",
-    "switch-preset-window-height": "cycle-preset-heights",
+    "expand-column-to-available-width": "column-width-expand",
+    "switch-preset-window-height": "window-height-cycle-presets",
+    "switch-preset-window-height-back": "window-height-cycle-presets-reverse",
     "reset-window-height": "window-height-reset",
 }
 NUMBERED = {

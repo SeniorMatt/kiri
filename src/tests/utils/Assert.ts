@@ -129,7 +129,7 @@ namespace Assert {
         columnWidths: number[] | number,
         grid: MockKwinClient[][],
         centered: boolean,
-        stackedColumns: number[] = [],
+        tabbedColumns: number[] = [],
         { message, skip=0 }: Options = {},
     ) {
         const nColumns = grid.length;
@@ -187,20 +187,19 @@ namespace Assert {
             );
         }
 
-        function getRectInGridStacked(column: number, window: number, nColumns: number, nWindows: number) {
-            const columnWidth = getColumnWidth(column);
+        function getRectInGridTabbed(column: number, window: number, nColumns: number, nWindows: number) {
             return new MockQmlRect(
-                getColumnX(column) + window * config.stackOffsetX,
-                tilingArea.y + window * config.stackOffsetY,
-                columnWidth - (nWindows-1) * config.stackOffsetX,
-                tilingArea.height - (nWindows-1) * config.stackOffsetY,
+                getColumnX(column),
+                tilingArea.y,
+                getColumnWidth(column),
+                tilingArea.height,
             );
         }
 
         for (let iColumn = 0; iColumn < nColumns; iColumn++) {
             const column = grid[iColumn];
-            const stacked = stackedColumns.includes(iColumn);
-            const getRect = stacked ? getRectInGridStacked : getRectInGrid;
+            const tabbed = tabbedColumns.includes(iColumn);
+            const getRect = tabbed ? getRectInGridTabbed : getRectInGrid;
             const nWindows = column.length;
             for (let iWindow = 0; iWindow < nWindows; iWindow++) {
                 const window = column[iWindow];

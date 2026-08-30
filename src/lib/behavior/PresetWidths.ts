@@ -24,25 +24,28 @@ class PresetWidths {
     }
 
     private static parsePresetWidths(presetWidths: string, spacing: number): ((tilingAreaWidth: number) => number)[] {
+        return presetWidths.split(",").map(widthStr => PresetWidths.parseWidth(widthStr, spacing));
+    }
+
+    // parses a single size like "50%", "800px" or "0.5" into a function of the available space; throws if invalid
+    public static parseWidth(widthStr: string, spacing: number): (tilingAreaWidth: number) => number {
         function getRatioFunction(ratio: number) {
             return (tilingAreaWidth: number) => Math.floor((tilingAreaWidth + spacing) * ratio - spacing);
         }
 
-        return presetWidths.split(",").map((widthStr: string) => {
-            widthStr = widthStr.trim();
+        widthStr = widthStr.trim();
 
-            const widthPx = PresetWidths.parseNumberWithSuffix(widthStr, "px");
-            if (widthPx !== undefined) {
-                return () => widthPx;
-            }
+        const widthPx = PresetWidths.parseNumberWithSuffix(widthStr, "px");
+        if (widthPx !== undefined) {
+            return () => widthPx;
+        }
 
-            const widthPct = PresetWidths.parseNumberWithSuffix(widthStr, "%");
-            if (widthPct !== undefined) {
-                return getRatioFunction(widthPct / 100.0);
-            }
+        const widthPct = PresetWidths.parseNumberWithSuffix(widthStr, "%");
+        if (widthPct !== undefined) {
+            return getRatioFunction(widthPct / 100.0);
+        }
 
-            return getRatioFunction(PresetWidths.parseNumberSafe(widthStr));
-        });
+        return getRatioFunction(PresetWidths.parseNumberSafe(widthStr));
     }
 
     private static parseNumberSafe(str: string) {

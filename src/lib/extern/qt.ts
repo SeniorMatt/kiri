@@ -47,6 +47,9 @@ interface QSignal<T extends unknown[]> {
 interface QmlTimer extends QmlObject {
     interval: number;
     readonly triggered: QSignal<[]>;
+    repeat: boolean;
     restart(): void;
+    start(): void;
+    stop(): void;
     destroy(): void;
 }

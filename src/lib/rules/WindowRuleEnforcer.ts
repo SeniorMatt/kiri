@@ -3,11 +3,52 @@ class WindowRuleEnforcer {
     private readonly preferTiling: ClientMatcher;
     private readonly followCaption: RegExp;
 
-    constructor(windowRules: WindowRule[], private readonly tileFullScreen: boolean) {
+    private readonly widthRules: { matcher: ClientMatcher, width: (tilingAreaWidth: number) => number }[];
+    private readonly defaultWidth: ((tilingAreaWidth: number) => number) | null;
+
+    constructor(
+        windowRules: WindowRule[],
+        private readonly tileFullScreen: boolean,
+        defaultColumnWidth = "",
+        gapsInnerHorizontal = 0,
+    ) {
+        this.widthRules = [];
+        for (const rule of windowRules) {
+            if (rule.width === undefined) {
+                continue;
+            }
+            try {
+                this.widthRules.push({
+                    matcher: new ClientMatcher(WindowRuleEnforcer.joinRegexes([WindowRuleEnforcer.getRuleString(rule)])),
+                    width: PresetWidths.parseWidth(rule.width, gapsInnerHorizontal),
+                });
+            } catch (error: any) {
+                log("invalid width in window rule:", rule.width, error);
+            }
+        }
+        this.defaultWidth = null;
+        if (defaultColumnWidth.trim() !== "") {
+            try {
+                this.defaultWidth = PresetWidths.parseWidth(defaultColumnWidth, gapsInnerHorizontal);
+            } catch (error: any) {
+                log("invalid defaultColumnWidth:", defaultColumnWidth, error);
+            }
+        }
+
         const [floatRegex, tileRegex, followCaptionRegex] = WindowRuleEnforcer.createWindowRuleRegexes(windowRules);
         this.preferFloating = new ClientMatcher(floatRegex);
         this.preferTiling = new ClientMatcher(tileRegex);
         this.followCaption = followCaptionRegex;
+    }
+
+    // returns the width a new window's column should get, or null to keep the window's own width
+    public getColumnWidth(kwinClient: KwinClient, tilingAreaWidth: number): number | null {
+        for (const rule of this.widthRules) {
+            if (rule.matcher.matches(kwinClient)) {
+                return rule.width(tilingAreaWidth);
+            }
+        }
+        return this.defaultWidth === null ? null : this.defaultWidth(tilingAreaWidth);
     }
 
     public shouldTile(kwinClient: KwinClient) {
@@ -55,6 +96,9 @@ class WindowRuleEnforcer {
                 WindowRuleEnforcer.wrapParens(ruleCaption),
             );
 
+            if (windowRule.tile === undefined) {
+                continue;
+            }
             (windowRule.tile ? tileRegexes : floatRegexes).push(ruleString);
             if (ruleCaption !== ".*") {
                 followCaptionRegexes.push(ruleClass);
@@ -66,6 +110,13 @@ class WindowRuleEnforcer {
             WindowRuleEnforcer.joinRegexes(tileRegexes),
             WindowRuleEnforcer.joinRegexes(followCaptionRegexes),
         ];
+    }
+
+    private static getRuleString(windowRule: WindowRule) {
+        return ClientMatcher.getRuleString(
+            WindowRuleEnforcer.wrapParens(WindowRuleEnforcer.parseRegex(windowRule.class)),
+            WindowRuleEnforcer.wrapParens(WindowRuleEnforcer.parseRegex(windowRule.caption)),
+        );
     }
 
     private static parseRegex(rawRule: string | undefined) {

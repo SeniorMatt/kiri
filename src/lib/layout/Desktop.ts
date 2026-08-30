@@ -1,7 +1,10 @@
 class Desktop {
+    private tabIndicators: TabIndicator[] = [];
     public readonly grid: Grid;
     private scrollX: number;
     private gestureScrollXInitial: number | null;
+    private readonly gestureVelocity = new VelocityTracker(100, 120);
+    private static readonly GESTURE_PROJECTION_MS = 150;
     private dirty: boolean;
     private dirtyScroll: boolean;
     private dirtyPins: boolean;
@@ -118,6 +121,12 @@ class Desktop {
     }
 
     private clampScrollX(x: number) {
+        if (this.config.alwaysCenterSingleColumn) {
+            const column = this.grid.getFirstColumn();
+            if (column !== null && column === this.grid.getLastColumn()) {
+                return Math.round((column.getWidth() - this.tilingArea.width) / 2);
+            }
+        }
         return this.config.clamper.clampScrollX(this, x);
     }
 
@@ -134,22 +143,46 @@ class Desktop {
         this.setScroll(this.scrollX + dx, force);
     }
 
-    public gestureScroll(amount: number) {
+    public gestureScroll(amount: number, now: number) {
         if (!this.config.gestureScroll) {
             return;
         }
         if (this.gestureScrollXInitial === null) {
             this.gestureScrollXInitial = this.scrollX;
+            this.gestureVelocity.reset();
         }
 
         if (this.config.gestureScrollInvert) {
             amount = -amount;
         }
         this.setScroll(this.gestureScrollXInitial + this.config.gestureScrollStep * amount, false);
+        this.gestureVelocity.add(now, this.scrollX);
+    }
+
+    public isGestureScrolling() {
+        return this.gestureScrollXInitial !== null;
+    }
+
+    // Fingers lifted: the column-aligned scroll position to settle on, taking the swipe velocity into account.
+    public getGestureSettleTarget(now: number) {
+        // niri-style: a column's left edge at the left edge of the screen, or the ends of the grid
+        const candidates: number[] = [this.clampScrollX(-Infinity), this.clampScrollX(Infinity)];
+        for (const column of this.grid.getColumns()) {
+            candidates.push(this.clampScrollX(column.getLeft()));
+        }
+        const velocity = this.gestureVelocity.getVelocity(now);
+        return pickSnapTarget(candidates, this.scrollX, velocity, Desktop.GESTURE_PROJECTION_MS);
+    }
+
+    public getScrollX() {
+        return this.scrollX;
     }
 
     public gestureScrollFinish(focusedWindow: Window|null) {
-        const scrolledRight = this.scrollX > this.gestureScrollXInitial!;
+        if (this.gestureScrollXInitial === null) {
+            return;
+        }
+        const scrolledRight = this.scrollX > this.gestureScrollXInitial;
         this.gestureScrollXInitial = null;
 
         const visibleRange = this.getCurrentVisibleRange();
@@ -167,11 +200,16 @@ class Desktop {
     public arrange() {
         // TODO (optimization): only arrange visible windows
         this.updateArea();
-        if (!this.dirty) {
-            return;
+        if (this.dirty) {
+            this.tabIndicators = [];
+            this.grid.arrange(this.tilingArea.x - this.scrollX, this.getCurrentVisibleRange());
+            this.dirty = false;
         }
-        this.grid.arrange(this.tilingArea.x - this.scrollX, this.getCurrentVisibleRange());
-        this.dirty = false;
+        publishTabIndicators(this.tabIndicators);
+    }
+
+    public addTabIndicator(indicator: TabIndicator) {
+        this.tabIndicators.push(indicator);
     }
 
     public forceArrange() {
@@ -200,6 +238,7 @@ namespace Desktop {
         marginBottom: number;
         marginLeft: number;
         marginRight: number;
+        alwaysCenterSingleColumn: boolean;
         gestureScroll: boolean;
         gestureScrollInvert: boolean;
         gestureScrollStep: number;

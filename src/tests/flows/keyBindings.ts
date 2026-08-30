@@ -21,6 +21,30 @@
         Assert.equalArrays(registered.get("column-move-to-column-1")!, []);
     });
 
+    tests.register("Keys from Kiri's settings replace stored keys", 1, () => {
+        const config = getDefaultConfig();
+        config.shortcutKeys = { "focus-left": ["Meta+D", "Meta+Shift+Left"], "desktop-3": ["bogus+key"] };
+        init(config);
+        const registered = (kglobalaccel as MockKGlobalAccel).registered;
+        Assert.equalArrays(registered.get("focus-left")!, [parseKeySequence("Meta+D")!, parseKeySequence("Meta+Shift+Left")!]);
+        // invalid keys fall back to the defaults
+        Assert.equalArrays(registered.get("desktop-3")!, [parseKeySequence("Meta+3")!]);
+        Assert.equalArrays(registered.get("focus-right")!, [parseKeySequence("Meta+L")!, parseKeySequence("Meta+Right")!]);
+        const flags = (kglobalaccel as MockKGlobalAccel).lastFlags;
+        Assert.equal(flags.get("focus-left"), 2 | 4);
+        Assert.equal(flags.get("focus-right"), 2);
+    });
+
+    tests.register("Key fields in settings", 1, () => {
+        const values: Record<string, string> = { key1_focus_left: " Meta+D ", key2_focus_left: "", key2_desktop_2: "Meta+F5" };
+        const keys = readShortcutKeys(name => values[name] ?? "");
+        Assert.equalArrays(keys["focus-left"], ["Meta+D"]);
+        Assert.equalArrays(keys["desktop-2"], ["Meta+F5"]);
+        Assert.equal(keys["focus-right"], undefined);
+        const names = getShortcutConfigDef().map(entry => entry.name);
+        Assert.assert(names.includes("key1_column_move_to_desktop_12") && names.includes("key2_focus_left"));
+    });
+
     tests.register("Switch desktop", 1, () => {
         const { qtMock } = init(getDefaultConfig());
         qtMock.fireShortcut("desktop-2");

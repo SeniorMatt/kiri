@@ -11,6 +11,10 @@ class Delayer {
         this.timer.restart();
     }
 
+    public stop() {
+        this.timer.stop();
+    }
+
     public destroy() {
         this.timer.destroy();
     }

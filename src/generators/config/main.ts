@@ -3,7 +3,7 @@ console.log(`<?xml version="1.0" encoding="UTF-8"?>
     <kcfgfile name="kwinrc" />
     <group name="">`);
 
-for (const entry of configDef) {
+for (const entry of [...configDef, ...getShortcutConfigDef()]) {
     console.log(`        <entry name="${entry.name}" type="${entry.type}">
             <default>${escapeXml(entry.default)}</default>
         </entry>`);

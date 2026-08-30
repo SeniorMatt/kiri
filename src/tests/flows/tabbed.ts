@@ -1,4 +1,4 @@
-tests.register("Stacked", 5, () => {
+tests.register("Tabbed", 5, () => {
     const config = getDefaultConfig();
     const { qtMock, workspaceMock, world } = init(config);
 
@@ -10,7 +10,7 @@ tests.register("Stacked", 5, () => {
     qtMock.fireShortcut("window-move-left");
     Assert.grid(config, tilingArea, 100, grid, true);
 
-    qtMock.fireShortcut("column-toggle-stacked");
+    qtMock.fireShortcut("column-toggle-tabbed");
     Assert.grid(config, tilingArea, 100, grid, true, [0]);
 
     qtMock.fireShortcut("focus-up");
@@ -25,6 +25,6 @@ tests.register("Stacked", 5, () => {
     qtMock.fireShortcut("window-move-down");
     Assert.grid(config, tilingArea, 100, grid, true, [0]);
 
-    qtMock.fireShortcut("column-toggle-stacked");
+    qtMock.fireShortcut("column-toggle-tabbed");
     Assert.grid(config, tilingArea, 100, grid, true);
 });

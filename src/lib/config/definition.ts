@@ -90,16 +90,6 @@ const configDef = [
         default: 16,
     },
     {
-        name: "stackOffsetX",
-        type: "UInt",
-        default: 8,
-    },
-    {
-        name: "stackOffsetY",
-        type: "UInt",
-        default: 32,
-    },
-    {
         name: "manualScrollStep",
         type: "UInt",
         default: 200,
@@ -130,7 +120,37 @@ const configDef = [
         default: false,
     },
     {
-        name: "stackColumnsByDefault",
+        name: "tabbedColumnsByDefault",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "tabIndicatorEnabled",
+        type: "Bool",
+        default: true,
+    },
+    {
+        name: "tabIndicatorWidth",
+        type: "UInt",
+        default: 4,
+    },
+    {
+        name: "tabIndicatorGap",
+        type: "UInt",
+        default: 5,
+    },
+    {
+        name: "tabIndicatorLength",
+        type: "Double",
+        default: 0.5,
+    },
+    {
+        name: "tabIndicatorPosition",
+        type: "String",
+        default: "left",
+    },
+    {
+        name: "tabIndicatorHideWhenSingleTab",
         type: "Bool",
         default: false,
     },
@@ -175,6 +195,31 @@ const configDef = [
         default: false,
     },
     {
+        name: "scrollingOnOverflow",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "centerGridWhenFits",
+        type: "Bool",
+        default: true,
+    },
+    {
+        name: "alwaysCenterSingleColumn",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "defaultColumnWidth",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "presetHeights",
+        type: "String",
+        default: "33.333%, 50%, 66.667%",
+    },
+    {
         name: "gestureScroll",
         type: "Bool",
         default: true,
@@ -190,6 +235,21 @@ const configDef = [
         default: 1920,
     },
     {
+        name: "gestureSettleDuration",
+        type: "UInt",
+        default: 250,
+    },
+    {
+        name: "gestureDesktopSwitch",
+        type: "Bool",
+        default: true,
+    },
+    {
+        name: "closeRelayoutDelay",
+        type: "UInt",
+        default: 150,
+    },
+    {
         name: "tiledKeepBelow",
         type: "Bool",
         default: true,
@@ -203,6 +263,46 @@ const configDef = [
         name: "noLayering",
         type: "Bool",
         default: false,
+    },
+    {
+        name: "focusRingEnabled",
+        type: "Bool",
+        default: true,
+    },
+    {
+        name: "focusRingWidth",
+        type: "UInt",
+        default: 4,
+    },
+    {
+        name: "focusRingActiveColor",
+        type: "String",
+        default: "#7fc8ff",
+    },
+    {
+        name: "focusRingInactiveColor",
+        type: "String",
+        default: "#505050",
+    },
+    {
+        name: "borderEnabled",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "borderWidth",
+        type: "UInt",
+        default: 4,
+    },
+    {
+        name: "borderActiveColor",
+        type: "String",
+        default: "#ffc87f",
+    },
+    {
+        name: "borderInactiveColor",
+        type: "String",
+        default: "#505050",
     },
     {
         name: "windowRules",

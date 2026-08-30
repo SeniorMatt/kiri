@@ -1,3 +1,5 @@
+const ringCaption = "kiri-ring";
+
 class ClientManager {
     private readonly config: ClientManager.Config;
     private readonly clientMap: Map<KwinClient, ClientWrapper>;
@@ -24,10 +26,14 @@ class ClientManager {
             notificationInvalidWindowRules.sendEvent();
             log("failed to parse windowRules:", error);
         }
-        this.windowRuleEnforcer = new WindowRuleEnforcer(parsedWindowRules, config.tileFullScreen);
+        this.windowRuleEnforcer = new WindowRuleEnforcer(parsedWindowRules, config.tileFullScreen, config.defaultColumnWidth, config.gapsInnerHorizontal);
     }
 
-    public addClient(kwinClient: KwinClient) {
+    // `existing` is for windows that were already open when Kiri started, they keep their width
+    public addClient(kwinClient: KwinClient, existing = false) {
+        if (kwinClient.caption.startsWith(ringCaption)) {
+            return; // our own focus ring window
+        }
         console.assert(!this.hasClient(kwinClient));
 
         let constructState: (client: ClientWrapper) => ClientState.State;
@@ -41,7 +47,15 @@ class ClientManager {
         ) {
             Clients.makeTileable(kwinClient);
             console.assert(Clients.canTileNow(kwinClient));
-            constructState = (client: ClientWrapper) => new ClientState.Tiled(this.world, client, desktop!.grid);
+            constructState = (client: ClientWrapper) => {
+                if (!existing) {
+                    const width = this.windowRuleEnforcer.getColumnWidth(kwinClient, desktop!.tilingArea.width);
+                    if (width !== null) {
+                        client.preferredWidth = width;
+                    }
+                }
+                return new ClientState.Tiled(this.world, client, desktop!.grid);
+            };
         } else {
             constructState = (client: ClientWrapper) => new ClientState.Floating(this.world, client, this.config, false);
         }
@@ -56,7 +70,9 @@ class ClientManager {
     }
 
     public removeClient(kwinClient: KwinClient, passFocus: FocusPassing.Type) {
-        console.assert(this.hasClient(kwinClient));
+        if (!this.hasClient(kwinClient)) {
+            return;
+        }
         const client = this.clientMap.get(kwinClient);
         if (client === undefined) {
             return;
@@ -234,5 +250,7 @@ namespace ClientManager {
     export interface Config {
         floatingKeepAbove: boolean;
         cursorFollowsFocus: boolean;
+        defaultColumnWidth: string;
+        gapsInnerHorizontal: number;
     }
 }

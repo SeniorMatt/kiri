@@ -107,10 +107,10 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.doIfTiledFocused(actions.windowHeightIncreaseDown),
         },
         {
-            name: "column-toggle-stacked",
-            description: "Toggle stacked layout for focused column",
+            name: "column-toggle-tabbed",
+            description: "Toggle tabbed column",
             defaultKeys: ["Meta+W"],
-            action: () => world.doIfTiledFocused(actions.columnToggleStacked),
+            action: () => world.doIfTiledFocused(actions.columnToggleTabbed),
         },
         {
             name: "column-move-left",
@@ -181,6 +181,26 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             name: "cycle-preset-widths-reverse",
             description: "Cycle through preset column widths in reverse",
             action: () => world.doIfTiledFocused(actions.cyclePresetWidthsReverse),
+        },
+        {
+            name: "column-width-expand",
+            description: "Expand column to available width",
+            action: () => world.doIfTiledFocused(actions.columnWidthExpand),
+        },
+        {
+            name: "window-height-cycle-presets",
+            description: "Cycle preset window heights",
+            action: () => world.doIfTiledFocused(actions.windowHeightCyclePresets),
+        },
+        {
+            name: "window-height-cycle-presets-reverse",
+            description: "Cycle preset window heights in reverse",
+            action: () => world.doIfTiledFocused(actions.windowHeightCyclePresetsReverse),
+        },
+        {
+            name: "window-height-reset",
+            description: "Reset window height",
+            action: () => world.doIfTiledFocused(actions.windowHeightReset),
         },
         {
             name: "columns-width-equalize",

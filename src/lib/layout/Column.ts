@@ -3,15 +3,16 @@ class Column {
     public gridX: number;
     private width: number; // TODO: increase column width to contain transients
     private readonly windows: LinkedList<Window>;
-    private stacked: boolean;
+    private tabbed: boolean;
     private focusTaker: Window|null;
     private static readonly minWidth = 40;
+    private static readonly minHeight = 40;
 
     constructor(grid: Grid, leftColumn: Column|null) {
         this.gridX = 0;
         this.width = 0;
         this.windows = new LinkedList();
-        this.stacked = grid.config.stackColumnsByDefault;
+        this.tabbed = grid.config.tabbedColumnsByDefault;
         this.focusTaker = null;
         this.grid = grid;
         this.grid.onColumnAdded(this, leftColumn);
@@ -46,6 +47,10 @@ class Column {
     public moveWindowDown(window: Window) {
         this.windows.moveForward(window);
         this.grid.desktop.onLayoutChanged();
+    }
+
+    public getWindows() {
+        return Array.from(this.windows.iterator());
     }
 
     public getWindowCount() {
@@ -195,15 +200,80 @@ class Column {
         this.grid.desktop.onLayoutChanged();
     }
 
+    // gives `window` the requested height and shrinks or grows the other windows of the column in proportion
+    public setWindowHeight(window: Window, height: number) {
+        const nWindows = this.windows.length();
+        if (nWindows < 2) {
+            return;
+        }
+        const totalHeight = this.grid.desktop.tilingArea.height - (nWindows-1) * this.grid.config.gapsInnerVertical;
+        const minHeight = Math.min(Column.minHeight, Math.floor(totalHeight / nWindows));
+        height = clamp(height, minHeight, totalHeight - (nWindows-1) * minHeight);
+
+        const others: Window[] = [];
+        let othersHeight = 0;
+        for (const other of this.windows.iterator()) {
+            if (other !== window) {
+                others.push(other);
+                othersHeight += other.height;
+            }
+        }
+        window.height = height;
+        let remainingPixels = totalHeight - height;
+        let remainingHeight = othersHeight;
+        let remainingWindows = others.length;
+        for (const other of others) {
+            const ratio = remainingHeight > 0 ? other.height / remainingHeight : 1 / remainingWindows;
+            const otherHeight = remainingWindows === 1 ? remainingPixels : Math.max(minHeight, Math.round(remainingPixels * ratio));
+            remainingHeight -= other.height;
+            other.height = otherHeight;
+            remainingPixels -= otherHeight;
+            remainingWindows--;
+        }
+
+        this.grid.desktop.onLayoutChanged();
+    }
+
+    // returns the heights of the column's windows relative to the available height
+    public getHeightRatios() {
+        const heights = Array.from(this.windows.iterator()).map(window => window.height);
+        const total = heights.reduce((a, b) => a + b, 0);
+        return heights.map(height => total > 0 ? height / total : 1 / heights.length);
+    }
+
+    public setHeightRatios(ratios: number[]) {
+        const nWindows = this.windows.length();
+        if (ratios.length !== nWindows || nWindows < 2) {
+            return;
+        }
+        let remainingPixels = this.grid.desktop.tilingArea.height - (nWindows-1) * this.grid.config.gapsInnerVertical;
+        let i = 0;
+        for (const window of this.windows.iterator()) {
+            const windowHeight = i === nWindows-1 ? remainingPixels : Math.round(Math.min(ratios[i], 1) * (this.grid.desktop.tilingArea.height - (nWindows-1) * this.grid.config.gapsInnerVertical));
+            window.height = windowHeight;
+            remainingPixels -= windowHeight;
+            i++;
+        }
+        this.grid.desktop.onLayoutChanged();
+    }
+
+    public isTabbed() {
+        return this.tabbed;
+    }
+
+    public setTabbed(tabbed: boolean) {
+        if (tabbed === this.tabbed) {
+            return;
+        }
+        this.tabbed = tabbed;
+        this.grid.desktop.onLayoutChanged();
+    }
+
     public resizeWindows() {
         const nWindows = this.windows.length();
         if (nWindows === 0) {
             return;
         }
-        if (nWindows === 1) {
-            this.stacked = this.grid.config.stackColumnsByDefault;
-        }
-
         let remainingPixels = this.grid.desktop.tilingArea.height - (nWindows-1) * this.grid.config.gapsInnerVertical;
         let remainingWindows = nWindows;
         for (const window of this.windows.iterator()) {
@@ -244,8 +314,8 @@ class Column {
             }
         }
 
-        if (this.stacked && this.windows.length() >= 2) {
-            this.arrangeStacked(x);
+        if (this.tabbed) {
+            this.arrangeTabbed(x);
             return;
         }
         let y = this.grid.desktop.tilingArea.y;
@@ -255,20 +325,64 @@ class Column {
         }
     }
 
-    public arrangeStacked(x: number) {
-        const nWindows = this.windows.length();
-        const windowWidth = this.getWidth() - (nWindows - 1) * this.grid.config.stackOffsetX;
-        const windowHeight = this.grid.desktop.tilingArea.height - (nWindows - 1) * this.grid.config.stackOffsetY;
-
-        let windowX = x;
-        let windowY = this.grid.desktop.tilingArea.y;
+    // every window gets the whole column, only the active one is raised above the others
+    private arrangeTabbed(x: number) {
+        const area = this.grid.desktop.tilingArea;
         for (const window of this.windows.iterator()) {
-            window.arrange(windowX, windowY, windowWidth, windowHeight);
-            windowX += this.grid.config.stackOffsetX;
-            windowY += this.grid.config.stackOffsetY;
+            window.arrange(x, area.y, this.getWidth(), area.height);
         }
-
         this.arrangeZ();
+        this.grid.desktop.addTabIndicator(this.getTabIndicator(x));
+    }
+
+    private getTabIndicator(x: number): TabIndicator {
+        const config = this.grid.config;
+        const area = this.grid.desktop.tilingArea;
+        const width = this.getWidth();
+        const position = config.tabIndicatorPosition;
+        const vertical = position === "left" || position === "right";
+        const thickness = config.tabIndicatorWidth;
+        const total = vertical ? area.height : width;
+        const length = Math.max(1, Math.round(total * clamp(config.tabIndicatorLength, 0, 1)));
+        const start = (vertical ? area.y : x) + Math.round((total - length) / 2);
+        let tabX: number;
+        let tabY: number;
+        switch (position) {
+        case "right":
+            tabX = x + width + config.tabIndicatorGap;
+            tabY = start;
+            break;
+        case "top":
+            tabX = start;
+            tabY = area.y - config.tabIndicatorGap - thickness;
+            break;
+        case "bottom":
+            tabX = start;
+            tabY = area.y + area.height + config.tabIndicatorGap;
+            break;
+        default:
+            tabX = x - config.tabIndicatorGap - thickness;
+            tabY = start;
+            break;
+        }
+        const active = this.getWindowToFocus();
+        let activeIndex = 0;
+        let i = 0;
+        for (const window of this.windows.iterator()) {
+            if (window === active) {
+                activeIndex = i;
+            }
+            i++;
+        }
+        return {
+            x: tabX,
+            y: tabY,
+            width: vertical ? thickness : length,
+            height: vertical ? length : thickness,
+            vertical: vertical,
+            count: this.windows.length(),
+            active: activeIndex,
+        };
     }
 
     public arrangeZ() {
@@ -286,11 +400,8 @@ class Column {
         }
     }
 
-    public toggleStacked() {
-        if (this.windows.length() < 2) {
-            return;
-        }
-        this.stacked = !this.stacked;
+    public toggleTabbed() {
+        this.tabbed = !this.tabbed;
         this.grid.desktop.onLayoutChanged();
     }
 
@@ -349,8 +460,8 @@ class Column {
     public onWindowFocused(window: Window) {
         this.grid.onColumnFocused(this, window);
         this.focusTaker = window;
-        if (this.stacked) {
-            this.arrangeZ();
+        if (this.tabbed) {
+            this.grid.desktop.forceArrange(); // the active tab changed
         }
     }
 

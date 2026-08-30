@@ -62,11 +62,43 @@ namespace KGlobalAccel {
 
     // KGlobalAccel::SetShortcutFlag
     export const setPresent = 2;
+    export const noAutoloading = 4;
     export const isDefault = 8;
 
     export function call(member: string, types: string[], args: unknown[], resolve: (value: any) => void = () => {}) {
         kglobalaccel.call(path, iface, member, types, args, resolve);
     }
+}
+
+// Kiri's settings have two key fields per action (primary and alternate), stored as "key1_<name>" and "key2_<name>"
+// with "-" replaced by "_". A key typed there wins over what the Shortcuts settings page has stored.
+function shortcutConfigName(slot: number, shortcutName: string) {
+    return `key${slot}_${shortcutName.replace(/-/g, "_")}`;
+}
+
+function getShortcutConfigDef() {
+    const empty: any = {};
+    const entries: { name: string, type: string, default: string }[] = [];
+    for (const shortcut of getShortcuts(empty, empty)) {
+        for (const slot of [1, 2]) {
+            entries.push({ name: shortcutConfigName(slot, shortcut.name), type: "String", default: "" });
+        }
+    }
+    return entries;
+}
+
+function readShortcutKeys(readConfig: (name: string) => string): Record<string, string[]> {
+    const empty: any = {};
+    const result: Record<string, string[]> = {};
+    for (const shortcut of getShortcuts(empty, empty)) {
+        const keys = [1, 2]
+            .map(slot => String(readConfig(shortcutConfigName(slot, shortcut.name)) ?? "").trim())
+            .filter(key => key !== "");
+        if (keys.length > 0) {
+            result[shortcut.name] = keys;
+        }
+    }
+    return result;
 }
 
 // Registers Kiri's shortcuts in their own "Kiri" group in Plasma's Shortcuts settings.
@@ -79,12 +111,8 @@ class KeyBindings {
     private readonly priorityDelayer: Delayer;
     private destroyed = false;
 
-    constructor(world: World, config: Actions.Config) {
-        const shortcuts = getShortcuts(world, new Actions(config));
-        for (const shortcut of shortcuts) {
-            this.actions.set(shortcut.name, catchWrap(shortcut.action));
-        }
-        kglobalaccel.onPressed = (name: string) => this.actions.get(name)?.();
+    constructor(world: World, config: Actions.Config, shortcutKeys: Record<string, string[]> = {}) {
+        const shortcuts = this.setActions(world, config);
 
         // Plasma's own shortcuts are registered again when plasmashell or kded start, which can happen after Kiri starts
         this.priorityDelayer = new Delayer(3000, () => this.takePriority());
@@ -97,8 +125,11 @@ class KeyBindings {
             const defaultKeys = parseKeys(shortcut.defaultKeys);
             KGlobalAccel.call("doRegister", ["as"], [actionId]);
             KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.isDefault]);
-            // without NoAutoloading, keys the user already set in Plasma's settings are kept
-            KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.setPresent], (keys: number[]|undefined) => {
+            // keys typed in Kiri's own settings replace the stored ones (NoAutoloading), so they also show up in Plasma's Shortcuts page
+            // without them, keys the user already set in Plasma's settings are kept (autoloading)
+            const userKeys = parseKeys(shortcutKeys[shortcut.name] ?? []);
+            const flags = userKeys.length > 0 ? KGlobalAccel.setPresent | KGlobalAccel.noAutoloading : KGlobalAccel.setPresent;
+            KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, userKeys.length > 0 ? userKeys : defaultKeys, flags], (keys: number[]|undefined) => {
                 for (const key of keys ?? []) {
                     this.activeKeys.add(key);
                 }
@@ -109,6 +140,18 @@ class KeyBindings {
                 }
             });
         }
+    }
+
+    // Points the shortcuts at a new world, keeping the registrations in kglobalaccel as they are.
+    // Used when Kiri reloads its settings, so shortcuts are neither registered twice nor lose priority.
+    public setActions(world: World, config: Actions.Config) {
+        const shortcuts = getShortcuts(world, new Actions(config));
+        this.actions.clear();
+        for (const shortcut of shortcuts) {
+            this.actions.set(shortcut.name, catchWrap(shortcut.action));
+        }
+        kglobalaccel.onPressed = (name: string) => this.actions.get(name)?.();
+        return shortcuts;
     }
 
     private takePriority() {
@@ -154,7 +197,7 @@ function parseKeys(keySequences: string[]) {
     for (const keySequence of keySequences) {
         const key = parseKeySequence(keySequence);
         if (key === undefined) {
-            log("invalid default key:", keySequence);
+            log("invalid key:", keySequence);
             continue;
         }
         keys.push(key);

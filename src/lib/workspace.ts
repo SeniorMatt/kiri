@@ -9,7 +9,11 @@ function initWorkspaceSignalHandlers(world: World, focusPasser: FocusPassing.Pas
 
     manager.connect(Workspace.windowRemoved, (kwinClient: KwinClient) => {
         world.do((clientManager, desktopManager) => {
+            const wasTiled = clientManager.findTiledWindow(kwinClient) !== null;
             clientManager.removeClient(kwinClient, FocusPassing.Type.Immediate);
+            if (wasTiled) {
+                world.holdArrangeForClose();
+            }
         });
     });
 

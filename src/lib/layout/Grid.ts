@@ -4,6 +4,7 @@ class Grid {
     public readonly focusPasser: FocusPassing.Passer;
     private readonly columns: LinkedList<Column>;
     private lastFocusedColumn: Column|null;
+    private previousFocusedColumn: Column|null;
     private width: number;
     private userResize: boolean; // is any part of the grid being resized by the user
     private readonly userResizeFinishedDelayer: Delayer;
@@ -14,6 +15,7 @@ class Grid {
         this.focusPasser = focusPasser;
         this.columns = new LinkedList();
         this.lastFocusedColumn = null;
+        this.previousFocusedColumn = null;
         this.width = 0;
         this.userResize = false;
         this.userResizeFinishedDelayer = new Delayer(50, () => {
@@ -59,12 +61,20 @@ class Grid {
         return this.userResize;
     }
 
+    public hasColumn(column: Column) {
+        return column.grid === this && this.columns.contains(column);
+    }
+
     public getLeftColumn(column: Column) {
         return this.columns.getPrev(column);
     }
 
     public getRightColumn(column: Column) {
         return this.columns.getNext(column);
+    }
+
+    public getColumns() {
+        return Array.from(this.columns.iterator());
     }
 
     public getFirstColumn() {
@@ -84,6 +94,14 @@ class Grid {
             return null;
         }
         return this.lastFocusedColumn;
+    }
+
+    // the column that had focus before the current one, if it still exists
+    public getPreviousFocusedColumn() {
+        if (this.previousFocusedColumn === null || !this.hasColumn(this.previousFocusedColumn)) {
+            return null;
+        }
+        return this.previousFocusedColumn;
     }
 
     public getLastFocusedWindow() {
@@ -195,6 +213,9 @@ class Grid {
         const lastFocusedColumn = this.getLastFocusedColumn();
         if (lastFocusedColumn !== null) {
             lastFocusedColumn.restoreToTiled(window);
+        }
+        if (column !== this.lastFocusedColumn) {
+            this.previousFocusedColumn = this.lastFocusedColumn;
         }
         this.lastFocusedColumn = column;
         this.desktop.scrollToColumn(column, false);

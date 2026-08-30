@@ -1,10 +1,14 @@
 interface LayoutConfig {
     gapsInnerHorizontal: number;
     gapsInnerVertical: number;
-    stackOffsetX: number;
-    stackOffsetY: number;
     offScreenOpacity: number;
-    stackColumnsByDefault: boolean;
+    tabbedColumnsByDefault: boolean;
+    tabIndicatorEnabled: boolean;
+    tabIndicatorWidth: number;
+    tabIndicatorGap: number;
+    tabIndicatorLength: number;
+    tabIndicatorPosition: string;
+    tabIndicatorHideWhenSingleTab: boolean;
     resizeNeighborColumn: boolean;
     reMaximize: boolean;
     tileMaximized: boolean;

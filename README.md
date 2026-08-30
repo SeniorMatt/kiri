@@ -16,7 +16,7 @@ Download `kiri_*.tar.gz` from [Releases](https://github.com/SeniorMatt/kiri/rele
     tar -xzf kiri_*.tar.gz
     kpackagetool6 --type=KWin/Script --install ./kiri
 
-Use `--upgrade` instead of `--install` to update. Enable it in System Settings > Window Management > KWin Scripts.
+Use `--upgrade` instead of `--install` to update. Or run `tools/install.sh kiri_*.tar.gz`, which does either and also gives Kiri's group in the Shortcuts settings an icon. Enable it in System Settings > Window Management > KWin Scripts.
 
 ## Shortcuts
 They're in System Settings > Shortcuts > Kiri, and the defaults follow niri's, except moving uses Meta+Shift instead of Meta+Ctrl:
@@ -55,3 +55,14 @@ Kiri has to be started in a real session or a nested KWin to try it out. If noth
 
 ## License
 GPLv3, see LICENSE.
+
+## Animations and gestures
+
+Kiri only sets window geometry; it does not animate. For sliding columns and resizes install the KWin effect
+[kwin4_effect_geometry_change](https://github.com/peterfajdiga/kwin4_effect_geometry_change). After a tiled window closes,
+Kiri waits `closeRelayoutDelay` ms (default 150) before re-laying out, so the neighbours slide after the close animation
+instead of jumping into it.
+
+Three-finger swipes: left/right scroll the columns and snap to a column edge on release (with momentum), up/down switch
+to the next/previous desktop. Plasma's own three-finger desktop swipe also fires when the desktop grid has more than one
+column (horizontal) or row (vertical); use a single column of desktops (rows = number of desktops) so only Kiri reacts.
