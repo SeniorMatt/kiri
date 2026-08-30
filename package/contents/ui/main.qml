@@ -30,7 +30,7 @@ Item {
         tag: "focus"
         wanted: qmlBase.ringConfig.focusRingEnabled === true
         target: Workspace.activeWindow
-        ringWidth: qmlBase.ringConfig.focusRingWidth
+        ringWidth: qmlBase.ringConfig.focusRingWidth ?? 0
         inset: qmlBase.ringInset
         ringColor: qmlBase.ringConfig.focusRingActiveColor
     }
@@ -40,7 +40,7 @@ Item {
         Ring {
             property bool isActive: target === Workspace.activeWindow
             wanted: qmlBase.ringConfig.borderEnabled === true
-            ringWidth: qmlBase.ringConfig.borderWidth
+            ringWidth: qmlBase.ringConfig.borderWidth ?? 0
             ringColor: isActive ? qmlBase.ringConfig.borderActiveColor : qmlBase.ringConfig.borderInactiveColor
         }
     }
