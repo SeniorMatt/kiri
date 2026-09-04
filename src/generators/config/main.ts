@@ -4,7 +4,11 @@ console.log(`<?xml version="1.0" encoding="UTF-8"?>
     <group name="">`);
 
 for (const entry of [...configDef, ...getShortcutConfigDef()]) {
-    console.log(`        <entry name="${entry.name}" type="${entry.type}">
+    const entryChoices: string[] | undefined = (entry as any).choices;
+    const choices = entryChoices !== undefined
+        ? `\n            <choices>\n${entryChoices.map(choice => `                <choice name="${choice}"/>`).join("\n")}\n            </choices>`
+        : "";
+    console.log(`        <entry name="${entry.name}" type="${entry.type}">${choices}
             <default>${escapeXml(entry.default)}</default>
         </entry>`);
 }

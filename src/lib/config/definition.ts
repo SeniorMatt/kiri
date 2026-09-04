@@ -146,8 +146,9 @@ const configDef = [
     },
     {
         name: "tabIndicatorPosition",
-        type: "String",
+        type: "Enum",
         default: "left",
+        choices: ["left", "right", "top", "bottom"],
     },
     {
         name: "tabIndicatorHideWhenSingleTab",
@@ -303,6 +304,21 @@ const configDef = [
         name: "borderInactiveColor",
         type: "String",
         default: "#505050",
+    },
+    {
+        name: "floatClasses",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "tileClasses",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "columnWidthRules",
+        type: "String",
+        default: "",
     },
     {
         name: "windowRules",

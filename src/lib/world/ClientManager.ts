@@ -26,7 +26,9 @@ class ClientManager {
             notificationInvalidWindowRules.sendEvent();
             log("failed to parse windowRules:", error);
         }
-        this.windowRuleEnforcer = new WindowRuleEnforcer(parsedWindowRules, config.tileFullScreen, config.defaultColumnWidth, config.gapsInnerHorizontal);
+        this.windowRuleEnforcer = new WindowRuleEnforcer(
+            [...getSimpleWindowRules(config.floatClasses, config.tileClasses, config.columnWidthRules), ...parsedWindowRules],
+            config.tileFullScreen, config.defaultColumnWidth, config.gapsInnerHorizontal);
     }
 
     // `existing` is for windows that were already open when Kiri started, they keep their width

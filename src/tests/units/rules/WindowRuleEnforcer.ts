@@ -42,3 +42,12 @@ tests.register("WindowRuleEnforcer", 1, () => {
         };
     }
 });
+
+tests.register("simple window rules", 1, () => {
+    const rules = getSimpleWindowRules("calc\n  mpv \n", "special", "firefox=66.667%\nbad-line\nkate = 800px");
+    const classes = rules.map(rule => `${rule.class}|${rule.tile}|${rule.width}`);
+    Assert.assert(
+        classes.join(",") === "firefox|undefined|66.667%,kate|undefined|800px,special|true|undefined,calc|false|undefined,mpv|false|undefined",
+        { message: "unexpected simple rules: " + classes.join(",") },
+    );
+});

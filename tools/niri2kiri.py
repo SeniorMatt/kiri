@@ -175,7 +175,18 @@ def parse_nodes(toks, pos=0):
 
 
 def parse_kdl(path):
-    return parse_nodes(tokenize(Path(path).expanduser().read_text()))[0]
+    path = Path(path).expanduser()
+    nodes = []
+    for node in parse_nodes(tokenize(path.read_text()))[0]:
+        if node[0] == "include" and node[1]:
+            included = (path.parent / Path(node[1][0]).expanduser())
+            if included.exists():
+                nodes += parse_kdl(included)
+            else:
+                print("# skipped: include", node[1][0], "(not found)", file=sys.stderr)
+            continue
+        nodes.append(node)
+    return nodes
 
 
 def find(nodes, name):

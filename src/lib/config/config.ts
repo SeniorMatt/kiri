@@ -47,6 +47,9 @@ interface Config {
     borderWidth: number;
     borderActiveColor: string;
     borderInactiveColor: string;
+    floatClasses: string;
+    tileClasses: string;
+    columnWidthRules: string;
     windowRules: string;
     tiledDesktops: string;
     shortcutKeys: Record<string, string[]>;
