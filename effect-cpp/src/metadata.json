@@ -1,0 +1,15 @@
+{
+    "KPlugin": {
+        "Authors": [
+            { "Name": "Senior Matthew" }
+        ],
+        "Category": "Window Management",
+        "Description": "Rounds window corners and draws Kiri's focus ring and borders as part of the window, so they follow its animations",
+        "EnabledByDefault": true,
+        "Id": "kiri_decorations",
+        "License": "GPL-3.0",
+        "Name": "Kiri decorations",
+        "Version": "0.1",
+        "Website": "https://github.com/SeniorMatt/kiri"
+    }
+}

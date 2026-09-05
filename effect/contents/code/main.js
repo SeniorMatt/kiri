@@ -82,6 +82,7 @@ class KiriAnimations {
         if (
             !window.managed || !window.visible || !window.onCurrentDesktop || window.minimized ||
             !window.normalWindow ||
+            window.caption.startsWith("kiri-ring-") || // the fallback ring and tab indicator windows follow their target themselves
             window.move || window.resize ||
             fullScreenChange || window.fullScreen ||
             now - data.created < 10 ||

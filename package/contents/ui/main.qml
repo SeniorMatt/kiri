@@ -13,6 +13,9 @@ Item {
     property var borderRings: ({})
     property int ringCounter: 0
     property var tabIndicators: []
+    // true while the C++ effect kiri_decorations is loaded: it paints the ring and borders (and rounds corners)
+    // with the window itself, so these QML windows are only the fallback
+    property bool decorationsEffect: false
     // with borders on, the focus ring goes around the border, like in niri
     readonly property int ringInset: ringConfig.borderEnabled === true ? (ringConfig.borderWidth ?? 0) : 0
 
@@ -30,7 +33,7 @@ Item {
     Ring {
         id: focusRing
         tag: "focus"
-        wanted: qmlBase.ringConfig.focusRingEnabled === true
+        wanted: qmlBase.ringConfig.focusRingEnabled === true && !qmlBase.decorationsEffect
         target: Workspace.activeWindow
         ringWidth: qmlBase.ringConfig.focusRingWidth ?? 0
         inset: qmlBase.ringInset
@@ -50,10 +53,36 @@ Item {
                 const g = target.frameGeometry, ag = a.frameGeometry;
                 return g.x === ag.x && g.y === ag.y && g.width === ag.width && g.height === ag.height;
             }
-            wanted: qmlBase.ringConfig.borderEnabled === true && !coveredByActive
+            wanted: qmlBase.ringConfig.borderEnabled === true && !coveredByActive && !qmlBase.decorationsEffect
             ringWidth: qmlBase.ringConfig.borderWidth ?? 0
             ringColor: isActive ? qmlBase.ringConfig.borderActiveColor : qmlBase.ringConfig.borderInactiveColor
         }
+    }
+
+    function checkDecorationsEffect() {
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/Effects",
+                iface: "org.kde.kwin.Effects",
+                member: "isEffectLoaded",
+                arguments: [new DBus.string("kiri_decorations")],
+                signature: "(s)",
+            },
+            (reply) => {
+                const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
+                qmlBase.decorationsEffect = value === true;
+            },
+            (error) => { qmlBase.decorationsEffect = false; },
+        );
+    }
+
+    Timer {
+        interval: 3000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: qmlBase.checkDecorationsEffect()
     }
 
     // borders switched on or off in the settings

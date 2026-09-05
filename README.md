@@ -11,12 +11,13 @@ What's different so far:
 Kiri has its own script ID, so it can be installed next to Karousel. Only enable one of them.
 
 ## Install
-Download `kiri_*.tar.gz` from [Releases](https://github.com/SeniorMatt/kiri/releases), then:
+Download `kiri_*.kwinscript` from [Releases](https://github.com/SeniorMatt/kiri/releases), then in System Settings > Window Management > KWin Scripts use "Install from File…", tick Kiri and log in again.
 
-    tar -xzf kiri_*.tar.gz
-    kpackagetool6 --type=KWin/Script --install ./kiri
+For the animation effect too, use the install script instead:
 
-Use `--upgrade` instead of `--install` to update. Or run `tools/install.sh kiri_*.tar.gz`, which does either and also gives Kiri's group in the Shortcuts settings an icon. Enable it in System Settings > Window Management > KWin Scripts.
+    gh api repos/SeniorMatt/kiri/contents/tools/install.sh -H "Accept: application/vnd.github.raw" | sh
+
+Run it again to update. Then log out and back in, and enable Kiri in System Settings > Window Management > KWin Scripts if it isn't already.
 
 ## Shortcuts
 They're in System Settings > Shortcuts > Kiri, and the defaults follow niri's, except moving uses Meta+Shift instead of Meta+Ctrl:

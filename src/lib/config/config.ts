@@ -39,6 +39,7 @@ interface Config {
     closeRelayoutDelay: number;
     tiledKeepBelow: boolean;
     floatingKeepAbove: boolean;
+    cornerRadius: number;
     focusRingEnabled: boolean;
     focusRingWidth: number;
     focusRingActiveColor: string;

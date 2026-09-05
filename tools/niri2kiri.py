@@ -410,6 +410,11 @@ def read_settings(path, warn):
     if L("default-column-display"):
         out["tabbedColumnsByDefault"] = (L("default-column-display")[1] or [""])[0] == "tabbed"
     ring_settings(L("focus-ring"), "focusRing", out, warn)
+    for rule in find(nodes, "window-rule"):
+        node = child(rule, "geometry-corner-radius")
+        if node and not find(rule[3], "match") and number(node[1]) is not None:
+            out["cornerRadius"] = max(0, number(node[1]))
+            break
     ring_settings(L("border"), "border", out, warn)
 
     tab = L("tab-indicator")

@@ -273,6 +273,17 @@ namespace NiriImport {
         return rules;
     }
 
+    // geometry-corner-radius of the first window-rule that has no match lines, i.e. applies to every window
+    function cornerRadius(nodes: Kdl.Node[]): number|undefined {
+        for (const rule of Kdl.find(nodes, "window-rule")) {
+            const node = Kdl.child(rule, "geometry-corner-radius");
+            if (node !== undefined && Kdl.find(rule.children, "match").length === 0 && number(node.args) !== undefined) {
+                return Math.max(0, number(node.args) as number);
+            }
+        }
+        return undefined;
+    }
+
     function readSettings(nodes: Kdl.Node[], warn: (msg: string) => void): Record<string, any> {
         const out: Record<string, any> = {};
         const layout = new Map<string, Kdl.Node>();
@@ -325,6 +336,10 @@ namespace NiriImport {
             out["tabbedColumnsByDefault"] = (display.args[0] ?? "") === "tabbed";
         }
         ringSettings(L("focus-ring"), "focusRing", out, warn);
+        const radius = cornerRadius(nodes);
+        if (radius !== undefined) {
+            out["cornerRadius"] = radius;
+        }
         ringSettings(L("border"), "border", out, warn);
 
         const tab = L("tab-indicator");

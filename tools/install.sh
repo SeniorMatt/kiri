@@ -1,8 +1,14 @@
 #!/bin/sh
-# Installs or updates Kiri from a release tarball or the package directory,
-# and gives the Kiri group in System Settings > Shortcuts the same icon as Window Management.
+# Installs or updates Kiri, and gives the Kiri group in System Settings > Shortcuts the same icon as Window Management.
+# With no argument it downloads the latest release:
+#   gh api repos/SeniorMatt/kiri/contents/tools/install.sh -H "Accept: application/vnd.github.raw" | sh
+# or give it a release tarball or the package directory.
 set -e
-src=${1:-./kiri}
+src=$1
+if [ -z "$src" ]; then
+    src=$(mktemp -d)/kiri.tar.gz
+    gh release download -R SeniorMatt/kiri --pattern 'kiri_*.tar.gz' --output "$src"
+fi
 case $src in
 *.tar.gz)
     tmp=$(mktemp -d)
@@ -43,4 +49,4 @@ if [ ! -e "$icons/scalable/apps/kiri.svg" ]; then
         ln -sf "$kwin_icon" "$icons/48x48/apps/kiri.png"
     fi
 fi
-echo "Kiri installed. Turn it off and on in System Settings > Window Management > KWin Scripts to load the new version."
+echo "Kiri installed. Log out and back in to start the new version."

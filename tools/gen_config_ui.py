@@ -166,6 +166,9 @@ layout_tab = tab("layout", "Layout", [
 ])
 
 appearance_tab = tab("appearance", "Appearance", [
+    group("Corners", [
+        spin("cornerRadius", "Corner radius:", "Rounds window corners, needs the Kiri decorations effect (0 = square, like niri's default)", 0, 99),
+    ]),
     group("Focus ring", [
         check("focusRingEnabled", "Draw a ring around the focused window"),
         spin("focusRingWidth", "Width:", "Thickness of the ring", 0, 99),

@@ -29,6 +29,8 @@ uninstall:
 
 package: build
 	tar -czf ./kiri_${subst .,_,${VERSION}}.tar.gz ./package ./effect --transform s/package/kiri/ --transform s/effect/kiri_animations/
+	rm -f ./kiri_${subst .,_,${VERSION}}.kwinscript
+	cd ./package && zip -qr ../kiri_${subst .,_,${VERSION}}.kwinscript .
 
 docs-key-bindings-bbcode:
 	@./run-ts.sh ./src/generators/docs/keyBindingsBbcode

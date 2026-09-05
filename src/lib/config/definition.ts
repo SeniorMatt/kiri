@@ -266,6 +266,11 @@ const configDef = [
         default: false,
     },
     {
+        name: "cornerRadius",
+        type: "UInt",
+        default: 0,
+    },
+    {
         name: "focusRingEnabled",
         type: "Bool",
         default: true,

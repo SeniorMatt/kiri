@@ -13,6 +13,7 @@ function setRingConfig(config: Config) {
         return; // tests
     }
     (qmlBase as any).ringConfig = {
+        cornerRadius: config.cornerRadius,
         focusRingEnabled: config.focusRingEnabled,
         focusRingWidth: config.focusRingWidth,
         focusRingActiveColor: config.focusRingActiveColor,

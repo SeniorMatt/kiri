@@ -59,6 +59,7 @@ tests.register("NiriImport", 1, () => {
             border { on; width 3 }
             tab-indicator { width 6; gap 2; position "top"; length total-proportion=0.7; hide-when-single-tab; active-color "red" }
         }
+        window-rule { geometry-corner-radius 12 }
         window-rule {
             match app-id="^mpv$" title="^Video"
             match app-id="pavucontrol"
@@ -94,6 +95,7 @@ tests.register("NiriImport", 1, () => {
     Assert.equal(s["presetHeights"], "50%");
     Assert.equal(s["defaultColumnWidth"], "75%");
     Assert.equal(s["tabbedColumnsByDefault"], true);
+    Assert.equal(s["cornerRadius"], 12);
     Assert.equal(s["focusRingWidth"], 2);
     Assert.equal(s["focusRingActiveColor"], "#ff0000");
     Assert.equal(s["focusRingInactiveColor"], "#0000ff");
