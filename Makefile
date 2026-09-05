@@ -21,12 +21,14 @@ test:
 
 install: build
 	kpackagetool6 --type=KWin/Script --install=./package || kpackagetool6 --type=KWin/Script --upgrade=./package
+	kpackagetool6 --type=KWin/Effect --install=./effect || kpackagetool6 --type=KWin/Effect --upgrade=./effect
 
 uninstall:
 	kpackagetool6 --type=KWin/Script --remove=kiri
+	kpackagetool6 --type=KWin/Effect --remove=kiri_animations
 
 package: build
-	tar -czf ./kiri_${subst .,_,${VERSION}}.tar.gz ./package --transform s/package/kiri/
+	tar -czf ./kiri_${subst .,_,${VERSION}}.tar.gz ./package ./effect --transform s/package/kiri/ --transform s/effect/kiri_animations/
 
 docs-key-bindings-bbcode:
 	@./run-ts.sh ./src/generators/docs/keyBindingsBbcode

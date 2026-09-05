@@ -178,6 +178,17 @@ class KeyBindings {
         }
     }
 
+    // Puts back the default keys of actions whose key fields (or niri binds) were removed
+    public static resetToDefaultKeys(names: string[]) {
+        const empty: any = {};
+        for (const shortcut of getShortcuts(empty, empty)) {
+            if (names.includes(shortcut.name)) {
+                const actionId = [KGlobalAccel.component, shortcut.name, KGlobalAccel.componentFriendly, shortcut.description];
+                KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, parseKeys(shortcut.defaultKeys), KGlobalAccel.setPresent | KGlobalAccel.noAutoloading]);
+            }
+        }
+    }
+
     public destroy() {
         this.destroyed = true;
         this.priorityDelayer.destroy();

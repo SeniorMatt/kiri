@@ -60,10 +60,11 @@ GPLv3, see LICENSE.
 
 ## Animations and gestures
 
-Kiri only sets window geometry; it does not animate. For sliding columns and resizes install the KWin effect
-[kwin4_effect_geometry_change](https://github.com/peterfajdiga/kwin4_effect_geometry_change). After a tiled window closes,
-Kiri waits `closeRelayoutDelay` ms (default 150) before re-laying out, so the neighbours slide after the close animation
-instead of jumping into it.
+Kiri ships a KWin effect, `kiri_animations`, that animates window moves and resizes (ease-out, 250 ms, retargets smoothly
+when interrupted; skipped during mouse move/resize, full-screen toggles and touchpad scrolling). `make install` and
+`tools/install.sh` install and enable it; otherwise enable "Kiri animations" in System Settings > Window Management > Desktop
+Effects. Don't run another geometry-change effect next to it. After a tiled window closes, Kiri waits `closeRelayoutDelay`
+ms (default 150) before re-laying out, so the neighbours slide after the close animation instead of jumping into it.
 
 Three-finger swipes: left/right scroll the columns and snap to a column edge on release (with momentum), up/down switch
 to the next/previous desktop. Plasma's own three-finger desktop swipe also fires when the desktop grid has more than one

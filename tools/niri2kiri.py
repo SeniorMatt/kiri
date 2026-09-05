@@ -165,6 +165,7 @@ def parse_nodes(toks, pos=0):
             elif kind == "{":
                 children, pos = parse_nodes(toks, pos + 1)
                 pos += 1
+                break  # the node ends with its children
             elif pos + 1 < len(toks) and toks[pos + 1][0] == "=":
                 props[toks[pos][1]] = toks[pos + 2][1]; pos += 3
             else:

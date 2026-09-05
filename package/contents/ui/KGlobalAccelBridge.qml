@@ -19,17 +19,17 @@ QtObject {
         throw new Error("unsupported D-Bus type " + type);
     }
 
-    function unwrap(value) {
-        if (Array.isArray(value)) {
-            return value.map(v => bridge.unwrap(v));
-        }
-        if (value !== null && typeof value === "object" && "value" in value) {
-            return bridge.unwrap(value.value);
-        }
-        return value;
-    }
-
     function call(path, iface, member, types, args, resolve) {
+        // self-contained: replies can arrive after this object is gone (Kiri unloaded), when `bridge` is null
+        const unwrap = (value) => {
+            if (Array.isArray(value)) {
+                return value.map(unwrap);
+            }
+            if (value !== null && typeof value === "object" && "value" in value) {
+                return unwrap(value.value);
+            }
+            return value;
+        };
         DBus.SessionBus.asyncCall(
             {
                 service: "org.kde.kglobalaccel",
@@ -39,7 +39,7 @@ QtObject {
                 arguments: args.map((arg, i) => bridge.wrap(types[i], arg)),
                 signature: "(" + types.join("") + ")",
             },
-            (reply) => resolve(bridge.unwrap(reply.value)),
+            (reply) => resolve(unwrap(reply.value)),
             (error) => {
                 console.log("Kiri: kglobalaccel", member, "failed:", error && error.error ? error.error.message : error);
                 resolve(undefined);

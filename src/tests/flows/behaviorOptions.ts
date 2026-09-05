@@ -176,3 +176,21 @@ tests.register("Reload settings", 5, () => {
     Assert.equal(client3.getActualFrameGeometry().height, tilingArea.height);
     Assert.assert(xBefore !== undefined);
 });
+
+tests.register("Reload removed key field", 1, () => {
+    const config = getDefaultConfig();
+    const { world } = init(config);
+    const settings: any = Object.assign({}, config);
+    KWin = { __brand: "KWin", readConfig: (key: string, defaultValue: any) => settings[key] ?? defaultValue };
+    const kiri = new Kiri(config, world);
+    const accel = kglobalaccel as MockKGlobalAccel;
+    const defaultKeys = accel.registered.get("focus-left");
+
+    settings.key1_focus_left = "Meta+D";
+    Assert.equal(kiri.reloadConfig(), true);
+    Assert.equal(String(accel.registered.get("focus-left")), String(parseKeySequence("Meta+D")));
+
+    settings.key1_focus_left = "";
+    Assert.equal(kiri.reloadConfig(), true);
+    Assert.equal(String(accel.registered.get("focus-left")), String(defaultKeys), { message: "default keys are back" });
+});

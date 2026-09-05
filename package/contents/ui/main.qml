@@ -13,6 +13,8 @@ Item {
     property var borderRings: ({})
     property int ringCounter: 0
     property var tabIndicators: []
+    // with borders on, the focus ring goes around the border, like in niri
+    readonly property int ringInset: ringConfig.borderEnabled === true ? (ringConfig.borderWidth ?? 0) : 0
 
     Instantiator {
         model: qmlBase.ringConfig.tabIndicatorEnabled === true ? qmlBase.tabIndicators.length : 0
@@ -39,7 +41,16 @@ Item {
         id: borderRingComponent
         Ring {
             property bool isActive: target === Workspace.activeWindow
-            wanted: qmlBase.ringConfig.borderEnabled === true
+            // a hidden tab sits right under the active one, its border would cover the active border
+            readonly property bool coveredByActive: {
+                const a = Workspace.activeWindow;
+                if (isActive || a === null || target === null) {
+                    return false;
+                }
+                const g = target.frameGeometry, ag = a.frameGeometry;
+                return g.x === ag.x && g.y === ag.y && g.width === ag.width && g.height === ag.height;
+            }
+            wanted: qmlBase.ringConfig.borderEnabled === true && !coveredByActive
             ringWidth: qmlBase.ringConfig.borderWidth ?? 0
             ringColor: isActive ? qmlBase.ringConfig.borderActiveColor : qmlBase.ringConfig.borderInactiveColor
         }

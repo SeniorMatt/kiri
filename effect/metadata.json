@@ -1,0 +1,19 @@
+{
+    "KPackageStructure": "KWin/Effect",
+    "KPlugin": {
+        "Name": "Kiri animations",
+        "Description": "Smoothly animates window moves and resizes of tiled windows, like niri",
+        "Icon": "preferences-system-windows",
+        "Authors": [{
+            "Name": "Senior Matthew"
+        }],
+        "Category": "Window Management",
+        "EnabledByDefault": false,
+        "Id": "kiri_animations",
+        "Version": "0.1",
+        "License": "GPLv3",
+        "Website": "https://github.com/SeniorMatt/kiri"
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js"
+}

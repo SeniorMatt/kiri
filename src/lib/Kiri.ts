@@ -4,6 +4,7 @@ function loadConfig(): Config {
         config[entry.name] = KWin.readConfig(entry.name, entry.default);
     }
     config.shortcutKeys = readShortcutKeys(name => KWin.readConfig(name, ""));
+    NiriImport.apply(config);
     return config;
 }
 
@@ -90,6 +91,8 @@ class Kiri {
             // the keys changed, so register the shortcuts again
             keyBindings.destroy();
             keyBindings = null;
+            const removed = Object.keys(this.config.shortcutKeys).filter(name => !(name in config.shortcutKeys));
+            KeyBindings.resetToDefaultKeys(removed);
         }
         this.world.destroy();
         try {

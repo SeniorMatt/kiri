@@ -239,6 +239,19 @@ rules_tab = tab("windowRules", "Window Rules", [
     ]),
 ])
 
+niri_tab = tab("niri", "niri", [
+    group("Import niri config", [
+        note("Paste the contents of your niri config.kdl (usually ~/.config/niri/config.kdl) below and tick the box. Kiri reads it every time the settings change "
+             "and applies it on top of the other tabs, so the values it sets win over the Layout, Appearance and Behavior tabs. "
+             "It sets: the key binds (Shortcuts; keys typed in the Shortcuts tab still win), gaps and struts, center-focused-column, always-center-single-column, "
+             "preset column widths and window heights, default column width and display, focus ring, border, tab indicator, warp-mouse-to-focus, "
+             "and window rules that set open-floating or default-column-width (matched by app-id and title). "
+             "Everything else in the file is ignored; lines Kiri can't use are listed in the KWin log."),
+        check("niriConfigEnabled", "Use this niri config", "When off, the pasted text is kept but not used"),
+        text("niriConfig", "niri config.kdl:", "The text of your niri config", 360, placeholder="layout {\n    gaps 16\n}\nbinds {\n    Mod+H { focus-column-left; }\n}"),
+    ]),
+])
+
 shortcuts_tab = ('<widget class="QWidget" name="tab_shortcuts"><attribute name="title"><string>Shortcuts</string></attribute><layout class="QVBoxLayout">'
     '<item><widget class="QLabel" name="label_shortcutsRule"><property name="text"><string>Keys set here take priority and are copied to the Kiri group in System Settings &gt; Shortcuts, without a conflict check. Leave both fields empty to use the keys set in System Settings.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>'
     '<item><widget class="QScrollArea" name="scroll_shortcuts"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property>'
@@ -247,7 +260,7 @@ shortcuts_tab = ('<widget class="QWidget" name="tab_shortcuts"><attribute name="
 doc = ('<?xml version="1.0" encoding="UTF-8"?>\n<ui version="4.0">\n<class>KWin::KarouselConfigForm</class>\n'
        '<widget class="QWidget" name="KWin::KarouselConfigForm"><property name="windowTitle"><string>Kiri</string></property>'
        '<layout class="QVBoxLayout" name="layout_main"><item><widget class="QTabWidget" name="tabContainer">'
-       + layout_tab + appearance_tab + behavior_tab + gestures_tab + rules_tab + shortcuts_tab +
-       '</widget></item><item><widget class="QLabel" name="label"><property name="text"><string>Kiri needs to be restarted for changes to take effect.</string></property></widget></item></layout></widget>\n'
+       + layout_tab + appearance_tab + behavior_tab + gestures_tab + rules_tab + shortcuts_tab + niri_tab +
+       '</widget></item><item><widget class="QLabel" name="label"><property name="text"><string>Changes apply as soon as you press Apply.</string></property></widget></item></layout></widget>\n'
        '<resources/><connections/></ui>\n')
 open(PATH, "w", encoding="utf-8").write(doc)

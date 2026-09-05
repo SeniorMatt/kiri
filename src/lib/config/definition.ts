@@ -330,4 +330,14 @@ const configDef = [
         type: "String",
         default: ".*",
     },
+    {
+        name: "niriConfigEnabled",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "niriConfig",
+        type: "String",
+        default: "",
+    },
 ];

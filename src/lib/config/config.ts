@@ -52,5 +52,7 @@ interface Config {
     columnWidthRules: string;
     windowRules: string;
     tiledDesktops: string;
+    niriConfigEnabled: boolean;
+    niriConfig: string;
     shortcutKeys: Record<string, string[]>;
 }
