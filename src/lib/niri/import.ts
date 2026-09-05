@@ -408,7 +408,7 @@ namespace NiriImport {
         }
         const result = parse(config.niriConfig, config.windowRules);
         Object.assign(config, result.settings);
-        config.shortcutKeys = { ...result.shortcutKeys, ...config.shortcutKeys };
+        config.shortcutKeys = Object.assign({}, result.shortcutKeys, config.shortcutKeys);
         for (const line of result.skipped) {
             log("niri config, skipped:", line);
         }
