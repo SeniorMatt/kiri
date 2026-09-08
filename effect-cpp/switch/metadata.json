@@ -1,0 +1,15 @@
+{
+    "KPlugin": {
+        "Authors": [
+            { "Name": "Senior Matthew" }
+        ],
+        "Category": "Virtual Desktop Switching Animation",
+        "Description": "Switches vertical desktops by following the touchpad swipe and settling fast, never blocking the next switch",
+        "EnabledByDefault": true,
+        "Id": "kiri_desktop_switch",
+        "License": "GPL-3.0",
+        "Name": "Kiri desktop switch",
+        "Version": "0.1",
+        "Website": "https://github.com/SeniorMatt/kiri"
+    }
+}

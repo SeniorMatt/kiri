@@ -248,7 +248,7 @@ const configDef = [
     {
         name: "closeRelayoutDelay",
         type: "UInt",
-        default: 150,
+        default: 0,
     },
     {
         name: "tiledKeepBelow",

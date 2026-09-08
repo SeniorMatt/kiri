@@ -119,6 +119,26 @@ class Actions {
         }
     };
 
+    // niri's consume-window-into-column: the first window of the column on the right joins the bottom of this column
+    public readonly windowConsumeIntoColumn = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const rightColumn = grid.getRightColumn(column);
+        if (rightColumn === null) {
+            return;
+        }
+        rightColumn.getFirstWindow().moveToColumn(column, true, FocusPassing.Type.None);
+        grid.desktop.autoAdjustScroll();
+    };
+
+    // niri's expel-window-from-column: the focused window gets its own column on the right
+    public readonly windowExpelFromColumn = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        if (column.getWindowCount() === 1) {
+            return;
+        }
+        const newColumn = new Column(grid, column);
+        window.moveToColumn(newColumn, true, FocusPassing.Type.None);
+        grid.desktop.autoAdjustScroll();
+    };
+
     // TODO (optimization): only arrange moved windows
     public readonly windowMoveUp = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         column.moveWindowUp(window);

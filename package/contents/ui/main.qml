@@ -59,6 +59,15 @@ Item {
         }
     }
 
+    property int decorationsChecks: 0
+    // the compiled effect not being there is normal on a script-only install; a KWin update can also break it
+    function noteDecorationsEffect(loaded) {
+        decorationsChecks++;
+        if (decorationsChecks === 3 && !loaded) {
+            console.warn("Kiri: the compiled effect kiri_decorations is not loaded, drawing the rings with the script. If you installed it, a KWin update may have broken it: run install.sh again.");
+        }
+    }
+
     function checkDecorationsEffect() {
         DBus.SessionBus.asyncCall(
             {
@@ -72,6 +81,7 @@ Item {
             (reply) => {
                 const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
                 qmlBase.decorationsEffect = value === true;
+                qmlBase.noteDecorationsEffect(value === true);
             },
             (error) => { qmlBase.decorationsEffect = false; },
         );

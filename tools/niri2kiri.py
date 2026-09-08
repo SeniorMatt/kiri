@@ -38,6 +38,8 @@ ACTIONS = {
     "move-column-to-workspace-up": "column-move-to-previous-desktop",
     "consume-or-expel-window-left": "window-move-left",
     "consume-or-expel-window-right": "window-move-right",
+    "consume-window-into-column": "window-consume-into-column",
+    "expel-window-from-column": "window-expel-from-column",
     "switch-preset-column-width": "cycle-preset-widths",
     "switch-preset-column-width-back": "cycle-preset-widths-reverse",
     "maximize-column": "column-width-maximize",

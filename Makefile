@@ -28,9 +28,19 @@ uninstall:
 	kpackagetool6 --type=KWin/Effect --remove=kiri_animations
 
 package: build
-	tar -czf ./kiri_${subst .,_,${VERSION}}.tar.gz ./package ./effect --transform s/package/kiri/ --transform s/effect/kiri_animations/
+	rm -rf ./kiri-pkg-tmp
+	mkdir -p ./kiri-pkg-tmp/kiri_${subst .,_,${VERSION}}
+	cp -r ./package ./effect ./effect-cpp ./kiri-pkg-tmp/kiri_${subst .,_,${VERSION}}/
+	cp ./tools/install.sh ./LICENSE ./README.md ./kiri-pkg-tmp/kiri_${subst .,_,${VERSION}}/
+	rm -rf ./kiri-pkg-tmp/kiri_${subst .,_,${VERSION}}/effect-cpp/build
+	tar -czf ./kiri_${subst .,_,${VERSION}}.tar.gz -C ./kiri-pkg-tmp kiri_${subst .,_,${VERSION}}
+	rm -rf ./kiri-pkg-tmp
 	rm -f ./kiri_${subst .,_,${VERSION}}.kwinscript
 	cd ./package && zip -qr ../kiri_${subst .,_,${VERSION}}.kwinscript .
+
+# builds and installs everything on this machine, including the compiled effects
+install-all:
+	./tools/install.sh
 
 docs-key-bindings-bbcode:
 	@./run-ts.sh ./src/generators/docs/keyBindingsBbcode

@@ -60,6 +60,14 @@ tests.register("Focus and move windows", 1, () => {
     testLayout("window-move-next",        [ [client3], [client1], [client2] ]);
     testLayout("window-move-left",        [ [client3],    [client1,client2] ]);
 
+    testFocus("focus-1", client3);
+    testLayout("window-consume-into-column", [ [client3,client1],    [client2] ]);
+    testFocus("focus-down", client1);
+    testLayout("window-expel-from-column",   [ [client3], [client1], [client2] ]);
+    testLayout("window-expel-from-column",   [ [client3], [client1], [client2] ]);
+    testFocus("focus-2", client1);
+    testLayout("window-consume-into-column", [ [client3],    [client1,client2] ]);
+
     const col1Win1 = client3;
     const col2Win1 = client1;
     const col2Win2 = client2;

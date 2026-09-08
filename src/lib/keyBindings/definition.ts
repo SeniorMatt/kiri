@@ -65,6 +65,18 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.doIfTiledFocused(actions.windowMoveRight),
         },
         {
+            name: "window-consume-into-column",
+            description: "Move the window on the right into this column",
+            defaultKeys: ["Meta+Shift+,", "Meta+<"],
+            action: () => world.doIfTiledFocused(actions.windowConsumeIntoColumn),
+        },
+        {
+            name: "window-expel-from-column",
+            description: "Move window out of its column",
+            defaultKeys: ["Meta+Shift+.", "Meta+>"],
+            action: () => world.doIfTiledFocused(actions.windowExpelFromColumn),
+        },
+        {
             name: "window-move-up",
             description: "Move window up",
             defaultKeys: ["Meta+Shift+K", "Meta+Shift+Up"],

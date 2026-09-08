@@ -1,36 +1,104 @@
 #!/bin/sh
-# Installs or updates Kiri, and gives the Kiri group in System Settings > Shortcuts the same icon as Window Management.
-# With no argument it downloads the latest release:
-#   gh api repos/SeniorMatt/kiri/contents/tools/install.sh -H "Accept: application/vnd.github.raw" | sh
-# or give it a release tarball or the package directory.
+# Installs or updates Kiri on this machine. Run it from the extracted release (kiri_X.tar.gz) or a git checkout:
+#   ./install.sh
+# It builds the compiled KWin effects against the KWin you have installed (so run it again after a KWin
+# update), installs the Kiri script and the kiri_animations effect for your user, turns everything on and does
+# the one-time setup (Plasma's Slide effect off, desktops in one column). If the build fails, Kiri still works:
+# it draws its rings itself and the old Slide stays.
+#   ./install.sh --no-build    skip the compiled effects
 set -e
-src=$1
-if [ -z "$src" ]; then
-    src=$(mktemp -d)/kiri.tar.gz
-    gh release download -R SeniorMatt/kiri --pattern 'kiri_*.tar.gz' --output "$src"
-fi
-case $src in
-*.tar.gz)
-    tmp=$(mktemp -d)
-    tar -xzf "$src" -C "$tmp"
-    src=$tmp/kiri
-    effect=$tmp/kiri_animations
-    ;;
-*)
-    effect=$(dirname "$src")/kiri_animations
-    [ -d "$effect" ] || effect=$(dirname "$src")/effect
-    ;;
-esac
-kpackagetool6 --type=KWin/Script --upgrade "$src" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Script --install "$src"
 
-# the animation effect (smooth window moves and resizes), enabled once and reloaded on every update
-if [ -d "$effect" ]; then
-    kpackagetool6 --type=KWin/Effect --upgrade "$effect" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Effect --install "$effect"
-    if [ "$(kreadconfig6 --file kwinrc --group Plugins --key kiri_animationsEnabled)" != false ]; then
-        kwriteconfig6 --file kwinrc --group Plugins --key kiri_animationsEnabled true
-        qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect kiri_animations >/dev/null 2>&1 || true
-        qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect kiri_animations >/dev/null 2>&1 || true
+here=$(cd "$(dirname "$0")" && pwd)
+root=$here
+[ -d "$root/package" ] || root=$(dirname "$here")
+[ -d "$root/package" ] || { echo "install.sh: can't find the package/ directory next to this script" >&2; exit 1; }
+effect=$root/effect
+cpp=$root/effect-cpp
+build=true
+[ "$1" = --no-build ] && build=false
+
+SUDO=sudo
+[ "$(id -u)" = 0 ] && SUDO=
+
+# ---- the compiled effects ----------------------------------------------------------------------------
+compiled=false
+if $build && [ -d "$cpp" ]; then
+    missing=false
+    command -v cmake >/dev/null 2>&1 || missing=true
+    command -v g++ >/dev/null 2>&1 || missing=true
+    [ -d /usr/share/ECM ] || missing=true
+    [ -f /usr/include/kwin/effect/effecthandler.h ] || missing=true
+    [ -f /usr/include/epoxy/gl.h ] || missing=true
+    if $missing; then
+        if command -v pacman >/dev/null 2>&1; then
+            echo "Installing build tools and KWin headers (sudo pacman -S --needed) ..."
+            $SUDO pacman -S --needed --noconfirm base-devel cmake extra-cmake-modules kwin libepoxy qt6-base kconfig kcoreaddons
+        else
+            echo "Missing cmake, a C++ compiler, extra-cmake-modules or the KWin headers; skipping the compiled effects." >&2
+        fi
     fi
+    builddir=${XDG_CACHE_HOME:-$HOME/.cache}/kiri-build
+    rm -rf "$builddir"
+    mkdir -p "$builddir"
+    if cmake -S "$cpp" -B "$builddir" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr >"$builddir/log.txt" 2>&1 &&
+        cmake --build "$builddir" -j "$(nproc)" >>"$builddir/log.txt" 2>&1; then
+        # let KWin let go of the old plugins before replacing the files
+        for e in kiri_decorations kiri_desktop_switch; do
+            qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
+        done
+        # remove first: a new file instead of overwriting one KWin may have mapped
+        for f in $(find /usr/lib/qt6/plugins/kwin/effects/plugins -name 'kiri_*.so' 2>/dev/null); do
+            $SUDO rm -f "$f"
+        done
+        $SUDO cmake --install "$builddir" >>"$builddir/log.txt" 2>&1
+        compiled=true
+        echo "Built and installed the compiled effects (kiri_decorations, kiri_desktop_switch)."
+    else
+        echo "Building the compiled effects failed, see $builddir/log.txt. Kiri still works without them." >&2
+    fi
+fi
+
+# ---- the script and the animation effect ---------------------------------------------------------------
+kpackagetool6 --type=KWin/Script --upgrade "$root/package" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Script --install "$root/package"
+kpackagetool6 --type=KWin/Effect --upgrade "$effect" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Effect --install "$effect"
+
+# ---- turn things on ------------------------------------------------------------------------------------
+w() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" "$3"; }
+w Plugins kiriEnabled true
+if [ "$(kreadconfig6 --file kwinrc --group Plugins --key kiri_animationsEnabled)" != false ]; then
+    w Plugins kiri_animationsEnabled true
+fi
+if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key effectsEnabled)" != done ]; then
+    # the first install turns them on; after that the user's choice stays
+    w Plugins kiri_decorationsEnabled true
+    w Plugins kiri_desktop_switchEnabled true
+    w Plugins slideEnabled false
+    w Kiri-install effectsEnabled done
+fi
+# desktops one above the other, like niri's workspaces, unless the user has chosen a layout already
+# (a Rows line in kwinrc means somebody chose one)
+if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key desktopsVertical)" != done ]; then
+    number=$(kreadconfig6 --file kwinrc --group Desktops --key Number --default 1)
+    if ! grep -q '^Rows=' "${XDG_CONFIG_HOME:-$HOME/.config}/kwinrc" 2>/dev/null && [ "$number" -gt 1 ]; then
+        w Desktops Rows "$number"
+    fi
+    [ "$number" -gt 1 ] && w Kiri-install desktopsVertical done
+fi
+
+# ---- apply without logging out where KWin allows it ----------------------------------------------------
+applied=false
+if qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1; then
+    applied=true
+    rows=$(kreadconfig6 --file kwinrc --group Desktops --key Rows --default 0)
+    [ "$rows" -gt 0 ] && qdbus6 org.kde.KWin /VirtualDesktopManager org.freedesktop.DBus.Properties.Set org.kde.KWin.VirtualDesktopManager rows "$rows" >/dev/null 2>&1 || true
+    $compiled && qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect slide >/dev/null 2>&1 || true
+    for e in kiri_animations kiri_decorations kiri_desktop_switch; do
+        qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
+        qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect $e >/dev/null 2>&1 || true
+    done
+    # a new version of the script: stop the running one, reconfigure starts it again
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript kiri >/dev/null 2>&1 || true
+    qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
 fi
 
 # the Shortcuts page looks up an icon named after the shortcut group, "kiri"
@@ -43,10 +111,15 @@ for kwin_icon in /usr/share/icons/breeze/apps/48/kwin.svg /usr/share/icons/hicol
     fi
 done
 if [ ! -e "$icons/scalable/apps/kiri.svg" ]; then
-    kwin_icon=$(find /usr/share/icons/hicolor -name 'kwin.png' | sort -V | tail -1)
+    kwin_icon=$(find /usr/share/icons/hicolor -name 'kwin.png' 2>/dev/null | sort -V | tail -1)
     if [ -n "$kwin_icon" ]; then
         mkdir -p "$icons/48x48/apps"
         ln -sf "$kwin_icon" "$icons/48x48/apps/kiri.png"
     fi
 fi
-echo "Kiri installed. Log out and back in to start the new version."
+
+if $applied; then
+    echo "Kiri installed and running."
+else
+    echo "Kiri installed. Log out and back in to start it."
+fi

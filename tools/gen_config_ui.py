@@ -24,6 +24,8 @@ extra_rows = [
     ("window_height_increase_down", "Cycle preset window heights", "window_height_cycle_presets"),
     ("window_height_cycle_presets", "Cycle preset window heights in reverse", "window_height_cycle_presets_reverse"),
     ("window_height_cycle_presets_reverse", "Reset window height", "window_height_reset"),
+    ("window_move_right", "Move the window on the right into this column", "window_consume_into_column"),
+    ("window_consume_into_column", "Move window out of its column", "window_expel_from_column"),
 ]
 for after, label, key in extra_rows:
     for _, rows in sections:
