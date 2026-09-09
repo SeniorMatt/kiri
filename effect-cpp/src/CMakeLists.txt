@@ -7,4 +7,5 @@ target_link_libraries(kiri_decorations PRIVATE
     KF6::ConfigCore
     KF6::CoreAddons
     Qt6::Gui
+    Qt6::DBus
     epoxy::epoxy)

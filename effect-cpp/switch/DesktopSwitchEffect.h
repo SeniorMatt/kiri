@@ -16,7 +16,7 @@
 // kwineffects
 #include "effect/effect.h"
 #include "effect/effectwindow.h"
-#include "effect/springmotion.h"
+#include "SpringMotion.h"
 #include "effect/timeline.h"
 
 #include <QObject>

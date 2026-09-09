@@ -9,6 +9,10 @@
 
 #pragma once
 
+#include <QAction>
+#include <QElapsedTimer>
+#include <memory>
+#include <vector>
 #include <effect/offscreeneffect.h>
 
 #include <QColor>
@@ -40,6 +44,7 @@ struct Settings
 class Effect final : public KWin::OffscreenEffect
 {
     Q_OBJECT
+    Q_CLASSINFO("D-Bus Interface", "org.kde.kiri.Decorations")
 
 public:
     Effect();
@@ -56,8 +61,14 @@ public:
     int requestedEffectChainPosition() const override;
     bool blocksDirectScanout() const override;
 
+public Q_SLOTS:
+    // debug: fire wheel bind number i (0..11, in registration order) as if KWin had matched it
+    Q_SCRIPTABLE void debugWheel(int i);
+
 private:
     void loadSettings();
+    void registerWheelShortcuts();
+    void wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection direction, const QString &shortcut);
     bool decorated(KWin::EffectWindow *w) const;
     int radiusFor(KWin::EffectWindow *w) const;
     KWin::RectF outerBounds(KWin::EffectWindow *w) const;
@@ -69,6 +80,8 @@ private:
     std::unique_ptr<KWin::GLShader> m_cornerShader;
     std::unique_ptr<KWin::GLShader> m_ringShader;
     KWin::EffectWindow *m_active = nullptr;
+    std::vector<std::unique_ptr<QAction>> m_wheelActions;
+    QElapsedTimer m_wheelCooldown;
 };
 
 } // namespace KiriDecorations

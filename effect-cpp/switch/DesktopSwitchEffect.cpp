@@ -148,7 +148,7 @@ void DesktopSwitchScreen::prePaintScreen(ScreenPrePaintData &data)
         Q_UNREACHABLE();
 
     case State::ActiveAnimation: {
-        const std::chrono::milliseconds timeDelta = m_clock.tick(data.view);
+        const std::chrono::nanoseconds timeDelta = m_clock.tick(data.view);
 
         m_motionX.advance(timeDelta);
         m_motionY.advance(timeDelta);
@@ -562,7 +562,7 @@ void DesktopSwitchEffect::debugRelease()
 
 QString DesktopSwitchEffect::debugPosition()
 {
-    DesktopSwitchScreen *s = getSlideEffectScreen(effects->activeScreen());
+    DesktopSwitchScreen *s = getDesktopSwitchScreen(effects->activeScreen());
     if (!s || !s->isActive()) {
         return QStringLiteral("idle");
     }

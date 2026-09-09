@@ -17,6 +17,9 @@
 #include <KConfigGroup>
 #include <KSharedConfig>
 
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCall>
 #include <QLoggingCategory>
 #include <QStandardPaths>
 #include <QVector2D>
@@ -53,6 +56,10 @@ Effect::Effect()
     }
 
     loadSettings();
+    registerWheelShortcuts();
+    if (!QDBusConnection::sessionBus().registerObject(QStringLiteral("/KiriDecorations"), this, QDBusConnection::ExportScriptableSlots)) {
+        qCWarning(KIRI_DECO) << "could not register the debug D-Bus object";
+    }
     m_watcher = KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("kwinrc")));
     connect(m_watcher.data(), &KConfigWatcher::configChanged, this, [this](const KConfigGroup &group) {
         if (group.name() == QLatin1String("Script-kiri") || group.name() == QLatin1String("Plugins")) {
@@ -71,12 +78,18 @@ Effect::Effect()
             repaintAround(w);
         }
     });
-    connect(KWin::effects, &KWin::EffectsHandler::windowFrameGeometryChanged, this, [this](KWin::EffectWindow *w, const KWin::RectF &old) {
-        // the ring is outside of what KWin repaints for the window itself
-        const int reach = m_settings.borderWidth + m_settings.ringWidth + 2;
-        KWin::effects->addRepaint(old.adjusted(-reach, -reach, reach, reach));
-        repaintAround(w);
-    });
+    auto watch = [this](KWin::EffectWindow *w) {
+        connect(w, &KWin::EffectWindow::windowFrameGeometryChanged, this, [this](KWin::EffectWindow *w, const KWin::RectF &old) {
+            // the ring is outside of what KWin repaints for the window itself
+            const int reach = m_settings.borderWidth + m_settings.ringWidth + 2;
+            KWin::effects->addRepaint(old.adjusted(-reach, -reach, reach, reach));
+            repaintAround(w);
+        });
+    };
+    connect(KWin::effects, &KWin::EffectsHandler::windowAdded, this, watch);
+    for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
+        watch(w);
+    }
     connect(KWin::effects, &KWin::EffectsHandler::windowClosed, this, [this](KWin::EffectWindow *w) {
         if (m_active == w) {
             m_active = nullptr;
@@ -84,7 +97,56 @@ Effect::Effect()
     });
 }
 
-Effect::~Effect() = default;
+Effect::~Effect()
+{
+    QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/KiriDecorations"));
+}
+
+// Mouse wheel navigation like niri's binds. KWin scripts can't bind the wheel, so this effect does and asks
+// Kiri's own shortcuts to do the work through kglobalaccel. All of them share one 150 ms cooldown, like niri's.
+void Effect::wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection direction, const QString &shortcut)
+{
+    auto action = std::make_unique<QAction>();
+    connect(action.get(), &QAction::triggered, this, [this, shortcut] {
+        if (!m_settings.kiriEnabled || (m_wheelCooldown.isValid() && m_wheelCooldown.elapsed() < 150)) {
+            return;
+        }
+        m_wheelCooldown.start();
+        QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/component/kiri"),
+                                                              QStringLiteral("org.kde.kglobalaccel.Component"), QStringLiteral("invokeShortcut"));
+        message << shortcut;
+        QDBusConnection::sessionBus().asyncCall(message);
+    });
+    KWin::effects->registerAxisShortcut(modifiers, direction, action.get());
+    m_wheelActions.push_back(std::move(action));
+}
+
+void Effect::debugWheel(int i)
+{
+    if (i >= 0 && i < int(m_wheelActions.size())) {
+        m_wheelActions[i]->trigger();
+    }
+}
+
+void Effect::registerWheelShortcuts()
+{
+    const Qt::KeyboardModifiers meta = Qt::MetaModifier;
+    const Qt::KeyboardModifiers metaCtrl = Qt::MetaModifier | Qt::ControlModifier;
+    const Qt::KeyboardModifiers metaShift = Qt::MetaModifier | Qt::ShiftModifier;
+    const Qt::KeyboardModifiers metaCtrlShift = Qt::MetaModifier | Qt::ControlModifier | Qt::ShiftModifier;
+    wheel(meta, KWin::PointerAxisDown, QStringLiteral("desktop-next"));
+    wheel(meta, KWin::PointerAxisUp, QStringLiteral("desktop-previous"));
+    wheel(metaCtrl, KWin::PointerAxisDown, QStringLiteral("column-move-to-next-desktop"));
+    wheel(metaCtrl, KWin::PointerAxisUp, QStringLiteral("column-move-to-previous-desktop"));
+    wheel(meta, KWin::PointerAxisRight, QStringLiteral("focus-right"));
+    wheel(meta, KWin::PointerAxisLeft, QStringLiteral("focus-left"));
+    wheel(metaCtrl, KWin::PointerAxisRight, QStringLiteral("column-move-right"));
+    wheel(metaCtrl, KWin::PointerAxisLeft, QStringLiteral("column-move-left"));
+    wheel(metaShift, KWin::PointerAxisDown, QStringLiteral("focus-right"));
+    wheel(metaShift, KWin::PointerAxisUp, QStringLiteral("focus-left"));
+    wheel(metaCtrlShift, KWin::PointerAxisDown, QStringLiteral("column-move-right"));
+    wheel(metaCtrlShift, KWin::PointerAxisUp, QStringLiteral("column-move-left"));
+}
 
 bool Effect::supported()
 {
