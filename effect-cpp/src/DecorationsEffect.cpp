@@ -20,6 +20,7 @@
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCall>
+#include <QDBusPendingCallWatcher>
 #include <QLoggingCategory>
 #include <QStandardPaths>
 #include <QVector2D>
@@ -108,6 +109,7 @@ void Effect::wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection d
 {
     auto action = std::make_unique<QAction>();
     connect(action.get(), &QAction::triggered, this, [this, shortcut] {
+        qCDebug(KIRI_DECO) << "wheel" << shortcut << m_settings.kiriEnabled;
         if (!m_settings.kiriEnabled || (m_wheelCooldown.isValid() && m_wheelCooldown.elapsed() < 150)) {
             return;
         }
@@ -115,7 +117,14 @@ void Effect::wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection d
         QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/component/kiri"),
                                                               QStringLiteral("org.kde.kglobalaccel.Component"), QStringLiteral("invokeShortcut"));
         message << shortcut;
-        QDBusConnection::sessionBus().asyncCall(message);
+        auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message), this);
+        connect(watcher, &QDBusPendingCallWatcher::finished, watcher, [shortcut](QDBusPendingCallWatcher *w) {
+            if (w->isError()) {
+                qCWarning(KIRI_DECO) << "invoking" << shortcut << "failed:" << w->error().message();
+            }
+            w->deleteLater();
+        });
+        qCDebug(KIRI_DECO) << "invoked" << shortcut;
     });
     KWin::effects->registerAxisShortcut(modifiers, direction, action.get());
     m_wheelActions.push_back(std::move(action));
