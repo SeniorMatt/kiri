@@ -16,6 +16,9 @@
 #include <effect/offscreeneffect.h>
 
 #include <QColor>
+#include <QHash>
+#include <QList>
+#include <QUuid>
 #include <KConfigWatcher>
 
 #include <memory>
@@ -39,6 +42,21 @@ struct Settings
     int borderWidth = 4;
     QColor borderActiveColor = QColor(QStringLiteral("#ffc87f"));
     QColor borderInactiveColor = QColor(QStringLiteral("#505050"));
+    bool tabEnabled = true;
+    int tabWidth = 4;
+    int tabGap = 5;
+    double tabLength = 0.5;
+    QString tabPosition = QStringLiteral("left");
+    bool tabHideWhenSingle = false;
+    QColor tabActiveColor = QColor(QStringLiteral("#7fc8ff"));
+    QColor tabInactiveColor = QColor(QStringLiteral("#505050"));
+};
+
+// a tabbed column as Kiri reports it: its windows in tab order and the shown one
+struct TabGroup
+{
+    QList<QUuid> windows;
+    int active = 0;
 };
 
 class Effect final : public KWin::OffscreenEffect
@@ -64,6 +82,8 @@ public:
 public Q_SLOTS:
     // debug: fire wheel bind number i (0..11, in registration order) as if KWin had matched it
     Q_SCRIPTABLE void debugWheel(int i);
+    // Kiri's tabbed columns as JSON: [{"windows": ["{uuid}", ...], "active": 0}, ...]
+    Q_SCRIPTABLE void setTabGroups(const QString &json);
 
 private:
     void loadSettings();
@@ -73,6 +93,10 @@ private:
     int radiusFor(KWin::EffectWindow *w) const;
     KWin::RectF outerBounds(KWin::EffectWindow *w) const;
     void repaintAround(KWin::EffectWindow *w);
+    double reach() const;
+    const TabGroup *tabGroupOf(KWin::EffectWindow *w) const;
+    void drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity);
+    void fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &rect, const QColor &color, const KWin::Region &deviceRegion, double opacity);
     void drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity);
 
     Settings m_settings;
@@ -80,6 +104,8 @@ private:
     std::unique_ptr<KWin::GLShader> m_cornerShader;
     std::unique_ptr<KWin::GLShader> m_ringShader;
     KWin::EffectWindow *m_active = nullptr;
+    QList<TabGroup> m_tabGroups;
+    QHash<QUuid, int> m_tabGroupOf;
     std::vector<std::unique_ptr<QAction>> m_wheelActions;
     QElapsedTimer m_wheelCooldown;
 };

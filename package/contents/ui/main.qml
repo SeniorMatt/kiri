@@ -13,6 +13,8 @@ Item {
     property var borderRings: ({})
     property int ringCounter: 0
     property var tabIndicators: []
+    // JSON of every desktop's tabbed columns, for the compiled effect that paints their indicators
+    property string tabGroups: "[]"
     // true while the C++ effect kiri_decorations is loaded: it paints the ring and borders (and rounds corners)
     // with the window itself, so these QML windows are only the fallback
     property bool decorationsEffect: false
@@ -20,7 +22,7 @@ Item {
     readonly property int ringInset: ringConfig.borderEnabled === true ? (ringConfig.borderWidth ?? 0) : 0
 
     Instantiator {
-        model: qmlBase.ringConfig.tabIndicatorEnabled === true ? qmlBase.tabIndicators.length : 0
+        model: qmlBase.ringConfig.tabIndicatorEnabled === true && !qmlBase.decorationsEffect ? qmlBase.tabIndicators.length : 0
         delegate: TabIndicator {
             tag: String(index)
             info: qmlBase.tabIndicators[index] ?? ({ x: 0, y: 0, width: 1, height: 1, vertical: true, count: 0, active: 0 })
@@ -82,10 +84,31 @@ Item {
                 const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
                 qmlBase.decorationsEffect = value === true;
                 qmlBase.noteDecorationsEffect(value === true);
+                if (value === true) {
+                    qmlBase.sendTabGroups(); // also after the effect was reloaded
+                }
             },
             (error) => { qmlBase.decorationsEffect = false; },
         );
     }
+
+    function sendTabGroups() {
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriDecorations",
+                iface: "org.kde.kiri.Decorations",
+                member: "setTabGroups",
+                arguments: [new DBus.string(qmlBase.tabGroups)],
+                signature: "(s)",
+            },
+            () => {},
+            (error) => {},
+        );
+    }
+
+    onTabGroupsChanged: if (decorationsEffect) sendTabGroups()
+    onDecorationsEffectChanged: if (decorationsEffect) sendTabGroups()
 
     Timer {
         interval: 3000

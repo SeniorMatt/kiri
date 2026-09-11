@@ -21,6 +21,9 @@
 #include <QDBusMessage>
 #include <QDBusPendingCall>
 #include <QDBusPendingCallWatcher>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLoggingCategory>
 #include <QStandardPaths>
 #include <QVector2D>
@@ -82,7 +85,7 @@ Effect::Effect()
     auto watch = [this](KWin::EffectWindow *w) {
         connect(w, &KWin::EffectWindow::windowFrameGeometryChanged, this, [this](KWin::EffectWindow *w, const KWin::RectF &old) {
             // the ring is outside of what KWin repaints for the window itself
-            const int reach = m_settings.borderWidth + m_settings.ringWidth + 2;
+            const double reach = this->reach();
             KWin::effects->addRepaint(old.adjusted(-reach, -reach, reach, reach));
             repaintAround(w);
         });
@@ -177,7 +180,76 @@ void Effect::loadSettings()
     s.borderWidth = int(kiri.readEntry("borderWidth", 4u));
     s.borderActiveColor = readColor(kiri, "borderActiveColor", s.borderActiveColor);
     s.borderInactiveColor = readColor(kiri, "borderInactiveColor", s.borderInactiveColor);
+    s.tabEnabled = kiri.readEntry("tabIndicatorEnabled", true);
+    s.tabWidth = int(kiri.readEntry("tabIndicatorWidth", 4u));
+    s.tabGap = int(kiri.readEntry("tabIndicatorGap", 5u));
+    s.tabLength = std::clamp(kiri.readEntry("tabIndicatorLength", 0.5), 0.0, 1.0);
+    // an enum is stored by the name of its choice, or by its number
+    static const QStringList positions = {QStringLiteral("left"), QStringLiteral("right"), QStringLiteral("top"), QStringLiteral("bottom")};
+    const QString position = kiri.readEntry("tabIndicatorPosition", QStringLiteral("left"));
+    bool isNumber = false;
+    const int number = position.toInt(&isNumber);
+    s.tabPosition = isNumber ? positions.value(number, QStringLiteral("left")) : (positions.contains(position) ? position : QStringLiteral("left"));
+    s.tabHideWhenSingle = kiri.readEntry("tabIndicatorHideWhenSingleTab", false);
+    s.tabActiveColor = readColor(kiri, "focusRingActiveColor", s.tabActiveColor);
+    s.tabInactiveColor = readColor(kiri, "focusRingInactiveColor", s.tabInactiveColor);
     m_settings = s;
+}
+
+void Effect::setTabGroups(const QString &json)
+{
+    QList<TabGroup> groups;
+    QHash<QUuid, int> index;
+    const QJsonArray array = QJsonDocument::fromJson(json.toUtf8()).array();
+    for (const QJsonValue &value : array) {
+        const QJsonObject object = value.toObject();
+        TabGroup group;
+        for (const QJsonValue &id : object.value(QStringLiteral("windows")).toArray()) {
+            const QUuid uuid(id.toString());
+            if (!uuid.isNull()) {
+                group.windows.push_back(uuid);
+            }
+        }
+        group.active = std::clamp(object.value(QStringLiteral("active")).toInt(), 0, std::max(0, int(group.windows.size()) - 1));
+        if (group.windows.isEmpty()) {
+            continue;
+        }
+        for (const QUuid &uuid : std::as_const(group.windows)) {
+            index.insert(uuid, groups.size());
+        }
+        groups.push_back(group);
+    }
+    // repaint the columns that changed, and the ones that are gone
+    auto repaint = [this](const QList<TabGroup> &list) {
+        for (const TabGroup &group : list) {
+            for (const QUuid &uuid : group.windows) {
+                if (KWin::EffectWindow *w = KWin::effects->findWindow(uuid)) {
+                    repaintAround(w);
+                }
+            }
+        }
+    };
+    if (groups.size() != m_tabGroups.size() || !std::equal(groups.begin(), groups.end(), m_tabGroups.begin(), [](const TabGroup &a, const TabGroup &b) { return a.windows == b.windows && a.active == b.active; })) {
+        repaint(m_tabGroups);
+        m_tabGroups = groups;
+        m_tabGroupOf = index;
+        repaint(m_tabGroups);
+    }
+}
+
+double Effect::reach() const
+{
+    double reach = m_settings.borderWidth + m_settings.ringWidth + 2;
+    if (m_settings.tabEnabled) {
+        reach = std::max<double>(reach, m_settings.tabGap + m_settings.tabWidth + 2);
+    }
+    return reach;
+}
+
+const TabGroup *Effect::tabGroupOf(KWin::EffectWindow *w) const
+{
+    const auto it = m_tabGroupOf.constFind(w->internalId());
+    return it == m_tabGroupOf.constEnd() ? nullptr : &m_tabGroups[it.value()];
 }
 
 void Effect::reconfigure(ReconfigureFlags)
@@ -237,7 +309,7 @@ int Effect::radiusFor(KWin::EffectWindow *w) const
 
 KWin::RectF Effect::outerBounds(KWin::EffectWindow *w) const
 {
-    const int reach = m_settings.borderWidth + m_settings.ringWidth + 2;
+    const double reach = this->reach();
     return w->frameGeometry().adjusted(-reach, -reach, reach, reach);
 }
 
@@ -284,7 +356,83 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
                                  frame.width() * data.xScale(), frame.height() * data.yScale());
         drawRing(viewport, w, visual, deviceRegion, data.opacity());
     }
+    // the tab indicator of a tabbed column belongs to its shown window
+    if (m_settings.tabEnabled && isActive() && !w->isFullScreen()) {
+        if (const TabGroup *group = tabGroupOf(w); group && group->windows.value(group->active) == w->internalId()
+            && (group->windows.size() >= 2 || !m_settings.tabHideWhenSingle)) {
+            const KWin::RectF frame = w->frameGeometry();
+            const KWin::RectF visual(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
+                                     frame.width() * data.xScale(), frame.height() * data.yScale());
+            drawTabIndicator(viewport, *group, visual, deviceRegion, data.opacity());
+        }
+    }
     return result;
+}
+
+void Effect::fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &rect, const QColor &color, const KWin::Region &deviceRegion, double opacity)
+{
+    std::vector<QVector2D> vertices;
+    for (const KWin::Rect &deviceRect : deviceRegion.rects()) {
+        const KWin::RectF part = viewport.mapFromDeviceCoordinates(KWin::RectF(deviceRect)).intersected(rect);
+        if (part.isEmpty()) {
+            continue;
+        }
+        const QVector2D tl(part.left(), part.top()), tr(part.right(), part.top());
+        const QVector2D bl(part.left(), part.bottom()), br(part.right(), part.bottom());
+        for (const QVector2D &v : {tl, tr, bl, bl, tr, br}) {
+            vertices.push_back(v);
+        }
+    }
+    if (vertices.empty()) {
+        return;
+    }
+    const double alpha = color.alphaF() * opacity;
+    KWin::GLShader *shader = KWin::ShaderManager::instance()->pushShader(KWin::ShaderTrait::UniformColor);
+    shader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, viewport.projectionMatrix());
+    shader->setUniform(KWin::GLShader::ColorUniform::Color, QVector4D(color.redF() * alpha, color.greenF() * alpha, color.blueF() * alpha, alpha));
+    KWin::GLVertexBuffer *vbo = KWin::GLVertexBuffer::streamingBuffer();
+    vbo->reset();
+    vbo->setVertices(vertices);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    vbo->render(GL_TRIANGLES);
+    glDisable(GL_BLEND);
+    KWin::ShaderManager::instance()->popShader();
+}
+
+// niri's tab indicator: a bar beside the column, split into one segment per window, the shown one highlighted.
+// Same geometry as the script's fallback (Column.getTabIndicator), but taken from where the window is painted now.
+void Effect::drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity)
+{
+    const QString &position = m_settings.tabPosition;
+    const bool vertical = position == QLatin1String("left") || position == QLatin1String("right");
+    const double thickness = m_settings.tabWidth;
+    const double total = vertical ? frame.height() : frame.width();
+    const double length = std::max(1.0, std::round(total * m_settings.tabLength));
+    const double start = std::round((vertical ? frame.y() : frame.x()) + (total - length) / 2);
+    double x, y;
+    if (position == QLatin1String("right")) {
+        x = frame.x() + frame.width() + m_settings.tabGap;
+        y = start;
+    } else if (position == QLatin1String("top")) {
+        x = start;
+        y = frame.y() - m_settings.tabGap - thickness;
+    } else if (position == QLatin1String("bottom")) {
+        x = start;
+        y = frame.y() + frame.height() + m_settings.tabGap;
+    } else {
+        x = frame.x() - m_settings.tabGap - thickness;
+        y = start;
+    }
+    x = std::round(x);
+    y = std::round(y);
+    const int count = group.windows.size();
+    for (int i = 0; i < count; ++i) {
+        const double from = std::round(i * length / count);
+        const double to = std::round((i + 1) * length / count);
+        const KWin::RectF segment = vertical ? KWin::RectF(x, y + from, thickness, to - from) : KWin::RectF(x + from, y, to - from, thickness);
+        fillRect(viewport, segment, i == group.active ? m_settings.tabActiveColor : m_settings.tabInactiveColor, deviceRegion, opacity);
+    }
 }
 
 void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity)

@@ -385,6 +385,7 @@ class Column {
             vertical: vertical,
             count: this.windows.length(),
             active: activeIndex,
+            windows: Array.from(this.windows.iterator()).map(window => String(window.client.kwinClient.internalId)),
         };
     }
 

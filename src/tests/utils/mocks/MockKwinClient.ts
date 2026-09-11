@@ -3,6 +3,7 @@ class MockKwinClient {
 
     private static readonly borderThickness = 10;
 
+    public readonly internalId = `{${Math.random().toString(16).slice(2)}}`;
     public caption = "App";
     public minSize: Readonly<QmlSize> = new MockQmlSize(randomJitter(), randomJitter());
     public maxSize: Readonly<QmlSize> = new MockQmlSize(9999, 9999);

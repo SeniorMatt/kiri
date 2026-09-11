@@ -212,7 +212,7 @@ class Desktop {
             this.grid.arrange(this.tilingArea.x - this.scrollX, this.getCurrentVisibleRange());
             this.dirty = false;
         }
-        publishTabIndicators(this.tabIndicators);
+        publishTabIndicators(this, this.tabIndicators);
     }
 
     public addTabIndicator(indicator: TabIndicator) {
@@ -235,6 +235,7 @@ class Desktop {
     }
 
     public destroy() {
+        publishTabIndicators(this, [], false);
         this.grid.destroy();
     }
 }

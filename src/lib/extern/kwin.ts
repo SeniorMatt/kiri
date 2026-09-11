@@ -55,6 +55,7 @@ interface Output { __brand: "Output" }
 interface KwinClient {
     __brand: "KwinClient";
 
+    readonly internalId: unknown;
     readonly caption: string;
     readonly minSize: Readonly<QmlSize>;
     readonly maxSize: Readonly<QmlSize>;

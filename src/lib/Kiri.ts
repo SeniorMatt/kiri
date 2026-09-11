@@ -38,18 +38,41 @@ interface TabIndicator {
     vertical: boolean;
     count: number;
     active: number;
+    windows: string[]; // internal ids, in tab order
 }
 
 let lastTabIndicatorsJson = "[]";
+let lastTabGroupsJson = "[]";
+const tabIndicatorsByDesktop = new Map<any, TabIndicator[]>();
 
-function publishTabIndicators(indicators: TabIndicator[]) {
+// `tabIndicators` (this desktop's, for the script's own fallback windows) and `tabGroups` (every desktop's, as
+// JSON, for the compiled effect, which paints them with the windows and so also while desktops switch)
+function publishTabIndicators(owner: any, indicators: TabIndicator[], isCurrent = true) {
     if (typeof qmlBase === "undefined") {
         return; // tests
     }
-    const json = JSON.stringify(indicators);
-    if (json !== lastTabIndicatorsJson) {
-        lastTabIndicatorsJson = json;
-        (qmlBase as any).tabIndicators = indicators;
+    if (indicators.length > 0) {
+        tabIndicatorsByDesktop.set(owner, indicators);
+    } else {
+        tabIndicatorsByDesktop.delete(owner);
+    }
+    if (isCurrent) {
+        const json = JSON.stringify(indicators);
+        if (json !== lastTabIndicatorsJson) {
+            lastTabIndicatorsJson = json;
+            (qmlBase as any).tabIndicators = indicators;
+        }
+    }
+    const groups: { windows: string[]; active: number }[] = [];
+    tabIndicatorsByDesktop.forEach(list => {
+        for (const indicator of list) {
+            groups.push({ windows: indicator.windows, active: indicator.active });
+        }
+    });
+    const groupsJson = JSON.stringify(groups);
+    if (groupsJson !== lastTabGroupsJson) {
+        lastTabGroupsJson = groupsJson;
+        (qmlBase as any).tabGroups = groupsJson;
     }
 }
 
