@@ -4,7 +4,7 @@ namespace ClientState {
         private readonly config: ClientManager.Config;
         private readonly signalManager: SignalManager;
 
-        constructor(world: World, client: ClientWrapper, config: ClientManager.Config, limitHeight: boolean) {
+        constructor(world: World, client: ClientWrapper, config: ClientManager.Config, limitHeight: boolean, tileAfterFullScreen = false) {
             this.client = client;
             this.config = config;
             if (config.floatingKeepAbove) {
@@ -13,7 +13,7 @@ namespace ClientState {
             if (limitHeight && client.kwinClient.tile === null) {
                 Floating.limitHeight(client);
             }
-            this.signalManager = Floating.initSignalManager(world, client.kwinClient);
+            this.signalManager = Floating.initSignalManager(world, client.kwinClient, tileAfterFullScreen);
         }
 
         public destroy(passFocus: FocusPassing.Type) {
@@ -37,8 +37,19 @@ namespace ClientState {
             );
         }
 
-        private static initSignalManager(world: World, kwinClient: KwinClient) {
+        private static initSignalManager(world: World, kwinClient: KwinClient, tileAfterFullScreen: boolean) {
             const manager = new SignalManager();
+
+            if (tileAfterFullScreen) {
+                // untileable only because it started full-screen (games): tile it when it leaves full-screen mode
+                manager.connect(kwinClient.fullScreenChanged, () => {
+                    if (!kwinClient.fullScreen) {
+                        world.do((clientManager, desktopManager) => {
+                            clientManager.tileClientIfPossible(kwinClient);
+                        });
+                    }
+                });
+            }
 
             manager.connect(kwinClient.tileChanged, () => {
                 // on X11, this fires after `frameGeometryChanged`

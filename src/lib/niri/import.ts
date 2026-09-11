@@ -28,8 +28,11 @@ namespace NiriImport {
         "focus-workspace-up": "desktop-previous",
         "move-column-to-workspace-down": "column-move-to-next-desktop",
         "move-column-to-workspace-up": "column-move-to-previous-desktop",
-        "consume-or-expel-window-left": "window-move-left",
-        "consume-or-expel-window-right": "window-move-right",
+        "move-window-to-workspace-down": "window-move-to-next-desktop",
+        "move-window-to-workspace-up": "window-move-to-previous-desktop",
+        "consume-or-expel-window-left": "window-consume-or-expel-left",
+        "consume-or-expel-window-right": "window-consume-or-expel-right",
+        "switch-focus-between-floating-and-tiling": "window-switch-focus-floating-tiling",
         "consume-window-into-column": "window-consume-into-column",
         "expel-window-from-column": "window-expel-from-column",
         "switch-preset-column-width": "cycle-preset-widths",
@@ -50,6 +53,7 @@ namespace NiriImport {
     const NUMBERED: Record<string, string> = {
         "focus-workspace": "desktop-{}",
         "move-column-to-workspace": "column-move-to-desktop-{}",
+        "move-window-to-workspace": "window-move-to-desktop-{}",
         "focus-column": "focus-{}",
     };
 

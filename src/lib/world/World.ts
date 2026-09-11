@@ -257,6 +257,19 @@ class World {
         this.doIfTiled(Workspace.activeWindow, f);
     }
 
+    // Runs `f` for a tiled focused window; a floating focused window is moved by (dx, dy) instead
+    public doIfTiledFocusedOrMoveFloating(
+        f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
+        dx: number,
+        dy: number,
+    ) {
+        const active = Workspace.activeWindow;
+        if (active !== null && this.clientManager.moveFloatingClient(active, dx, dy)) {
+            return;
+        }
+        this.doIfTiledFocused(f);
+    }
+
     // Called when a tiled window was closed: the others keep their place until the close animation is over
     public holdArrangeForClose() {
         if (this.closeRelayoutDelay === 0) {

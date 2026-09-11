@@ -21,7 +21,9 @@ tests.register("Pass focus", 100, () => {
     Assert.equal(workspaceMock.activeWindow, client4);
 
     qtMock.fireShortcut("column-move-to-desktop-2");
-    Assert.equal(workspaceMock.activeWindow, client1b);
+    Assert.equal(workspaceMock.activeWindow, client4); // the moved column keeps the focus on desktop 2
+    workspaceMock.currentDesktop = workspaceMock.desktops[0];
+    workspaceMock.activeWindow = client1b;
 
     removeWindow(client1b);
     Assert.equal(workspaceMock.activeWindow, client1a);

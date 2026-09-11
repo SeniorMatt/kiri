@@ -11,11 +11,15 @@ What's different so far:
 Kiri has its own script ID, so it can be installed next to Karousel. Only enable one of them.
 
 ## Install
-Download `kiri_*.kwinscript` from [Releases](https://github.com/SeniorMatt/kiri/releases), then in System Settings > Window Management > KWin Scripts use "Install from File…", tick Kiri and log in again.
+Full install (borders and rounded corners that follow animations, a workspace switch that follows the touchpad,
+mouse wheel binds, the animation effect): download `kiri_*.tar.gz` from [Releases](https://github.com/SeniorMatt/kiri/releases), extract it and run
 
-For the animation effect too, use the install script instead:
+    ./install.sh
 
-    gh api repos/SeniorMatt/kiri/contents/tools/install.sh -H "Accept: application/vnd.github.raw" | sh
+It builds the compiled effects against your KWin, so run it again after KWin updates. Arch-based systems only for now.
+
+Script only: download `kiri_*.kwinscript`, then in System Settings > Window Management > KWin Scripts use
+"Install from File…", tick Kiri and log in again.
 
 Run it again to update. Then log out and back in, and enable Kiri in System Settings > Window Management > KWin Scripts if it isn't already.
 

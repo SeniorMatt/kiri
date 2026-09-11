@@ -24,7 +24,12 @@ extra_rows = [
     ("window_height_increase_down", "Cycle preset window heights", "window_height_cycle_presets"),
     ("window_height_cycle_presets", "Cycle preset window heights in reverse", "window_height_cycle_presets_reverse"),
     ("window_height_cycle_presets_reverse", "Reset window height", "window_height_reset"),
-    ("window_move_right", "Move the window on the right into this column", "window_consume_into_column"),
+    ("window_move_right", "Consume the window into the left column, or expel it to the left", "window_consume_or_expel_left"),
+    ("window_consume_or_expel_left", "Consume the window into the right column, or expel it to the right", "window_consume_or_expel_right"),
+    ("window_consume_or_expel_right", "Move the window on the right into this column", "window_consume_into_column"),
+    ("window_toggle_floating", "Switch focus between floating and tiled windows", "window_switch_focus_floating_tiling"),
+    ("column_move_to_previous_desktop", "Move window to the next desktop", "window_move_to_next_desktop"),
+    ("window_move_to_next_desktop", "Move window to the previous desktop", "window_move_to_previous_desktop"),
     ("window_consume_into_column", "Move window out of its column", "window_expel_from_column"),
 ]
 for after, label, key in extra_rows:

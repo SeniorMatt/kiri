@@ -87,6 +87,23 @@ class Actions {
         lastColumn.getWindowToFocus().focus();
     };
 
+    // niri's switch-focus-between-floating-and-tiling
+    public readonly switchFocusFloatingTiling = (cm: ClientManager, dm: DesktopManager) => {
+        const active = Workspace.activeWindow;
+        if (active !== null && cm.isFloating(active)) {
+            const desktop = dm.getCurrentDesktop();
+            const window = desktop === undefined ? null : desktop.grid.getLastFocusedWindow();
+            if (window !== null) {
+                window.focus();
+            }
+        } else {
+            const floating = cm.findLastFocusedFloating();
+            if (floating !== null) {
+                Workspace.activeWindow = floating;
+            }
+        }
+    };
+
     public readonly windowMoveLeft = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         if (column.getWindowCount() === 1) {
             // move from own column into existing column
@@ -119,6 +136,32 @@ class Actions {
         }
     };
 
+    // niri's consume-or-expel-window-left/right: a lone window joins the bottom of the neighbouring column
+    // (nothing happens at the edge), a window in a shared column becomes its own column on that side
+    // with the width of the column it left
+    public readonly windowConsumeOrExpelLeft = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        this.consumeOrExpel(window, column, grid, grid.getLeftColumn(column), grid.getLeftColumn(column));
+    };
+
+    public readonly windowConsumeOrExpelRight = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        this.consumeOrExpel(window, column, grid, grid.getRightColumn(column), column);
+    };
+
+    private consumeOrExpel(window: Window, column: Column, grid: Grid, neighbour: Column|null, newColumnLeftOf: Column|null) {
+        if (column.getWindowCount() === 1) {
+            if (neighbour === null) {
+                return;
+            }
+            window.moveToColumn(neighbour, true, FocusPassing.Type.None);
+        } else {
+            const width = column.getWidth();
+            const newColumn = new Column(grid, newColumnLeftOf);
+            newColumn.setWidth(width, false);
+            window.moveToColumn(newColumn, true, FocusPassing.Type.None);
+        }
+        grid.desktop.autoAdjustScroll();
+    }
+
     // niri's consume-window-into-column: the first window of the column on the right joins the bottom of this column
     public readonly windowConsumeIntoColumn = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         const rightColumn = grid.getRightColumn(column);
@@ -129,13 +172,22 @@ class Actions {
         grid.desktop.autoAdjustScroll();
     };
 
-    // niri's expel-window-from-column: the focused window gets its own column on the right
+    // niri's expel-window-from-column: the bottom window of the column gets its own column on the right
+    // (with the same width); the focus stays in this column, on the window above if the expelled one had it
     public readonly windowExpelFromColumn = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         if (column.getWindowCount() === 1) {
             return;
         }
+        const expelled = column.getLastWindow();
+        if (expelled.isFocused()) {
+            const above = column.getAboveWindow(expelled);
+            if (above !== null) {
+                above.focus();
+            }
+        }
         const newColumn = new Column(grid, column);
-        window.moveToColumn(newColumn, true, FocusPassing.Type.None);
+        newColumn.setWidth(column.getWidth(), false);
+        expelled.moveToColumn(newColumn, true, FocusPassing.Type.None);
         grid.desktop.autoAdjustScroll();
     };
 
@@ -514,41 +566,85 @@ class Actions {
         }
     };
 
+    // like niri: the column goes to the right of the target's active column, the target becomes the current
+    // desktop and the moved column keeps the focus
     public readonly columnMoveToDesktop = (desktopIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        const newGrid = this.getOtherGrid(desktopIndex, dm, oldGrid);
+        if (newGrid === null) {
+            return;
+        }
+        const wasFocused = window.isFocused();
+        column.moveToGrid(newGrid, newGrid.getLastFocusedColumn() ?? newGrid.getLastColumn());
+        if (wasFocused) {
+            Workspace.currentDesktop = newGrid.desktop.kwinDesktop;
+            window.focus();
+        }
+    };
+
+    public readonly windowMoveToDesktop = (desktopIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        if (column.getWindowCount() === 1) {
+            this.columnMoveToDesktop(desktopIndex, cm, dm, window, column, oldGrid);
+            return;
+        }
+        const newGrid = this.getOtherGrid(desktopIndex, dm, oldGrid);
+        if (newGrid === null) {
+            return;
+        }
+        const wasFocused = window.isFocused();
+        const newColumn = new Column(newGrid, newGrid.getLastFocusedColumn() ?? newGrid.getLastColumn());
+        window.moveToColumn(newColumn, true, wasFocused ? FocusPassing.Type.Immediate : FocusPassing.Type.None);
+        window.client.kwinClient.desktops = [newGrid.desktop.kwinDesktop];
+        if (wasFocused) {
+            Workspace.currentDesktop = newGrid.desktop.kwinDesktop;
+            window.focus();
+        }
+    };
+
+    private getOtherGrid(desktopIndex: number, dm: DesktopManager, oldGrid: Grid) {
         const kwinDesktop = Workspace.desktops[desktopIndex];
         if (kwinDesktop === undefined) {
-            return;
+            return null;
         }
         const newDesktop = dm.getDesktopInCurrentActivity(kwinDesktop);
         if (newDesktop === undefined) {
-            return;
+            return null;
         }
         const newGrid = newDesktop.grid;
-        if (newGrid === null || newGrid === oldGrid) {
-            return;
+        return newGrid === null || newGrid === oldGrid ? null : newGrid;
+    }
+
+    private adjacentDesktopIndex(oldGrid: Grid, step: number) {
+        const index = Workspace.desktops.indexOf(oldGrid.desktop.kwinDesktop);
+        const target = index + step;
+        return index < 0 || target < 0 || target >= Workspace.desktops.length ? null : target;
+    }
+
+    public readonly windowMoveToNextDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        const target = this.adjacentDesktopIndex(oldGrid, 1);
+        if (target !== null) {
+            this.windowMoveToDesktop(target, cm, dm, window, column, oldGrid);
         }
-        column.moveToGrid(newGrid, newGrid.getLastColumn());
+    };
+
+    public readonly windowMoveToPreviousDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        const target = this.adjacentDesktopIndex(oldGrid, -1);
+        if (target !== null) {
+            this.windowMoveToDesktop(target, cm, dm, window, column, oldGrid);
+        }
     };
 
     public readonly columnMoveToNextDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
-        const currentDesktopIndex = Workspace.desktops.indexOf(oldGrid.desktop.kwinDesktop);
-        if (currentDesktopIndex < 0) {
-            return;
+        const target = this.adjacentDesktopIndex(oldGrid, 1);
+        if (target !== null) {
+            this.columnMoveToDesktop(target, cm, dm, window, column, oldGrid);
         }
-        const targetDesktopIndex = currentDesktopIndex + 1;
-        if (targetDesktopIndex >= Workspace.desktops.length) {
-            return;
-        }
-        this.columnMoveToDesktop(targetDesktopIndex, cm, dm, window, column, oldGrid);
     };
 
     public readonly columnMoveToPreviousDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
-        const currentDesktopIndex = Workspace.desktops.indexOf(oldGrid.desktop.kwinDesktop);
-        const targetDesktopIndex = currentDesktopIndex - 1;
-        if (targetDesktopIndex < 0) {
-            return;
+        const target = this.adjacentDesktopIndex(oldGrid, -1);
+        if (target !== null) {
+            this.columnMoveToDesktop(target, cm, dm, window, column, oldGrid);
         }
-        this.columnMoveToDesktop(targetDesktopIndex, cm, dm, window, column, oldGrid);
     };
 
     public readonly tailMoveToDesktop = (desktopIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {

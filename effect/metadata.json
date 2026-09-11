@@ -10,7 +10,7 @@
         "Category": "Window Management",
         "EnabledByDefault": false,
         "Id": "kiri_animations",
-        "Version": "0.4",
+        "Version": "0.5",
         "License": "GPLv3",
         "Website": "https://github.com/SeniorMatt/kiri"
     },

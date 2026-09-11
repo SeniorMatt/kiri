@@ -192,6 +192,7 @@ class Grid {
             switch (passFocus) {
             case FocusPassing.Type.Immediate:
                 columnToFocus.getWindowToFocus().focus();
+                this.focusPasser.request(columnToFocus.getWindowToFocus().client.kwinClient); // KWin may still drop the focus while closing
                 return;
             case FocusPassing.Type.OnUnfocus:
                 this.focusPasser.request(columnToFocus.getWindowToFocus().client.kwinClient);

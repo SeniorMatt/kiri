@@ -4,6 +4,7 @@ class ClientManager {
     private readonly config: ClientManager.Config;
     private readonly clientMap: Map<KwinClient, ClientWrapper>;
     private lastFocusedClient: KwinClient|null;
+    private floatingFocusOrder: KwinClient[] = []; // most recently focused last
     private readonly windowRuleEnforcer: WindowRuleEnforcer;
 
     constructor(
@@ -59,7 +60,7 @@ class ClientManager {
                 return new ClientState.Tiled(this.world, client, desktop!.grid);
             };
         } else {
-            constructState = (client: ClientWrapper) => new ClientState.Floating(this.world, client, this.config, false);
+            constructState = (client: ClientWrapper) => new ClientState.Floating(this.world, client, this.config, false, kwinClient.fullScreen);
         }
 
         const client = new ClientWrapper(
@@ -79,7 +80,10 @@ class ClientManager {
         if (client === undefined) {
             return;
         }
-        if (kwinClient !== this.lastFocusedClient) {
+        // KWin may already have dropped the focus (e.g. a closing full-screen window with focus-follows-mouse
+        // over empty space): then a neighbour must get it as well
+        const focusLost = Workspace.activeWindow === null || Workspace.activeWindow === kwinClient;
+        if (kwinClient !== this.lastFocusedClient && !focusLost) {
             passFocus = FocusPassing.Type.None;
         }
         client.destroy(passFocus);
@@ -173,6 +177,22 @@ class ClientManager {
         }
     }
 
+    public tileClientIfPossible(kwinClient: KwinClient) {
+        const client = this.clientMap.get(kwinClient);
+        if (client === undefined || !(client.stateManager.getState() instanceof ClientState.Floating)) {
+            return;
+        }
+        if (!Clients.canTileEver(kwinClient) || !this.windowRuleEnforcer.shouldTile(kwinClient)) {
+            return;
+        }
+        Clients.makeTileable(kwinClient);
+        const desktop = this.desktopManager.getDesktopForClient(kwinClient);
+        if (desktop === undefined) {
+            return;
+        }
+        client.stateManager.setState(() => new ClientState.Tiled(this.world, client, desktop.grid), FocusPassing.Type.None);
+    }
+
     public toggleFloatingClient(kwinClient: KwinClient) {
         const client = this.clientMap.get(kwinClient);
         if (client === undefined) {
@@ -198,6 +218,10 @@ class ClientManager {
 
     public onClientFocused(kwinClient: KwinClient) {
         this.lastFocusedClient = kwinClient;
+        if (this.isFloating(kwinClient)) {
+            this.floatingFocusOrder = this.floatingFocusOrder.filter(c => c !== kwinClient);
+            this.floatingFocusOrder.push(kwinClient);
+        }
         const window = this.findTiledWindow(kwinClient);
         if (window === null) {
             return;
@@ -207,6 +231,47 @@ class ClientManager {
         if (this.config.cursorFollowsFocus) {
             this.moveCursorToWindow(window);
         }
+    }
+
+    public isFloating(kwinClient: KwinClient) {
+        const client = this.clientMap.get(kwinClient);
+        return client !== undefined && client.stateManager.getState() instanceof ClientState.Floating;
+    }
+
+    // The floating window that was focused last on the current desktop and screen
+    public findLastFocusedFloating(): KwinClient|null {
+        for (let i = this.floatingFocusOrder.length - 1; i >= 0; i--) {
+            const kwinClient = this.floatingFocusOrder[i];
+            if (!this.isFloating(kwinClient)) {
+                continue;
+            }
+            if (
+                kwinClient.minimized ||
+                !kwinClient.desktops.includes(Workspace.currentDesktop) ||
+                (kwinClient.activities.length > 0 && !kwinClient.activities.includes(Workspace.currentActivity)) ||
+                kwinClient.output !== Workspace.activeScreen
+            ) {
+                continue;
+            }
+            return kwinClient;
+        }
+        return null;
+    }
+
+    // niri moves floating windows by a fixed step, the window stays inside the work area
+    public moveFloatingClient(kwinClient: KwinClient, dx: number, dy: number) {
+        const client = this.clientMap.get(kwinClient);
+        if (client === undefined || !this.isFloating(kwinClient)) {
+            return false;
+        }
+        const area = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
+        const frame = kwinClient.frameGeometry;
+        const width = frame.width.round();
+        const height = frame.height.round();
+        const x = Math.max(area.x, Math.min(frame.x.round() + dx, rectRight(area) - width));
+        const y = Math.max(area.y, Math.min(frame.y.round() + dy, rectBottom(area) - height));
+        client.place(x, y, width, height);
+        return true;
     }
 
     public findTiledWindow(kwinClient: KwinClient) {

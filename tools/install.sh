@@ -32,7 +32,7 @@ if $build && [ -d "$cpp" ]; then
     if $missing; then
         if command -v pacman >/dev/null 2>&1; then
             echo "Installing build tools and KWin headers (sudo pacman -S --needed) ..."
-            $SUDO pacman -S --needed --noconfirm base-devel cmake extra-cmake-modules kwin libepoxy qt6-base kconfig kcoreaddons
+            $SUDO pacman -S --needed --noconfirm base-devel cmake extra-cmake-modules kwin libepoxy qt6-base kconfig kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers
         else
             echo "Missing cmake, a C++ compiler, extra-cmake-modules or the KWin headers; skipping the compiled effects." >&2
         fi

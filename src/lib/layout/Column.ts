@@ -186,6 +186,9 @@ class Column {
             }
         }
         this.grid.desktop.adjustScroll(-leftEdgeDeltaStep, true);
+        if (this.grid.getLastFocusedColumn() === this) {
+            this.grid.desktop.recenterWhileResizing(this);
+        }
     }
 
     public adjustWindowHeight(window: Window, heightDelta: number, top: boolean) {
@@ -446,6 +449,7 @@ class Column {
                 switch (passFocus) {
                 case FocusPassing.Type.Immediate:
                     windowToFocus.focus();
+                    this.grid.focusPasser.request(windowToFocus.client.kwinClient); // KWin may still drop the focus while closing
                     break;
                 case FocusPassing.Type.OnUnfocus:
                     this.grid.focusPasser.request(windowToFocus.client.kwinClient);

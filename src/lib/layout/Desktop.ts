@@ -106,6 +106,13 @@ class Desktop {
         this.scrollToColumn(focusedColumn, false);
     }
 
+    // keep a centered column centered while the user is still resizing it
+    public recenterWhileResizing(column: Column) {
+        if (this.config.scroller instanceof CenteredScroller) {
+            this.scrollToColumn(column, true);
+        }
+    }
+
     public scrollToColumn(column: Column, force: boolean) {
         if (force || this.dirtyScroll || !Range.contains(this.getCurrentVisibleRange(), column)) {
             this.config.scroller.scrollToColumn(this, column);

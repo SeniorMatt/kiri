@@ -108,3 +108,32 @@ tests.register("User resize", 10, () => {
         assertSizes(305, 295, h, h);
     }
 });
+
+tests.register("User resize keeps the column centered", 1, () => {
+    const config = getDefaultConfig();
+    config.scrollingCentered = true;
+    config.scrollingLazy = false;
+    config.scrollingGrouped = false;
+    const { qtMock, workspaceMock, world } = init(config);
+    const [c1, c2, c3] = workspaceMock.createClientsWithWidths(300, 300, 300);
+    workspaceMock.activeWindow = c1;
+    workspaceMock.activeWindow = c2;
+    const center = (c: MockKwinClient) => {
+        const f = c.getActualFrameGeometry();
+        return f.x + f.width/2;
+    };
+    const areaCenter = tilingArea.x + tilingArea.width/2;
+    Assert.equal(center(c2), areaCenter);
+
+    // still dragging: the column must already be centered
+    const frame = c2.getFrameGeometryCopy();
+    c2.resize = true;
+    c2.interactiveMoveResizeStarted.fire();
+    frame.width += 100;
+    c2.frameGeometry = frame;
+    // the dragged window is left alone, the neighbours show where the column sits: it is 400 wide now
+    Assert.equal(rectRight(c1.getActualFrameGeometry()) + gapH, areaCenter - 200);
+    c2.resize = false;
+    c2.interactiveMoveResizeFinished.fire();
+    Assert.equal(center(c2), areaCenter);
+});

@@ -104,3 +104,190 @@ tests.register("Focus and move windows", 1, () => {
     testFocus("focus-previous", col1Win1);
     testFocus("focus-previous", col1Win1);
 });
+
+{
+    function setup(nClients = 3) {
+        const config = getDefaultConfig();
+        const { qtMock, workspaceMock } = init(config);
+        const clients = workspaceMock.createClients(nClients);
+        const fire = (name: string) => qtMock.fireShortcut(name);
+        const layout = (grid: MockKwinClient[][]) => Assert.grid(config, tilingArea, 100, grid, true, [], { skip: 1 });
+        const focus = (expected: KwinClient) => Assert.assert(workspaceMock.activeWindow === expected, {
+            message: `wrong activeWindow: ${workspaceMock.activeWindow?.pid}`,
+            skip: 1,
+        });
+        // name the windows after their initial columns, left to right
+        const cols: MockKwinClient[] = [];
+        for (let i = 1; i <= nClients; i++) {
+            fire(`focus-${i}`);
+            cols.push(workspaceMock.activeWindow as MockKwinClient);
+        }
+        return { qtMock, workspaceMock, cols, fire, layout, focus };
+    }
+
+    tests.register("niri consume-or-expel: lone window", 1, () => {
+        const { cols: [a, b, c], fire, layout, focus } = setup();
+        layout([[a], [b], [c]]);
+
+        // nothing happens at the edges
+        fire("focus-1");
+        focus(a);
+        fire("window-consume-or-expel-left");
+        layout([[a], [b], [c]]);
+        focus(a);
+        fire("focus-3");
+        fire("window-consume-or-expel-right");
+        layout([[a], [b], [c]]);
+        focus(c);
+
+        // goes to the bottom of the neighbouring column and keeps focus
+        fire("focus-2");
+        fire("window-consume-or-expel-left");
+        layout([[a, b], [c]]);
+        focus(b);
+        fire("window-consume-or-expel-left");
+        layout([[b], [a], [c]]);
+        focus(b);
+        fire("window-consume-or-expel-right");
+        layout([[a, b], [c]]);
+        focus(b);
+        fire("window-consume-or-expel-right");
+        layout([[a], [b], [c]]);
+        focus(b);
+
+        // the target column may already hold several windows; the window joins at the bottom
+        fire("window-consume-or-expel-right");
+        fire("window-consume-or-expel-left");
+        fire("focus-3");
+        fire("window-consume-or-expel-left");
+        layout([[a], [b, c]]);
+        focus(c);
+        fire("focus-1");
+        fire("window-consume-or-expel-right");
+        layout([[b, c, a]]);
+        focus(a);
+    });
+
+    tests.register("niri consume-or-expel: window in a shared column", 1, () => {
+        const { cols: [a, b, c], fire, layout, focus } = setup();
+        fire("focus-3");
+        fire("window-consume-or-expel-left");
+        fire("focus-1");
+        fire("window-consume-or-expel-right");
+        layout([[b, c, a]]);
+        focus(a);
+
+        // the middle window leaves to the left as a new column, to the right it joins the bottom of the next column
+        fire("focus-up");
+        focus(c);
+        fire("window-consume-or-expel-left");
+        layout([[c], [b, a]]);
+        focus(c);
+        fire("window-consume-or-expel-right");
+        layout([[b, a, c]]);
+        focus(c);
+        fire("window-consume-or-expel-right");
+        layout([[b, a], [c]]);
+        focus(c);
+
+        // the top window of the first column leaves to the left, even though there is no column there
+        fire("focus-left");
+        fire("focus-up");
+        fire("focus-up");
+        focus(b);
+        fire("window-consume-or-expel-left");
+        layout([[b], [a], [c]]);
+        focus(b);
+
+        // the bottom window leaves to the right
+        fire("window-consume-or-expel-right");
+        layout([[a, b], [c]]);
+        fire("window-consume-or-expel-right");
+        layout([[a], [b], [c]]);
+        focus(b);
+    });
+
+    tests.register("niri consume-window-into-column", 1, () => {
+        const { cols: [a, b, c], fire, layout, focus } = setup();
+        fire("focus-3");
+        fire("window-consume-into-column");
+        layout([[a], [b], [c]]);
+        fire("focus-1");
+        fire("window-consume-into-column");
+        layout([[a, b], [c]]);
+        focus(a);
+        fire("focus-down");
+        focus(b);
+        fire("window-consume-into-column");
+        layout([[a, b, c]]);
+        focus(b);
+        fire("window-consume-into-column");
+        layout([[a, b, c]]);
+
+        // only the first window of the next column is taken
+        fire("focus-up");
+        fire("focus-up");
+        focus(a);
+        fire("window-consume-or-expel-left");
+        layout([[a], [b, c]]);
+        fire("window-consume-into-column");
+        layout([[a, b], [c]]);
+        focus(a);
+    });
+
+    tests.register("niri expel-window-from-column", 1, () => {
+        const { cols: [a, b, c], fire, layout, focus } = setup();
+        fire("window-expel-from-column");
+        layout([[a], [b], [c]]);
+        fire("focus-1");
+        fire("window-consume-into-column");
+        fire("window-consume-into-column");
+        layout([[a, b, c]]);
+
+        // the bottom window is expelled, the focus stays on the focused window
+        focus(a);
+        fire("window-expel-from-column");
+        layout([[a, b], [c]]);
+        focus(a);
+
+        // when the bottom window is focused, the focus moves up
+        fire("focus-down");
+        focus(b);
+        fire("window-expel-from-column");
+        layout([[a], [b], [c]]);
+        focus(a);
+
+        // the expelled window goes right next to the column, not to the end
+        fire("window-consume-into-column");
+        fire("focus-up");
+        fire("window-expel-from-column");
+        layout([[a], [b], [c]]);
+    });
+
+    tests.register("niri expel and consume-or-expel keep the column width", 1, () => {
+        const config = getDefaultConfig();
+        const { qtMock, workspaceMock } = init(config);
+        workspaceMock.createClientsWithWidths(300, 100);
+        qtMock.fireShortcut("focus-1");
+        const first = workspaceMock.activeWindow as MockKwinClient;
+        qtMock.fireShortcut("focus-2");
+        const second = workspaceMock.activeWindow as MockKwinClient;
+        const w1 = first.getActualFrameGeometry().width;
+        const w2 = second.getActualFrameGeometry().width;
+        Assert.assert(w1 !== w2);
+        const [widerWin, narrowWin] = w1 > w2 ? [first, second] : [second, first];
+
+        // narrow joins the wide column
+        qtMock.fireShortcut(narrowWin === second ? "window-consume-or-expel-left" : "window-consume-or-expel-right");
+        Assert.equal(narrowWin.getActualFrameGeometry().width, widerWin.getActualFrameGeometry().width);
+        const width = widerWin.getActualFrameGeometry().width;
+
+        // and leaves it as a column of the same width
+        qtMock.fireShortcut("window-consume-or-expel-right");
+        Assert.equal(narrowWin.getActualFrameGeometry().width, width);
+        qtMock.fireShortcut("window-consume-or-expel-left");
+        qtMock.fireShortcut("window-expel-from-column");
+        qtMock.fireShortcut("focus-2");
+        Assert.equal((workspaceMock.activeWindow as MockKwinClient).getActualFrameGeometry().width, width);
+    });
+}
