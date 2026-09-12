@@ -60,7 +60,14 @@ class ClientManager {
                 return new ClientState.Tiled(this.world, client, desktop!.grid);
             };
         } else {
-            constructState = (client: ClientWrapper) => new ClientState.Floating(this.world, client, this.config, false, kwinClient.fullScreen);
+            log("window not tiled:", JSON.stringify({
+                caption: kwinClient.caption,
+                resourceClass: kwinClient.resourceClass,
+                pid: kwinClient.pid,
+                fullScreen: kwinClient.fullScreen,
+                reason: this.windowRuleEnforcer.whyNotTiled(kwinClient) || (desktop === undefined ? "no tiled desktop for it" : "unknown"),
+            }));
+            constructState = (client: ClientWrapper) => new ClientState.Floating(this.world, client, this.config, false, true);
         }
 
         const client = new ClientWrapper(

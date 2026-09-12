@@ -1,6 +1,6 @@
 class EdgeClamper {
     // when the whole grid fits on the screen it is centered (Karousel's behavior), or aligned to the left like niri does
-    constructor(private readonly centerWhenFits = true) {}
+    constructor(public readonly centerWhenFits = true) {}
 
     public clampScrollX(desktop: Desktop, x: number) {
         const minScroll = 0;

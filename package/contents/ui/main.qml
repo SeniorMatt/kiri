@@ -253,16 +253,18 @@ Item {
         onProgressChanged: qmlBase.karouselInstance.gestureScroll(progress)
     }
 
+    // With desktops in rows, KWin's own vertical swipe (animated by kiri_desktop_switch) already switches desktops,
+    // so these only act when there is a single row and KWin's swipe does nothing
     SwipeGestureHandler {
         direction: SwipeGestureHandler.Direction.Up
         fingerCount: 3
-        onActivated: qmlBase.karouselInstance.gestureSwitchDesktop(1)
+        onActivated: if (Workspace.desktopGridHeight <= 1) qmlBase.karouselInstance.gestureSwitchDesktop(1)
     }
 
     SwipeGestureHandler {
         direction: SwipeGestureHandler.Direction.Down
         fingerCount: 3
-        onActivated: qmlBase.karouselInstance.gestureSwitchDesktop(-1)
+        onActivated: if (Workspace.desktopGridHeight <= 1) qmlBase.karouselInstance.gestureSwitchDesktop(-1)
     }
 
     KGlobalAccelBridge {

@@ -41,13 +41,12 @@ namespace ClientState {
             const manager = new SignalManager();
 
             if (tileAfterFullScreen) {
-                // untileable only because it started full-screen (games): tile it when it leaves full-screen mode
+                // floating only because Kiri could not tile it when it appeared (games that are not resizable
+                // until they go full-screen, or leave it): try again whenever full-screen mode changes
                 manager.connect(kwinClient.fullScreenChanged, () => {
-                    if (!kwinClient.fullScreen) {
-                        world.do((clientManager, desktopManager) => {
-                            clientManager.tileClientIfPossible(kwinClient);
-                        });
-                    }
+                    world.do((clientManager, desktopManager) => {
+                        clientManager.tileClientIfPossible(kwinClient);
+                    });
                 });
             }
 

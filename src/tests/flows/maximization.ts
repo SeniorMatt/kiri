@@ -237,7 +237,7 @@
 
             {
                 qtMock.fireShortcut("focus-left");
-                const opts = { message: "fullScreenClient is not in the grid, so we can't move focus directionally" };
+                // fullScreenClient is not in the grid: the focus keys lead into the grid
                 Assert.assert(!windowedClient.fullScreen);
                 Assert.equal(windowedClient.keepBelow, shouldKeepBelow(true));
                 Assert.equal(windowedClient.keepAbove, shouldKeepAbove(true));
@@ -246,10 +246,11 @@
                 Assert.equal(fullScreenClient.keepBelow, shouldKeepBelow(false));
                 Assert.equal(fullScreenClient.keepAbove, shouldKeepAbove(false));
                 Assert.equalRects(fullScreenClient.getActualFrameGeometry(), screen);
-                Assert.equal(Workspace.activeWindow, fullScreenClient, opts);
+                Assert.equal(Workspace.activeWindow, windowedClient);
             }
 
             {
+                Workspace.activeWindow = fullScreenClient;
                 qtMock.fireShortcut("focus-1");
                 const opts = { message: "fullScreenClient is not in grid, so it should stay full-screen" };
                 Assert.assert(!windowedClient.fullScreen);

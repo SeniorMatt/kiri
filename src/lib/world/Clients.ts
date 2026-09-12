@@ -4,6 +4,10 @@ namespace Clients {
         "xwaylandvideobridge",
     ];
 
+    export function isProhibitedClass(kwinClient: KwinClient) {
+        return prohibitedClasses.includes(kwinClient.resourceClass);
+    }
+
     export function canTileEver(kwinClient: KwinClient) {
         const shapeable = (kwinClient.moveable && kwinClient.resizeable) || kwinClient.fullScreen; // full-screen windows may become shapeable after exiting full-screen mode
         return shapeable &&

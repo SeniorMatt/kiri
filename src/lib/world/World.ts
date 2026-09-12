@@ -257,6 +257,25 @@ class World {
         this.doIfTiled(Workspace.activeWindow, f);
     }
 
+    // Like `doIfTiledFocused`, but when the focused window is not in the grid (floating, a full-screen game that
+    // was not tiled, nothing focused) the focus moves into the grid instead, so such a window can always be left
+    public doIfTiledFocusedOrEnterGrid(
+        f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
+    ) {
+        const active = Workspace.activeWindow;
+        if (active === null || this.clientManager.findTiledWindow(active) === null) {
+            this.do((clientManager, desktopManager) => {
+                const desktop = desktopManager.getCurrentDesktop();
+                const window = desktop === undefined ? null : desktop.grid.getLastFocusedWindow();
+                if (window !== null) {
+                    window.focus();
+                }
+            });
+            return;
+        }
+        this.doIfTiled(active, f);
+    }
+
     // Runs `f` for a tiled focused window; a floating focused window is moved by (dx, dy) instead
     public doIfTiledFocusedOrMoveFloating(
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
@@ -344,7 +363,8 @@ class World {
             const focusedWindow = Workspace.activeWindow === null ? null : clientManager.findTiledWindow(Workspace.activeWindow);
             const currentDesktop = desktopManager.getCurrentDesktop();
             if (currentDesktop !== undefined) {
-                currentDesktop.gestureScrollFinish(focusedWindow);
+                // an untiled focused window (a full-screen game) is left by the gesture as well
+                currentDesktop.gestureScrollFinish(focusedWindow, Workspace.activeWindow !== null && focusedWindow === null);
             }
         });
     }

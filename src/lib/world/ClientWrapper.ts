@@ -27,13 +27,18 @@ class ClientWrapper {
         this.stateManager = new ClientState.Manager(constructInitialState(this));
     }
 
-    public place(x: number, y: number, width: number, height: number) {
+    public place(x: number, y: number, width: number, height: number, ignoreUserResize = false) {
         this.manipulatingGeometry.do(() => {
-            if (this.kwinClient.resize) {
+            if (this.kwinClient.resize && !ignoreUserResize) {
                 // window is being manually resized, prevent fighting with the user
                 return;
             }
             this.lastPlacement = Qt.rect(x, y, width, height);
+            const current = this.kwinClient.frameGeometry;
+            if (current.x === x && current.y === y && current.width === width && current.height === height) {
+                // nothing to do; a repeated set makes some Xwayland clients redraw (black flashes)
+                return;
+            }
             this.kwinClient.frameGeometry = this.lastPlacement;
             if (this.kwinClient.frameGeometry !== this.lastPlacement) {
                 // frameGeometry assignment failed. This sometimes happens on Wayland

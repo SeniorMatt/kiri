@@ -108,8 +108,10 @@ class MockKwinClient {
         return !this._fullScreen;
     }
 
+    public fixedSize = false; // like a game window whose min and max size are the same
+
     public get resizeable() {
-        return !this._fullScreen;
+        return !this._fullScreen && !this.fixedSize;
     }
 
     public get fullScreen() {

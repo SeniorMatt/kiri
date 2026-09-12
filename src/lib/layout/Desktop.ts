@@ -110,7 +110,28 @@ class Desktop {
     public recenterWhileResizing(column: Column) {
         if (this.config.scroller instanceof CenteredScroller) {
             this.scrollToColumn(column, true);
+        } else if (this.isLoneColumn(column)) {
+            // a lone column that the settings keep centered
+            if (this.keepsLoneColumnCentered(column)) {
+                this.setScroll(Math.round((column.getWidth() - this.tilingArea.width) / 2), true);
+            }
         }
+    }
+
+    // the lone column's own window is moved too while it is being resized, so it grows from the center
+    public recentersLoneColumnWhileResizing(column: Column) {
+        return this.grid.isUserResizing() && this.isLoneColumn(column) && this.keepsLoneColumnCentered(column);
+    }
+
+    private isLoneColumn(column: Column) {
+        return this.grid.getFirstColumn() === column && this.grid.getLastColumn() === column;
+    }
+
+    private keepsLoneColumnCentered(column: Column) {
+        const clamper = this.config.clamper;
+        return this.config.alwaysCenterSingleColumn ||
+            clamper instanceof CenterClamper ||
+            (clamper instanceof EdgeClamper && clamper.centerWhenFits && column.getWidth() <= this.tilingArea.width);
     }
 
     public scrollToColumn(column: Column, force: boolean) {
@@ -185,7 +206,7 @@ class Desktop {
         return this.scrollX;
     }
 
-    public gestureScrollFinish(focusedWindow: Window|null) {
+    public gestureScrollFinish(focusedWindow: Window|null, focusedUntiled = false) {
         if (this.gestureScrollXInitial === null) {
             return;
         }
@@ -193,7 +214,7 @@ class Desktop {
         this.gestureScrollXInitial = null;
 
         const visibleRange = this.getCurrentVisibleRange();
-        if (focusedWindow !== null && !Range.contains(visibleRange, focusedWindow.column)) {
+        if (focusedUntiled || (focusedWindow !== null && !Range.contains(visibleRange, focusedWindow.column))) {
             // the focused window is no longer visible, find a new window to focus
             const focusTargetColumn = scrolledRight ?
                 this.grid.getLeftmostVisibleColumn(visibleRange) :

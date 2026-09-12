@@ -58,9 +58,48 @@ class WindowRuleEnforcer {
             !kwinClient.modal &&
             kwinClient.managed &&
             kwinClient.pid > -1 &&
-            (kwinClient.fullScreen ? this.tileFullScreen : !Clients.isFullScreenGeometry(kwinClient)) &&
+            (!kwinClient.fullScreen || this.tileFullScreen) &&
             !this.preferFloating.matches(kwinClient)
         );
+    }
+
+    // Why `shouldTile` / `canTileEver` refuse a window, for the log (empty when nothing does)
+    public whyNotTiled(kwinClient: KwinClient) {
+        const reasons: string[] = [];
+        if (!(kwinClient.moveable && kwinClient.resizeable) && !kwinClient.fullScreen) {
+            reasons.push(`moveable=${kwinClient.moveable} resizeable=${kwinClient.resizeable}`);
+        }
+        if (kwinClient.popupWindow) {
+            reasons.push("popup window");
+        }
+        if (Clients.isProhibitedClass(kwinClient)) {
+            reasons.push("prohibited class");
+        }
+        if (this.preferTiling.matches(kwinClient)) {
+            return reasons.join(", ");
+        }
+        if (!kwinClient.normalWindow) {
+            reasons.push("not a normal window");
+        }
+        if (kwinClient.transient) {
+            reasons.push("transient");
+        }
+        if (kwinClient.modal) {
+            reasons.push("modal");
+        }
+        if (!kwinClient.managed) {
+            reasons.push("not managed");
+        }
+        if (kwinClient.pid <= -1) {
+            reasons.push("no pid");
+        }
+        if (kwinClient.fullScreen && !this.tileFullScreen) {
+            reasons.push("full-screen and tileFullScreen is off");
+        }
+        if (this.preferFloating.matches(kwinClient)) {
+            reasons.push("a float rule matches");
+        }
+        return reasons.join(", ");
     }
 
     public initClientSignalManager(world: World, kwinClient: KwinClient) {

@@ -75,14 +75,16 @@ if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key effec
     w Plugins slideEnabled false
     w Kiri-install effectsEnabled done
 fi
-# desktops one above the other, like niri's workspaces, unless the user has chosen a layout already
-# (a Rows line in kwinrc means somebody chose one)
-if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key desktopsVertical)" != done ]; then
-    number=$(kreadconfig6 --file kwinrc --group Desktops --key Number --default 1)
-    if ! grep -q '^Rows=' "${XDG_CONFIG_HOME:-$HOME/.config}/kwinrc" 2>/dev/null && [ "$number" -gt 1 ]; then
-        w Desktops Rows "$number"
-    fi
-    [ "$number" -gt 1 ] && w Kiri-install desktopsVertical done
+# Plasma's "Geometry change" effect also animates every frame change and fights kiri_animations (windows
+# jump back and forth), so it goes off
+w Plugins kwin4_effect_geometry_changeEnabled false
+# desktops one above the other, like niri's workspaces. Plasma writes Rows=1 (one horizontal row), which
+# makes KWin's own 3/4-finger left/right swipe switch desktops and fight Kiri's horizontal swipe
+number=$(kreadconfig6 --file kwinrc --group Desktops --key Number --default 1)
+rows=$(kreadconfig6 --file kwinrc --group Desktops --key Rows --default 1)
+if [ "$number" -gt 1 ] && [ "$rows" -lt "$number" ]; then
+    echo "Setting the desktops to $number rows (one above the other), was $rows."
+    w Desktops Rows "$number"
 fi
 
 # ---- apply without logging out where KWin allows it ----------------------------------------------------
@@ -90,7 +92,8 @@ applied=false
 if qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1; then
     applied=true
     rows=$(kreadconfig6 --file kwinrc --group Desktops --key Rows --default 0)
-    [ "$rows" -gt 0 ] && qdbus6 org.kde.KWin /VirtualDesktopManager org.freedesktop.DBus.Properties.Set org.kde.KWin.VirtualDesktopManager rows "$rows" >/dev/null 2>&1 || true
+    qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect kwin4_effect_geometry_change >/dev/null 2>&1 || true
+    [ "$rows" -gt 0 ] && dbus-send --session --type=method_call --dest=org.kde.KWin /VirtualDesktopManager org.freedesktop.DBus.Properties.Set string:org.kde.KWin.VirtualDesktopManager string:rows variant:uint32:"$rows" >/dev/null 2>&1 || true
     $compiled && qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect slide >/dev/null 2>&1 || true
     for e in kiri_animations kiri_decorations kiri_desktop_switch; do
         qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
@@ -120,6 +123,5 @@ fi
 
 if $applied; then
     echo "Kiri installed and running."
-else
-    echo "Kiri installed. Log out and back in to start it."
 fi
+echo "Done. Log out and log back in to finish."
