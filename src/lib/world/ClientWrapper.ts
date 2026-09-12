@@ -27,12 +27,17 @@ class ClientWrapper {
         this.stateManager = new ClientState.Manager(constructInitialState(this));
     }
 
-    public place(x: number, y: number, width: number, height: number, ignoreUserResize = false) {
+    public place(x: number, y: number, width: number, height: number) {
         this.manipulatingGeometry.do(() => {
-            if (this.kwinClient.resize && !ignoreUserResize) {
-                // window is being manually resized, prevent fighting with the user
+            if (this.kwinClient.resize) {
+                // The window is being manually resized: KWin recomputes its geometry from the pointer at every
+                // step, so moving it would fight with the user. Only tell the effect where to paint it.
+                const frame = this.kwinClient.frameGeometry;
+                const moved = frame.x.round() !== x || frame.y.round() !== y;
+                setVisualPosition(String(this.kwinClient.internalId), moved ? [x, y] : null);
                 return;
             }
+            setVisualPosition(String(this.kwinClient.internalId), null);
             this.lastPlacement = Qt.rect(x, y, width, height);
             const current = this.kwinClient.frameGeometry;
             if (current.x === x && current.y === y && current.width === width && current.height === height) {

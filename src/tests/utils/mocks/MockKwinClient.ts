@@ -58,6 +58,9 @@ class MockKwinClient {
         this.activities = [Workspace.currentActivity];
     }
 
+    get maximizedVertically() { return this._maximizedVertically; }
+    get maximizedHorizontally() { return this._maximizedHorizontally; }
+
     setMaximize(vertically: boolean, horizontally: boolean) {
         this.windowed = !(vertically || horizontally);
 

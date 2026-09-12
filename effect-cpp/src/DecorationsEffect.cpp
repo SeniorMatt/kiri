@@ -237,6 +237,32 @@ void Effect::setTabGroups(const QString &json)
     }
 }
 
+void Effect::setVisualPositions(const QString &json)
+{
+    QHash<QUuid, QPointF> positions;
+    const QJsonObject object = QJsonDocument::fromJson(json.toUtf8()).object();
+    for (auto it = object.begin(); it != object.end(); ++it) {
+        const QJsonArray xy = it.value().toArray();
+        const QUuid uuid(it.key());
+        if (!uuid.isNull() && xy.size() == 2) {
+            positions.insert(uuid, QPointF(xy.at(0).toDouble(), xy.at(1).toDouble()));
+        }
+    }
+    auto repaint = [this](const QHash<QUuid, QPointF> &list) {
+        for (auto it = list.begin(); it != list.end(); ++it) {
+            if (KWin::EffectWindow *w = KWin::effects->findWindow(it.key())) {
+                const double reach = this->reach();
+                const KWin::RectF f = w->frameGeometry();
+                KWin::effects->addRepaint(KWin::RectF(it.value().x(), it.value().y(), f.width(), f.height()).adjusted(-reach, -reach, reach, reach));
+                repaintAround(w);
+            }
+        }
+    };
+    repaint(m_visualPositions);
+    m_visualPositions = positions;
+    repaint(m_visualPositions);
+}
+
 double Effect::reach() const
 {
     double reach = m_settings.borderWidth + m_settings.ringWidth + 2;
@@ -325,6 +351,9 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     if (radiusFor(w) > 0) {
         data.setTranslucent(); // the cut corners show what is behind the window
     }
+    if (m_visualPositions.contains(w->internalId())) {
+        data.setTransformed(); // painted somewhere else than where KWin thinks it is
+    }
     OffscreenEffect::prePaintWindow(view, w, data);
 }
 
@@ -345,6 +374,13 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
         KWin::ShaderManager::instance()->popShader();
     } else {
         unredirect(w);
+    }
+
+    // Kiri moves the painted window instead of the real one while the user resizes it
+    const auto visualIt = m_visualPositions.constFind(w->internalId());
+    if (visualIt != m_visualPositions.constEnd()) {
+        data.setXTranslation(data.xTranslation() + visualIt->x() - w->frameGeometry().x());
+        data.setYTranslation(data.yTranslation() + visualIt->y() - w->frameGeometry().y());
     }
 
     const bool result = OffscreenEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);

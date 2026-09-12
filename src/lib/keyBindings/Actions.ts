@@ -280,10 +280,27 @@ class Actions {
         this.config.columnResizer.decreaseWidth(column);
     };
 
+    // like niri's maximize-column: the column takes the whole tiling width (gaps kept), a second press restores the old width
     public readonly columnWidthMaximize = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        this.config.columnResizer.maximizeWidth(column);
+        const desktop = grid.desktop;
+        const fullWidth = Math.min(Math.max(desktop.tilingArea.width, column.getMinWidth()), column.getMaxWidth());
+        if (column.getWidth() === fullWidth && column.widthBeforeMaximize !== undefined) {
+            const restoreWidth = column.widthBeforeMaximize;
+            column.widthBeforeMaximize = undefined;
+            column.setWidth(restoreWidth, true);
+        } else if (column.getWidth() !== fullWidth) {
+            column.widthBeforeMaximize = column.getWidth();
+            column.setWidth(fullWidth, true);
+        }
+        desktop.scrollCenterVisible(column);
     };
 
+    // like niri's maximize-window-to-edges: KWin maximizes the window, Kiri keeps it in its column
+    // (see tileMaximized) and it fills the work area without gaps; a second press restores it
+    public readonly windowMaximizeToEdges = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const maximized = window.client.getMaximizedMode() === MaximizedMode.Maximized;
+        window.client.setMaximize(!maximized, !maximized);
+    };
 
     public readonly columnWidthMinimize = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         this.config.columnResizer.minimizeWidth(column);

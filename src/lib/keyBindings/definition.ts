@@ -204,9 +204,15 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         },
         {
             name: "column-width-maximize",
-            description: "Increase column width to maximum",
+            description: "Maximize column width (toggle)",
             defaultKeys: ["Meta+F"],
             action: () => world.doIfTiledFocused(actions.columnWidthMaximize),
+        },
+        {
+            name: "window-maximize-to-edges",
+            description: "Maximize window to the screen edges (toggle)",
+            defaultKeys: ["Meta+M"],
+            action: () => world.doIfTiledFocused(actions.windowMaximizeToEdges),
         },
         {
             name: "column-width-minimize",

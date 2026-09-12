@@ -58,7 +58,7 @@ class Window {
                 height = fillArea.height;
             }
         }
-        this.client.place(x, y, width, height, this.column.grid.desktop.recentersLoneColumnWhileResizing(this.column));
+        this.client.place(x, y, width, height);
     }
 
     private shouldReMaximize() {

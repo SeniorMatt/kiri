@@ -15,6 +15,7 @@ Item {
     property var tabIndicators: []
     // JSON of every desktop's tabbed columns, for the compiled effect that paints their indicators
     property string tabGroups: "[]"
+    property string visualPositions: "{}"
     // true while the C++ effect kiri_decorations is loaded: it paints the ring and borders (and rounds corners)
     // with the window itself, so these QML windows are only the fallback
     property bool decorationsEffect: false
@@ -107,8 +108,24 @@ Item {
         );
     }
 
+    function sendVisualPositions() {
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriDecorations",
+                iface: "org.kde.kiri.Decorations",
+                member: "setVisualPositions",
+                arguments: [new DBus.string(qmlBase.visualPositions)],
+                signature: "(s)",
+            },
+            () => {},
+            (error) => {},
+        );
+    }
+
     onTabGroupsChanged: if (decorationsEffect) sendTabGroups()
-    onDecorationsEffectChanged: if (decorationsEffect) sendTabGroups()
+    onVisualPositionsChanged: if (decorationsEffect) sendVisualPositions()
+    onDecorationsEffectChanged: if (decorationsEffect) { sendTabGroups(); sendVisualPositions(); }
 
     Timer {
         interval: 3000

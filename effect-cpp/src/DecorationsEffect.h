@@ -84,6 +84,9 @@ public Q_SLOTS:
     Q_SCRIPTABLE void debugWheel(int i);
     // Kiri's tabbed columns as JSON: [{"windows": ["{uuid}", ...], "active": 0}, ...]
     Q_SCRIPTABLE void setTabGroups(const QString &json);
+    // where Kiri wants windows painted while KWin's interactive resize owns their real position:
+    // {"{uuid}": [x, y], ...} (absolute frame position, so it stays right whatever KWin does meanwhile)
+    Q_SCRIPTABLE void setVisualPositions(const QString &json);
 
 private:
     void loadSettings();
@@ -106,6 +109,7 @@ private:
     KWin::EffectWindow *m_active = nullptr;
     QList<TabGroup> m_tabGroups;
     QHash<QUuid, int> m_tabGroupOf;
+    QHash<QUuid, QPointF> m_visualPositions;
     std::vector<std::unique_ptr<QAction>> m_wheelActions;
     QElapsedTimer m_wheelCooldown;
 };

@@ -149,6 +149,7 @@ tests.register("NiriImport", 1, () => {
     Assert.equal(def.shortcutKeys["desktop-1"].join(), "Meta+1");
     Assert.equal(def.shortcutKeys["window-close"].join(), "Meta+Q,Alt+F4");
     Assert.equal(def.shortcutKeys["column-width-maximize"].join(), "Meta+F");
+    Assert.equal(def.shortcutKeys["window-maximize-to-edges"].join(), "Meta+M");
 
     // the owner's config, when present
     const owner = "/tmp/claude-1001/-home-matthew-karousel/965f5914-ffa6-4c87-9792-e98cdab55c88/scratchpad/nixos/modules/session/niri/config.kdl";

@@ -76,6 +76,33 @@ function publishTabIndicators(owner: any, indicators: TabIndicator[], isCurrent 
     }
 }
 
+// Where Kiri wants a window painted while KWin's own interactive resize owns its real geometry (id -> [x, y]).
+// The compiled effect paints the window there; the real geometry is set when the resize is over.
+const visualPositions = new Map<string, [number, number]>();
+let lastVisualPositionsJson = "{}";
+
+function setVisualPosition(id: string, position: [number, number] | null) {
+    const old = visualPositions.get(id);
+    if (position === null ? old === undefined : (old !== undefined && old[0] === position[0] && old[1] === position[1])) {
+        return;
+    }
+    if (position === null) {
+        visualPositions.delete(id);
+    } else {
+        visualPositions.set(id, position);
+    }
+    if (typeof qmlBase === "undefined") {
+        return; // tests
+    }
+    const obj: Record<string, [number, number]> = {};
+    visualPositions.forEach((v, k) => { obj[k] = v; });
+    const json = JSON.stringify(obj);
+    if (json !== lastVisualPositionsJson) {
+        lastVisualPositionsJson = json;
+        (qmlBase as any).visualPositions = json;
+    }
+}
+
 // Owns the World and rebuilds it when the settings change
 class Kiri {
     private world: World;

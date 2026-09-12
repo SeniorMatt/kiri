@@ -1,6 +1,7 @@
 class Column {
     public grid: Grid;
     public gridX: number;
+    public widthBeforeMaximize: number|undefined;
     private width: number; // TODO: increase column width to contain transients
     private readonly windows: LinkedList<Window>;
     private tabbed: boolean;
@@ -186,9 +187,7 @@ class Column {
             }
         }
         this.grid.desktop.adjustScroll(-leftEdgeDeltaStep, true);
-        if (this.grid.getLastFocusedColumn() === this) {
-            this.grid.desktop.recenterWhileResizing(this);
-        }
+        this.grid.desktop.recenterWhileResizing(this, this.grid.getLastFocusedColumn() === this);
     }
 
     public adjustWindowHeight(window: Window, heightDelta: number, top: boolean) {

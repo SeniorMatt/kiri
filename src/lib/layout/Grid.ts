@@ -6,6 +6,7 @@ class Grid {
     private lastFocusedColumn: Column|null;
     private previousFocusedColumn: Column|null;
     private width: number;
+    private userResized = false; // a user resize happened since the layout was last settled
     private userResize: boolean; // is any part of the grid being resized by the user
     private readonly userResizeFinishedDelayer: Delayer;
 
@@ -21,6 +22,11 @@ class Grid {
         this.userResizeFinishedDelayer = new Delayer(50, () => {
             // this delay prevents windows' contents from freezing after resizing
             this.desktop.onLayoutChanged();
+            const focused = this.getLastFocusedColumn();
+            if (focused !== null && this.userResized) {
+                this.desktop.recenterWhileResizing(focused, true);
+            }
+            this.userResized = false;
             this.desktop.autoAdjustScroll();
             this.desktop.arrange();
         });
@@ -232,6 +238,7 @@ class Grid {
 
     public onUserResizeStarted() {
         this.userResize = true;
+        this.userResized = true;
     }
 
     public onUserResizeFinished() {

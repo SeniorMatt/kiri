@@ -30,6 +30,7 @@ extra_rows = [
     ("window_toggle_floating", "Switch focus between floating and tiled windows", "window_switch_focus_floating_tiling"),
     ("column_move_to_previous_desktop", "Move window to the next desktop", "window_move_to_next_desktop"),
     ("window_move_to_next_desktop", "Move window to the previous desktop", "window_move_to_previous_desktop"),
+    ("window_toggle_fullscreen", "Maximize window to the screen edges", "window_maximize_to_edges"),
     ("window_consume_into_column", "Move window out of its column", "window_expel_from_column"),
 ]
 for after, label, key in extra_rows:

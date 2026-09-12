@@ -38,6 +38,7 @@ namespace NiriImport {
         "switch-preset-column-width": "cycle-preset-widths",
         "switch-preset-column-width-back": "cycle-preset-widths-reverse",
         "maximize-column": "column-width-maximize",
+        "maximize-window-to-edges": "window-maximize-to-edges",
         "fullscreen-window": "window-toggle-fullscreen",
         "center-column": "grid-scroll-focused",
         "toggle-window-floating": "window-toggle-floating",
