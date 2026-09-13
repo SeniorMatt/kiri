@@ -87,6 +87,8 @@ public Q_SLOTS:
     // where Kiri wants windows painted while KWin's interactive resize owns their real position:
     // {"{uuid}": [x, y], ...} (absolute frame position, so it stays right whatever KWin does meanwhile)
     Q_SCRIPTABLE void setVisualPositions(const QString &json);
+    // re-read Kiri's settings: KWin's settings page writes them without telling anyone, Kiri calls this after
+    Q_SCRIPTABLE void reloadSettings(const QString &unused);
 
 private:
     void loadSettings();

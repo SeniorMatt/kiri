@@ -225,18 +225,22 @@ class ClientManager {
 
     public onClientFocused(kwinClient: KwinClient) {
         this.lastFocusedClient = kwinClient;
+        // Like niri, only focus changes made by Kiri move the cursor, never pointer focus or an app activating
+        // itself; the cursor position is checked before onFocused scrolls the window away from it. Floating
+        // windows too: with focus follows mouse, a cursor left on the tiled window would take the focus back.
+        const cursorWasOnWindow = rectContainsPoint(roundQtRect(kwinClient.frameGeometry), Workspace.cursorPos);
+        const focusedByKiri = KiriFocus.take(kwinClient);
+        const warp = this.config.cursorFollowsFocus && focusedByKiri && !cursorWasOnWindow;
         if (this.isFloating(kwinClient)) {
             this.floatingFocusOrder = this.floatingFocusOrder.filter(c => c !== kwinClient);
             this.floatingFocusOrder.push(kwinClient);
         }
         const window = this.findTiledWindow(kwinClient);
-        if (window === null) {
-            return;
+        if (window !== null) {
+            window.onFocused();
         }
-
-        window.onFocused();
-        if (this.config.cursorFollowsFocus) {
-            this.moveCursorToWindow(window);
+        if (warp && (window !== null || this.isFloating(kwinClient))) {
+            moveCursorToFocus.call();
         }
     }
 
@@ -245,10 +249,14 @@ class ClientManager {
         return client !== undefined && client.stateManager.getState() instanceof ClientState.Floating;
     }
 
-    // The floating window that was focused last on the current desktop and screen
+    // The floating window that was focused last on the current desktop and screen; like niri's floating layer,
+    // which always has an active window when it isn't empty, any floating window there if none was focused yet
     public findLastFocusedFloating(): KwinClient|null {
-        for (let i = this.floatingFocusOrder.length - 1; i >= 0; i--) {
-            const kwinClient = this.floatingFocusOrder[i];
+        const candidates = [
+            ...this.floatingFocusOrder.slice().reverse(),
+            ...Array.from(this.clientMap.keys()).filter(c => !this.floatingFocusOrder.includes(c)).reverse(),
+        ];
+        for (const kwinClient of candidates) {
             if (!this.isFloating(kwinClient)) {
                 continue;
             }
@@ -309,14 +317,6 @@ class ClientManager {
 
     public destroy() {
         this.removeAllClients();
-    }
-
-    private moveCursorToWindow(window: Window) {
-        const cursorAlreadyOnWindow = rectContainsPoint(roundQtRect(window.client.kwinClient.frameGeometry), Workspace.cursorPos);
-        if (cursorAlreadyOnWindow) {
-            return;
-        }
-        moveCursorToFocus.call();
     }
 }
 

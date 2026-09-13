@@ -5,6 +5,10 @@ class Grid {
     private readonly columns: LinkedList<Column>;
     private lastFocusedColumn: Column|null;
     private previousFocusedColumn: Column|null;
+    // niri's activate_prev_column_on_removal: a column that was just opened to the right of the active one gives the
+    // focus back to the column left of it when it is closed, as long as nothing else was focused in between
+    private opened: { column: Column, previous: Column, scrollX: number } | null = null;
+    private returnTo: { column: Column, scrollX: number } | null = null;
     private width: number;
     private userResized = false; // a user resize happened since the layout was last settled
     private userResize: boolean; // is any part of the grid being resized by the user
@@ -182,18 +186,43 @@ class Grid {
         this.desktop.autoAdjustScroll();
     }
 
+    // `previous` is the column that was active before the new column `column` was put to the right of it
+    public onColumnOpened(column: Column, previous: Column|null, scrollX: number) {
+        if (previous === null || this.getLeftColumn(column) !== previous) {
+            return;
+        }
+        if (this.lastFocusedColumn === column) {
+            this.returnTo = { column: previous, scrollX: scrollX };
+        } else {
+            this.opened = { column: column, previous: previous, scrollX: scrollX };
+        }
+    }
+
     public onColumnRemoved(column: Column, passFocus: FocusPassing.Type) {
         const isLastColumn = this.columns.length() === 1;
         const rightColumn = this.getRightColumn(column);
-        const columnToFocus = isLastColumn ? null : this.getLeftColumn(column) ?? rightColumn;
+        const leftColumn = this.getLeftColumn(column);
+        // like niri: the column that takes the place of the closed one (the right neighbour) gets the focus,
+        // or the left one when the closed one was the last, or the one it was opened from
+        const returnTo = this.returnTo !== null && column === this.lastFocusedColumn && this.returnTo.column === leftColumn ? this.returnTo : null;
+        const columnToFocus = isLastColumn ? null : returnTo !== null ? leftColumn : rightColumn ?? leftColumn;
+        if (this.opened !== null && this.opened.column === column) {
+            this.opened = null;
+        }
         if (column === this.lastFocusedColumn) {
             this.lastFocusedColumn = columnToFocus;
+            this.returnTo = null;
+        } else if (this.returnTo !== null && (this.returnTo.column === column || this.lastFocusedColumn === null)) {
+            this.returnTo = null;
         }
 
         this.columns.remove(column);
         this.columnsSetX(rightColumn);
 
         this.desktop.onLayoutChanged();
+        if (returnTo !== null) {
+            this.desktop.setScroll(returnTo.scrollX, false); // the view goes back to where it was before the window opened
+        }
         if (columnToFocus !== null) {
             switch (passFocus) {
             case FocusPassing.Type.Immediate:
@@ -223,6 +252,11 @@ class Grid {
         }
         if (column !== this.lastFocusedColumn) {
             this.previousFocusedColumn = this.lastFocusedColumn;
+            this.returnTo = null;
+            if (this.opened !== null && this.opened.column === column) {
+                this.returnTo = { column: this.opened.previous, scrollX: this.opened.scrollX };
+            }
+            this.opened = null;
         }
         this.lastFocusedColumn = column;
         this.desktop.scrollToColumn(column, false);

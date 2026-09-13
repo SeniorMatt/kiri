@@ -79,6 +79,7 @@ class ClientWrapper {
     }
 
     public focus() {
+        KiriFocus.mark(this.kwinClient);
         Workspace.activeWindow = this.kwinClient;
     }
 

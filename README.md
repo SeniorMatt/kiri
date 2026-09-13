@@ -18,6 +18,9 @@ mouse wheel binds, the animation effect): download `kiri_*.tar.gz` from [Release
 
 It builds the compiled effects against your KWin, so run it again after KWin updates. Arch-based systems only for now.
 
+To remove it, run `./uninstall.sh` from the same folder. It asks before removing anything, then asks whether to
+also delete your Kiri settings and shortcuts; keep them if you only want Kiri gone for a while.
+
 Script only: download `kiri_*.kwinscript`, then in System Settings > Window Management > KWin Scripts use
 "Install from File…", tick Kiri and log in again.
 

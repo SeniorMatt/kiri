@@ -432,7 +432,8 @@ class Column {
 
     public onWindowRemoved(window: Window, passFocus: FocusPassing.Type) {
         const lastWindow = this.windows.length() === 1;
-        const windowToFocus = this.getAboveWindow(window) ?? this.getBelowWindow(window);
+        // like niri: the window below takes the place of the removed one, the one above if it was the bottom one
+        const windowToFocus = this.getBelowWindow(window) ?? this.getAboveWindow(window);
 
         this.windows.remove(window);
 

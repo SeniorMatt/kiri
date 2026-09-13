@@ -196,6 +196,12 @@ void Effect::loadSettings()
     m_settings = s;
 }
 
+void Effect::reloadSettings(const QString &)
+{
+    loadSettings();
+    KWin::effects->addRepaintFull();
+}
+
 void Effect::setTabGroups(const QString &json)
 {
     QList<TabGroup> groups;

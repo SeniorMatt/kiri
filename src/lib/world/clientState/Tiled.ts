@@ -9,8 +9,11 @@ namespace ClientState {
             this.defaultState = { skipSwitcher: client.kwinClient.skipSwitcher };
             Tiled.prepareClientForTiling(client, grid.config);
 
-            const column = new Column(grid, grid.getLastFocusedColumn() ?? grid.getLastColumn());
+            const previousColumn = grid.getLastFocusedColumn();
+            const scrollX = grid.desktop.getScrollX();
+            const column = new Column(grid, previousColumn ?? grid.getLastColumn());
             const window = new Window(client, column);
+            grid.onColumnOpened(column, previousColumn, scrollX);
 
             this.window = window;
             this.signalManager = Tiled.initSignalManager(world, window, grid.config);

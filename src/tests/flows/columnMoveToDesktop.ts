@@ -41,8 +41,8 @@ tests.register("Column move to desktop", 10, () => {
     qtMock.fireShortcut("focus-end");
     qtMock.fireShortcut("focus-left");
     qtMock.fireShortcut("focus-left");
-    // W1: 0, [1,2,3], 4, *5*, 6
-    Assert.equal(workspaceMock.activeWindow, client4);
+    // W1: 0, 4, [1,2,3], *5*, 6 (the column came back to the right of the active column 4, which got the focus when it left)
+    Assert.equal(workspaceMock.activeWindow, client1b);
     qtMock.fireShortcut("focus-right");
     Assert.equal(workspaceMock.activeWindow, client5);
     qtMock.fireShortcut("tail-move-to-previous-desktop"); // no-op

@@ -108,6 +108,22 @@ Item {
         );
     }
 
+    // the compiled effect reads the ring, border and corner settings from kwinrc too
+    function reloadDecorationsSettings() {
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriDecorations",
+                iface: "org.kde.kiri.Decorations",
+                member: "reloadSettings",
+                arguments: [new DBus.string("")],
+                signature: "(s)",
+            },
+            () => {},
+            (error) => {},
+        );
+    }
+
     function sendVisualPositions() {
         DBus.SessionBus.asyncCall(
             {
@@ -191,7 +207,10 @@ Item {
     Timer {
         id: reloadTimer
         interval: 700
-        onTriggered: qmlBase.karouselInstance.reloadConfig()
+        onTriggered: {
+            qmlBase.karouselInstance.reloadConfig();
+            qmlBase.reloadDecorationsSettings();
+        }
     }
 
     Loader {

@@ -32,6 +32,7 @@ namespace FocusPassing {
                 return;
             }
 
+            KiriFocus.mark(this.currentRequest.target);
             Workspace.activeWindow = this.currentRequest.target;
         }
     }

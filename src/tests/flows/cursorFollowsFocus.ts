@@ -8,29 +8,44 @@ tests.register("Cursor follows focus", 10, () => {
     Assert.assert(rectContainsPoint(client1.getActualFrameGeometry(), initialCursorPos), { message: "invalid test setup" });
     workspaceMock.cursorPos = initialCursorPos.clone();
 
-    runOneOf(
-        () => { Workspace.activeWindow = client1; },
-        () => { qtMock.fireShortcut("focus-1"); },
-    );
+    qtMock.fireShortcut("focus-1");
     Assert.assert(rectContainsPoint(client1.getActualFrameGeometry(), Workspace.cursorPos));
     Assert.assert(!rectContainsPoint(client2.getActualFrameGeometry(), Workspace.cursorPos));
     Assert.assert(pointEquals(Workspace.cursorPos, initialCursorPos), { message: "Cursor should not have been moved because it was already within the focused client" });
 
-    runOneOf(
-        () => { Workspace.activeWindow = client2; },
-        () => { qtMock.fireShortcut("focus-2"); },
-    );
+    qtMock.fireShortcut("focus-2");
     Assert.assert(!rectContainsPoint(client1.getActualFrameGeometry(), Workspace.cursorPos));
     Assert.assert(rectContainsPoint(client2.getActualFrameGeometry(), Workspace.cursorPos));
 
-    runOneOf(
-        () => { Workspace.activeWindow = client1; },
-        () => { qtMock.fireShortcut("focus-1"); },
-    );
+    qtMock.fireShortcut("focus-1");
     Assert.assert(rectContainsPoint(client1.getActualFrameGeometry(), Workspace.cursorPos));
     Assert.assert(!rectContainsPoint(client2.getActualFrameGeometry(), Workspace.cursorPos));
     const lastCursorPos = workspaceMock.cursorPos.clone();
 
     Workspace.activeWindow = null;
     Assert.assert(pointEquals(Workspace.cursorPos, lastCursorPos), { message: "Cursor should not have been moved" });
+});
+
+tests.register("Cursor follows focus: pointer focus never warps", 10, () => {
+    // A window focused by the pointer (focus follows mouse, hovering while dragging a file) gets scrolled into
+    // view; the cursor must stay where the user put it, even though the window moved away from it
+    const config = getDefaultConfig();
+    config.cursorFollowsFocus = true;
+    const { qtMock, workspaceMock, world } = init(config);
+
+    const [client1, client2, client3, client4] = workspaceMock.createClients(4);
+    qtMock.fireShortcut("focus-1");
+    const frame = client4.getActualFrameGeometry();
+    const pointerPos = new MockQmlPoint(frame.x + 5, frame.y + 5);
+    workspaceMock.cursorPos = pointerPos.clone();
+
+    Workspace.activeWindow = client4;
+    Assert.assert(pointEquals(Workspace.cursorPos, pointerPos), { message: "Cursor should stay where the pointer focused the window" });
+
+    // An app activating itself (not under the cursor) doesn't move the cursor either
+    Workspace.activeWindow = client2;
+    Assert.assert(pointEquals(Workspace.cursorPos, pointerPos), { message: "Cursor should not follow an app activating itself" });
+
+    qtMock.fireShortcut("focus-1");
+    Assert.assert(rectContainsPoint(client1.getActualFrameGeometry(), Workspace.cursorPos), { message: "Keyboard focus should still warp" });
 });

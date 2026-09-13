@@ -99,6 +99,7 @@ class Actions {
         } else {
             const floating = cm.findLastFocusedFloating();
             if (floating !== null) {
+                KiriFocus.mark(floating);
                 Workspace.activeWindow = floating;
             }
         }

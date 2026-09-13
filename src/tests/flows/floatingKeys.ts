@@ -121,3 +121,24 @@ tests.register("Window that starts full-screen is tiled after leaving full-scree
         Assert.assert(game.getActualFrameGeometry().x < a.getActualFrameGeometry().x);
     }
 });
+
+tests.register("Switch focus to floating moves the cursor", 1, () => {
+    // with focus follows mouse, a cursor left on the tiled window would take the focus straight back
+    const config = getDefaultConfig();
+    config.cursorFollowsFocus = true;
+    const { qtMock, workspaceMock } = init(config);
+    const [tiled, floating] = workspaceMock.createClients(2);
+    workspaceMock.activeWindow = floating;
+    qtMock.fireShortcut("window-toggle-floating");
+    floating.frameGeometry = new MockQmlRect(1200, 600, 300, 200);
+    qtMock.fireShortcut("focus-1");
+    Assert.assert(rectContainsPoint(tiled.getActualFrameGeometry(), Workspace.cursorPos), { message: "invalid test setup" });
+    Assert.assert(!rectContainsPoint(floating.getActualFrameGeometry(), Workspace.cursorPos), { message: "invalid test setup" });
+
+    qtMock.fireShortcut("window-switch-focus-floating-tiling");
+    Assert.equal(workspaceMock.activeWindow, floating);
+    Assert.assert(rectContainsPoint(floating.getActualFrameGeometry(), Workspace.cursorPos));
+    qtMock.fireShortcut("window-switch-focus-floating-tiling");
+    Assert.equal(workspaceMock.activeWindow, tiled);
+    Assert.assert(rectContainsPoint(tiled.getActualFrameGeometry(), Workspace.cursorPos));
+});

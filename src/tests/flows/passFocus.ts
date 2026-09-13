@@ -17,23 +17,26 @@ tests.register("Pass focus", 100, () => {
         );
     }
 
+    // like niri: the window or column that takes the place of the closed one gets the focus, the one before it if
+    // there is none after it
     removeWindow(client5);
-    Assert.equal(workspaceMock.activeWindow, client4);
+    Assert.equal(workspaceMock.activeWindow, client6);
 
+    workspaceMock.activeWindow = client4;
     qtMock.fireShortcut("column-move-to-desktop-2");
     Assert.equal(workspaceMock.activeWindow, client4); // the moved column keeps the focus on desktop 2
     workspaceMock.currentDesktop = workspaceMock.desktops[0];
     workspaceMock.activeWindow = client1b;
 
     removeWindow(client1b);
-    Assert.equal(workspaceMock.activeWindow, client1a);
-
-    removeWindow(client1a);
     Assert.equal(workspaceMock.activeWindow, client1c);
 
     removeWindow(client1c);
-    Assert.equal(workspaceMock.activeWindow, client0);
+    Assert.equal(workspaceMock.activeWindow, client1a);
 
-    removeWindow(client0);
+    removeWindow(client1a);
     Assert.equal(workspaceMock.activeWindow, client6);
+
+    removeWindow(client6);
+    Assert.equal(workspaceMock.activeWindow, client0);
 });
