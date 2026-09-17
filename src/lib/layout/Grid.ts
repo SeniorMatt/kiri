@@ -250,6 +250,7 @@ class Grid {
         if (lastFocusedColumn !== null) {
             lastFocusedColumn.restoreToTiled(window);
         }
+        const previous = this.getLastFocusedColumn();
         if (column !== this.lastFocusedColumn) {
             this.previousFocusedColumn = this.lastFocusedColumn;
             this.returnTo = null;
@@ -259,7 +260,7 @@ class Grid {
             this.opened = null;
         }
         this.lastFocusedColumn = column;
-        this.desktop.scrollToColumn(column, false);
+        this.desktop.scrollToColumn(column, false, previous === column ? null : previous);
     }
 
     public onScreenSizeChanged() {

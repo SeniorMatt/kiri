@@ -135,6 +135,9 @@ tests.register("NiriImport", 1, () => {
     NiriImport.apply(disabled);
     Assert.equal(disabled.gapsInnerHorizontal, 8);
 
+    // an empty default-column-width lets windows choose their own width
+    Assert.equal(NiriImport.parse("layout { default-column-width {} }").settings["defaultColumnWidth"], "");
+
     // garbage in must not throw
     NiriImport.parse("}}} { { \"unterminated");
 

@@ -73,20 +73,60 @@ tests.register("Center focused column on overflow", 5, () => {
     }
     const tilingCenter = tilingArea.x + tilingArea.width / 2;
 
+    // niri compares the new column with its neighbour on the side the focus came from, not with the old column
     const [client0, client1, client2] = workspaceMock.createClientsWithWidths(300, 300, 300);
     Assert.assert(Math.abs(centerX(client2) - tilingCenter) > 100, { message: "the last column is not centered (it is the last one)" });
-
-    // client0 and client2 don't fit together, so client0 is centered
     qtMock.fireShortcut("focus-start");
     Assert.assert(workspaceMock.activeWindow === client0);
-    Assert.assert(Math.abs(centerX(client0) - tilingCenter) <= 1, { message: "client0 should be centered" });
-
-    // client0 and client1 fit together, so both are scrolled into view without centering client1
+    Assert.assert(Math.abs(centerX(client0) - tilingCenter) > 100, { message: "client0 fits together with client1, so it is not centered" });
     qtMock.fireShortcut("focus-right");
     Assert.assert(workspaceMock.activeWindow === client1);
     Assert.fullyVisible(client0.getActualFrameGeometry());
     Assert.fullyVisible(client1.getActualFrameGeometry());
     Assert.assert(Math.abs(centerX(client1) - tilingCenter) > 1, { message: "client1 should not be centered" });
+});
+
+tests.register("Center focused column on overflow (wide columns)", 5, () => {
+    const config = getDefaultConfig();
+    config.scrollingLazy = false;
+    config.scrollingOnOverflow = true;
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock, world } = init(config);
+
+    function centerX(client: MockKwinClient) {
+        const frame = client.getActualFrameGeometry();
+        return frame.x + frame.width / 2;
+    }
+    const tilingCenter = tilingArea.x + tilingArea.width / 2;
+
+    const [client0, client1, client2] = workspaceMock.createClientsWithWidths(400, 400, 400);
+    qtMock.fireShortcut("focus-start");
+    Assert.assert(Math.abs(centerX(client0) - tilingCenter) <= 1, { message: "client0 and client1 don't fit together, so client0 is centered" });
+    qtMock.fireShortcut("focus-right");
+    Assert.assert(Math.abs(centerX(client1) - tilingCenter) <= 1, { message: "client1 doesn't fit with client0, so it is centered" });
+    qtMock.fireShortcut("focus-right");
+    Assert.assert(Math.abs(centerX(client2) - tilingCenter) <= 1, { message: "client2 doesn't fit with client1, so it is centered" });
+    qtMock.fireShortcut("focus-left");
+    Assert.assert(Math.abs(centerX(client1) - tilingCenter) <= 1, { message: "going back centers client1 again" });
+});
+
+tests.register("Center focused column always", 5, () => {
+    const config = getDefaultConfig();
+    config.scrollingLazy = false;
+    config.scrollingCentered = true;
+    const { qtMock, workspaceMock, world } = init(config);
+
+    function centerX(client: MockKwinClient) {
+        const frame = client.getActualFrameGeometry();
+        return frame.x + frame.width / 2;
+    }
+    const tilingCenter = tilingArea.x + tilingArea.width / 2;
+
+    const [client0, client1, client2] = workspaceMock.createClientsWithWidths(100, 100, 100);
+    for (const client of [client0, client1, client2, client1, client0]) {
+        workspaceMock.activeWindow = client;
+        Assert.assert(Math.abs(centerX(client) - tilingCenter) <= 1, { message: "every focused column is centered, even when it was visible already" });
+    }
 });
 
 tests.register("Window height presets", 5, () => {
@@ -193,4 +233,20 @@ tests.register("Reload removed key field", 1, () => {
     settings.key1_focus_left = "";
     Assert.equal(kiri.reloadConfig(), true);
     Assert.equal(String(accel.registered.get("focus-left")), String(defaultKeys), { message: "default keys are back" });
+});
+
+tests.register("niri's defaults: new windows are half as wide, columns aligned left", 5, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = configDef.find(def => def.name === "centerGridWhenFits")!.default as boolean;
+    config.defaultColumnWidth = configDef.find(def => def.name === "defaultColumnWidth")!.default as string;
+    const { qtMock, workspaceMock, world } = init(config);
+
+    const halfWidth = Math.floor((tilingArea.width + gapH) / 2 - gapH);
+    const [client0] = workspaceMock.createClientsWithWidths(300);
+    Assert.equal(client0.getActualFrameGeometry().width, halfWidth);
+    Assert.equal(client0.getActualFrameGeometry().x, tilingArea.x, { message: "a lone column is not centered" });
+    const [client1] = workspaceMock.createClientsWithWidths(500);
+    Assert.equal(client1.getActualFrameGeometry().width, halfWidth);
+    Assert.equal(client0.getActualFrameGeometry().x, tilingArea.x);
+    Assert.equal(client1.getActualFrameGeometry().x, tilingArea.x + halfWidth + gapH);
 });

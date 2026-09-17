@@ -334,9 +334,10 @@ namespace NiriImport {
         if (sizes(L("preset-window-heights")) !== "") {
             out["presetHeights"] = sizes(L("preset-window-heights"));
         }
-        const defaultWidth = size(L("default-column-width"));
-        if (defaultWidth !== undefined) {
-            out["defaultColumnWidth"] = defaultWidth;
+        const defaultWidthNode = L("default-column-width");
+        if (defaultWidthNode !== undefined) {
+            // an empty block lets the windows pick their own width, which is "" for Kiri
+            out["defaultColumnWidth"] = size(defaultWidthNode) ?? "";
         }
         const display = L("default-column-display");
         if (display !== undefined) {

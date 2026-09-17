@@ -203,7 +203,7 @@ const configDef = [
     {
         name: "centerGridWhenFits",
         type: "Bool",
-        default: true,
+        default: false,
     },
     {
         name: "alwaysCenterSingleColumn",
@@ -213,7 +213,7 @@ const configDef = [
     {
         name: "defaultColumnWidth",
         type: "String",
-        default: "",
+        default: "50%",
     },
     {
         name: "presetHeights",

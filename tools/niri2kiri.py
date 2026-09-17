@@ -412,8 +412,9 @@ def read_settings(path, warn):
         out["presetWidths"] = sizes(L("preset-column-widths"))
     if L("preset-window-heights") and sizes(L("preset-window-heights")):
         out["presetHeights"] = sizes(L("preset-window-heights"))
-    if L("default-column-width") and size(L("default-column-width")):
-        out["defaultColumnWidth"] = size(L("default-column-width"))
+    if L("default-column-width"):
+        # an empty block lets the windows pick their own width, which is "" for Kiri
+        out["defaultColumnWidth"] = size(L("default-column-width")) or ""
     if L("default-column-display"):
         out["tabbedColumnsByDefault"] = (L("default-column-display")[1] or [""])[0] == "tabbed"
     ring_settings(L("focus-ring"), "focusRing", out, warn)

@@ -116,14 +116,20 @@ class Desktop {
         }
     }
 
-    public scrollToColumn(column: Column, force: boolean) {
-        if (force || this.dirtyScroll || !Range.contains(this.getCurrentVisibleRange(), column)) {
-            this.config.scroller.scrollToColumn(this, column);
+    // `previous` is the column that was active before `column` took the focus
+    public scrollToColumn(column: Column, force: boolean, previous: Column|null = null) {
+        if (force || this.dirtyScroll || this.config.scroller.alwaysScroll === true || !Range.contains(this.getCurrentVisibleRange(), column)) {
+            this.config.scroller.scrollToColumn(this, column, previous);
         }
     }
 
     private getVisibleRange(scrollX: number) {
         return Range.create(scrollX, this.tilingArea.width);
+    }
+
+    // the width niri calls the working area: the tiling area plus the outer gaps
+    public getWorkingWidth() {
+        return this.tilingArea.width + this.config.marginLeft + this.config.marginRight;
     }
 
     public getCurrentVisibleRange() {
@@ -330,7 +336,9 @@ namespace Desktop {
     }
 
     export interface Scroller {
-        scrollToColumn(desktop: Desktop, column: Column): void;
+        // always called, also for columns that are already visible (niri centers those too)
+        readonly alwaysScroll?: boolean;
+        scrollToColumn(desktop: Desktop, column: Column, previous: Column|null): void;
     }
 
     export interface Clamper {

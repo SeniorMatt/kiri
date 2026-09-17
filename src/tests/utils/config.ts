@@ -9,5 +9,7 @@ function getDefaultConfig(): Config {
     config.gapsInnerVertical = 8;
     config.presetWidths = "50%, 100%";
     config.gestureScroll = false;
+    config.centerGridWhenFits = true;
+    config.defaultColumnWidth = "";
     return config;
 }
