@@ -59,9 +59,83 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.do(actions.focusEnd),
         },
         {
+            name: "focus-column-right-or-first",
+            description: "Focus the column on the right, the first one at the end",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusColumnRightOrFirst),
+        },
+        {
+            name: "focus-column-left-or-last",
+            description: "Focus the column on the left, the last one at the start",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusColumnLeftOrLast),
+        },
+        {
+            name: "focus-window-down-or-column-left",
+            description: "Focus the window below, or the column on the left",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowDownOrColumnLeft),
+        },
+        {
+            name: "focus-window-down-or-column-right",
+            description: "Focus the window below, or the column on the right",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowDownOrColumnRight),
+        },
+        {
+            name: "focus-window-up-or-column-left",
+            description: "Focus the window above, or the column on the left",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowUpOrColumnLeft),
+        },
+        {
+            name: "focus-window-up-or-column-right",
+            description: "Focus the window above, or the column on the right",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowUpOrColumnRight),
+        },
+        {
+            name: "focus-window-top",
+            description: "Focus the top window of the column",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowTop),
+        },
+        {
+            name: "focus-window-bottom",
+            description: "Focus the bottom window of the column",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowBottom),
+        },
+        {
+            name: "focus-window-down-or-top",
+            description: "Focus the window below, the top one at the bottom",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowDownOrTop),
+        },
+        {
+            name: "focus-window-up-or-bottom",
+            description: "Focus the window above, the bottom one at the top",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowUpOrBottom),
+        },
+        {
+            name: "focus-window-or-desktop-down",
+            description: "Focus the window below, or the next desktop",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowOrDesktopDown),
+        },
+        {
+            name: "focus-window-or-desktop-up",
+            description: "Focus the window above, or the previous desktop",
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowOrDesktopUp),
+        },
+        {
+            name: "focus-window-previous",
+            description: "Focus the previously focused window",
+            action: () => world.do(actions.focusWindowPrevious),
+        },
+        {
+            name: "focus-floating",
+            description: "Focus the floating windows",
+            action: () => world.do(actions.focusFloating),
+        },
+        {
+            name: "focus-tiling",
+            description: "Focus the tiled windows",
+            action: () => world.do(actions.focusTiling),
+        },
+        {
             name: "window-move-left",
             description: "Move window left",
-            defaultKeys: ["Meta+["],
             action: () => world.doIfTiledFocusedOrMoveFloating(actions.windowMoveLeft, -50, 0),
         },
         {
@@ -73,38 +147,101 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         {
             name: "window-consume-or-expel-left",
             description: "Consume the window into the left column, or expel it to the left",
-            defaultKeys: ["Meta+,"],
+            defaultKeys: ["Meta+["],
             action: () => world.doIfTiledFocused(actions.windowConsumeOrExpelLeft),
         },
         {
             name: "window-consume-or-expel-right",
             description: "Consume the window into the right column, or expel it to the right",
-            defaultKeys: ["Meta+."],
+            defaultKeys: ["Meta+]"],
             action: () => world.doIfTiledFocused(actions.windowConsumeOrExpelRight),
         },
         {
             name: "window-consume-into-column",
             description: "Move the window on the right into this column",
-            defaultKeys: ["Meta+Shift+,", "Meta+<"],
+            defaultKeys: ["Meta+,"],
             action: () => world.doIfTiledFocused(actions.windowConsumeIntoColumn),
         },
         {
             name: "window-expel-from-column",
             description: "Move window out of its column",
-            defaultKeys: ["Meta+Shift+.", "Meta+>"],
+            defaultKeys: ["Meta+."],
             action: () => world.doIfTiledFocused(actions.windowExpelFromColumn),
         },
         {
             name: "window-move-up",
             description: "Move window up",
-            defaultKeys: ["Meta+Shift+K", "Meta+Shift+Up"],
+            defaultKeys: ["Meta+Ctrl+K", "Meta+Ctrl+Up"],
             action: () => world.doIfTiledFocusedOrMoveFloating(actions.windowMoveUp, 0, -50),
         },
         {
             name: "window-move-down",
             description: "Move window down",
-            defaultKeys: ["Meta+Shift+J", "Meta+Shift+Down"],
+            defaultKeys: ["Meta+Ctrl+J", "Meta+Ctrl+Down"],
             action: () => world.doIfTiledFocusedOrMoveFloating(actions.windowMoveDown, 0, 50),
+        },
+        {
+            name: "window-move-down-or-to-desktop-down",
+            description: "Move the window down, or to the next desktop",
+            action: () => world.doIfTiledFocused(actions.windowMoveDownOrToDesktopDown),
+        },
+        {
+            name: "window-move-up-or-to-desktop-up",
+            description: "Move the window up, or to the previous desktop",
+            action: () => world.doIfTiledFocused(actions.windowMoveUpOrToDesktopUp),
+        },
+        {
+            name: "window-swap-left",
+            description: "Swap the window with the one in the column on the left",
+            action: () => world.doIfTiledFocused(actions.swapWindowLeft),
+        },
+        {
+            name: "window-swap-right",
+            description: "Swap the window with the one in the column on the right",
+            action: () => world.doIfTiledFocused(actions.swapWindowRight),
+        },
+        {
+            name: "window-move-to-floating",
+            description: "Move the window to the floating layer",
+            action: () => world.do(actions.windowMoveToFloating),
+        },
+        {
+            name: "window-move-to-tiling",
+            description: "Move the window to the tiled layer",
+            action: () => world.do(actions.windowMoveToTiling),
+        },
+        {
+            name: "column-display-normal",
+            description: "Show the column normally",
+            action: () => world.doIfTiledFocused(actions.columnDisplayNormal),
+        },
+        {
+            name: "column-display-tabbed",
+            description: "Show the column as tabs",
+            action: () => world.doIfTiledFocused(actions.columnDisplayTabbed),
+        },
+        {
+            name: "column-center-visible",
+            description: "Center the columns that are on screen",
+            defaultKeys: ["Meta+Ctrl+C"],
+            action: () => world.doIfTiledFocused(actions.centerVisibleColumns),
+        },
+        {
+            name: "window-height-increase",
+            description: "Increase window height by a share of the screen",
+            defaultKeys: ["Meta+Shift+="],
+            action: () => world.doIfTiledFocused(actions.windowHeightStep.partial(actions.config.windowHeightStep)),
+        },
+        {
+            name: "window-height-decrease",
+            description: "Decrease window height by a share of the screen",
+            defaultKeys: ["Meta+Shift+-"],
+            action: () => world.doIfTiledFocused(actions.windowHeightStep.partial(-actions.config.windowHeightStep)),
+        },
+        {
+            name: "desktop-previous-used",
+            description: "Switch back to the previously used desktop",
+            action: () => switchToPreviousDesktop(world),
         },
         {
             name: "window-move-next",
@@ -145,37 +282,37 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         {
             name: "column-move-left",
             description: "Move column left",
-            defaultKeys: ["Meta+Shift+H", "Meta+Shift+Left"],
+            defaultKeys: ["Meta+Ctrl+H", "Meta+Ctrl+Left"],
             action: () => world.doIfTiledFocusedOrMoveFloating(actions.columnMoveLeft, -50, 0),
         },
         {
             name: "column-move-right",
             description: "Move column right",
-            defaultKeys: ["Meta+Shift+L", "Meta+Shift+Right"],
+            defaultKeys: ["Meta+Ctrl+L", "Meta+Ctrl+Right"],
             action: () => world.doIfTiledFocusedOrMoveFloating(actions.columnMoveRight, 50, 0),
         },
         {
             name: "column-move-start",
             description: "Move column to start",
-            defaultKeys: ["Meta+Shift+Home"],
+            defaultKeys: ["Meta+Ctrl+Home"],
             action: () => world.doIfTiledFocused(actions.columnMoveStart),
         },
         {
             name: "column-move-end",
             description: "Move column to end",
-            defaultKeys: ["Meta+Shift+End"],
+            defaultKeys: ["Meta+Ctrl+End"],
             action: () => world.doIfTiledFocused(actions.columnMoveEnd),
         },
         {
             name: "column-move-to-next-desktop",
             description: "Move column to the next desktop",
-            defaultKeys: ["Meta+Shift+PgDown", "Meta+Shift+U"],
+            defaultKeys: ["Meta+Ctrl+PgDown", "Meta+Ctrl+U"],
             action: () => world.doIfTiledFocused(actions.columnMoveToNextDesktop),
         },
         {
             name: "column-move-to-previous-desktop",
             description: "Move column to the previous desktop",
-            defaultKeys: ["Meta+Shift+PgUp", "Meta+Shift+I"],
+            defaultKeys: ["Meta+Ctrl+PgUp", "Meta+Ctrl+I"],
             action: () => world.doIfTiledFocused(actions.columnMoveToPreviousDesktop),
         },
         {
@@ -192,14 +329,24 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         },
         {
             name: "column-width-increase",
-            description: "Increase column width",
+            description: "Increase column width by a share of the screen",
             defaultKeys: ["Meta+="],
-            action: () => world.doIfTiledFocused(actions.columnWidthIncrease),
+            action: () => world.doIfTiledFocused(actions.columnWidthStep.partial(actions.config.columnWidthStep)),
         },
         {
             name: "column-width-decrease",
-            description: "Decrease column width",
+            description: "Decrease column width by a share of the screen",
             defaultKeys: ["Meta+-"],
+            action: () => world.doIfTiledFocused(actions.columnWidthStep.partial(-actions.config.columnWidthStep)),
+        },
+        {
+            name: "column-width-fit-increase",
+            description: "Increase column width to the next size that fits the visible columns",
+            action: () => world.doIfTiledFocused(actions.columnWidthIncrease),
+        },
+        {
+            name: "column-width-fit-decrease",
+            description: "Decrease column width to the next size that fits the visible columns",
             action: () => world.doIfTiledFocused(actions.columnWidthDecrease),
         },
         {
@@ -228,16 +375,19 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         {
             name: "cycle-preset-widths-reverse",
             description: "Cycle through preset column widths in reverse",
+            defaultKeys: ["Meta+Shift+R"],
             action: () => world.doIfTiledFocused(actions.cyclePresetWidthsReverse),
         },
         {
             name: "column-width-expand",
             description: "Expand column to available width",
+            defaultKeys: ["Meta+Ctrl+F"],
             action: () => world.doIfTiledFocused(actions.columnWidthExpand),
         },
         {
             name: "window-height-cycle-presets",
             description: "Cycle preset window heights",
+            defaultKeys: ["Meta+Ctrl+Shift+R"],
             action: () => world.doIfTiledFocused(actions.windowHeightCyclePresets),
         },
         {
@@ -248,6 +398,7 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         {
             name: "window-height-reset",
             description: "Reset window height",
+            defaultKeys: ["Meta+Ctrl+R"],
             action: () => world.doIfTiledFocused(actions.windowHeightReset),
         },
         {
@@ -331,7 +482,7 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         {
             name: "window-close",
             description: "Close window",
-            defaultKeys: ["Meta+Q"],
+            defaultKeys: ["Meta+Q", "Alt+F4"],
             action: () => Workspace.activeWindow?.closeWindow(),
         },
         {
@@ -352,6 +503,13 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => kglobalaccel.call("/component/kwin", "org.kde.kglobalaccel.Component", "invokeShortcut", ["s"], ["Overview"], () => {}),
         },
     ];
+}
+
+function switchToPreviousDesktop(world: World) {
+    const previous = world.previousDesktop;
+    if (previous !== null && Workspace.desktops.includes(previous)) {
+        Workspace.currentDesktop = previous;
+    }
 }
 
 function currentDesktopIndex() {
@@ -377,6 +535,11 @@ function getNumKeyBindings(world: World, actions: Actions): NumKeyBinding[] {
             name: "focus-{}",
             description: "Move focus to column {}",
             action: (i: number) => world.do(actions.focus.partial(i)),
+        },
+        {
+            name: "focus-window-in-column-{}",
+            description: "Move focus to window {} of the column",
+            action: (i: number) => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowInColumn.partial(i)),
         },
         {
             name: "window-move-to-column-{}",

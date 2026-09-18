@@ -29,6 +29,7 @@ function initWorkspaceSignalHandlers(world: World, focusPasser: FocusPassing.Pas
     });
 
     manager.connect(Workspace.currentDesktopChanged, () => {
+        world.onDesktopChanged();
         world.do(() => {}); // re-arrange desktop
     });
 

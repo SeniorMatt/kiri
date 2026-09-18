@@ -19,31 +19,31 @@ tests.register("Preset Widths default", 5, () => {
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-increase"),
+        () => qtMock.fireShortcut("column-width-fit-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(halfWidth));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-increase"),
+        () => qtMock.fireShortcut("column-width-fit-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(maxWidth));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-decrease"),
+        () => qtMock.fireShortcut("column-width-fit-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(halfWidth));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-increase"),
+        () => qtMock.fireShortcut("column-width-fit-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(maxWidth));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-decrease"),
+        () => qtMock.fireShortcut("column-width-fit-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(halfWidth));
 });
@@ -70,19 +70,19 @@ tests.register("Preset Widths custom", 5, () => {
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-increase"),
+        () => qtMock.fireShortcut("column-width-fit-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(250));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-increase"),
+        () => qtMock.fireShortcut("column-width-fit-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(halfWidth));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-increase"),
+        () => qtMock.fireShortcut("column-width-fit-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(500));
 
@@ -91,13 +91,13 @@ tests.register("Preset Widths custom", 5, () => {
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-increase"),
+        () => qtMock.fireShortcut("column-width-fit-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(250));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths-reverse"),
-        () => qtMock.fireShortcut("column-width-decrease"),
+        () => qtMock.fireShortcut("column-width-fit-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(100));
 
@@ -106,7 +106,7 @@ tests.register("Preset Widths custom", 5, () => {
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths-reverse"),
-        () => qtMock.fireShortcut("column-width-decrease"),
+        () => qtMock.fireShortcut("column-width-fit-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(halfWidth));
 });
@@ -135,19 +135,19 @@ tests.register("Preset Widths custom percentages", 5, () => {
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-increase"),
+        () => qtMock.fireShortcut("column-width-fit-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width50));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-increase"),
+        () => qtMock.fireShortcut("column-width-fit-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width75));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths"),
-        () => qtMock.fireShortcut("column-width-increase"),
+        () => qtMock.fireShortcut("column-width-fit-increase"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width100));
 
@@ -159,19 +159,19 @@ tests.register("Preset Widths custom percentages", 5, () => {
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths-reverse"),
-        () => qtMock.fireShortcut("column-width-decrease"),
+        () => qtMock.fireShortcut("column-width-fit-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width75));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths-reverse"),
-        () => qtMock.fireShortcut("column-width-decrease"),
+        () => qtMock.fireShortcut("column-width-fit-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width50));
 
     runOneOf(
         () => qtMock.fireShortcut("cycle-preset-widths-reverse"),
-        () => qtMock.fireShortcut("column-width-decrease"),
+        () => qtMock.fireShortcut("column-width-fit-decrease"),
     );
     Assert.equalRects(kwinClient.getActualFrameGeometry(), getRect(width25));
 });

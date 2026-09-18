@@ -20,16 +20,12 @@ ACTIONS = {
     "focus-column-right": "focus-right",
     "focus-window-up": "focus-up",
     "focus-window-down": "focus-down",
-    "focus-window-or-workspace-up": "focus-up",
-    "focus-window-or-workspace-down": "focus-down",
     "focus-column-first": "focus-start",
     "focus-column-last": "focus-end",
     "move-column-left": "column-move-left",
     "move-column-right": "column-move-right",
     "move-window-up": "window-move-up",
     "move-window-down": "window-move-down",
-    "move-window-up-or-to-workspace-up": "window-move-up",
-    "move-window-down-or-to-workspace-down": "window-move-down",
     "move-column-to-first": "column-move-start",
     "move-column-to-last": "column-move-end",
     "focus-workspace-down": "desktop-next",
@@ -57,12 +53,39 @@ ACTIONS = {
     "switch-preset-window-height": "window-height-cycle-presets",
     "switch-preset-window-height-back": "window-height-cycle-presets-reverse",
     "reset-window-height": "window-height-reset",
+    "focus-window-or-workspace-up": "focus-window-or-desktop-up",
+    "focus-window-or-workspace-down": "focus-window-or-desktop-down",
+    "move-window-up-or-to-workspace-up": "window-move-up-or-to-desktop-up",
+    "move-window-down-or-to-workspace-down": "window-move-down-or-to-desktop-down",
+    "focus-column-right-or-first": "focus-column-right-or-first",
+    "focus-column-left-or-last": "focus-column-left-or-last",
+    "focus-window-down-or-column-left": "focus-window-down-or-column-left",
+    "focus-window-down-or-column-right": "focus-window-down-or-column-right",
+    "focus-window-up-or-column-left": "focus-window-up-or-column-left",
+    "focus-window-up-or-column-right": "focus-window-up-or-column-right",
+    "focus-window-top": "focus-window-top",
+    "focus-window-bottom": "focus-window-bottom",
+    "focus-window-down-or-top": "focus-window-down-or-top",
+    "focus-window-up-or-bottom": "focus-window-up-or-bottom",
+    "swap-window-left": "window-swap-left",
+    "swap-window-right": "window-swap-right",
+    "center-window": "grid-scroll-focused",
+    "center-visible-columns": "column-center-visible",
+    "focus-workspace-previous": "desktop-previous-used",
+    "move-window-to-floating": "window-move-to-floating",
+    "move-window-to-tiling": "window-move-to-tiling",
+    "focus-floating": "focus-floating",
+    "focus-tiling": "focus-tiling",
+    "focus-window-previous": "focus-window-previous",
+    "open-overview": "overview",
 }
 NUMBERED = {
     "focus-workspace": "desktop-{}",
     "move-column-to-workspace": "column-move-to-desktop-{}",
     "move-window-to-workspace": "window-move-to-desktop-{}",
     "focus-column": "focus-{}",
+    "focus-window-in-column": "focus-window-in-column-{}",
+    "move-column-to-index": "column-move-to-column-{}",
 }
 MODIFIERS = {"mod": "Meta", "super": "Meta", "win": "Meta", "ctrl": "Ctrl", "control": "Ctrl", "shift": "Shift", "alt": "Alt"}
 KEYS = {
@@ -209,7 +232,7 @@ def child(node, name):
 # ---- shortcuts ----
 
 def read_binds(path):
-    binds, skipped = {}, []
+    binds, skipped, steps = {}, [], {}
     for blk in find(parse_kdl(path), "binds"):
         for key, _, _, cmds in blk[3]:
             if not cmds:
@@ -217,8 +240,12 @@ def read_binds(path):
             name, args = cmds[0][0], cmds[0][1]
             if name in NUMBERED and args and args[0].isdigit():
                 action = NUMBERED[name].format(args[0])
-            elif name == "set-column-width" and args:
-                action = "column-width-decrease" if args[0].startswith("-") else "column-width-increase"
+            elif name in ("set-column-width", "set-window-height") and args and re.fullmatch(r"[+-]\d+(\.\d+)?%", args[0]):
+                kind = "column-width" if name == "set-column-width" else "window-height"
+                action = kind + ("-decrease" if args[0].startswith("-") else "-increase")
+                steps.setdefault("columnWidthStep" if kind == "column-width" else "windowHeightStep", round(float(args[0][1:-1])))
+            elif name == "set-column-display" and args and args[0] in ("tabbed", "normal"):
+                action = "column-display-" + args[0]
             else:
                 action = ACTIONS.get(name)
             kiri_key = convert_key(key)
@@ -226,7 +253,7 @@ def read_binds(path):
                 skipped.append(f"{key} {' '.join([name] + args)}")
                 continue
             binds.setdefault(action, []).append(kiri_key)
-    return binds, skipped
+    return binds, skipped, steps
 
 
 def read_kiri_section(path):
@@ -244,7 +271,7 @@ def read_kiri_section(path):
 
 
 def shortcut_lines(config, shortcuts_file, warn):
-    binds, skipped = read_binds(config)
+    binds, skipped, _ = read_binds(config)
     entries = read_kiri_section(shortcuts_file)
     if not entries:
         sys.exit(f"no [kiri] section in {shortcuts_file}, enable Kiri once first")
@@ -383,6 +410,12 @@ def window_rules(nodes, warn):
 
 
 def read_settings(path, warn):
+    out = read_settings_inner(path, warn)
+    out.update(read_binds(path)[2])
+    return out
+
+
+def read_settings_inner(path, warn):
     nodes = parse_kdl(path)
     out = {}
     layout = {}

@@ -8,6 +8,8 @@ interface Config {
     manualScrollStep: number;
     presetWidths: string;
     verticalResizeStep: number;
+    columnWidthStep: number;
+    windowHeightStep: number;
     offScreenOpacity: number;
     untileOnDrag: boolean;
     cursorFollowsFocus: boolean;

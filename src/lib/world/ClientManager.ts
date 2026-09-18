@@ -5,6 +5,8 @@ class ClientManager {
     private readonly clientMap: Map<KwinClient, ClientWrapper>;
     private lastFocusedClient: KwinClient|null;
     private floatingFocusOrder: KwinClient[] = []; // most recently focused last
+    private focusStamps = new Map<KwinClient, number>(); // for focus-window-previous
+    private focusCounter = 0;
     private readonly windowRuleEnforcer: WindowRuleEnforcer;
 
     constructor(
@@ -95,6 +97,7 @@ class ClientManager {
         }
         client.destroy(passFocus);
         this.clientMap.delete(kwinClient);
+        this.focusStamps.delete(kwinClient);
     }
 
     private findTransientFor(kwinClient: KwinClient) {
@@ -225,6 +228,7 @@ class ClientManager {
 
     public onClientFocused(kwinClient: KwinClient) {
         this.lastFocusedClient = kwinClient;
+        this.focusStamps.set(kwinClient, ++this.focusCounter);
         // Like niri, only focus changes made by Kiri move the cursor, never pointer focus or an app activating
         // itself; the cursor position is checked before onFocused scrolls the window away from it. Floating
         // windows too: with focus follows mouse, a cursor left on the tiled window would take the focus back.
@@ -242,6 +246,19 @@ class ClientManager {
         if (warp && (window !== null || this.isFloating(kwinClient))) {
             moveCursorToFocus.call();
         }
+    }
+
+    // niri's focus-window-previous: the window that had the focus before the current one
+    public findPreviousFocused(): KwinClient|null {
+        let best: KwinClient|null = null;
+        let bestStamp = -1;
+        for (const [kwinClient, stamp] of this.focusStamps) {
+            if (kwinClient !== Workspace.activeWindow && !kwinClient.minimized && stamp > bestStamp && this.clientMap.has(kwinClient)) {
+                best = kwinClient;
+                bestStamp = stamp;
+            }
+        }
+        return best;
     }
 
     public isFloating(kwinClient: KwinClient) {

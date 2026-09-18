@@ -85,6 +85,12 @@ class Desktop {
         this.setScroll(targetScrollX, false);
     }
 
+    // niri: center-focused-column "always", or a lone column with always-center-single-column
+    public isCenteringFocusedColumn() {
+        return this.config.scroller instanceof CenteredScroller ||
+            (this.config.alwaysCenterSingleColumn && this.grid.getFirstColumn() === this.grid.getLastColumn());
+    }
+
     public scrollCenterRange(range: Range) {
         const scrollAmount = Range.minus(range, this.getCurrentVisibleRange());
         this.adjustScroll(scrollAmount, true);

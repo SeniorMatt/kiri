@@ -152,8 +152,8 @@ class Window {
     private onMaximizedOrFullScreenChanged() {
         this.skipArrange = this.isMaximizedOutsideGrid();
         this.updateLayering();
-        if ((this.fillsWidth() || this.fillsHeight()) && this.column.getWindowCount() > 1) {
-            // a maximized or full-screen window gets a column of its own
+        if ((this.fillsWidth() || this.fillsHeight()) && this.column.getWindowCount() > 1 && !this.column.isTabbed()) {
+            // a maximized or full-screen window gets a column of its own (a tabbed column keeps its tabs, like niri)
             const newColumn = new Column(this.column.grid, this.column);
             this.moveToColumn(newColumn, true, FocusPassing.Type.None);
         }

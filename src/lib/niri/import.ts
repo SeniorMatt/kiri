@@ -12,16 +12,12 @@ namespace NiriImport {
         "focus-column-right": "focus-right",
         "focus-window-up": "focus-up",
         "focus-window-down": "focus-down",
-        "focus-window-or-workspace-up": "focus-up",
-        "focus-window-or-workspace-down": "focus-down",
         "focus-column-first": "focus-start",
         "focus-column-last": "focus-end",
         "move-column-left": "column-move-left",
         "move-column-right": "column-move-right",
         "move-window-up": "window-move-up",
         "move-window-down": "window-move-down",
-        "move-window-up-or-to-workspace-up": "window-move-up",
-        "move-window-down-or-to-workspace-down": "window-move-down",
         "move-column-to-first": "column-move-start",
         "move-column-to-last": "column-move-end",
         "focus-workspace-down": "desktop-next",
@@ -49,6 +45,31 @@ namespace NiriImport {
         "switch-preset-window-height": "window-height-cycle-presets",
         "switch-preset-window-height-back": "window-height-cycle-presets-reverse",
         "reset-window-height": "window-height-reset",
+        "focus-window-or-workspace-up": "focus-window-or-desktop-up",
+        "focus-window-or-workspace-down": "focus-window-or-desktop-down",
+        "move-window-up-or-to-workspace-up": "window-move-up-or-to-desktop-up",
+        "move-window-down-or-to-workspace-down": "window-move-down-or-to-desktop-down",
+        "focus-column-right-or-first": "focus-column-right-or-first",
+        "focus-column-left-or-last": "focus-column-left-or-last",
+        "focus-window-down-or-column-left": "focus-window-down-or-column-left",
+        "focus-window-down-or-column-right": "focus-window-down-or-column-right",
+        "focus-window-up-or-column-left": "focus-window-up-or-column-left",
+        "focus-window-up-or-column-right": "focus-window-up-or-column-right",
+        "focus-window-top": "focus-window-top",
+        "focus-window-bottom": "focus-window-bottom",
+        "focus-window-down-or-top": "focus-window-down-or-top",
+        "focus-window-up-or-bottom": "focus-window-up-or-bottom",
+        "swap-window-left": "window-swap-left",
+        "swap-window-right": "window-swap-right",
+        "center-window": "grid-scroll-focused",
+        "center-visible-columns": "column-center-visible",
+        "focus-workspace-previous": "desktop-previous-used",
+        "move-window-to-floating": "window-move-to-floating",
+        "move-window-to-tiling": "window-move-to-tiling",
+        "focus-floating": "focus-floating",
+        "focus-tiling": "focus-tiling",
+        "focus-window-previous": "focus-window-previous",
+        "open-overview": "overview",
     };
 
     const NUMBERED: Record<string, string> = {
@@ -56,6 +77,8 @@ namespace NiriImport {
         "move-column-to-workspace": "column-move-to-desktop-{}",
         "move-window-to-workspace": "window-move-to-desktop-{}",
         "focus-column": "focus-{}",
+        "focus-window-in-column": "focus-window-in-column-{}",
+        "move-column-to-index": "column-move-to-column-{}",
     };
 
     const MODIFIERS: Record<string, string> = {
@@ -100,6 +123,7 @@ namespace NiriImport {
     function readBinds(nodes: Kdl.Node[]) {
         const binds: Record<string, string[]> = {};
         const skipped: string[] = [];
+        const steps: Record<string, any> = {}; // set-column-width "+5%" gives the step of the width keys
         for (const block of Kdl.find(nodes, "binds")) {
             for (const bind of block.children) {
                 if (bind.children.length === 0) {
@@ -110,8 +134,15 @@ namespace NiriImport {
                 let action: string|undefined;
                 if (has(NUMBERED, command.name) && args.length > 0 && /^\d+$/.test(args[0])) {
                     action = NUMBERED[command.name].replace("{}", args[0]);
-                } else if (command.name === "set-column-width" && args.length > 0) {
-                    action = args[0].startsWith("-") ? "column-width-decrease" : "column-width-increase";
+                } else if ((command.name === "set-column-width" || command.name === "set-window-height") && args.length > 0 && /^[+-]\d+(\.\d+)?%$/.test(args[0])) {
+                    const kind = command.name === "set-column-width" ? "column-width" : "window-height";
+                    action = kind + (args[0].startsWith("-") ? "-decrease" : "-increase");
+                    const stepName = kind === "column-width" ? "columnWidthStep" : "windowHeightStep";
+                    if (steps[stepName] === undefined) {
+                        steps[stepName] = Math.round(parseFloat(args[0].substring(1)));
+                    }
+                } else if (command.name === "set-column-display" && (args[0] === "tabbed" || args[0] === "normal")) {
+                    action = "column-display-" + args[0];
                 } else if (has(ACTIONS, command.name)) {
                     action = ACTIONS[command.name];
                 }
@@ -123,7 +154,7 @@ namespace NiriImport {
                 (binds[action] = binds[action] ?? []).push(key);
             }
         }
-        return { binds, skipped };
+        return { binds, skipped, steps };
     }
 
     const COLOR_NAMES: Record<string, string> = {
@@ -415,7 +446,7 @@ namespace NiriImport {
         }
         const bound = readBinds(nodes);
         skipped.push(...bound.skipped);
-        const settings = readSettings(nodes, warn);
+        const settings = Object.assign(readSettings(nodes, warn), bound.steps);
         const rules = windowRules(nodes, warn);
         if (rules.length > 0) {
             settings["windowRules"] = mergeRules(rules, existingWindowRules);

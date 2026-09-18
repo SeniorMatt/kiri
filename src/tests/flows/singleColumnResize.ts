@@ -53,7 +53,7 @@ tests.register("Single column stays centered while resizing", 6, () => {
             workspaceMock.resizeWindow(client, true, leftSide, false, new MockQmlSize(20, 0), new MockQmlSize(10, 0));
             Assert.centered(config, tilingArea, client, { message: "centered after a longer mouse resize" });
 
-            qtMock.fireShortcut("column-width-increase");
+            qtMock.fireShortcut("column-width-fit-increase");
             Assert.centered(config, tilingArea, client, { message: "centered after a keyboard width change" });
         }
     }

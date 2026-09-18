@@ -1,6 +1,6 @@
 class Actions {
     constructor(
-        private readonly config: Actions.Config,
+        public readonly config: Actions.Config,
     ) {}
 
     public readonly focusLeft = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
@@ -87,21 +87,195 @@ class Actions {
         lastColumn.getWindowToFocus().focus();
     };
 
-    // niri's switch-focus-between-floating-and-tiling
+    // niri's focus-column-right-or-first / focus-column-left-or-last
+    public readonly focusColumnRightOrFirst = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        (grid.getRightColumn(column) ?? grid.getFirstColumn()!).getWindowToFocus().focus();
+    };
+
+    public readonly focusColumnLeftOrLast = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        (grid.getLeftColumn(column) ?? grid.getLastColumn()!).getWindowToFocus().focus();
+    };
+
+    // niri's focus-window-down-or-column-left and friends: the next window in the column, else the neighbouring column
+    public readonly focusWindowDownOrColumnLeft = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const below = column.getBelowWindow(window);
+        (below ?? grid.getLeftColumn(column)?.getWindowToFocus())?.focus();
+    };
+
+    public readonly focusWindowDownOrColumnRight = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const below = column.getBelowWindow(window);
+        (below ?? grid.getRightColumn(column)?.getWindowToFocus())?.focus();
+    };
+
+    public readonly focusWindowUpOrColumnLeft = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const above = column.getAboveWindow(window);
+        (above ?? grid.getLeftColumn(column)?.getWindowToFocus())?.focus();
+    };
+
+    public readonly focusWindowUpOrColumnRight = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const above = column.getAboveWindow(window);
+        (above ?? grid.getRightColumn(column)?.getWindowToFocus())?.focus();
+    };
+
+    public readonly focusWindowTop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        column.getFirstWindow().focus();
+    };
+
+    public readonly focusWindowBottom = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        column.getLastWindow().focus();
+    };
+
+    public readonly focusWindowDownOrTop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        (column.getBelowWindow(window) ?? column.getFirstWindow()).focus();
+    };
+
+    public readonly focusWindowUpOrBottom = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        (column.getAboveWindow(window) ?? column.getLastWindow()).focus();
+    };
+
+    // niri's focus-window-in-column N: the Nth window of the column, the last one for a number that is too big
+    public readonly focusWindowInColumn = (index: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const windows = column.getWindows();
+        windows[Math.min(index, windows.length - 1)].focus();
+    };
+
+    // niri's focus-window-or-workspace-down/up: at the edge of the column the next desktop is shown
+    public readonly focusWindowOrDesktopDown = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const below = column.getBelowWindow(window);
+        if (below !== null) {
+            below.focus();
+        } else {
+            Actions.switchDesktop(1);
+        }
+    };
+
+    public readonly focusWindowOrDesktopUp = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const above = column.getAboveWindow(window);
+        if (above !== null) {
+            above.focus();
+        } else {
+            Actions.switchDesktop(-1);
+        }
+    };
+
+    public static switchDesktop(step: number) {
+        const target = Workspace.desktops[Workspace.desktops.indexOf(Workspace.currentDesktop) + step];
+        if (target !== undefined) {
+            Workspace.currentDesktop = target;
+        }
+    }
+
+    // niri's move-window-down-or-to-workspace-down/up
+    public readonly windowMoveDownOrToDesktopDown = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        if (column.getBelowWindow(window) !== null) {
+            column.moveWindowDown(window);
+        } else {
+            this.windowMoveToNextDesktop(cm, dm, window, column, grid);
+        }
+    };
+
+    public readonly windowMoveUpOrToDesktopUp = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        if (column.getAboveWindow(window) !== null) {
+            column.moveWindowUp(window);
+        } else {
+            this.windowMoveToPreviousDesktop(cm, dm, window, column, grid);
+        }
+    };
+
+    // niri's swap-window-left/right: the active window changes places with the active window of the neighbouring
+    // column (two single-window columns just swap, like move-column); the focus follows the window
+    public readonly swapWindowLeft = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        this.swapWindow(window, column, grid, grid.getLeftColumn(column), true);
+    };
+
+    public readonly swapWindowRight = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        this.swapWindow(window, column, grid, grid.getRightColumn(column), false);
+    };
+
+    private swapWindow(window: Window, column: Column, grid: Grid, target: Column|null, left: boolean) {
+        if (target === null) {
+            return;
+        }
+        if (column.getWindowCount() === 1 && target.getWindowCount() === 1) {
+            if (left) {
+                grid.moveColumnLeft(column);
+            } else {
+                grid.moveColumnRight(column);
+            }
+            return;
+        }
+        const other = target.getWindowToFocus();
+        const windowAbove = column.getAboveWindow(window);
+        const otherAbove = target.getAboveWindow(other);
+        const width = column.getWidth();
+        if (column.getWindowCount() === 1) {
+            // the column stays for the other window, with its width
+            other.moveToColumn(column, true, FocusPassing.Type.None, window);
+            column.setWidth(width, false);
+            window.moveToColumn(target, false, FocusPassing.Type.None, otherAbove);
+        } else {
+            window.moveToColumn(target, false, FocusPassing.Type.None, otherAbove);
+            other.moveToColumn(column, false, FocusPassing.Type.None, windowAbove);
+        }
+        column.setFocusTaker(other);
+        target.setFocusTaker(window);
+        window.focus();
+        grid.desktop.autoAdjustScroll();
+    }
+
+    // niri's set-column-display
+    public readonly columnDisplayNormal = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        column.setTabbed(false);
+    };
+
+    public readonly columnDisplayTabbed = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        column.setTabbed(true);
+    };
+
+    public readonly focusWindowPrevious = (cm: ClientManager, dm: DesktopManager) => {
+        const previous = cm.findPreviousFocused();
+        if (previous !== null) {
+            KiriFocus.mark(previous);
+            Workspace.activeWindow = previous;
+        }
+    };
+
+    // niri's focus-floating, focus-tiling and switch-focus-between-floating-and-tiling
+    public readonly focusFloating = (cm: ClientManager, dm: DesktopManager) => {
+        const floating = cm.findLastFocusedFloating();
+        if (floating !== null) {
+            KiriFocus.mark(floating);
+            Workspace.activeWindow = floating;
+        }
+    };
+
+    public readonly focusTiling = (cm: ClientManager, dm: DesktopManager) => {
+        const desktop = dm.getCurrentDesktop();
+        const window = desktop === undefined ? null : desktop.grid.getLastFocusedWindow();
+        if (window !== null) {
+            window.focus();
+        }
+    };
+
     public readonly switchFocusFloatingTiling = (cm: ClientManager, dm: DesktopManager) => {
         const active = Workspace.activeWindow;
         if (active !== null && cm.isFloating(active)) {
-            const desktop = dm.getCurrentDesktop();
-            const window = desktop === undefined ? null : desktop.grid.getLastFocusedWindow();
-            if (window !== null) {
-                window.focus();
-            }
+            this.focusTiling(cm, dm);
         } else {
-            const floating = cm.findLastFocusedFloating();
-            if (floating !== null) {
-                KiriFocus.mark(floating);
-                Workspace.activeWindow = floating;
-            }
+            this.focusFloating(cm, dm);
+        }
+    };
+
+    // niri's move-window-to-floating / move-window-to-tiling
+    public readonly windowMoveToFloating = (cm: ClientManager, dm: DesktopManager) => {
+        if (Workspace.activeWindow !== null && cm.findTiledWindow(Workspace.activeWindow) !== null) {
+            cm.toggleFloatingClient(Workspace.activeWindow);
+        }
+    };
+
+    public readonly windowMoveToTiling = (cm: ClientManager, dm: DesktopManager) => {
+        if (Workspace.activeWindow !== null && cm.isFloating(Workspace.activeWindow)) {
+            cm.toggleFloatingClient(Workspace.activeWindow);
         }
     };
 
@@ -281,6 +455,21 @@ class Actions {
         this.config.columnResizer.decreaseWidth(column);
     };
 
+    // niri's set-column-width "+10%" / "-10%": the width changes by a share of the screen
+    public readonly columnWidthStep = (percent: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const desktop = grid.desktop;
+        const full = desktop.tilingArea.width + grid.config.gapsInnerHorizontal;
+        column.widthBeforeMaximize = undefined;
+        column.setWidth(column.getWidth() + Math.round(full * percent / 100), true);
+        desktop.autoAdjustScroll();
+    };
+
+    // niri's set-window-height "+10%" / "-10%"
+    public readonly windowHeightStep = (percent: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const full = grid.desktop.tilingArea.height + grid.config.gapsInnerVertical;
+        column.setFixedHeight(window, window.height + Math.round(full * percent / 100), null);
+    };
+
     // like niri's maximize-column: the column takes the whole tiling width (gaps kept), a second press restores the old width
     public readonly columnWidthMaximize = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         const desktop = grid.desktop;
@@ -329,7 +518,13 @@ class Actions {
         if (left === null || right === null) {
             return;
         }
+        if (left === column && right === column) {
+            // only this column is fully on screen: niri makes it full width, which a second press undoes
+            this.columnWidthMaximize(cm, dm, window, column, grid);
+            return;
+        }
         const freeSpace = visibleRange.getWidth() - (right.getRight() - left.getLeft());
+        column.widthBeforeMaximize = undefined;
         column.setWidth(column.getWidth() + freeSpace, true);
         desktop.scrollCenterVisible(column);
     };
@@ -519,13 +714,23 @@ class Actions {
         grid.desktop.scrollToColumn(lastColumn, false);
     };
 
+    // niri's center-column: always centers the focused column (no toggling back)
     public readonly gridScrollFocused = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        const scrollAmount = Range.minus(column, grid.desktop.getCurrentVisibleRange());
-        if (scrollAmount !== 0) {
-            grid.desktop.adjustScroll(scrollAmount, true);
-        } else {
-            grid.desktop.scrollToColumn(column, true);
+        grid.desktop.scrollCenterRange(column);
+    };
+
+    // niri's center-visible-columns: the columns that are fully on screen are centered as a group
+    public readonly centerVisibleColumns = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const desktop = grid.desktop;
+        if (desktop.isCenteringFocusedColumn()) {
+            return;
         }
+        const visibleRange = desktop.getCurrentVisibleRange();
+        const visible = Array.from(grid.getVisibleColumns(visibleRange));
+        if (!visible.includes(column)) {
+            return;
+        }
+        desktop.scrollCenterRange(Range.fromRanges(visible[0], visible[visible.length - 1]));
     };
 
     public readonly gridScrollLeftColumn = (cm: ClientManager, dm: DesktopManager) => {
@@ -576,7 +781,8 @@ class Actions {
             return;
         }
         const grid = desktop.grid;
-        const targetColumn = grid.getColumnAtIndex(columnIndex);
+        // like niri, a number that is too big means the last column
+        const targetColumn = grid.getColumnAtIndex(columnIndex) ?? grid.getLastColumn();
         if (targetColumn === null) {
             return;
         }
@@ -593,7 +799,7 @@ class Actions {
     };
 
     public readonly columnMoveToColumn = (columnIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        const targetColumn = grid.getColumnAtIndex(columnIndex);
+        const targetColumn = grid.getColumnAtIndex(columnIndex) ?? grid.getLastColumn();
         if (targetColumn === null || targetColumn === column) {
             return;
         }
@@ -726,6 +932,8 @@ class Actions {
 namespace Actions {
     export interface Config {
         manualScrollStep: number;
+        columnWidthStep: number;
+        windowHeightStep: number;
         presetWidths: {
             next: (currentWidth: number, minWidth: number, maxWidth: number, tilingAreaWidth: number) => number;
             prev: (currentWidth: number, minWidth: number, maxWidth: number, tilingAreaWidth: number) => number

@@ -100,6 +100,16 @@ const configDef = [
         default: "33.333%, 50%, 66.667%",
     },
     {
+        name: "columnWidthStep",
+        type: "UInt",
+        default: 10,
+    },
+    {
+        name: "windowHeightStep",
+        type: "UInt",
+        default: 10,
+    },
+    {
         name: "verticalResizeStep",
         type: "UInt",
         default: 32,

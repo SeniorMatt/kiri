@@ -13,8 +13,20 @@
     tests.register("Niri default keys", 1, () => {
         init(getDefaultConfig());
         const registered = (kglobalaccel as MockKGlobalAccel).registered;
-        Assert.equalArrays(registered.get("focus-left")!, [parseKeySequence("Meta+H")!, parseKeySequence("Meta+Left")!]);
-        Assert.equalArrays(registered.get("column-move-right")!, [parseKeySequence("Meta+Shift+L")!, parseKeySequence("Meta+Shift+Right")!]);
+        const fs = require("fs");
+        // every bind of niri's default config that Kiri has an action for uses the same keys
+        const def = NiriImport.parse(fs.readFileSync("src/tests/fixtures/niri-default.kdl", "utf8"));
+        let checked = 0;
+        for (const action of Object.keys(def.shortcutKeys)) {
+            const keys = registered.get(action);
+            Assert.assert(keys !== undefined, { message: `niri binds ${action}, which Kiri doesn't register` });
+            for (const key of def.shortcutKeys[action]) {
+                Assert.assert(keys!.includes(parseKeySequence(key)!), { message: `${action}: niri's ${key} is missing in Kiri` });
+                checked++;
+            }
+        }
+        Assert.assert(checked > 40, { message: "most of niri's default binds are mapped: " + checked });
+        Assert.equalArrays(registered.get("column-move-right")!, [parseKeySequence("Meta+Ctrl+L")!, parseKeySequence("Meta+Ctrl+Right")!]);
         Assert.equalArrays(registered.get("desktop-3")!, [parseKeySequence("Meta+3")!]);
         Assert.equalArrays(registered.get("column-move-to-desktop-9")!, [parseKeySequence("Meta+Ctrl+9")!]);
         Assert.equalArrays(registered.get("desktop-10")!, []);

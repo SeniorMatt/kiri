@@ -14,6 +14,8 @@ class World {
     private readonly closeRelayoutDelayer: Delayer;
     private readonly closeRelayoutDelay: number;
     private arrangeHeld = false;
+    private currentDesktop: KwinDesktop|null = null;
+    public previousDesktop: KwinDesktop|null = null; // niri's focus-workspace-previous
 
     // `keyBindings` and `layout` are given when Kiri reloads its settings: the shortcuts stay registered
     // and the windows are put back into the columns they were in.
@@ -44,6 +46,8 @@ class World {
 
         const actionsConfig = {
             manualScrollStep: config.manualScrollStep,
+            columnWidthStep: config.columnWidthStep,
+            windowHeightStep: config.windowHeightStep,
             presetWidths: presetWidths,
             presetHeights: presetHeights,
             verticalResizeStep: config.verticalResizeStep,
@@ -125,6 +129,7 @@ class World {
         if (layout !== null) {
             this.restoreLayout(layout);
         }
+        this.currentDesktop = Workspace.currentDesktop;
         this.update();
     }
 
@@ -395,6 +400,13 @@ class World {
         }
         this.clientManager.destroy();
         this.desktopManager.destroy();
+    }
+
+    public onDesktopChanged() {
+        if (this.currentDesktop !== Workspace.currentDesktop) {
+            this.previousDesktop = this.currentDesktop;
+            this.currentDesktop = Workspace.currentDesktop;
+        }
     }
 
     public onScreenResized() {
