@@ -20,6 +20,9 @@
 #include <QList>
 #include <QUuid>
 #include <KConfigWatcher>
+#include <chrono>
+
+#include "NiriAnim.h"
 
 #include <memory>
 
@@ -59,6 +62,14 @@ struct TabGroup
     int active = 0;
 };
 
+// how far a window has gone to "expanded" (full screen or maximized to the edges): 0 normal, 1 expanded. niri fades
+// the ring, border and rounded corners out with the window-resize spring when that happens and back in when it ends.
+struct ExpandedState
+{
+    double from = 0, to = 0, start = 0;
+    bool known = false;
+};
+
 class Effect final : public KWin::OffscreenEffect
 {
     Q_OBJECT
@@ -71,6 +82,8 @@ public:
     static bool supported();
 
     void reconfigure(ReconfigureFlags flags) override;
+    void prePaintScreen(KWin::ScreenPrePaintData &data) override;
+    void postPaintScreen() override;
     void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data) override;
     bool drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data) override;
 
@@ -95,12 +108,15 @@ private:
     void registerWheelShortcuts();
     void wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection direction, const QString &shortcut);
     bool decorated(KWin::EffectWindow *w) const;
-    int radiusFor(KWin::EffectWindow *w) const;
+    double radiusFor(KWin::EffectWindow *w) const;
+    double expandedProgress(KWin::EffectWindow *w) const;
+    double tabProgress(const TabGroup &group) const;
+    double clock() const;
     KWin::RectF outerBounds(KWin::EffectWindow *w) const;
     void repaintAround(KWin::EffectWindow *w);
     double reach() const;
     const TabGroup *tabGroupOf(KWin::EffectWindow *w) const;
-    void drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity);
+    void drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, double progress);
     void fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &rect, const QColor &color, const KWin::Region &deviceRegion, double opacity);
     void drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity);
 
@@ -112,6 +128,14 @@ private:
     QList<TabGroup> m_tabGroups;
     QHash<QUuid, int> m_tabGroupOf;
     QHash<QUuid, QPointF> m_visualPositions;
+    // where each window's ring/border was last drawn: repainted when it moves, or the old one stays as a trail
+    QHash<KWin::EffectWindow *, KWin::RectF> m_painted;
+    void repaintPainted(KWin::EffectWindow *w);
+    mutable QHash<KWin::EffectWindow *, ExpandedState> m_expanded;
+    // tab indicator open animations by the first window of the column: start time and whether it is the window-open one
+    QHash<QUuid, std::pair<double, bool>> m_tabOpen;
+    std::chrono::steady_clock::time_point m_clockStart = std::chrono::steady_clock::now();
+    double m_frameTime = 0;
     std::vector<std::unique_ptr<QAction>> m_wheelActions;
     QElapsedTimer m_wheelCooldown;
 };

@@ -37,6 +37,7 @@ namespace KiriDecorations
 
 namespace
 {
+constexpr int CaptureRole = 0x4B495249; // set by kiri_motion while it snapshots a window
 QString shaderPath(const QString &name)
 {
     return QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("kwin/shaders/") + name);
@@ -48,6 +49,99 @@ QColor readColor(const KConfigGroup &group, const char *key, const QColor &fallb
     return color.isValid() ? color : fallback;
 }
 } // namespace
+
+double Effect::clock() const
+{
+    return std::chrono::duration<double>(std::chrono::steady_clock::now() - m_clockStart).count();
+}
+
+// niri's expanded_progress: a spring (window-resize parameters) from 0 to 1 when the window becomes full screen or
+// reaches the screen edges, from 1 to 0 when it stops being so
+double Effect::expandedProgress(KWin::EffectWindow *w) const
+{
+    bool expanded = w->isFullScreen();
+    if (!expanded) {
+        if (const auto *output = w->screen()) {
+            const KWin::RectF screen = output->geometry();
+            const KWin::RectF frame = w->frameGeometry();
+            expanded = frame.width() >= screen.width() - 0.5 && frame.height() >= screen.height() - 0.5;
+        }
+    }
+    ExpandedState &s = m_expanded[w];
+    const double t = m_frameTime;
+    const double target = expanded ? 1.0 : 0.0;
+    const double factor = KWin::effects->animationTimeFactor();
+    const double speed = factor > 0 ? 1.0 / factor : 0;
+    auto value = [&]() {
+        if (speed <= 0) {
+            return s.to;
+        }
+        return s.from + (s.to - s.from) * NiriAnim::resizeSpring().value((t - s.start) * speed);
+    };
+    if (!s.known) {
+        s = ExpandedState{target, target, t, true};
+    } else if (s.to != target) {
+        s = ExpandedState{value(), target, t, true};
+    }
+    return value();
+}
+
+// niri's tab indicator open animation: the tabs grow from nothing, with window-movement's spring when a column
+// becomes tabbed, with window-open's 150 ms ease-out-expo when its first window appears as a tab
+double Effect::tabProgress(const TabGroup &group) const
+{
+    const auto it = m_tabOpen.constFind(group.windows.first());
+    if (it == m_tabOpen.constEnd()) {
+        return 1.0;
+    }
+    const double factor = KWin::effects->animationTimeFactor();
+    const double speed = factor > 0 ? 1.0 / factor : 0;
+    const double t = (m_frameTime - it->first) * speed;
+    if (speed <= 0) {
+        return 1.0;
+    }
+    if (it->second) {
+        return std::max(0.0, NiriAnim::easeOutExpo(std::clamp(t / (NiriAnim::Defaults::openMs / 1000), 0.0, 1.0)));
+    }
+    static const NiriAnim::Spring spring(0, 1, 0, NiriAnim::Defaults::moveDamping, NiriAnim::Defaults::moveStiffness, NiriAnim::Defaults::moveEpsilon);
+    return std::max(0.0, spring.value(t));
+}
+
+void Effect::prePaintScreen(KWin::ScreenPrePaintData &data)
+{
+    m_frameTime = clock();
+    KWin::OffscreenEffect::prePaintScreen(data);
+}
+
+void Effect::postPaintScreen()
+{
+    const double factor = KWin::effects->animationTimeFactor();
+    const double speed = factor > 0 ? 1.0 / factor : 0;
+    bool again = false;
+    for (auto it = m_expanded.begin(); it != m_expanded.end();) {
+        if (it.key()->isDeleted() && it->to == 1) {
+            it = m_expanded.erase(it);
+            continue;
+        }
+        if (it->from != it->to && !NiriAnim::resizeSpring().isDone((m_frameTime - it->start) * speed)) {
+            again = true;
+        }
+        ++it;
+    }
+    for (auto it = m_tabOpen.begin(); it != m_tabOpen.end();) {
+        const double length = it->second ? NiriAnim::Defaults::openMs / 1000 : NiriAnim::moveSpring().duration();
+        if (speed <= 0 || (m_frameTime - it->first) * speed >= length) {
+            it = m_tabOpen.erase(it);
+        } else {
+            again = true;
+            ++it;
+        }
+    }
+    if (again) {
+        KWin::effects->addRepaintFull();
+    }
+    KWin::OffscreenEffect::postPaintScreen();
+}
 
 Effect::Effect()
 {
@@ -87,6 +181,7 @@ Effect::Effect()
             // the ring is outside of what KWin repaints for the window itself
             const double reach = this->reach();
             KWin::effects->addRepaint(old.adjusted(-reach, -reach, reach, reach));
+            repaintPainted(w);
             repaintAround(w);
         });
     };
@@ -98,6 +193,10 @@ Effect::Effect()
         if (m_active == w) {
             m_active = nullptr;
         }
+    });
+    connect(KWin::effects, &KWin::EffectsHandler::windowDeleted, this, [this](KWin::EffectWindow *w) {
+        repaintPainted(w);
+        m_painted.remove(w);
     });
 }
 
@@ -237,6 +336,13 @@ void Effect::setTabGroups(const QString &json)
     };
     if (groups.size() != m_tabGroups.size() || !std::equal(groups.begin(), groups.end(), m_tabGroups.begin(), [](const TabGroup &a, const TabGroup &b) { return a.windows == b.windows && a.active == b.active; })) {
         repaint(m_tabGroups);
+        // a column that was not tabbed before (none of its windows had an indicator) gets the open animation
+        for (const TabGroup &group : std::as_const(groups)) {
+            const bool known = std::any_of(group.windows.begin(), group.windows.end(), [this](const QUuid &id) { return m_tabGroupOf.contains(id); });
+            if (!known && m_frameTime > 0) {
+                m_tabOpen.insert(group.windows.first(), {clock(), group.windows.size() == 1});
+            }
+        }
         m_tabGroups = groups;
         m_tabGroupOf = index;
         repaint(m_tabGroups);
@@ -260,6 +366,7 @@ void Effect::setVisualPositions(const QString &json)
                 const double reach = this->reach();
                 const KWin::RectF f = w->frameGeometry();
                 KWin::effects->addRepaint(KWin::RectF(it.value().x(), it.value().y(), f.width(), f.height()).adjusted(-reach, -reach, reach, reach));
+                repaintPainted(w);
                 repaintAround(w);
             }
         }
@@ -314,7 +421,7 @@ bool Effect::blocksDirectScanout() const
 // pop-ups and windows that skip the taskbar (krunner and the like) are left alone.
 bool Effect::decorated(KWin::EffectWindow *w) const
 {
-    if (!isActive() || w->isDeleted() || w->isFullScreen() || w->isSpecialWindow()) {
+    if (!isActive() || w->isSpecialWindow()) {
         return false;
     }
     if (!(w->isNormalWindow() || w->isDialog())) {
@@ -323,26 +430,28 @@ bool Effect::decorated(KWin::EffectWindow *w) const
     if (w->caption().startsWith(QLatin1String("kiri-ring-"))) {
         return false; // the fallback ring windows of the Kiri script
     }
-    // a window that fills its screen (maximized, or Kiri's "maximized in grid" without gaps) has no corners to show
-    if (const auto *output = w->screen()) {
-        const KWin::RectF screen = output->geometry();
-        const KWin::RectF frame = w->frameGeometry();
-        if (frame.width() >= screen.width() - 0.5 && frame.height() >= screen.height() - 0.5) {
-            return false;
-        }
-    }
-    return true;
+    // a window that is full screen or fills its screen (maximized, or Kiri's "maximized in grid" without gaps) has no
+    // corners, ring or border once the fade out is done
+    return expandedProgress(w) < 1.0;
 }
 
-int Effect::radiusFor(KWin::EffectWindow *w) const
+double Effect::radiusFor(KWin::EffectWindow *w) const
 {
-    return decorated(w) ? m_settings.cornerRadius : 0;
+    return decorated(w) ? m_settings.cornerRadius * (1.0 - expandedProgress(w)) : 0;
 }
 
 KWin::RectF Effect::outerBounds(KWin::EffectWindow *w) const
 {
     const double reach = this->reach();
     return w->frameGeometry().adjusted(-reach, -reach, reach, reach);
+}
+
+void Effect::repaintPainted(KWin::EffectWindow *w)
+{
+    const auto it = m_painted.constFind(w);
+    if (it != m_painted.constEnd()) {
+        KWin::effects->addRepaint(*it);
+    }
 }
 
 void Effect::repaintAround(KWin::EffectWindow *w)
@@ -365,7 +474,7 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
 
 bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
 {
-    const int radius = radiusFor(w);
+    const double radius = radiusFor(w);
     if (radius > 0) {
         const double scale = w->screen()->scale();
         const auto frame = KWin::snapToPixels(w->frameGeometry(), scale) * scale;
@@ -390,22 +499,41 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
     }
 
     const bool result = OffscreenEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+    if (w->data(CaptureRole).toBool()) {
+        return result; // kiri_motion is taking a snapshot of the window: the ring and tab indicator are not part of it
+    }
 
+    {
+        // where the window and its ring are drawn this frame; when that changes (a resize, the visual offset,
+        // another effect moving it), the old place is cleared, or the ring stays behind as a trail
+        const KWin::RectF frame = w->frameGeometry();
+        const double reach = this->reach();
+        const KWin::RectF painted = KWin::RectF(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
+                                                frame.width() * data.xScale(), frame.height() * data.yScale())
+                                        .adjusted(-reach, -reach, reach, reach);
+        const auto previous = m_painted.constFind(w);
+        if (previous != m_painted.constEnd() && *previous != painted) {
+            KWin::effects->addRepaint(*previous);
+        }
+        m_painted.insert(w, painted);
+    }
+
+    const double fade = decorated(w) ? 1.0 - expandedProgress(w) : 0.0;
     if (decorated(w) && ((m_settings.borderEnabled && m_settings.borderWidth > 0) || (w == m_active && m_settings.ringEnabled && m_settings.ringWidth > 0))) {
         // where the window really is painted right now, other effects may be moving or scaling it
         const KWin::RectF frame = w->frameGeometry();
         const KWin::RectF visual(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
                                  frame.width() * data.xScale(), frame.height() * data.yScale());
-        drawRing(viewport, w, visual, deviceRegion, data.opacity());
+        drawRing(viewport, w, visual, deviceRegion, data.opacity() * fade);
     }
     // the tab indicator of a tabbed column belongs to its shown window
-    if (m_settings.tabEnabled && isActive() && !w->isFullScreen()) {
+    if (m_settings.tabEnabled && isActive() && fade > 0) {
         if (const TabGroup *group = tabGroupOf(w); group && group->windows.value(group->active) == w->internalId()
             && (group->windows.size() >= 2 || !m_settings.tabHideWhenSingle)) {
             const KWin::RectF frame = w->frameGeometry();
             const KWin::RectF visual(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
                                      frame.width() * data.xScale(), frame.height() * data.yScale());
-            drawTabIndicator(viewport, *group, visual, deviceRegion, data.opacity());
+            drawTabIndicator(viewport, *group, visual, deviceRegion, data.opacity() * fade, tabProgress(*group));
         }
     }
     return result;
@@ -444,13 +572,13 @@ void Effect::fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &r
 
 // niri's tab indicator: a bar beside the column, split into one segment per window, the shown one highlighted.
 // Same geometry as the script's fallback (Column.getTabIndicator), but taken from where the window is painted now.
-void Effect::drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity)
+void Effect::drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, double progress)
 {
     const QString &position = m_settings.tabPosition;
     const bool vertical = position == QLatin1String("left") || position == QLatin1String("right");
     const double thickness = m_settings.tabWidth;
     const double total = vertical ? frame.height() : frame.width();
-    const double length = std::max(1.0, std::round(total * m_settings.tabLength));
+    const double length = std::max(1.0, std::round(total * m_settings.tabLength * progress));
     const double start = std::round((vertical ? frame.y() : frame.x()) + (total - length) / 2);
     double x, y;
     if (position == QLatin1String("right")) {

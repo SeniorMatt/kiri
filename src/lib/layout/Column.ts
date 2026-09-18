@@ -190,7 +190,8 @@ class Column {
         this.grid.desktop.recenterWhileResizing(this, this.grid.getLastFocusedColumn() === this);
     }
 
-    public adjustWindowHeight(window: Window, heightDelta: number, top: boolean) {
+    // Karousel's keys that trade height with the neighbouring window; all heights become weights again afterwards
+    public tradeWindowHeight(window: Window, heightDelta: number, top: boolean) {
         const otherWindow = top ? this.windows.getPrev(window) : this.windows.getNext(window);
         if (otherWindow === null) {
             return;
@@ -198,42 +199,68 @@ class Column {
 
         window.height += heightDelta;
         otherWindow.height -= heightDelta;
+        for (const other of this.windows.iterator()) {
+            other.setAutoHeight(other.height);
+        }
 
         this.grid.desktop.onLayoutChanged();
     }
 
-    // gives `window` the requested height and shrinks or grows the other windows of the column in proportion
-    public setWindowHeight(window: Window, height: number) {
-        const nWindows = this.windows.length();
-        if (nWindows < 2) {
-            return;
+    // a window that is resized by dragging its edge: like niri's set-window-height it gets a fixed height
+    public adjustWindowHeight(window: Window, heightDelta: number, top: boolean) {
+        if ((top ? this.windows.getPrev(window) : this.windows.getNext(window)) === null) {
+            return; // the edge at the end of the column: nothing to take the space from
         }
-        const totalHeight = this.grid.desktop.tilingArea.height - (nWindows-1) * this.grid.config.gapsInnerVertical;
-        const minHeight = Math.min(Column.minHeight, Math.floor(totalHeight / nWindows));
-        height = clamp(height, minHeight, totalHeight - (nWindows-1) * minHeight);
+        this.setFixedHeight(window, window.height + heightDelta, null);
+    }
 
-        const others: Window[] = [];
-        let othersHeight = 0;
+    // niri's convert_heights_to_auto: the weights keep the current heights, centred on the median height
+    private convertHeightsToAuto() {
+        const windows = Array.from(this.windows.iterator());
+        const sorted = windows.map(window => window.height).sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        for (const window of windows) {
+            window.setAutoHeight(median > 0 ? window.height / median : 1);
+        }
+    }
+
+    private getMinWindowHeight(window: Window) {
+        return Math.max(1, window.client.kwinClient.minSize.height.ceil());
+    }
+
+    // like niri's set-window-height: the window gets this height, the others share the rest by their weights
+    public setFixedHeight(window: Window, height: number, presetIndex: number|null) {
+        if (window.fixedHeight === null) {
+            this.convertHeightsToAuto();
+        }
+        const totalHeight = this.grid.desktop.tilingArea.height - (this.windows.length()-1) * this.grid.config.gapsInnerVertical;
+        let othersMin = 0;
         for (const other of this.windows.iterator()) {
             if (other !== window) {
-                others.push(other);
-                othersHeight += other.height;
+                othersMin += this.getMinWindowHeight(other);
             }
         }
-        window.height = height;
-        let remainingPixels = totalHeight - height;
-        let remainingHeight = othersHeight;
-        let remainingWindows = others.length;
-        for (const other of others) {
-            const ratio = remainingHeight > 0 ? other.height / remainingHeight : 1 / remainingWindows;
-            const otherHeight = remainingWindows === 1 ? remainingPixels : Math.max(minHeight, Math.round(remainingPixels * ratio));
-            remainingHeight -= other.height;
-            other.height = otherHeight;
-            remainingPixels -= otherHeight;
-            remainingWindows--;
+        const max = window.client.kwinClient.maxSize.height.floor();
+        height = Math.min(height, Math.max(1, totalHeight - othersMin));
+        if (max > 0) {
+            height = Math.min(height, max);
         }
+        height = Math.max(height, this.getMinWindowHeight(window), 1);
+        window.fixedHeight = Math.round(height);
+        window.presetHeightIndex = presetIndex;
+        this.resizeWindows();
+    }
 
-        this.grid.desktop.onLayoutChanged();
+    // niri's reset-window-height: the window is auto-sized again (all windows of a tabbed column)
+    public resetWindowHeight(window: Window) {
+        if (this.tabbed) {
+            for (const other of this.windows.iterator()) {
+                other.setAutoHeight();
+            }
+        } else {
+            window.setAutoHeight();
+        }
+        this.resizeWindows();
     }
 
     // returns the heights of the column's windows relative to the available height
@@ -248,15 +275,12 @@ class Column {
         if (ratios.length !== nWindows || nWindows < 2) {
             return;
         }
-        let remainingPixels = this.grid.desktop.tilingArea.height - (nWindows-1) * this.grid.config.gapsInnerVertical;
         let i = 0;
         for (const window of this.windows.iterator()) {
-            const windowHeight = i === nWindows-1 ? remainingPixels : Math.round(Math.min(ratios[i], 1) * (this.grid.desktop.tilingArea.height - (nWindows-1) * this.grid.config.gapsInnerVertical));
-            window.height = windowHeight;
-            remainingPixels -= windowHeight;
+            window.setAutoHeight(ratios[i] * nWindows);
             i++;
         }
-        this.grid.desktop.onLayoutChanged();
+        this.resizeWindows();
     }
 
     public isTabbed() {
@@ -271,20 +295,71 @@ class Column {
         this.grid.desktop.onLayoutChanged();
     }
 
+    // Gives the windows their heights like niri's update_tile_sizes: fixed windows first, the rest of the column
+    // is shared by the weights of the auto windows (windows that need more than their share keep their minimum)
     public resizeWindows() {
-        const nWindows = this.windows.length();
+        const windows = Array.from(this.windows.iterator());
+        const nWindows = windows.length;
         if (nWindows === 0) {
             return;
         }
-        let remainingPixels = this.grid.desktop.tilingArea.height - (nWindows-1) * this.grid.config.gapsInnerVertical;
-        let remainingWindows = nWindows;
-        for (const window of this.windows.iterator()) {
-            const windowHeight = Math.round(remainingPixels / remainingWindows);
-            window.height = windowHeight;
-            remainingPixels -= windowHeight;
-            remainingWindows--;
+        const totalHeight = this.grid.desktop.tilingArea.height - (nWindows-1) * this.grid.config.gapsInnerVertical;
+        const minHeights = windows.map(window => this.getMinWindowHeight(window));
+
+        const heights: (number|null)[] = windows.map(() => null);
+        let heightLeft = totalHeight;
+        let weightLeft = 0;
+        windows.forEach((window, i) => {
+            if (window.fixedHeight !== null) {
+                let fixed = Math.round(window.fixedHeight);
+                if (nWindows > 1) {
+                    let othersMin = 0;
+                    minHeights.forEach((min, j) => othersMin += j === i ? 0 : min);
+                    fixed = Math.min(fixed, Math.max(1, totalHeight - othersMin));
+                } else {
+                    fixed = Math.min(fixed, Math.max(1, totalHeight));
+                }
+                heights[i] = Math.max(fixed, minHeights[i]);
+                heightLeft -= heights[i]!;
+            } else {
+                weightLeft += window.heightWeight;
+            }
+        });
+
+        // auto windows that don't get their minimum are fixed at it, which leaves less for the others
+        let again = true;
+        while (again) {
+            again = false;
+            let weight = weightLeft;
+            let left = heightLeft;
+            for (let i = 0; i < nWindows; i++) {
+                if (heights[i] !== null) {
+                    continue;
+                }
+                const auto = weight > 0 ? left * windows[i].heightWeight / weight : left;
+                if (minHeights[i] > auto) {
+                    heights[i] = minHeights[i];
+                    heightLeft -= minHeights[i];
+                    weightLeft -= windows[i].heightWeight;
+                    again = true;
+                    break;
+                }
+                const rounded = Math.max(1, Math.round(auto));
+                left -= rounded;
+                weight -= windows[i].heightWeight;
+            }
         }
-        // TODO: respect min height
+        for (let i = 0; i < nWindows; i++) {
+            if (heights[i] !== null) {
+                continue;
+            }
+            const auto = weightLeft > 0 ? heightLeft * windows[i].heightWeight / weightLeft : heightLeft;
+            const rounded = Math.max(1, Math.round(auto));
+            heights[i] = rounded;
+            heightLeft -= rounded;
+            weightLeft -= windows[i].heightWeight;
+        }
+        windows.forEach((window, i) => window.height = heights[i]!);
 
         this.grid.desktop.onLayoutChanged();
     }
@@ -294,6 +369,12 @@ class Column {
             return null;
         }
         return this.focusTaker;
+    }
+
+    public setFocusTaker(window: Window) {
+        if (this.windows.contains(window)) {
+            this.focusTaker = window;
+        }
     }
 
     public getWindowToFocus() {
@@ -408,12 +489,15 @@ class Column {
         this.grid.desktop.onLayoutChanged();
     }
 
-    public onWindowAdded(window: Window, bottom: boolean) {
-        if (bottom) {
-            this.windows.insertEnd(window);
-        } else {
+    public onWindowAdded(window: Window, bottom: boolean, after?: Window|null) {
+        if (after !== undefined && after !== null) {
+            this.windows.insertAfter(window, after);
+        } else if (after === null || !bottom) {
             this.windows.insertStart(window);
+        } else {
+            this.windows.insertEnd(window);
         }
+        window.setAutoHeight(); // like niri, a window that enters a column gets an auto height
 
         if (this.width === 0) {
             this.setWidth(window.client.preferredWidth, false);
@@ -445,6 +529,12 @@ class Column {
             console.assert(this.isEmpty());
             this.destroy(passFocus);
         } else {
+            if (this.windows.length() === 1) {
+                const remaining = this.getFirstWindow();
+                if (remaining.fixedHeight === null) {
+                    remaining.heightWeight = 1; // niri: a lone auto window gets weight 1 again
+                }
+            }
             this.resizeWindows();
             if (windowToFocus !== null) {
                 switch (passFocus) {

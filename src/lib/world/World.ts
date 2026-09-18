@@ -34,8 +34,7 @@ class World {
         }
 
         let presetHeights = {
-            next: (currentHeight: number, minHeight: number, maxHeight: number, tilingAreaHeight: number) => currentHeight,
-            prev: (currentHeight: number, minHeight: number, maxHeight: number, tilingAreaHeight: number) => currentHeight,
+            getOrdered: (tilingAreaHeight: number): number[] => [],
         };
         try {
             presetHeights = new PresetWidths(config.presetHeights, config.gapsInnerVertical);

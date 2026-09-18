@@ -1,0 +1,14 @@
+{
+    "KPlugin": {
+        "Authors": [
+            { "Name": "Senior Matthew" }
+        ],
+        "Category": "Window Management",
+        "Description": "niri's window animations for Kiri: movement and resize springs, open and close, cross-faded resizes",
+        "EnabledByDefault": true,
+        "License": "GPL-3.0",
+        "Name": "Kiri motion",
+        "Version": "0.1",
+        "Website": "https://github.com/SeniorMatt/kiri"
+    }
+}

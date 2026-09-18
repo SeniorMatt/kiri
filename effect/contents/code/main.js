@@ -5,7 +5,10 @@
 // Skipped during interactive move/resize, full-screen toggles, and while geometry changes arrive
 // in a rapid stream (touchpad scrolling), where the window just follows the input.
 
-const DURATION = 250;
+// Fallback for systems without the compiled kiri_motion effect, which does this with niri's exact springs.
+// niri's window-movement spring (stiffness 800, critically damped) is 95 % done after about 200 ms and rests
+// at 325 ms; OutCubic over 260 ms is the closest QEasingCurve.
+const DURATION = 260;
 const STREAM_GAP = 30; // ms between changes below which they count as one continuous stream
 const STREAM_LENGTH = 2; // fast changes in a row before animations are skipped
 const MIN_DELTA = 1; // px
@@ -19,6 +22,8 @@ function easeOut(t) {
 class KiriAnimations {
     constructor() {
         effects.windowAdded.connect(this.manage.bind(this));
+        effects.windowAdded.connect(this.opened.bind(this));
+        effects.windowClosed.connect(this.closed.bind(this));
         effects.stackingOrder.forEach(this.manage.bind(this));
         effect.configChanged.connect(this.loadConfig.bind(this));
         this.loadConfig();
@@ -33,6 +38,43 @@ class KiriAnimations {
         window.windowFrameGeometryChanged.connect(this.onGeometryChanged.bind(this));
         window.windowFullScreenChanged.connect(w => { w.kiriAnim.fullScreenChange = true; });
         window.windowStartUserMovedResized.connect(w => this.stop(w));
+    }
+
+    animatable(window) {
+        return window.managed && window.visible && !window.popupWindow && (window.normalWindow || window.dialog) &&
+            !window.caption.startsWith("kiri-ring-");
+    }
+
+    // niri's window-open: 150 ms ease-out-expo, scale 0.5 -> 1 around the centre while fading in
+    opened(window) {
+        if (this.duration <= 0 || !this.animatable(window)) {
+            return;
+        }
+        animate({
+            window: window,
+            duration: animationTime(150),
+            curve: QEasingCurve.OutExpo,
+            animations: [
+                { type: Effect.Scale, from: 0.5, to: 1 },
+                { type: Effect.Opacity, from: 0, to: 1 },
+            ],
+        });
+    }
+
+    // niri's window-close: 150 ms ease-out-quad, scale 1 -> 0.8 while fading out
+    closed(window) {
+        if (this.duration <= 0 || !this.animatable(window)) {
+            return;
+        }
+        animate({
+            window: window,
+            duration: animationTime(150),
+            curve: QEasingCurve.OutQuad,
+            animations: [
+                { type: Effect.Scale, from: 1, to: 0.8 },
+                { type: Effect.Opacity, from: 1, to: 0 },
+            ],
+        });
     }
 
     stop(window) {

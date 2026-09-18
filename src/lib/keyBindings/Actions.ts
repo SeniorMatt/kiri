@@ -231,7 +231,7 @@ class Actions {
     };
 
     public readonly windowHeightIncreaseUp = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        window.column.adjustWindowHeight(
+        window.column.tradeWindowHeight(
             window,
             this.config.verticalResizeStep,
             true,
@@ -239,7 +239,7 @@ class Actions {
     };
 
     public readonly windowHeightIncreaseDown = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        window.column.adjustWindowHeight(
+        window.column.tradeWindowHeight(
             window,
             this.config.verticalResizeStep,
             false,
@@ -342,23 +342,43 @@ class Actions {
         this.cycleHeight(window, column, grid, true);
     };
 
+    // niri's switch-preset-window-height (toggle_window_height): a window that is on a preset goes to the next one,
+    // otherwise to the first preset taller than it (the last one shorter when going back)
     private cycleHeight(window: Window, column: Column, grid: Grid, reverse: boolean) {
-        const nWindows = column.getWindowCount();
-        if (nWindows < 2) {
+        const presets = this.config.presetHeights.getOrdered(grid.desktop.tilingArea.height);
+        const len = presets.length;
+        if (len === 0) {
             return;
         }
-        const tilingHeight = grid.desktop.tilingArea.height;
-        const totalHeight = tilingHeight - (nWindows-1) * grid.config.gapsInnerVertical;
-        const presets = this.config.presetHeights;
-        const newHeight = reverse ?
-            presets.prev(window.height, 1, totalHeight, tilingHeight) :
-            presets.next(window.height, 1, totalHeight, tilingHeight);
-        column.setWindowHeight(window, newHeight);
+        let index: number;
+        if (window.presetHeightIndex !== null && window.presetHeightIndex < len) {
+            index = (window.presetHeightIndex + (reverse ? len - 1 : 1)) % len;
+        } else {
+            const current = window.height;
+            if (reverse) {
+                index = len - 1;
+                for (let i = len - 1; i >= 0; i--) {
+                    if (presets[i] + 1 < current) {
+                        index = i;
+                        break;
+                    }
+                }
+            } else {
+                index = 0;
+                for (let i = 0; i < len; i++) {
+                    if (current + 1 < presets[i]) {
+                        index = i;
+                        break;
+                    }
+                }
+            }
+        }
+        column.setFixedHeight(window, presets[index], index);
     }
 
-    // niri's reset-window-height: all windows of the column get the same height again
+    // niri's reset-window-height: the window gets an auto height again
     public readonly windowHeightReset = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        column.resizeWindows();
+        column.resetWindowHeight(window);
     };
 
     public readonly columnsWidthEqualize = (cm: ClientManager, dm: DesktopManager) => {
@@ -712,8 +732,7 @@ namespace Actions {
         };
         verticalResizeStep: number;
         presetHeights: {
-            next: (currentHeight: number, minHeight: number, maxHeight: number, tilingAreaHeight: number) => number;
-            prev: (currentHeight: number, minHeight: number, maxHeight: number, tilingAreaHeight: number) => number;
+            getOrdered: (tilingAreaHeight: number) => number[];
         };
         columnResizer: ColumnResizer;
     }

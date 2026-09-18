@@ -17,6 +17,11 @@ class PresetWidths {
         return nextIndex >= 0 ? widths[nextIndex] : widths[0];
     }
 
+    // the presets in the order they were configured, not sorted and not clamped (niri cycles through them by index)
+    public getOrdered(tilingAreaWidth: number) {
+        return this.presets.map(f => f(tilingAreaWidth));
+    }
+
     public getWidths(minWidth: number, maxWidth: number, tilingAreaWidth: number) {
         const widths = this.presets.map(f => clamp(f(tilingAreaWidth), minWidth, maxWidth));
         widths.sort((a, b) => a - b);

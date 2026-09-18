@@ -1,7 +1,12 @@
 class Window {
     public column: Column;
     public readonly client: ClientWrapper;
-    public height: number;
+    public height: number; // the height the column gave the window in its last layout
+    // niri's window heights: auto windows share the free space of the column by weight, a window that was resized
+    // by hand or with the presets has a fixed height (set-window-height, switch-preset-window-height)
+    public heightWeight = 1;
+    public fixedHeight: number|null = null;
+    public presetHeightIndex: number|null = null;
     public readonly focusedState: Window.State;
     private skipArrange: boolean;
 
@@ -24,13 +29,20 @@ class Window {
         column.onWindowAdded(this, true);
     }
 
-    public moveToColumn(targetColumn: Column, bottom: boolean, passFocus: FocusPassing.Type) {
+    // `after` puts the window right below that window of the target column (null: at the top); without it, `bottom` decides
+    public moveToColumn(targetColumn: Column, bottom: boolean, passFocus: FocusPassing.Type, after?: Window|null) {
         if (targetColumn === this.column) {
             return;
         }
         this.column.onWindowRemoved(this, passFocus);
         this.column = targetColumn;
-        targetColumn.onWindowAdded(this, bottom);
+        targetColumn.onWindowAdded(this, bottom, after);
+    }
+
+    public setAutoHeight(weight = 1) {
+        this.heightWeight = weight;
+        this.fixedHeight = null;
+        this.presetHeightIndex = null;
     }
 
     public arrange(x: number, y: number, width: number, height: number) {

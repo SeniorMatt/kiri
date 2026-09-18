@@ -9,3 +9,5 @@ target_link_libraries(kiri_decorations PRIVATE
     Qt6::Gui
     Qt6::DBus
     epoxy::epoxy)
+
+target_include_directories(kiri_decorations PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../common)

@@ -3,7 +3,7 @@
 #   ./install.sh
 # It builds the compiled KWin effects against the KWin you have installed (so run it again after a KWin
 # update), installs the Kiri script and the kiri_animations effect for your user, turns everything on and does
-# the one-time setup (Plasma's Slide effect off, desktops in one column). If the build fails, Kiri still works:
+# the one-time setup (Plasma's Slide, Fade, Scale, Glide and Maximize effects off, desktops in one column). If the build fails, Kiri still works:
 # it draws its rings itself and the old Slide stays.
 #   ./install.sh --no-build    skip the compiled effects
 set -e
@@ -43,7 +43,7 @@ if $build && [ -d "$cpp" ]; then
     if cmake -S "$cpp" -B "$builddir" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr >"$builddir/log.txt" 2>&1 &&
         cmake --build "$builddir" -j "$(nproc)" >>"$builddir/log.txt" 2>&1; then
         # let KWin let go of the old plugins before replacing the files
-        for e in kiri_decorations kiri_desktop_switch; do
+        for e in kiri_decorations kiri_desktop_switch kiri_motion; do
             qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
         done
         # remove first: a new file instead of overwriting one KWin may have mapped
@@ -52,7 +52,7 @@ if $build && [ -d "$cpp" ]; then
         done
         $SUDO cmake --install "$builddir" >>"$builddir/log.txt" 2>&1
         compiled=true
-        echo "Built and installed the compiled effects (kiri_decorations, kiri_desktop_switch)."
+        echo "Built and installed the compiled effects (kiri_decorations, kiri_desktop_switch, kiri_motion)."
     else
         echo "Building the compiled effects failed, see $builddir/log.txt. Kiri still works without them." >&2
     fi
@@ -75,6 +75,21 @@ if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key effec
     w Plugins slideEnabled false
     w Kiri-install effectsEnabled done
 fi
+if $compiled; then
+    # kiri_motion does what the kiri_animations script effect does, with niri's springs, open/close and cross-faded
+    # resizes; two of them would animate every window twice. kiri_animations stays installed as the fallback
+    # for systems where the compiled effects can't be built.
+    if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key motionEnabled)" != done ]; then
+        w Plugins kiri_motionEnabled true
+        w Plugins kiri_animationsEnabled false
+        # Plasma's own window open/close and maximize animations would play on top of niri's: Fade, Scale,
+        # Glide (the choices for "Window open/close animation") and Maximize
+        for e in fade scale glide maximize; do
+            w Plugins "${e}Enabled" false
+        done
+        w Kiri-install motionEnabled done
+    fi
+fi
 # Plasma's "Geometry change" effect also animates every frame change and fights kiri_animations (windows
 # jump back and forth), so it goes off
 w Plugins kwin4_effect_geometry_changeEnabled false
@@ -94,9 +109,16 @@ if qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1; then
     rows=$(kreadconfig6 --file kwinrc --group Desktops --key Rows --default 0)
     qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect kwin4_effect_geometry_change >/dev/null 2>&1 || true
     [ "$rows" -gt 0 ] && dbus-send --session --type=method_call --dest=org.kde.KWin /VirtualDesktopManager org.freedesktop.DBus.Properties.Set string:org.kde.KWin.VirtualDesktopManager string:rows variant:uint32:"$rows" >/dev/null 2>&1 || true
-    $compiled && qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect slide >/dev/null 2>&1 || true
-    for e in kiri_animations kiri_decorations kiri_desktop_switch; do
+    if $compiled; then
+        for e in slide fade scale glide maximize; do
+            [ "$(kreadconfig6 --file kwinrc --group Plugins --key ${e}Enabled)" = false ] &&
+                qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
+        done
+    fi
+    for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion; do
         qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
+        # only the ones that are switched on (the script effect is the fallback and stays off beside kiri_motion)
+        [ "$(kreadconfig6 --file kwinrc --group Plugins --key ${e}Enabled)" = false ] && continue
         qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect $e >/dev/null 2>&1 || true
     done
     # a new version of the script: stop the running one, reconfigure starts it again

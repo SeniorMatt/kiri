@@ -95,9 +95,10 @@ void DesktopSwitchEffect::reconfigure(ReconfigureFlags)
 
 void DesktopSwitchScreen::reconfigure()
 {
-    // stiff and critically damped: settles in about 180 ms, no overshoot; the animation speed setting scales time
+    // niri's workspace-switch animation: spring, damping-ratio 1.0, stiffness 1000, epsilon 0.0001 (in workspaces,
+    // see setEpsilon below); the animation speed setting scales time
     const qreal factor = std::max(effects->animationTimeFactor(), 0.01);
-    const qreal springConstant = 2500.0 / (factor * factor);
+    const qreal springConstant = 1000.0 / (factor * factor);
     const qreal dampingRatio = 1.0;
 
     m_motionX = SpringMotion(springConstant, dampingRatio);
@@ -393,6 +394,12 @@ void DesktopSwitchScreen::startAnimation(const QPointF &oldPos, VirtualDesktop *
     m_motionX.setPosition(m_startPos.x() * virtualSpaceSize.width());
     m_motionY.setAnchor(m_endPos.y() * virtualSpaceSize.height());
     m_motionY.setPosition(m_startPos.y() * virtualSpaceSize.height());
+    // niri restarts the spring from the current position without the old velocity
+    m_motionX.setVelocity(0);
+    m_motionY.setVelocity(0);
+    // niri's epsilon is 0.0001 of a workspace; the springs here run in pixels
+    m_motionX.setEpsilon(0.0001 * virtualSpaceSize.width());
+    m_motionY.setEpsilon(0.0001 * virtualSpaceSize.height());
     m_clock.reset();
 
     effects->addRepaint(m_screen->geometry());
@@ -583,7 +590,11 @@ void DesktopSwitchEffect::desktopChangingCancelled()
 
 void DesktopSwitchScreen::desktopChangingCancelled()
 {
-    if (m_state != State::Inactive) {
+    // Only a gesture of ours can be cancelled. KWin sends the cancel at the end of EVERY desktop swipe,
+    // including left/right swipes it ignored because the desktops are in one column (Kiri scrolls columns
+    // with those); starting from the stale m_gesturePos then threw the running switch back to the old
+    // desktop on every left/right swipe.
+    if (m_state == State::ActiveGesture) {
         startAnimation(m_gesturePos, effects->currentDesktop(m_screen), nullptr);
     }
 }
