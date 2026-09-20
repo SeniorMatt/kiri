@@ -274,20 +274,62 @@ class ClientManager {
             ...Array.from(this.clientMap.keys()).filter(c => !this.floatingFocusOrder.includes(c)).reverse(),
         ];
         for (const kwinClient of candidates) {
-            if (!this.isFloating(kwinClient)) {
-                continue;
+            if (this.isFloatingHere(kwinClient)) {
+                return kwinClient;
             }
-            if (
-                kwinClient.minimized ||
-                !kwinClient.desktops.includes(Workspace.currentDesktop) ||
-                (kwinClient.activities.length > 0 && !kwinClient.activities.includes(Workspace.currentActivity)) ||
-                kwinClient.output !== Workspace.activeScreen
-            ) {
-                continue;
-            }
-            return kwinClient;
         }
         return null;
+    }
+
+    private isFloatingHere(kwinClient: KwinClient) {
+        return this.isFloating(kwinClient) &&
+            !kwinClient.minimized &&
+            kwinClient.desktops.includes(Workspace.currentDesktop) &&
+            (kwinClient.activities.length === 0 || kwinClient.activities.includes(Workspace.currentActivity)) &&
+            kwinClient.output === Workspace.activeScreen;
+    }
+
+    // niri's floating focus-left/right/up/down (floating.rs focus_directional): the floating window nearest in that
+    // direction, by the distance between centres along that axis; false if there is none
+    public focusFloatingInDirection(active: KwinClient, dx: number, dy: number) {
+        const frame = (c: KwinClient) => roundQtRect(c.frameGeometry);
+        const centre = (c: KwinClient) => ({ x: frame(c).x + frame(c).width / 2, y: frame(c).y + frame(c).height / 2 });
+        const from = centre(active);
+        let best: KwinClient|null = null;
+        let bestDistance = Infinity;
+        for (const kwinClient of this.clientMap.keys()) {
+            if (kwinClient === active || !this.isFloatingHere(kwinClient)) {
+                continue;
+            }
+            const to = centre(kwinClient);
+            const distance = dx !== 0 ? (to.x - from.x) * dx : (to.y - from.y) * dy;
+            if (distance > 0 && distance < bestDistance) {
+                best = kwinClient;
+                bestDistance = distance;
+            }
+        }
+        if (best === null) {
+            return false;
+        }
+        KiriFocus.mark(best);
+        Workspace.activeWindow = best;
+        return true;
+    }
+
+    // niri's floating focus-column-first/last: the leftmost or rightmost floating window
+    public focusFloatingExtreme(rightmost: boolean) {
+        let best: KwinClient|null = null;
+        for (const kwinClient of this.clientMap.keys()) {
+            if (this.isFloatingHere(kwinClient) && (best === null || (rightmost ? kwinClient.frameGeometry.x > best.frameGeometry.x : kwinClient.frameGeometry.x < best.frameGeometry.x))) {
+                best = kwinClient;
+            }
+        }
+        if (best === null) {
+            return false;
+        }
+        KiriFocus.mark(best);
+        Workspace.activeWindow = best;
+        return true;
     }
 
     // niri moves floating windows by a fixed step, the window stays inside the work area

@@ -280,6 +280,25 @@ class World {
         this.doIfTiled(active, f);
     }
 
+    // niri: when a floating window is active the focus keys move between the floating windows; with none in
+    // that direction (niri stays put) the focus enters the grid, so a window Kiri can't tile never traps it
+    public doIfTiledFocusedOrFocusFloating(
+        f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
+        dx: number,
+        dy: number,
+    ) {
+        const active = Workspace.activeWindow;
+        if (active !== null && this.clientManager.isFloating(active)) {
+            const moved = dx === 0 && dy === 0 ?
+                this.clientManager.focusFloatingExtreme(false) :
+                this.clientManager.focusFloatingInDirection(active, dx, dy);
+            if (moved) {
+                return;
+            }
+        }
+        this.doIfTiledFocusedOrEnterGrid(f);
+    }
+
     // Runs `f` for a tiled focused window; a floating focused window is moved by (dx, dy) instead
     public doIfTiledFocusedOrMoveFloating(
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,

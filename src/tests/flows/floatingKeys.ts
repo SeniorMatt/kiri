@@ -142,3 +142,28 @@ tests.register("Switch focus to floating moves the cursor", 1, () => {
     Assert.equal(workspaceMock.activeWindow, tiled);
     Assert.assert(rectContainsPoint(tiled.getActualFrameGeometry(), Workspace.cursorPos));
 });
+
+tests.register("Focus keys move between floating windows (niri)", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [tiled, f1, f2, f3] = workspaceMock.createClientsWithFrames(
+        new MockQmlRect(0, 0, 100, 100), new MockQmlRect(100, 300, 100, 100), new MockQmlRect(300, 300, 100, 100), new MockQmlRect(500, 100, 100, 100));
+    for (const client of [f1, f2, f3]) {
+        workspaceMock.activeWindow = client;
+        qtMock.fireShortcut("window-toggle-floating");
+    }
+    // they keep their tiled place when they float, so put them where the test wants them
+    f1.frameGeometry = new MockQmlRect(100, 300, 100, 100);
+    f2.frameGeometry = new MockQmlRect(300, 300, 100, 100);
+    f3.frameGeometry = new MockQmlRect(500, 100, 100, 100);
+    workspaceMock.activeWindow = f1;
+    qtMock.fireShortcut("focus-right");
+    Assert.equal(workspaceMock.activeWindow, f2, { message: "the nearest to the right" });
+    qtMock.fireShortcut("focus-right");
+    Assert.equal(workspaceMock.activeWindow, f3);
+    qtMock.fireShortcut("focus-left");
+    Assert.equal(workspaceMock.activeWindow, f2);
+    qtMock.fireShortcut("focus-up");
+    Assert.equal(workspaceMock.activeWindow, f3, { message: "f3 is higher up" });
+    qtMock.fireShortcut("focus-start");
+    Assert.equal(workspaceMock.activeWindow, tiled, { message: "focus-start is the grid's first column for tiled windows" });
+});
