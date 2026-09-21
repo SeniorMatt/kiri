@@ -127,6 +127,92 @@ class ClientManager {
         }
     }
 
+    // The window was dragged out of the grid. Like niri it is tiled again where it is dropped.
+    public floatForDrag(client: ClientWrapper) {
+        this.floatClient(client);
+        if (!this.config.dropToTile) {
+            return;
+        }
+        const kwinClient = client.kwinClient;
+        const manager = new SignalManager();
+        manager.connect(kwinClient.interactiveMoveResizeFinished, () => {
+            manager.destroy();
+            this.world.do(() => this.dropTile(kwinClient));
+        });
+    }
+
+    // niri's insert_position (scrolling.rs): the closest gap between columns or between windows to the cursor
+    private dropTile(kwinClient: KwinClient) {
+        const client = this.clientMap.get(kwinClient);
+        if (client === undefined || !(client.stateManager.getState() instanceof ClientState.Floating) || !Clients.canTileEver(kwinClient)) {
+            return;
+        }
+        const desktop = this.desktopManager.getDesktopForClient(kwinClient);
+        if (desktop === undefined) {
+            return;
+        }
+        const grid = desktop.grid;
+        const columns = grid.getColumns();
+        this.tileClient(client, grid);
+        const window = this.findTiledWindow(kwinClient);
+        if (window === null || columns.length === 0) {
+            return;
+        }
+
+        const gap = grid.config.gapsInnerHorizontal;
+        const cursor = Workspace.cursorPos;
+        const offsetX = desktop.tilingArea.x - desktop.getScrollX();
+        const xs = columns.map(column => column.getLeft() + offsetX - gap / 2);
+        xs.push(columns[columns.length - 1].getRight() + offsetX + gap / 2);
+        let closest = 0;
+        for (let i = 1; i < xs.length; i++) {
+            if (Math.abs(xs[i] - cursor.x) < Math.abs(xs[closest] - cursor.x)) {
+                closest = i;
+            }
+        }
+        let columnIndex = -1; // the column the cursor is over
+        for (let i = 0; i < columns.length; i++) {
+            if (cursor.x >= xs[i]) {
+                columnIndex = i;
+            }
+        }
+        let tileGap: { windowIndex: number, distance: number } | null = null;
+        if (columnIndex >= 0 && cursor.x < xs[columns.length]) {
+            const column = columns[columnIndex];
+            const windows = column.getWindows();
+            const gapV = grid.config.gapsInnerVertical;
+            if (column.isTabbed()) {
+                const active = column.getWindowToFocus();
+                const index = windows.indexOf(active);
+                const top = active.client.kwinClient.frameGeometry.y - gapV / 2;
+                const bottom = top + active.height + gapV;
+                tileGap = Math.abs(top - cursor.y) <= Math.abs(bottom - cursor.y) ?
+                    { windowIndex: index, distance: Math.abs(top - cursor.y) } :
+                    { windowIndex: index + 1, distance: Math.abs(bottom - cursor.y) };
+            } else {
+                let y = desktop.tilingArea.y - gapV / 2;
+                for (let j = 0; j <= windows.length; j++) {
+                    const distance = Math.abs(y - cursor.y);
+                    if (tileGap === null || distance < tileGap.distance) {
+                        tileGap = { windowIndex: j, distance: distance };
+                    }
+                    if (j < windows.length) {
+                        y += windows[j].height + gapV;
+                    }
+                }
+            }
+        }
+        const columnDistance = Math.abs(xs[closest] - cursor.x);
+        if (tileGap !== null && columnDistance > tileGap.distance) {
+            const column = columns[columnIndex];
+            const above = column.getWindows()[tileGap.windowIndex - 1] ?? null;
+            window.moveToColumn(column, true, FocusPassing.Type.None, above);
+        } else {
+            grid.moveColumn(window.column, closest === 0 ? null : columns[closest - 1]);
+        }
+        window.focus();
+    }
+
     public tileClient(client: ClientWrapper, grid: Grid) {
         if (client.stateManager.getState() instanceof ClientState.Tiled) {
             return;
@@ -385,5 +471,6 @@ namespace ClientManager {
         cursorFollowsFocus: boolean;
         defaultColumnWidth: string;
         gapsInnerHorizontal: number;
+        dropToTile: boolean;
     }
 }

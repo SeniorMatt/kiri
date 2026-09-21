@@ -32,3 +32,35 @@ tests.register("Drag tiled window, keep tiled", 20, () => {
     Assert.tiledClient(clientManager, client1);
     Assert.grid(config, tilingArea, 100, [[client0], [client1]], true);
 });
+
+tests.register("Drag tiled window, drop to tile (niri)", 10, () => {
+    const config = getDefaultConfig();
+    config.untileOnDrag = true;
+    config.dropToTile = true;
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock, world } = init(config);
+    const clientManager = getClientManager(world);
+
+    function layout() {
+        const [a, b, c] = clients;
+        return [a, b, c].map(client => Math.round(client.getActualFrameGeometry().x)).join();
+    }
+    let clients = workspaceMock.createClientsWithWidths(200, 200, 200);
+    const [a, b, c] = clients;
+    const startX = a.getActualFrameGeometry().x;
+
+    // dropped past the last column: the window becomes the last column
+    workspaceMock.cursorPos = new MockQmlPoint(700, 300);
+    workspaceMock.moveWindow(a, new MockQmlPoint(10, 10));
+    Assert.tiledClient(clientManager, a);
+    Assert.assert(a.getActualFrameGeometry().x > c.getActualFrameGeometry().x, { message: "a is the last column" });
+    Assert.assert(b.getActualFrameGeometry().x === startX, { message: "b moved to the front: " + layout() });
+
+    // dropped at the top of a column: it goes into the column, above its window
+    const bx = b.getActualFrameGeometry().x;
+    workspaceMock.cursorPos = new MockQmlPoint(bx + 100, tilingArea.y + 2);
+    workspaceMock.moveWindow(c, new MockQmlPoint(10, 10));
+    Assert.tiledClient(clientManager, c);
+    Assert.assert(Math.abs(c.getActualFrameGeometry().x - b.getActualFrameGeometry().x) < 1, { message: "c joined b's column" });
+    Assert.assert(c.getActualFrameGeometry().y < b.getActualFrameGeometry().y, { message: "c is above b" });
+});

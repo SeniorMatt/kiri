@@ -11,5 +11,6 @@ function getDefaultConfig(): Config {
     config.gestureScroll = false;
     config.centerGridWhenFits = true;
     config.defaultColumnWidth = "";
+    config.dropToTile = false;
     return config;
 }

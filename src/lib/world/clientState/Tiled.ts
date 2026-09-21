@@ -80,7 +80,7 @@ namespace ClientState {
                 if (kwinClient.move) {
                     if (config.untileOnDrag) {
                         world.do((clientManager, desktopManager) => {
-                            clientManager.floatClient(client);
+                            clientManager.floatForDrag(client);
                         });
                     } else {
                         moving = true;

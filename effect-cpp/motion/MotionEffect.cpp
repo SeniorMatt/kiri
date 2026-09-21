@@ -2,6 +2,7 @@
     Kiri motion. See MotionEffect.h. License: GPL-3.0-or-later.
 */
 
+#include <utility>
 #include "MotionEffect.h"
 
 #include <core/output.h>
@@ -40,11 +41,17 @@ Effect::Effect()
 
 Effect::~Effect()
 {
-    for (auto it = m_windows.begin(); it != m_windows.end(); ++it) {
+    // dropping the last reference to a closed window deletes it and emits windowDeleted, which must not reach
+    // this half-destroyed effect
+    disconnect(KWin::effects, nullptr, this, nullptr);
+    QHash<KWin::EffectWindow *, WindowState> windows = std::exchange(m_windows, {});
+    for (auto it = windows.begin(); it != windows.end(); ++it) {
         if (it->snapshot) {
             unredirect(it.key());
         }
+        it->itemEffect.reset();
     }
+    windows.clear();
 }
 
 bool Effect::supported()

@@ -236,6 +236,7 @@ appearance_tab = tab("appearance", "Appearance", [
 behavior_tab = tab("behavior", "Behavior", [
     group("Windows", [
         check("untileOnDrag", "Float a window when it is dragged", "Dragging a tiled window takes it out of the grid"),
+        check("dropToTile", "Tile a dragged window where it is dropped", "Like niri: a window dragged out of the grid goes back in at the gap closest to the cursor when you let go"),
         check("tabbedColumnsByDefault", "New columns are tabbed", "New columns start in tabbed display (only the active window is visible)"),
         check("cursorFollowsFocus", "Cursor follows focus", "Move the mouse cursor to a window focused from the keyboard"),
         check("skipSwitcher", "Tiled windows skip Alt+Tab", "Hide tiled windows from the window switcher"),

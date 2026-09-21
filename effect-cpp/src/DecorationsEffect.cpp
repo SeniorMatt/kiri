@@ -119,7 +119,7 @@ void Effect::postPaintScreen()
     const double speed = factor > 0 ? 1.0 / factor : 0;
     bool again = false;
     for (auto it = m_expanded.begin(); it != m_expanded.end();) {
-        if (it.key()->isDeleted() && it->to == 1) {
+        if (it.key()->isDeleted() && it->to == 1) { // closed but still fading out
             it = m_expanded.erase(it);
             continue;
         }
@@ -197,6 +197,7 @@ Effect::Effect()
     connect(KWin::effects, &KWin::EffectsHandler::windowDeleted, this, [this](KWin::EffectWindow *w) {
         repaintPainted(w);
         m_painted.remove(w);
+        m_expanded.remove(w); // KWin frees the window right after this
     });
 }
 

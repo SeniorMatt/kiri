@@ -125,6 +125,11 @@ const configDef = [
         default: true,
     },
     {
+        name: "dropToTile",
+        type: "Bool",
+        default: true,
+    },
+    {
         name: "cursorFollowsFocus",
         type: "Bool",
         default: false,

@@ -12,6 +12,7 @@ interface Config {
     windowHeightStep: number;
     offScreenOpacity: number;
     untileOnDrag: boolean;
+    dropToTile: boolean;
     cursorFollowsFocus: boolean;
     tabbedColumnsByDefault: boolean;
     tabIndicatorEnabled: boolean;
