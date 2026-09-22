@@ -30,6 +30,34 @@ class MockWorkspace {
 
     public raiseWindow(kwinClient: KwinClient) {}
 
+    private desktopCounter = 100;
+
+    public createDesktop(position: number, name: string) {
+        this.desktops.splice(position, 0, { __brand: "KwinDesktop", id: "desktop" + (this.desktopCounter++), name: name });
+        this.desktopsChanged.fire();
+    }
+
+    public removeDesktop(desktop: KwinDesktop) {
+        const index = this.desktops.indexOf(desktop);
+        if (index < 0) {
+            return;
+        }
+        this.desktops.splice(index, 1);
+        for (const window of this.windows) {
+            if (window.desktops.includes(desktop)) {
+                window.desktops = window.desktops.filter(d => d !== desktop);
+                if (window.desktops.length === 0) {
+                    window.desktops = [this.desktops[Math.max(0, index - 1)]];
+                }
+            }
+        }
+        if (this._currentDesktop === desktop) {
+            this._currentDesktop = this.desktops[Math.max(0, index - 1)];
+            this.currentDesktopChanged.fire();
+        }
+        this.desktopsChanged.fire();
+    }
+
     public createWindows(...kwinClients: MockKwinClient[]) {
         for (const kwinClient of kwinClients) {
             this.windows.push(kwinClient);

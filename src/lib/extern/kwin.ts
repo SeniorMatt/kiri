@@ -29,6 +29,8 @@ interface Workspace {
 
     clientArea(option: ClientAreaOption, output: Output, kwinDesktop: KwinDesktop): QmlRect;
     raiseWindow(kwinClient: KwinClient): void;
+    createDesktop(position: number, name: string): void;
+    removeDesktop(desktop: KwinDesktop): void;
 }
 
 const enum ClientAreaOption {

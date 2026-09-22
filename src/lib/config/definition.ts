@@ -346,6 +346,11 @@ const configDef = [
         default: defaultWindowRules,
     },
     {
+        name: "dynamicDesktops",
+        type: "Bool",
+        default: false,
+    },
+    {
         name: "tiledDesktops",
         type: "String",
         default: ".*",

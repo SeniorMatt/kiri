@@ -14,6 +14,8 @@ class World {
     private readonly closeRelayoutDelayer: Delayer;
     private readonly closeRelayoutDelay: number;
     private arrangeHeld = false;
+    private readonly dynamicDesktops: boolean;
+    private updatingDesktops = false;
     private currentDesktop: KwinDesktop|null = null;
     public previousDesktop: KwinDesktop|null = null; // niri's focus-workspace-previous
 
@@ -77,6 +79,7 @@ class World {
         this.gestureAnimationTimer.repeat = true;
         this.gestureAnimationTimer.triggered.connect(() => this.gestureAnimationStep());
 
+        this.dynamicDesktops = config.dynamicDesktops;
         this.closeRelayoutDelay = config.closeRelayoutDelay;
         this.closeRelayoutDelayer = new Delayer(config.closeRelayoutDelay, () => {
             this.arrangeHeld = false;
@@ -223,7 +226,29 @@ class World {
         }
     }
 
+    // niri's dynamic workspaces: there is always one empty desktop at the bottom, and empty ones in between are removed
+    private updateDynamicDesktops() {
+        if (!this.dynamicDesktops || this.updatingDesktops) {
+            return;
+        }
+        this.updatingDesktops = true;
+        try {
+            const desktops = Workspace.desktops;
+            if (this.clientManager.isDesktopOccupied(desktops[desktops.length - 1])) {
+                Workspace.createDesktop(desktops.length, "Desktop " + (desktops.length + 1));
+            }
+            for (const desktop of Workspace.desktops.slice(0, -1)) {
+                if (desktop !== Workspace.currentDesktop && !this.clientManager.isDesktopOccupied(desktop)) {
+                    Workspace.removeDesktop(desktop);
+                }
+            }
+        } finally {
+            this.updatingDesktops = false;
+        }
+    }
+
     private update() {
+        this.updateDynamicDesktops();
         if (this.arrangeHeld) {
             return;
         }

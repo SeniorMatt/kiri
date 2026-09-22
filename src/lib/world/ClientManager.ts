@@ -347,6 +347,16 @@ class ClientManager {
         return best;
     }
 
+    // whether a window lives on the desktop (niri's workspaces are empty when they have no windows)
+    public isDesktopOccupied(kwinDesktop: KwinDesktop) {
+        for (const kwinClient of this.clientMap.keys()) {
+            if (kwinClient.normalWindow && kwinClient.desktops.includes(kwinDesktop)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public isFloating(kwinClient: KwinClient) {
         const client = this.clientMap.get(kwinClient);
         return client !== undefined && client.stateManager.getState() instanceof ClientState.Floating;
