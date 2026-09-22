@@ -45,7 +45,7 @@ tests.register("Drag tiled window, drop to tile (niri)", 10, () => {
         const [a, b, c] = clients;
         return [a, b, c].map(client => Math.round(client.getActualFrameGeometry().x)).join();
     }
-    let clients = workspaceMock.createClientsWithWidths(200, 200, 200);
+    const clients = workspaceMock.createClientsWithWidths(200, 200, 200);
     const [a, b, c] = clients;
     const startX = a.getActualFrameGeometry().x;
 
