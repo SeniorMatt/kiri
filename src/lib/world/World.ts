@@ -286,6 +286,26 @@ class World {
         this.doIfTiled(Workspace.activeWindow, f);
     }
 
+    // Focus keys: a floating window moves the focus to the nearest floating window in that direction like niri's
+    // floating layer does, anything else behaves like `doIfTiledFocusedOrEnterGrid`
+    public doFocusInDirection(
+        f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
+        dx: number,
+        dy: number,
+    ) {
+        const active = Workspace.activeWindow;
+        if (active !== null && this.clientManager.isFloating(active)) {
+            let handled = false;
+            this.do((clientManager, desktopManager) => {
+                handled = clientManager.focusFloatingDirectional(active, dx, dy);
+            });
+            if (handled) {
+                return;
+            }
+        }
+        this.doIfTiledFocusedOrEnterGrid(f);
+    }
+
     // Like `doIfTiledFocused`, but when the focused window is not in the grid (floating, a full-screen game that
     // was not tiled, nothing focused) the focus moves into the grid instead, so such a window can always be left
     public doIfTiledFocusedOrEnterGrid(
@@ -303,25 +323,6 @@ class World {
             return;
         }
         this.doIfTiled(active, f);
-    }
-
-    // niri: when a floating window is active the focus keys move between the floating windows; with none in
-    // that direction (niri stays put) the focus enters the grid, so a window Kiri can't tile never traps it
-    public doIfTiledFocusedOrFocusFloating(
-        f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
-        dx: number,
-        dy: number,
-    ) {
-        const active = Workspace.activeWindow;
-        if (active !== null && this.clientManager.isFloating(active)) {
-            const moved = dx === 0 && dy === 0 ?
-                this.clientManager.focusFloatingExtreme(false) :
-                this.clientManager.focusFloatingInDirection(active, dx, dy);
-            if (moved) {
-                return;
-            }
-        }
-        this.doIfTiledFocusedOrEnterGrid(f);
     }
 
     // Runs `f` for a tiled focused window; a floating focused window is moved by (dx, dy) instead
@@ -370,6 +371,11 @@ class World {
     private gestureRelease() {
         const desktop = this.desktopManager.getCurrentDesktop();
         if (desktop === undefined || !desktop.isGestureScrolling()) {
+            return;
+        }
+        let accidental = false;
+        this.do(() => { accidental = desktop.gestureScrollAbortIfAccidental(); });
+        if (accidental) {
             return;
         }
         const from = desktop.getScrollX();

@@ -2,7 +2,7 @@
 # Installs or updates Kiri on this machine. Run it from the extracted release (kiri_X.tar.gz) or a git checkout:
 #   ./install.sh
 # It builds the compiled KWin effects against the KWin you have installed (so run it again after a KWin
-# update), installs the Kiri script and the kiri_animations effect for your user, turns everything on and does
+# update), installs the Kiri script for your user (and the kiri_animations effect if the build fails), turns everything on and does
 # the one-time setup (Plasma's Slide, Fade, Scale, Glide and Maximize effects off, desktops in one column). If the build fails, Kiri still works:
 # it draws its rings itself and the old Slide stays.
 #   ./install.sh --no-build    skip the compiled effects
@@ -60,12 +60,19 @@ fi
 
 # ---- the script and the animation effect ---------------------------------------------------------------
 kpackagetool6 --type=KWin/Script --upgrade "$root/package" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Script --install "$root/package"
-kpackagetool6 --type=KWin/Effect --upgrade "$effect" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Effect --install "$effect"
+if $compiled; then
+    # kiri_motion replaces the kiri_animations script effect; with both on every window animates twice, so the
+    # fallback is not installed at all and doesn't show up in Desktop Effects
+    kpackagetool6 --type=KWin/Effect --remove kiri_animations >/dev/null 2>&1 || true
+    kwriteconfig6 --file kwinrc --group Plugins --key kiri_animationsEnabled --delete
+else
+    kpackagetool6 --type=KWin/Effect --upgrade "$effect" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Effect --install "$effect"
+fi
 
 # ---- turn things on ------------------------------------------------------------------------------------
 w() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" "$3"; }
 w Plugins kiriEnabled true
-if [ "$(kreadconfig6 --file kwinrc --group Plugins --key kiri_animationsEnabled)" != false ]; then
+if ! $compiled && [ "$(kreadconfig6 --file kwinrc --group Plugins --key kiri_animationsEnabled)" != false ]; then
     w Plugins kiri_animationsEnabled true
 fi
 if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key effectsEnabled)" != done ]; then
@@ -77,11 +84,9 @@ if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key effec
 fi
 if $compiled; then
     # kiri_motion does what the kiri_animations script effect does, with niri's springs, open/close and cross-faded
-    # resizes; two of them would animate every window twice. kiri_animations stays installed as the fallback
-    # for systems where the compiled effects can't be built.
+    # resizes; kiri_animations is only installed as the fallback where the compiled effects can't be built.
     if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key motionEnabled)" != done ]; then
         w Plugins kiri_motionEnabled true
-        w Plugins kiri_animationsEnabled false
         # Plasma's own window open/close and maximize animations would play on top of niri's: Fade, Scale,
         # Glide (the choices for "Window open/close animation") and Maximize
         for e in fade scale glide maximize; do
@@ -147,3 +152,14 @@ if $applied; then
     echo "Kiri installed and running."
 fi
 echo "Done. Log out and log back in to finish."
+if [ -r /dev/tty ]; then
+    printf 'Log out now? [y/N] '
+    read -r answer </dev/tty || answer=
+    case $answer in
+        [yY]*)
+            qdbus6 org.kde.Shutdown /Shutdown org.kde.Shutdown.logout >/dev/null 2>&1 ||
+                qdbus6 org.kde.ksmserver /KSMServer org.kde.KSMServerInterface.logout 0 0 0 >/dev/null 2>&1 ||
+                echo "Couldn't log out automatically; please log out yourself." >&2
+            ;;
+    esac
+fi

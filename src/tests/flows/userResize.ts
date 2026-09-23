@@ -27,10 +27,10 @@ tests.register("User resize", 10, () => {
         assertSizes(310, 290, h-20, h+20);
 
         workspaceMock.resizeWindow(clientRightBottom, false, false, false, new MockQmlSize(-10, 20));
-        assertSizes(310, 280, h-20, h+20);
+        assertSizes(310, 280, h-40, h+40);
 
         workspaceMock.resizeWindow(clientRightBottom, false, false, true, new MockQmlSize(0, 20));
-        assertSizes(310, 280, h-40, h+40);
+        assertSizes(310, 280, h-60, h+60);
     }
 
     {
@@ -49,10 +49,10 @@ tests.register("User resize", 10, () => {
         assertSizes(310, 280, h-20, h+20);
 
         workspaceMock.resizeWindow(clientRightBottom, true, true, false, new MockQmlSize(-10, 20));
-        assertSizes(320, 270, h-20, h+20);
+        assertSizes(320, 270, h-40, h+40);
 
         workspaceMock.resizeWindow(clientRightBottom, true, false, true, new MockQmlSize(0, 20));
-        assertSizes(320, 270, h-40, h+40);
+        assertSizes(320, 270, h-60, h+60);
     }
 
     {
@@ -72,10 +72,10 @@ tests.register("User resize", 10, () => {
         assertSizes(310, 295, h-20, h+20);
 
         workspaceMock.resizeWindow(clientRightBottom, true, true, false, new MockQmlSize(-10, 20));
-        assertSizes(310, 295, h-20, h+20);
+        assertSizes(310, 295, h-40, h+40);
 
         workspaceMock.resizeWindow(clientRightTop, true, true, false, new MockQmlSize(-10, 0));
-        assertSizes(310, 295, h-20, h+20);
+        assertSizes(310, 295, h-40, h+40);
 
         // TODO
         // workspaceMock.resizeWindow(clientRightBottom, true, false, true, new MockQmlSize(0, -80));
@@ -136,4 +136,36 @@ tests.register("User resize keeps the column centered", 1, () => {
     c2.resize = false;
     c2.interactiveMoveResizeFinished.fire();
     Assert.equal(center(c2), areaCenter);
+});
+
+tests.register("Resizing a floating window leaves the tiled layout alone", 3, () => {
+    for (const edgeResize of [false, true]) {
+        for (const leftEdge of [false, true]) {
+            const { qtMock, workspaceMock } = init(getDefaultConfig());
+            const [a, b, c, floating] = workspaceMock.createClients(4);
+            workspaceMock.activeWindow = floating;
+            qtMock.fireShortcut("window-toggle-floating");
+            const before = [a, b, c].map(client => client.getActualFrameGeometry().clone());
+            const floatingBefore = floating.getFrameGeometryCopy();
+
+            workspaceMock.resizeWindow(floating, edgeResize, leftEdge, false, new MockQmlSize(40, 30), new MockQmlSize(20, 10));
+
+            const floatingAfter = floating.getActualFrameGeometry();
+            Assert.equal(floatingAfter.width, floatingBefore.width + 60);
+            Assert.equal(floatingAfter.height, floatingBefore.height + 40);
+            [a, b, c].forEach((client, i) => Assert.rect(
+                client.getActualFrameGeometry(), before[i].x, before[i].y, before[i].width, before[i].height,
+            ));
+        }
+    }
+});
+
+tests.register("Column width is kept after leaving full-screen mode", 5, () => {
+    const { workspaceMock } = init(getDefaultConfig());
+    const [a, b] = workspaceMock.createClientsWithWidths(300, 400);
+    workspaceMock.activeWindow = b;
+    b.fullScreen = true;
+    b.fullScreen = false;
+    Assert.equal(b.getActualFrameGeometry().width, 400);
+    Assert.equal(a.getActualFrameGeometry().width, 300);
 });

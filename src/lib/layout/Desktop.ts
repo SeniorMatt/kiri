@@ -4,7 +4,12 @@ class Desktop {
     private scrollX: number;
     private gestureScrollXInitial: number | null;
     private readonly gestureVelocity = new VelocityTracker(100, 120);
-    private static readonly GESTURE_PROJECTION_MS = 150;
+    private static readonly GESTURE_PROJECTION_MS = 333; // niri: 1 / (1000 * -ln 0.997) seconds of the release velocity
+    // KWin starts a horizontal handler on the first few units of every swipe, before it has locked the axis;
+    // a swipe that ends up vertical cancels it again. Less than this much progress (0.05 = 10 units) is not a swipe.
+    private static readonly GESTURE_MIN_PROGRESS = 0.05;
+    private gestureMaxAmount = 0;
+    private gestureRight = true;
     private dirty: boolean;
     private dirtyScroll: boolean;
     private dirtyPins: boolean;
@@ -172,12 +177,15 @@ class Desktop {
         if (this.gestureScrollXInitial === null) {
             this.gestureScrollXInitial = this.scrollX;
             this.gestureVelocity.reset();
+            this.gestureMaxAmount = 0;
         }
+        this.gestureMaxAmount = Math.max(this.gestureMaxAmount, Math.abs(amount));
 
         if (this.config.gestureScrollInvert) {
             amount = -amount;
         }
-        this.setScroll(this.gestureScrollXInitial + this.config.gestureScrollStep * amount, false);
+        // like niri, the view follows the fingers freely, past the ends too; releasing snaps it back
+        this.setScroll(this.gestureScrollXInitial + this.config.gestureScrollStep * amount, true);
         this.gestureVelocity.add(now, this.scrollX);
     }
 
@@ -191,31 +199,46 @@ class Desktop {
         const candidates: number[] = [this.clampScrollX(-Infinity), this.clampScrollX(Infinity)];
         for (const column of this.grid.getColumns()) {
             candidates.push(this.clampScrollX(column.getLeft()));
+            // niri also snaps with a column's right edge at the right edge of the screen
+            candidates.push(this.clampScrollX(column.getRight() - this.tilingArea.width));
         }
         const velocity = this.gestureVelocity.getVelocity(now);
+        const moved = this.gestureScrollXInitial === null ? 0 : this.scrollX - this.gestureScrollXInitial;
+        this.gestureRight = velocity !== 0 ? velocity > 0 : moved >= 0;
         return pickSnapTarget(candidates, this.scrollX, velocity, Desktop.GESTURE_PROJECTION_MS);
+    }
+
+    // A gesture that never got past a few units was KWin guessing the axis of a vertical swipe: put it back, no focus change.
+    public gestureScrollAbortIfAccidental() {
+        if (this.gestureScrollXInitial === null || this.gestureMaxAmount >= Desktop.GESTURE_MIN_PROGRESS) {
+            return false;
+        }
+        this.setScroll(this.gestureScrollXInitial, false);
+        this.gestureScrollXInitial = null;
+        return true;
     }
 
     public getScrollX() {
         return this.scrollX;
     }
 
+    // niri: after a swipe, the column furthest in the swipe's direction that is fully on screen gets focus,
+    // also when all columns fit on the screen and the view did not move
     public gestureScrollFinish(focusedWindow: Window|null, focusedUntiled = false) {
         if (this.gestureScrollXInitial === null) {
             return;
         }
-        const scrolledRight = this.scrollX > this.gestureScrollXInitial;
         this.gestureScrollXInitial = null;
 
         const visibleRange = this.getCurrentVisibleRange();
-        if (focusedUntiled || (focusedWindow !== null && !Range.contains(visibleRange, focusedWindow.column))) {
-            // the focused window is no longer visible, find a new window to focus
-            const focusTargetColumn = scrolledRight ?
-                this.grid.getLeftmostVisibleColumn(visibleRange) :
-                this.grid.getRightmostVisibleColumn(visibleRange);
-            if (focusTargetColumn !== null) {
-                focusTargetColumn.getWindowToFocus().focus();
-            }
+        const focusTargetColumn = this.gestureRight ?
+            this.grid.getRightmostVisibleColumn(visibleRange) :
+            this.grid.getLeftmostVisibleColumn(visibleRange);
+        if (focusTargetColumn === null) {
+            return;
+        }
+        if (focusedUntiled || focusedWindow === null || focusedWindow.column !== focusTargetColumn) {
+            focusTargetColumn.getWindowToFocus().focus();
         }
     }
 

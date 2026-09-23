@@ -23,6 +23,7 @@ constexpr int CaptureRole = 0x4B495249;
 constexpr double ResizeThreshold = 10; // px, niri's RESIZE_ANIMATION_THRESHOLD
 constexpr double StreamGap = 0.030; // changes closer than this count as one continuous stream (touchpad scrolling)
 constexpr int StreamLength = 2;
+constexpr double StreamMinDuration = 0.060; // a chain shorter than this is a few layout passes of one action, not a scroll
 constexpr double SettleAfterOpen = 0.05; // Kiri places a new window right after it appears; that is no movement
 } // namespace
 
@@ -226,6 +227,16 @@ QSizeF Effect::paintedSize(const WindowState &s, const KWin::RectF &frame, doubl
                   std::max(1.0, s.sizeFrom.height() + (frame.height() - s.sizeFrom.height()) * p));
 }
 
+bool Effect::anyUserResize() const
+{
+    for (auto it = m_windows.cbegin(); it != m_windows.cend(); ++it) {
+        if (it.key()->isUserResize()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
 {
     auto it = m_windows.find(w);
@@ -239,9 +250,13 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
     const bool fast = s.lastChange >= 0 && t - s.lastChange < StreamGap;
     s.lastChange = t;
     s.streak = fast ? s.streak + 1 : 0;
+    if (!fast) {
+        s.streamStart = t;
+    }
 
     if (m_speed <= 0 || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()
-        || s.closeStart >= 0 || t - s.created < SettleAfterOpen || s.streak >= StreamLength || old.isEmpty() || frame.isEmpty()) {
+        || anyUserResize() // like niri's interactive resize (animate = false): the neighbours follow the mouse at once
+        || s.closeStart >= 0 || t - s.created < SettleAfterOpen || (s.streak >= StreamLength && t - s.streamStart >= StreamMinDuration) || old.isEmpty() || frame.isEmpty()) {
         stopWindow(w, s);
         return;
     }

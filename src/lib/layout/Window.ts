@@ -223,7 +223,9 @@ class Window {
 
     public onFrameGeometryChanged() {
         const newGeometry = this.client.kwinClient.frameGeometry;
-        this.column.setWidth(newGeometry.width.round(), true);
+        if (!Clients.isFrameFullScreenSize(this.client.kwinClient)) {
+            this.column.setWidth(newGeometry.width.round(), true);
+        }
         this.column.grid.desktop.onLayoutChanged();
     }
 

@@ -55,6 +55,14 @@ namespace Clients {
             kwinClient.clientGeometry.height.round() >= fullScreenArea.height;
     }
 
+    // right after a window leaves full-screen mode its frame still covers the screen, but the title bar is back,
+    // so `isFullScreenGeometry` is already false: such a frame is KWin's, not the size the window wants to tile at
+    export function isFrameFullScreenSize(kwinClient: KwinClient) {
+        const fullScreenArea = Workspace.clientArea(ClientAreaOption.FullScreenArea, kwinClient.output, getKwinDesktopApprox(kwinClient));
+        return kwinClient.frameGeometry.width.round() >= fullScreenArea.width &&
+            kwinClient.frameGeometry.height.round() >= fullScreenArea.height;
+    }
+
     export function isOnVirtualDesktop(kwinClient: KwinClient, kwinDesktop: KwinDesktop) {
         return kwinClient.desktops.length === 0 || kwinClient.desktops.includes(kwinDesktop);
     }

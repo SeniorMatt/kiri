@@ -50,6 +50,7 @@ struct WindowState
 
     double created = 0;
     double lastChange = -1;
+    double streamStart = 0; // when the current chain of closely spaced changes began
     int streak = 0;
     QSizeF lastSize;
 };
@@ -76,6 +77,7 @@ public:
 
 private:
     void manage(KWin::EffectWindow *w);
+    bool anyUserResize() const;
     void onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old);
     void onAboutToChange(KWin::EffectWindow *w);
     void onClosed(KWin::EffectWindow *w);

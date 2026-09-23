@@ -370,14 +370,14 @@ class ClientManager {
             ...Array.from(this.clientMap.keys()).filter(c => !this.floatingFocusOrder.includes(c)).reverse(),
         ];
         for (const kwinClient of candidates) {
-            if (this.isFloatingHere(kwinClient)) {
+            if (this.isFloatingOnCurrentDesktop(kwinClient)) {
                 return kwinClient;
             }
         }
         return null;
     }
 
-    private isFloatingHere(kwinClient: KwinClient) {
+    private isFloatingOnCurrentDesktop(kwinClient: KwinClient) {
         return this.isFloating(kwinClient) &&
             !kwinClient.minimized &&
             kwinClient.desktops.includes(Workspace.currentDesktop) &&
@@ -385,47 +385,36 @@ class ClientManager {
             kwinClient.output === Workspace.activeScreen;
     }
 
-    // niri's floating focus-left/right/up/down (floating.rs focus_directional): the floating window nearest in that
-    // direction, by the distance between centres along that axis; false if there is none
-    public focusFloatingInDirection(active: KwinClient, dx: number, dy: number) {
-        const frame = (c: KwinClient) => roundQtRect(c.frameGeometry);
-        const centre = (c: KwinClient) => ({ x: frame(c).x + frame(c).width / 2, y: frame(c).y + frame(c).height / 2 });
-        const from = centre(active);
+    // niri's focus-left/right/up/down in the floating layer: the nearest other floating window in that direction
+    // (by the distance between window centers); nothing happens if there is none, the focus doesn't leave the layer.
+    // Returns false when `active` is the only floating window, so a lone floating window (a game that could not
+    // be tiled, say) can still be left with the focus keys
+    public focusFloatingDirectional(active: KwinClient, dx: number, dy: number) {
+        let others = 0;
+        const center = (c: KwinClient) => {
+            const frame = c.frameGeometry;
+            return { x: frame.x + frame.width/2, y: frame.y + frame.height/2 };
+        };
+        const from = center(active);
         let best: KwinClient|null = null;
         let bestDistance = Infinity;
         for (const kwinClient of this.clientMap.keys()) {
-            if (kwinClient === active || !this.isFloatingHere(kwinClient)) {
+            if (kwinClient === active || !this.isFloatingOnCurrentDesktop(kwinClient)) {
                 continue;
             }
-            const to = centre(kwinClient);
-            const distance = dx !== 0 ? (to.x - from.x) * dx : (to.y - from.y) * dy;
+            others++;
+            const to = center(kwinClient);
+            const distance = dx * (to.x - from.x) + dy * (to.y - from.y);
             if (distance > 0 && distance < bestDistance) {
                 best = kwinClient;
                 bestDistance = distance;
             }
         }
-        if (best === null) {
-            return false;
+        if (best !== null) {
+            KiriFocus.mark(best);
+            Workspace.activeWindow = best;
         }
-        KiriFocus.mark(best);
-        Workspace.activeWindow = best;
-        return true;
-    }
-
-    // niri's floating focus-column-first/last: the leftmost or rightmost floating window
-    public focusFloatingExtreme(rightmost: boolean) {
-        let best: KwinClient|null = null;
-        for (const kwinClient of this.clientMap.keys()) {
-            if (this.isFloatingHere(kwinClient) && (best === null || (rightmost ? kwinClient.frameGeometry.x > best.frameGeometry.x : kwinClient.frameGeometry.x < best.frameGeometry.x))) {
-                best = kwinClient;
-            }
-        }
-        if (best === null) {
-            return false;
-        }
-        KiriFocus.mark(best);
-        Workspace.activeWindow = best;
-        return true;
+        return others > 0;
     }
 
     // niri moves floating windows by a fixed step, the window stays inside the work area

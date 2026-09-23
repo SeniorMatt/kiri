@@ -190,6 +190,10 @@ class Column {
         this.grid.desktop.recenterWhileResizing(this, this.grid.getLastFocusedColumn() === this);
     }
 
+    public isTopWindow(window: Window) {
+        return this.windows.getPrev(window) === null;
+    }
+
     // Karousel's keys that trade height with the neighbouring window; all heights become weights again afterwards
     public tradeWindowHeight(window: Window, heightDelta: number, top: boolean) {
         const otherWindow = top ? this.windows.getPrev(window) : this.windows.getNext(window);
@@ -204,14 +208,6 @@ class Column {
         }
 
         this.grid.desktop.onLayoutChanged();
-    }
-
-    // a window that is resized by dragging its edge: like niri's set-window-height it gets a fixed height
-    public adjustWindowHeight(window: Window, heightDelta: number, top: boolean) {
-        if ((top ? this.windows.getPrev(window) : this.windows.getNext(window)) === null) {
-            return; // the edge at the end of the column: nothing to take the space from
-        }
-        this.setFixedHeight(window, window.height + heightDelta, null);
     }
 
     // niri's convert_heights_to_auto: the weights keep the current heights, centred on the median height

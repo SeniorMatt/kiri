@@ -155,11 +155,12 @@ namespace ClientState {
                             );
                         }
                         if (newGeometry.height !== oldGeometry.height) {
-                            window.column.adjustWindowHeight(
-                                window,
-                                newGeometry.height - oldGeometry.height,
-                                newGeometry.y !== oldGeometry.y,
-                            );
+                            // like niri: the dragged window gets the height under the pointer and the rest of
+                            // the column shares what is left; the top edge of the first window does nothing
+                            const top = newGeometry.y !== oldGeometry.y;
+                            if (!(top && window.column.isTopWindow(window))) {
+                                window.column.setFixedHeight(window, newGeometry.height, null);
+                            }
                         }
                     });
                 } else if (
