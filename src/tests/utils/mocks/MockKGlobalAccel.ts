@@ -1,5 +1,6 @@
 class MockKGlobalAccel {
     public onPressed: ((name: string) => void)|null = null;
+    public onRepeated: ((name: string) => void)|null = null;
     public readonly registered = new Map<string, number[]>();
     public readonly lastFlags = new Map<string, number>();
     private readonly stored = new Map<string, number[]>(); // like kglobalshortcutsrc
@@ -37,5 +38,11 @@ class MockKGlobalAccel {
     public press(name: string) {
         Assert.assert(this.registered.has(name), { message: "unknown shortcut " + name });
         this.onPressed?.(name);
+    }
+
+    // a held key: kglobalacceld emits globalShortcutRepeated
+    public repeat(name: string) {
+        Assert.assert(this.registered.has(name), { message: "unknown shortcut " + name });
+        this.onRepeated?.(name);
     }
 }

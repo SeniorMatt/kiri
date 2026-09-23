@@ -12,6 +12,10 @@ namespace KiriFocus {
         time = Date.now();
     }
 
+    export function peek(kwinClient: KwinClient) {
+        return target === kwinClient && Date.now() - time <= validMs;
+    }
+
     export function take(kwinClient: KwinClient) {
         const result = target === kwinClient && Date.now() - time <= validMs;
         if (target === kwinClient) {

@@ -68,3 +68,21 @@ function parseKey(key: string) {
     }
     return undefined;
 }
+
+// KWin hands kglobalaccel the key a shortcut produces, with the Shift that was used to type it taken away
+// ("Meta+Shift+=" arrives as "Meta++", "Meta+Shift+-" as "Meta+_"), so on a US layout a key written with Shift and
+// a symbol key never matches. This is the form that does match (the original is registered too, for other layouts).
+const usShiftedSymbols: Record<string, string> = {
+    "1": "!", "2": "@", "3": "#", "4": "$", "5": "%", "6": "^", "7": "&", "8": "*", "9": "(", "0": ")",
+    "-": "_", "=": "+", "[": "{", "]": "}", ";": ":", "'": "\"", ",": "<", ".": ">", "/": "?", "\\": "|", "`": "~",
+};
+
+function shiftedSymbolVariant(code: number): number|undefined {
+    const shift = keyModifiers["shift"];
+    if ((code & shift) === 0) {
+        return undefined;
+    }
+    const key = code & 0x01ffffff;
+    const symbol = key >= 0x20 && key < 0x7f ? usShiftedSymbols[String.fromCharCode(key)] : undefined;
+    return symbol === undefined ? undefined : (code & ~shift & ~0x01ffffff) | symbol.charCodeAt(0);
+}

@@ -46,7 +46,19 @@ class World {
             log("failed to parse presetHeights:", error);
         }
 
+        // niri's floating layer takes the presets relative to the work area, without the gaps of the grid
+        let floatingPresetWidths = { getOrdered: (size: number): number[] => [] };
+        let floatingPresetHeights = { getOrdered: (size: number): number[] => [] };
+        try {
+            floatingPresetWidths = new PresetWidths(config.presetWidths, 0);
+            floatingPresetHeights = new PresetWidths(config.presetHeights, 0);
+        } catch (error: any) {
+            log("failed to parse the floating presets:", error);
+        }
+
         const actionsConfig = {
+            floatingPresetWidths: floatingPresetWidths,
+            floatingPresetHeights: floatingPresetHeights,
             manualScrollStep: config.manualScrollStep,
             columnWidthStep: config.columnWidthStep,
             windowHeightStep: config.windowHeightStep,
@@ -286,24 +298,28 @@ class World {
         this.doIfTiled(Workspace.activeWindow, f);
     }
 
-    // Focus keys: a floating window moves the focus to the nearest floating window in that direction like niri's
-    // floating layer does, anything else behaves like `doIfTiledFocusedOrEnterGrid`
+    // niri's two layers: when a floating window has the focus, the focus keys act on the floating layer only (`floating`
+    // runs, and if nothing is in that direction nothing happens), they never jump into the grid. Anything else
+    // runs `f` on the grid like `doIfTiledFocusedOrEnterGrid`. Only the floating/tiling switch keys cross the layers.
+    public doFocusLayered(
+        f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
+        floating: (clientManager: ClientManager, active: KwinClient) => void,
+    ) {
+        const active = Workspace.activeWindow;
+        // a full-screen window that is only floating because it could not be tiled (a game) can still be left
+        if (active !== null && this.clientManager.isFloating(active) && !active.fullScreen) {
+            this.do(clientManager => floating(clientManager, active));
+            return;
+        }
+        this.doIfTiledFocusedOrEnterGrid(f);
+    }
+
     public doFocusInDirection(
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
         dx: number,
         dy: number,
     ) {
-        const active = Workspace.activeWindow;
-        if (active !== null && this.clientManager.isFloating(active)) {
-            let handled = false;
-            this.do((clientManager, desktopManager) => {
-                handled = clientManager.focusFloatingDirectional(active, dx, dy);
-            });
-            if (handled) {
-                return;
-            }
-        }
-        this.doIfTiledFocusedOrEnterGrid(f);
+        this.doFocusLayered(f, (cm, active) => cm.focusFloatingDirectional(active, dx, dy));
     }
 
     // Like `doIfTiledFocused`, but when the focused window is not in the grid (floating, a full-screen game that
@@ -323,6 +339,20 @@ class World {
             return;
         }
         this.doIfTiled(active, f);
+    }
+
+    // Runs `f` for a tiled focused window; for a floating one `floating` runs instead (niri's floating layer
+    // answers the size keys too)
+    public doIfTiledFocusedOrFloating(
+        f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
+        floating: (clientManager: ClientManager, active: KwinClient) => void,
+    ) {
+        const active = Workspace.activeWindow;
+        if (active !== null && this.clientManager.isFloating(active)) {
+            this.do(clientManager => floating(clientManager, active));
+            return;
+        }
+        this.doIfTiledFocused(f);
     }
 
     // Runs `f` for a tiled focused window; a floating focused window is moved by (dx, dy) instead

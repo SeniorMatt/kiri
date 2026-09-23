@@ -1,4 +1,4 @@
-tests.register("Focus keys leave a window that is not in the grid", 6, () => {
+tests.register("Focus keys do not leave the floating layer (niri); the switch key does", 6, () => {
     for (const key of ["focus-left", "focus-right", "focus-up", "focus-down", "focus-next", "focus-previous"]) {
         const { qtMock, workspaceMock } = init(getDefaultConfig());
         const [a, b, game] = workspaceMock.createClients(3);
@@ -7,6 +7,8 @@ tests.register("Focus keys leave a window that is not in the grid", 6, () => {
         workspaceMock.activeWindow = b;
         workspaceMock.activeWindow = game;
         qtMock.fireShortcut(key);
+        Assert.equal(workspaceMock.activeWindow, game, { message: key });
+        qtMock.fireShortcut("window-switch-focus-floating-tiling");
         Assert.equal(workspaceMock.activeWindow, b, { message: key });
     }
 });
@@ -17,10 +19,10 @@ tests.register("Full-screen window that cannot be resized is tiled once it is fu
     const game = new MockKwinClient(new MockQmlRect(100, 100, 400, 300));
     game.fixedSize = true;
     workspaceMock.createWindows(game);
-    // not tileable while it is a fixed-size window, but the focus keys still lead out of it
+    // not tileable while it is a fixed-size window: like any floating window, only the switch key leads out of it
     qtMock.fireShortcut("focus-left");
-    Assert.equal(workspaceMock.activeWindow, a);
-    qtMock.fireShortcut("focus-right");
+    Assert.equal(workspaceMock.activeWindow, game);
+    qtMock.fireShortcut("window-switch-focus-floating-tiling");
     Assert.equal(workspaceMock.activeWindow, a);
 
     workspaceMock.activeWindow = game;

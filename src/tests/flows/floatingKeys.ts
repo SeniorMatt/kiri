@@ -167,3 +167,132 @@ tests.register("Focus keys move between floating windows like niri", 1, () => {
     qtMock.fireShortcut("window-switch-focus-floating-tiling");
     Assert.equal(workspaceMock.activeWindow, tiled);
 });
+
+tests.register("A held key repeats move keys but not toggles", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const accel = kglobalaccel as MockKGlobalAccel;
+    const [tiled, floating] = workspaceMock.createClientsWithFrames(
+        new MockQmlRect(0, 0, 100, 100), new MockQmlRect(500, 300, 100, 100));
+    workspaceMock.activeWindow = floating;
+    qtMock.fireShortcut("window-toggle-floating");
+    workspaceMock.activeWindow = floating;
+    const x = () => Math.round(floating.getFrameGeometryCopy().x);
+    const start = x();
+    for (let i = 0; i < 3; i++) {
+        accel.repeat("column-move-left");
+    }
+    Assert.equal(x(), start - 150);
+    accel.repeat("window-toggle-floating"); // does not repeat
+    Assert.equal(x(), start - 150);
+    accel.repeat("window-toggle-floating");
+    workspaceMock.activeWindow = floating;
+    accel.repeat("column-move-right");
+    Assert.equal(x(), start - 100, { message: "still floating" });
+});
+
+tests.register("Focus keys stay in their layer (niri)", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [tiledA, tiledB, floatA, floatB] = workspaceMock.createClientsWithFrames(
+        new MockQmlRect(0, 0, 100, 100), new MockQmlRect(0, 0, 100, 100),
+        new MockQmlRect(100, 300, 100, 100), new MockQmlRect(400, 300, 100, 100));
+    for (const client of [floatA, floatB]) {
+        workspaceMock.activeWindow = client;
+        qtMock.fireShortcut("window-toggle-floating");
+    }
+    const fire = (name: string) => qtMock.fireShortcut(name);
+    floatA.frameGeometry = new MockQmlRect(100, 300, 100, 100);
+    floatB.frameGeometry = new MockQmlRect(400, 300, 100, 100);
+
+    // from a floating window: only floating windows, nothing happens when there is none that way
+    workspaceMock.activeWindow = floatA;
+    fire("focus-left");
+    Assert.equal(workspaceMock.activeWindow, floatA);
+    fire("focus-right");
+    Assert.equal(workspaceMock.activeWindow, floatB);
+    fire("focus-right");
+    Assert.equal(workspaceMock.activeWindow, floatB, { message: "does not jump into the grid" });
+    fire("focus-start");
+    Assert.equal(workspaceMock.activeWindow, floatA);
+    fire("focus-column-left-or-last");
+    Assert.equal(workspaceMock.activeWindow, floatB, { message: "left of the first wraps to the last" });
+    fire("focus-window-in-column-1");
+    Assert.equal(workspaceMock.activeWindow, floatB, { message: "no-op in the floating layer" });
+    fire("focus-next");
+    Assert.equal(workspaceMock.activeWindow, floatB);
+
+    // from a tiled window the floating ones are never reached
+    workspaceMock.activeWindow = tiledA;
+    for (const name of ["focus-right", "focus-right", "focus-left", "focus-down", "focus-up", "focus-end", "focus-start",
+        "focus-column-right-or-first", "focus-column-left-or-last", "focus-next", "focus-previous"]) {
+        fire(name);
+        Assert.assert(workspaceMock.activeWindow === tiledA || workspaceMock.activeWindow === tiledB, { message: name + " reached a floating window" });
+    }
+
+    // the switch keys cross the layers
+    fire("window-switch-focus-floating-tiling");
+    Assert.assert(workspaceMock.activeWindow === floatA || workspaceMock.activeWindow === floatB);
+    fire("window-switch-focus-floating-tiling");
+    Assert.assert(workspaceMock.activeWindow === tiledA || workspaceMock.activeWindow === tiledB);
+});
+
+tests.register("A lone floating window is not left with the focus keys", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [tiled, floating] = workspaceMock.createClients(2);
+    workspaceMock.activeWindow = floating;
+    qtMock.fireShortcut("window-toggle-floating");
+    workspaceMock.activeWindow = floating;
+    for (const name of ["focus-left", "focus-right", "focus-up", "focus-down", "focus-start", "focus-end"]) {
+        qtMock.fireShortcut(name);
+        Assert.equal(workspaceMock.activeWindow, floating, { message: name });
+    }
+    qtMock.fireShortcut("window-switch-focus-floating-tiling");
+    Assert.equal(workspaceMock.activeWindow, tiled);
+});
+
+tests.register("Size keys resize floating windows like niri", 1, () => {
+    const config = getDefaultConfig();
+    config.presetWidths = "25%, 50%, 100%";
+    config.presetHeights = "25%, 50%";
+    const { qtMock, workspaceMock } = init(config);
+    const [tiled, floating] = workspaceMock.createClients(2);
+    workspaceMock.activeWindow = floating;
+    qtMock.fireShortcut("window-toggle-floating");
+    workspaceMock.activeWindow = floating;
+    floating.frameGeometry = new MockQmlRect(200, 100, 300, 200);
+    const size = () => {
+        const f = floating.getFrameGeometryCopy();
+        return [Math.round(f.x), Math.round(f.y), Math.round(f.width), Math.round(f.height)];
+    };
+    const tiledBefore = tiled.getFrameGeometryCopy();
+
+    // presets are shares of the work area (no gaps), the top-left corner stays
+    qtMock.fireShortcut("cycle-preset-widths"); // 300 is taller than 25% of 1600? depends on the screen: first preset above it
+    const first = size();
+    Assert.equal(first[0], 200);
+    Assert.equal(first[1], 100);
+    Assert.equal(first[3], 200);
+    const w1 = first[2];
+    qtMock.fireShortcut("cycle-preset-widths");
+    Assert.assert(size()[2] !== w1, { message: "next preset" });
+    qtMock.fireShortcut("cycle-preset-widths-reverse");
+    Assert.equal(size()[2], w1, { message: "back to the same preset" });
+
+    // set-column-width / set-window-height +-10% of the work area
+    const [, , w, h] = size();
+    qtMock.fireShortcut("column-width-increase");
+    Assert.assert(size()[2] > w);
+    qtMock.fireShortcut("window-height-decrease");
+    Assert.assert(size()[3] < h);
+    qtMock.fireShortcut("window-height-increase");
+    Assert.equal(size()[3], h);
+    qtMock.fireShortcut("window-height-cycle-presets");
+    const h1 = size()[3];
+    qtMock.fireShortcut("window-height-cycle-presets");
+    Assert.assert(size()[3] !== h1);
+    // reset-window-height does nothing for floating windows in niri
+    qtMock.fireShortcut("window-height-reset");
+    Assert.assert(size()[3] !== h);
+
+    // the tiled layout is left alone
+    Assert.equalRects(tiled.getFrameGeometryCopy(), tiledBefore);
+});

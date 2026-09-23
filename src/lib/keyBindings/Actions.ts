@@ -464,6 +464,19 @@ class Actions {
         desktop.autoAdjustScroll();
     };
 
+    // the same keys on a floating window (niri's floating layer): sizes relative to the work area
+    public readonly floatingSizeStep = (horizontal: boolean, percent: number, cm: ClientManager, active: KwinClient) => {
+        cm.adjustFloatingSize(active, horizontal, percent);
+    };
+
+    public readonly floatingSizePreset = (horizontal: boolean, forwards: boolean, cm: ClientManager, active: KwinClient) => {
+        const area = Workspace.clientArea(ClientAreaOption.PlacementArea, active.output, Clients.getKwinDesktopApprox(active));
+        const presets = horizontal ?
+            this.config.floatingPresetWidths.getOrdered(area.width) :
+            this.config.floatingPresetHeights.getOrdered(area.height);
+        cm.cycleFloatingSizePreset(active, horizontal, forwards, presets);
+    };
+
     // niri's set-window-height "+10%" / "-10%"
     public readonly windowHeightStep = (percent: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         const full = grid.desktop.tilingArea.height + grid.config.gapsInnerVertical;
@@ -932,6 +945,8 @@ class Actions {
 namespace Actions {
     export interface Config {
         manualScrollStep: number;
+        floatingPresetWidths: { getOrdered(size: number): number[] };
+        floatingPresetHeights: { getOrdered(size: number): number[] };
         columnWidthStep: number;
         windowHeightStep: number;
         presetWidths: {

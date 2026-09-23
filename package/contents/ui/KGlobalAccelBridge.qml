@@ -7,6 +7,8 @@ QtObject {
     id: bridge
 
     property var onPressed: null
+    // key auto-repeat of a held shortcut: KWin (6.5+) sends it to kglobalacceld, which emits globalShortcutRepeated
+    property var onRepeated: null
 
     function wrap(type, value) {
         switch (type) {
@@ -56,6 +58,12 @@ QtObject {
         function dbusglobalShortcutPressed(component, shortcut, timestamp) {
             if (bridge.onPressed !== null) {
                 bridge.onPressed(String(shortcut));
+            }
+        }
+
+        function dbusglobalShortcutRepeated(component, shortcut, timestamp) {
+            if (bridge.onRepeated !== null) {
+                bridge.onRepeated(String(shortcut));
             }
         }
     }

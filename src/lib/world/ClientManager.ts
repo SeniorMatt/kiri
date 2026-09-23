@@ -312,7 +312,21 @@ class ClientManager {
         return this.clientMap.has(kwinClient);
     }
 
+    // Kiri warped the cursor to this tiled window just now (see onClientFocused)
+    private warpedToTiled: { client: KwinClient, time: number }|null = null;
+
     public onClientFocused(kwinClient: KwinClient) {
+        // With focus follows mouse, the warp to a tiled window that sits under a floating window (which is always on
+        // top) makes KWin focus the floating one. Floating and tiled windows only swap focus with the switch key
+        // (niri's layers), so a floating window that gets the focus right after the warp, not from Kiri, gives it back.
+        const warped = this.warpedToTiled;
+        this.warpedToTiled = null;
+        if (warped !== null && warped.client !== kwinClient && Date.now() - warped.time < 800 &&
+            this.isFloating(kwinClient) && !KiriFocus.peek(kwinClient) && this.clientMap.has(warped.client)) {
+            KiriFocus.mark(warped.client);
+            Workspace.activeWindow = warped.client;
+            return;
+        }
         this.lastFocusedClient = kwinClient;
         this.focusStamps.set(kwinClient, ++this.focusCounter);
         // Like niri, only focus changes made by Kiri move the cursor, never pointer focus or an app activating
@@ -330,6 +344,9 @@ class ClientManager {
             window.onFocused();
         }
         if (warp && (window !== null || this.isFloating(kwinClient))) {
+            if (window !== null) {
+                this.warpedToTiled = { client: kwinClient, time: Date.now() };
+            }
             moveCursorToFocus.call();
         }
     }
@@ -386,9 +403,8 @@ class ClientManager {
     }
 
     // niri's focus-left/right/up/down in the floating layer: the nearest other floating window in that direction
-    // (by the distance between window centers); nothing happens if there is none, the focus doesn't leave the layer.
-    // Returns false when `active` is the only floating window, so a lone floating window (a game that could not
-    // be tiled, say) can still be left with the focus keys
+    // (by the distance between window centers); nothing happens if there is none, the focus doesn't leave the layer
+    // (only the floating/tiling switch keys cross the layers). Returns whether the focus moved.
     public focusFloatingDirectional(active: KwinClient, dx: number, dy: number) {
         let others = 0;
         const center = (c: KwinClient) => {
@@ -414,7 +430,28 @@ class ClientManager {
             KiriFocus.mark(best);
             Workspace.activeWindow = best;
         }
-        return others > 0;
+        return best !== null;
+    }
+
+    // niri's focus_leftmost/rightmost/topmost/bottommost of the floating layer (by the windows' top-left corners)
+    public focusFloatingExtreme(active: KwinClient, edge: "left"|"right"|"top"|"bottom") {
+        let best: KwinClient|null = null;
+        let bestValue = Infinity;
+        for (const kwinClient of this.clientMap.keys()) {
+            if (!this.isFloatingOnCurrentDesktop(kwinClient)) {
+                continue;
+            }
+            const frame = kwinClient.frameGeometry;
+            const value = edge === "left" ? frame.x : edge === "right" ? -frame.x : edge === "top" ? frame.y : -frame.y;
+            if (value < bestValue) {
+                best = kwinClient;
+                bestValue = value;
+            }
+        }
+        if (best !== null && best !== active) {
+            KiriFocus.mark(best);
+            Workspace.activeWindow = best;
+        }
     }
 
     // niri moves floating windows by a fixed step, the window stays inside the work area
@@ -431,6 +468,80 @@ class ClientManager {
         const y = Math.max(area.y, Math.min(frame.y.round() + dy, rectBottom(area) - height));
         client.place(x, y, width, height);
         return true;
+    }
+
+    // niri's floating layer resizes a window by size changes relative to the work area; the top-left corner stays
+    // (the position is only pulled back so that at least a part of the window is on screen, like niri does)
+    private resizeFloatingClient(kwinClient: KwinClient, horizontal: boolean, size: number) {
+        const client = this.clientMap.get(kwinClient);
+        if (client === undefined) {
+            return;
+        }
+        const area = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
+        const frame = kwinClient.frameGeometry;
+        const min = horizontal ? kwinClient.minSize.width.ceil() : kwinClient.minSize.height.ceil();
+        const max = horizontal ? kwinClient.maxSize.width.floor() : kwinClient.maxSize.height.floor();
+        size = Math.max(1, Math.round(size));
+        if (max > 0) {
+            size = Math.min(size, max);
+        }
+        size = Math.max(size, min);
+        const width = horizontal ? size : frame.width.round();
+        const height = horizontal ? frame.height.round() : size;
+        // niri's Data::recompute_logical_pos: at least a quarter of the window (10..75 px) stays on screen
+        const minOnScreenX = Math.min(Math.max(width / 4, 10), 75);
+        const minOnScreenY = Math.min(Math.max(height / 4, 10), 75);
+        const x = Math.min(Math.max(frame.x.round(), area.x - (width - minOnScreenX)), rectRight(area) - minOnScreenX);
+        const y = Math.min(Math.max(frame.y.round(), area.y - (height - minOnScreenY)), rectBottom(area) - minOnScreenY);
+        client.place(x, y, width, height);
+    }
+
+    private floatingAreaSize(kwinClient: KwinClient, horizontal: boolean) {
+        const area = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
+        return horizontal ? area.width : area.height;
+    }
+
+    private readonly floatingPresetIndex = { width: new Map<KwinClient, number>(), height: new Map<KwinClient, number>() };
+
+    // niri's set-column-width / set-window-height "+10%" on a floating window: the size changes by a share of the work area
+    public adjustFloatingSize(kwinClient: KwinClient, horizontal: boolean, percent: number) {
+        const available = this.floatingAreaSize(kwinClient, horizontal);
+        const frame = kwinClient.frameGeometry;
+        const current = horizontal ? frame.width : frame.height;
+        (horizontal ? this.floatingPresetIndex.width : this.floatingPresetIndex.height).delete(kwinClient);
+        this.resizeFloatingClient(kwinClient, horizontal, current + available * percent / 100);
+    }
+
+    // niri's switch-preset-column-width / switch-preset-window-height on a floating window (Floating::toggle_window_width):
+    // a window that was set to a preset goes to the next one, otherwise to the first preset larger than it
+    // (the last smaller one when going back). `presets` are the sizes in pixels in the configured order.
+    public cycleFloatingSizePreset(kwinClient: KwinClient, horizontal: boolean, forwards: boolean, presets: number[]) {
+        const len = presets.length;
+        if (len === 0) {
+            return;
+        }
+        const indices = horizontal ? this.floatingPresetIndex.width : this.floatingPresetIndex.height;
+        const frame = kwinClient.frameGeometry;
+        const current = horizontal ? frame.width : frame.height;
+        let index = indices.get(kwinClient);
+        if (index !== undefined && index < len) {
+            index = (index + (forwards ? 1 : len - 1)) % len;
+        } else if (forwards) {
+            index = presets.findIndex(preset => current + 1 < preset);
+            if (index < 0) {
+                index = 0;
+            }
+        } else {
+            index = len - 1;
+            for (let i = len - 1; i >= 0; i--) {
+                if (presets[i] + 1 < current) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        this.resizeFloatingClient(kwinClient, horizontal, presets[index]);
+        indices.set(kwinClient, index);
     }
 
     public findTiledWindow(kwinClient: KwinClient) {

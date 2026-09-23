@@ -53,6 +53,20 @@ function getShortcuts(world: World, actions: Actions): Shortcut[] {
     return shortcuts;
 }
 
+// Holding a key repeats its action like in niri (binds repeat by default there). Close, overview and the toggles
+// do not repeat (niri's default config has repeat=false for close-window), a held key would flip them back and forth.
+const NO_REPEAT = new Set([
+    "window-close", "overview", "window-toggle-floating", "window-toggle-fullscreen", "window-move-to-floating",
+    "window-move-to-tiling", "column-toggle-tabbed", "column-display-normal", "column-display-tabbed",
+    "column-width-maximize", "column-width-expand", "window-maximize-to-edges", "window-switch-focus-floating-tiling",
+    "desktop-previous-used", "screen-switch",
+]);
+
+// Actions that had no default keys in earlier versions (kglobalacceld stored them as "no key" and never applies a new default)
+const GAINED_DEFAULT_KEYS = new Set([
+    "window-height-cycle-presets", "window-height-reset", "column-width-expand", "cycle-preset-widths-reverse",
+]);
+
 namespace KGlobalAccel {
     export const path = "/kglobalaccel";
     export const iface = "org.kde.KGlobalAccel";
@@ -130,6 +144,15 @@ class KeyBindings {
             const userKeys = parseKeys(shortcutKeys[shortcut.name] ?? []);
             const flags = userKeys.length > 0 ? KGlobalAccel.setPresent | KGlobalAccel.noAutoloading : KGlobalAccel.setPresent;
             KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, userKeys.length > 0 ? userKeys : defaultKeys, flags], (keys: number[]|undefined) => {
+                if (userKeys.length === 0 && defaultKeys.length > 0 && (keys ?? []).length === 0 && GAINED_DEFAULT_KEYS.has(shortcut.name)) {
+                    // kglobalacceld keeps what it stored, and older versions stored "no key" for these actions
+                    // (their default keys came later), so the default never took effect: set it once more
+                    KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.setPresent | KGlobalAccel.noAutoloading], (newKeys: number[]|undefined) => {
+                        for (const key of newKeys ?? []) {
+                            this.activeKeys.add(key);
+                        }
+                    });
+                }
                 for (const key of keys ?? []) {
                     this.activeKeys.add(key);
                 }
@@ -151,6 +174,11 @@ class KeyBindings {
             this.actions.set(shortcut.name, catchWrap(shortcut.action));
         }
         kglobalaccel.onPressed = (name: string) => this.actions.get(name)?.();
+        kglobalaccel.onRepeated = (name: string) => {
+            if (!NO_REPEAT.has(name)) {
+                this.actions.get(name)?.();
+            }
+        };
         return shortcuts;
     }
 
@@ -193,6 +221,7 @@ class KeyBindings {
         this.destroyed = true;
         this.priorityDelayer.destroy();
         kglobalaccel.onPressed = null;
+        kglobalaccel.onRepeated = null;
         for (const name of this.actions.keys()) {
             KGlobalAccel.call("setInactive", ["as"], [[KGlobalAccel.component, name, "", ""]]);
         }
@@ -212,6 +241,10 @@ function parseKeys(keySequences: string[]) {
             continue;
         }
         keys.push(key);
+        const variant = shiftedSymbolVariant(key);
+        if (variant !== undefined) {
+            keys.push(variant);
+        }
     }
     return keys;
 }

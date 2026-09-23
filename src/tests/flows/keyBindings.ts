@@ -67,3 +67,14 @@
         Assert.equal(Workspace.currentDesktop, Workspace.desktops[0]);
     });
 }
+
+tests.register("Shift with a symbol key is also registered the way KWin reports it", 1, () => {
+    init(getDefaultConfig());
+    const registered = (kglobalaccel as MockKGlobalAccel).registered;
+    const meta = 0x10000000;
+    const shift = 0x02000000;
+    const keys = registered.get("window-height-increase")!;
+    Assert.assert(keys.includes(meta | shift | "=".charCodeAt(0)), { message: "as written" });
+    Assert.assert(keys.includes(meta | "+".charCodeAt(0)), { message: "Meta++, what KWin sends for Shift+=" });
+    Assert.assert(registered.get("window-height-decrease")!.includes(meta | "_".charCodeAt(0)));
+});

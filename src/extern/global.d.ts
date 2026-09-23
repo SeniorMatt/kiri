@@ -8,5 +8,6 @@ declare const notificationInvalidPresetWidths: Notification;
 declare const moveCursorToFocus: DBusCall;
 declare const kglobalaccel: {
     onPressed: ((name: string) => void)|null;
+    onRepeated: ((name: string) => void)|null;
     call(path: string, iface: string, member: string, types: string[], args: unknown[], resolve: (value: any) => void): void;
 };
