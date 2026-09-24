@@ -43,7 +43,7 @@ if $build && [ -d "$cpp" ]; then
     if cmake -S "$cpp" -B "$builddir" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr >"$builddir/log.txt" 2>&1 &&
         cmake --build "$builddir" -j "$(nproc)" >>"$builddir/log.txt" 2>&1; then
         # let KWin let go of the old plugins before replacing the files
-        for e in kiri_decorations kiri_desktop_switch kiri_motion; do
+        for e in kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe; do
             qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
         done
         # remove first: a new file instead of overwriting one KWin may have mapped
@@ -82,6 +82,11 @@ if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key effec
     w Plugins slideEnabled false
     w Kiri-install effectsEnabled done
 fi
+if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key swipeEnabled)" != done ]; then
+    # added in 0.9.1: turned on once, also for people who installed an older version
+    w Plugins kiri_swipeEnabled true
+    w Kiri-install swipeEnabled done
+fi
 if $compiled; then
     # kiri_motion does what the kiri_animations script effect does, with niri's springs, open/close and cross-faded
     # resizes; kiri_animations is only installed as the fallback where the compiled effects can't be built.
@@ -94,6 +99,15 @@ if $compiled; then
         done
         w Kiri-install motionEnabled done
     fi
+fi
+# focus follows the mouse like in niri: Kiri does it itself (it pauses while a Plasma popup such as the launcher is
+# open, which KWin's own focus-follows-mouse can't), so KWin goes to "Click to focus". The old policy is kept once
+# and uninstall.sh puts it back.
+if [ "$(kreadconfig6 --file kwinrc --group Script-kiri --key focusFollowsMouse --default true)" = true ]; then
+    if [ -z "$(kreadconfig6 --file kwinrc --group Kiri-install --key focusPolicyBefore)" ]; then
+        w Kiri-install focusPolicyBefore "$(kreadconfig6 --file kwinrc --group Windows --key FocusPolicy --default ClickToFocus)"
+    fi
+    w Windows FocusPolicy ClickToFocus
 fi
 # Plasma's "Geometry change" effect also animates every frame change and fights kiri_animations (windows
 # jump back and forth), so it goes off
@@ -120,7 +134,7 @@ if qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1; then
                 qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
         done
     fi
-    for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion; do
+    for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe; do
         qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
         # only the ones that are switched on (the script effect is the fallback and stays off beside kiri_motion)
         [ "$(kreadconfig6 --file kwinrc --group Plugins --key ${e}Enabled)" = false ] && continue

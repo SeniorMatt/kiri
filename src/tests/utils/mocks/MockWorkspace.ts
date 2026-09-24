@@ -18,6 +18,8 @@ class MockWorkspace {
     public readonly windowAdded = new MockQSignal<[KwinClient]>();
     public readonly windowRemoved = new MockQSignal<[KwinClient]>();
     public readonly windowActivated = new MockQSignal<[KwinClient|null]>();
+    public readonly cursorPosChanged = new MockQSignal<[]>();
+    public readonly stackingOrder: KwinClient[] = [];
     public readonly screensChanged = new MockQSignal<[]>();
     public readonly activitiesChanged = new MockQSignal<[]>();
     public readonly desktopsChanged = new MockQSignal<[]>();
@@ -104,6 +106,7 @@ class MockWorkspace {
             if (delta.y !== 0) {
                 frame.y += delta.y;
             }
+            this.cursorPos = new MockQmlPoint(this.cursorPos.x + delta.x, this.cursorPos.y + delta.y); // the pointer drags the window
             runOneOf(
                 () => window.getActualFrameGeometry().set(frame),
                 () => window.frameGeometry = frame,

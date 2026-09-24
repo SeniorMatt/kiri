@@ -13,6 +13,7 @@ interface LayoutConfig {
     reMaximize: boolean;
     tileMaximized: boolean;
     tileFullScreen: boolean;
+    hideTitlebars: boolean;
     skipSwitcher: boolean;
     tiledKeepBelow: boolean;
     maximizedKeepAbove: boolean;

@@ -6,7 +6,7 @@ namespace ClientState {
         private static readonly maxExternalFrameGeometryChangedIntervalMs = 1000;
 
         constructor(world: World, client: ClientWrapper, grid: Grid) {
-            this.defaultState = { skipSwitcher: client.kwinClient.skipSwitcher };
+            this.defaultState = { skipSwitcher: client.kwinClient.skipSwitcher, noBorder: client.kwinClient.noBorder };
             Tiled.prepareClientForTiling(client, grid.config);
 
             const previousColumn = grid.getLastFocusedColumn();
@@ -76,15 +76,18 @@ namespace ClientState {
             let resizing = false;
             let resizeStartWidth = 0;
             let resizeNeighbor: { column: Column, startWidth: number } | undefined;
+            let dragStart: { x: number, y: number } | null = null;
+            let dragLimit = 0;
+            let dragHome = { x: 0, y: 0 };
             manager.connect(kwinClient.interactiveMoveResizeStarted, () => {
                 if (kwinClient.move) {
                     if (config.untileOnDrag) {
-                        world.do((clientManager, desktopManager) => {
-                            clientManager.floatForDrag(client);
-                        });
-                    } else {
-                        moving = true;
+                        // niri: the window stays in the grid until the pointer has travelled 256 px, then it follows the pointer
+                        dragStart = { x: Workspace.cursorPos.x, y: Workspace.cursorPos.y };
+                        dragHome = { x: kwinClient.frameGeometry.x, y: kwinClient.frameGeometry.y };
+                        dragLimit = ClientManager.dragStartDistance;
                     }
+                    moving = true;
                     return;
                 }
 
@@ -105,6 +108,8 @@ namespace ClientState {
             });
 
             manager.connect(kwinClient.interactiveMoveResizeFinished, () => {
+                dragStart = null;
+                setVisualPosition(String(kwinClient.internalId), null);
                 if (moving) {
                     moving = false;
                     world.do(() => window.column.grid.desktop.onLayoutChanged()); // move the dragged window back to its position
@@ -123,6 +128,26 @@ namespace ClientState {
                     world.do((clientManager, desktopManager) => {
                         clientManager.pinClient(kwinClient);
                     });
+                    return;
+                }
+
+                if (dragStart !== null) {
+                    const dx = Workspace.cursorPos.x - dragStart.x;
+                    const dy = Workspace.cursorPos.y - dragStart.y;
+                    const squared = dx * dx + dy * dy;
+                    if (squared >= dragLimit * dragLimit) {
+                        dragStart = null;
+                        moving = false;
+                        world.do((clientManager, desktopManager) => {
+                            clientManager.floatForDrag(client);
+                        });
+                    } else {
+                        // niri's rubber band (limit 0.5, stiffness 1): KWin moves the window with the pointer, the effect
+                        // paints it at (1 - 1 / (2x + 1)) / 2 of the travel, x = squared distance / threshold squared
+                        const x = squared / (dragLimit * dragLimit);
+                        const factor = (1 - 1 / (2 * x + 1)) / 2;
+                        setVisualPosition(String(kwinClient.internalId), [Math.round(dragHome.x + dx * factor), Math.round(dragHome.y + dy * factor)]);
+                    }
                     return;
                 }
 
@@ -167,7 +192,10 @@ namespace ClientState {
                     !window.column.grid.isUserResizing() &&
                     !client.isManipulatingGeometry(newGeometry) &&
                     client.getMaximizedMode() === MaximizedMode.Unmaximized &&
-                    !Clients.isFullScreenGeometry(kwinClient) // not using `kwinClient.fullScreen` because it may not be set yet at this point
+                    // Without a title bar the client area is the whole frame, so a screen-sized frame looks like full-screen
+                    // geometry even when the window has just left full-screen mode (KWin can still restore a screen-sized
+                    // frame then); KWin sets the full-screen flag before the frame of a window that enters it.
+                    (!Clients.isFullScreenGeometry(kwinClient) || (config.hideTitlebars && !kwinClient.fullScreen)) // not using `kwinClient.fullScreen` because it may not be set yet at this point
                 ) {
                     if (externalFrameGeometryChangedRateLimiter.acquire()) {
                         world.do(() => window.onFrameGeometryChanged());
@@ -184,7 +212,18 @@ namespace ClientState {
                     }
 
                     window.onFullScreenChanged(kwinClient.fullScreen);
+                    // KWin brings the title bar back when a window leaves full-screen mode
+                    if (config.hideTitlebars && !kwinClient.fullScreen) {
+                        client.setNoBorder(true);
+                    }
                 });
+                // The pass above has placed the window at its slot. Leaving full-screen mode can leave the pointer
+                // over a neighbour or in a gap, where focus-follows-mouse takes the focus away at the next pointer
+                // movement; the pointer goes with the window.
+                if (!kwinClient.fullScreen && Workspace.activeWindow === kwinClient &&
+                    !rectContainsPoint(roundQtRect(kwinClient.frameGeometry), Workspace.cursorPos)) {
+                    moveCursorToFocus.call();
+                }
             });
 
             manager.connect(kwinClient.tileChanged, () => {
@@ -227,6 +266,9 @@ namespace ClientState {
             if (config.skipSwitcher) {
                 client.kwinClient.skipSwitcher = true;
             }
+            if (config.hideTitlebars) {
+                client.setNoBorder(true);
+            }
 
             if (client.kwinClient.fullScreen && !config.tileFullScreen) {
                 if (config.maximizedKeepAbove) {
@@ -256,6 +298,9 @@ namespace ClientState {
                 client.kwinClient.opacity = 1.0;
             }
             client.setFullScreen(false);
+            if (config.hideTitlebars) {
+                client.setNoBorder(defaultState.noBorder);
+            }
             if (client.kwinClient.tile === null) {
                 client.setMaximize(false, false);
             }
@@ -266,6 +311,7 @@ namespace ClientState {
     namespace Tiled {
         export interface WindowState {
             skipSwitcher: boolean;
+            noBorder: boolean;
         }
     }
 }

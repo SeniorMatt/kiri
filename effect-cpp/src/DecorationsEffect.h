@@ -84,6 +84,7 @@ public:
     void reconfigure(ReconfigureFlags flags) override;
     void prePaintScreen(KWin::ScreenPrePaintData &data) override;
     void postPaintScreen() override;
+    bool paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, int mask, const KWin::Region &deviceRegion, KWin::LogicalOutput *screen) override;
     void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data) override;
     bool drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data) override;
 
@@ -100,6 +101,8 @@ public Q_SLOTS:
     // where Kiri wants windows painted while KWin's interactive resize owns their real position:
     // {"{uuid}": [x, y], ...} (absolute frame position, so it stays right whatever KWin does meanwhile)
     Q_SCRIPTABLE void setVisualPositions(const QString &json);
+    // niri's insert hint while a window is dragged: {"r": [x, y, w, h] (screen coordinates), "w": "{uuid}" of the dragged window}, or "null"
+    Q_SCRIPTABLE void setInsertHint(const QString &json);
     // re-read Kiri's settings: KWin's settings page writes them without telling anyone, Kiri calls this after
     Q_SCRIPTABLE void reloadSettings(const QString &unused);
 
@@ -128,6 +131,9 @@ private:
     QList<TabGroup> m_tabGroups;
     QHash<QUuid, int> m_tabGroupOf;
     QHash<QUuid, QPointF> m_visualPositions;
+    KWin::RectF m_insertHint; // empty = none
+    QUuid m_hintWindow;       // the window being dragged
+    void drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion);
     // where each window's ring/border was last drawn: repainted when it moves, or the old one stays as a trail
     QHash<KWin::EffectWindow *, KWin::RectF> m_painted;
     void repaintPainted(KWin::EffectWindow *w);

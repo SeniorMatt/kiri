@@ -124,6 +124,17 @@ class ClientWrapper {
         });
     }
 
+    // The frame geometry is what Kiri places, so a window without a title bar gets exactly the size of its slot
+    // (the client area then equals the frame). KWin ignores the change while the window is full-screen.
+    public setNoBorder(noBorder: boolean) {
+        if (this.kwinClient.noBorder === noBorder) {
+            return;
+        }
+        this.manipulatingGeometry.do(() => {
+            this.kwinClient.noBorder = noBorder;
+        });
+    }
+
     public getMaximizedMode() {
         return this.maximizedMode;
     }

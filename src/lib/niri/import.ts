@@ -410,6 +410,7 @@ namespace NiriImport {
             }
         }
 
+        out["hideTitlebars"] = Kdl.find(nodes, "prefer-no-csd").length > 0;
         for (const block of Kdl.find(nodes, "input")) {
             if (Kdl.child(block, "warp-mouse-to-focus")) {
                 out["cursorFollowsFocus"] = true;

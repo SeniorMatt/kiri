@@ -17,6 +17,8 @@
 #include "effect/effect.h"
 #include "effect/effectwindow.h"
 #include "SpringMotion.h"
+#include "input_event_spy.h"
+#include "../common/NiriSwipe.h"
 #include "effect/timeline.h"
 
 #include <QObject>
@@ -72,6 +74,10 @@ public:
     void windowDeleted(EffectWindow *w);
     void finishedSwitching();
     QPointF visualPosition() const;
+    // niri's workspace switch swipe: follow the fingers to a (fractional) row of the desktop grid, then
+    // spring to a row with the release velocity
+    void niriGesture(double row);
+    void startNiriAnimation(double fromRow, int toRow, double velocity);
 
 private:
     QPoint getDrawCoords(QPointF pos, LogicalOutput *screen);
@@ -103,6 +109,10 @@ private:
     QPointF m_endPos;
 
     QPointF m_gesturePos;
+    NiriAnim::Spring m_niriSpring;
+    bool m_niriAnim = false;
+    double m_niriElapsed = 0.0; // seconds
+    double m_niriX = 0.0;
     // where the desktops were on screen relative to the gesture start desktop when the fingers came down
     QPointF m_gestureBase;
 
@@ -127,7 +137,7 @@ private:
     LogicalOutput *m_screen;
 };
 
-class DesktopSwitchEffect : public Effect
+class DesktopSwitchEffect : public Effect, public InputEventSpy
 {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.kde.kiri.DesktopSwitch")
@@ -153,6 +163,15 @@ public:
 
     static bool supported();
 
+    // niri's three-finger vertical swipe, from the raw touchpad events: the desktops follow the fingers 1:1
+    // (300 units per desktop, a rubber band past the first and last one), and on release spring to the
+    // desktop niri would pick from the projected velocity. KWin's own gesture (offset capped at its
+    // threshold, always the next desktop or none) is ignored for these swipes.
+    void swipeGestureBegin(PointerSwipeGestureBeginEvent *event) override;
+    void swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event) override;
+    void swipeGestureEnd(PointerSwipeGestureEndEvent *event) override;
+    void swipeGestureCancelled(PointerSwipeGestureCancelEvent *event) override;
+
     int horizontalGap() const;
     int verticalGap() const;
     bool slideBackground() const;
@@ -176,6 +195,18 @@ private Q_SLOTS:
 private:
     void finishedSwitching();
     DesktopSwitchScreen *getDesktopSwitchScreen(LogicalOutput *screen);
+    void swipeFinish(std::chrono::microseconds time);
+    void swipeApplyRelease();
+    void swipeUpdateScreen(double row);
+
+    enum class SwipePhase { Idle, Pending, Vertical, Other };
+    SwipePhase m_swipePhase = SwipePhase::Idle;
+    QPointF m_swipeCumulative;
+    NiriSwipe::Unaccelerate m_swipeUnaccel;
+    NiriSwipe::WorkspaceGesture m_swipeGesture;
+    int m_swipeCenter = 0;
+    NiriSwipe::WorkspaceGesture::Release m_swipeRelease{};
+    bool m_swipeReleasePending = false;
 
 private:
     int m_hGap;

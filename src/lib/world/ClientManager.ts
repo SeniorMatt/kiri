@@ -7,6 +7,7 @@ class ClientManager {
     private floatingFocusOrder: KwinClient[] = []; // most recently focused last
     private focusStamps = new Map<KwinClient, number>(); // for focus-window-previous
     private focusCounter = 0;
+    private readonly floatingFrames = new Map<KwinClient, { x: number, y: number, width: number, height: number }>();
     private readonly windowRuleEnforcer: WindowRuleEnforcer;
 
     constructor(
@@ -98,6 +99,7 @@ class ClientManager {
         client.destroy(passFocus);
         this.clientMap.delete(kwinClient);
         this.focusStamps.delete(kwinClient);
+        this.floatingFrames.delete(kwinClient);
     }
 
     private findTransientFor(kwinClient: KwinClient) {
@@ -127,41 +129,56 @@ class ClientManager {
         }
     }
 
-    // The window was dragged out of the grid. Like niri it is tiled again where it is dropped.
+    // niri's interactive move: the window leaves the grid after INTERACTIVE_MOVE_START_THRESHOLD (256 px) of pointer
+    // travel (floating windows move at once), keeps its size and follows the pointer; the insert hint shows where it
+    // lands and it is tiled again there on release.
+    public static readonly dragStartDistance = 256;
+    public static readonly dragOpacity = 0.75;
+
     public floatForDrag(client: ClientWrapper) {
-        this.floatClient(client);
-        if (!this.config.dropToTile) {
-            return;
-        }
-        const kwinClient = client.kwinClient;
-        const manager = new SignalManager();
-        manager.connect(kwinClient.interactiveMoveResizeFinished, () => {
-            manager.destroy();
-            this.world.do(() => this.dropTile(kwinClient));
-        });
+        this.floatDragged(client);
     }
 
-    // niri's insert_position (scrolling.rs): the closest gap between columns or between windows to the cursor
-    private dropTile(kwinClient: KwinClient) {
-        const client = this.clientMap.get(kwinClient);
-        if (client === undefined || !(client.stateManager.getState() instanceof ClientState.Floating) || !Clients.canTileEver(kwinClient)) {
+    public floatDragged(client: ClientWrapper) {
+        const kwinClient = client.kwinClient;
+        const opacityBefore = kwinClient.opacity;
+        kwinClient.opacity = ClientManager.dragOpacity; // niri's INTERACTIVE_MOVE_ALPHA
+        setVisualPosition(String(kwinClient.internalId), null); // the rubber band is over
+        // no limitHeight: the dragged window keeps the size it had in the grid, like niri's moving tile
+        if (!(client.stateManager.getState() instanceof ClientState.Floating)) {
+            client.stateManager.setState(() => new ClientState.Floating(this.world, client, this.config, false), FocusPassing.Type.None);
+        }
+        if (!this.config.dropToTile) {
+            const done = new SignalManager();
+            done.connect(kwinClient.interactiveMoveResizeFinished, () => {
+                done.destroy();
+                kwinClient.opacity = opacityBefore;
+            });
             return;
         }
-        const desktop = this.desktopManager.getDesktopForClient(kwinClient);
-        if (desktop === undefined) {
-            return;
+        const manager = new SignalManager();
+        const update = () => this.world.do(() => this.updateInsertHint(kwinClient));
+        manager.connect(kwinClient.frameGeometryChanged, update);
+        manager.connect(kwinClient.interactiveMoveResizeFinished, () => {
+            manager.destroy();
+            kwinClient.opacity = opacityBefore;
+            setInsertHint(null);
+            this.world.do(() => this.dropTile(kwinClient));
+        });
+        update();
+    }
+
+    // niri's scrolling insert_position: the closest gap between columns, or between the windows of the column
+    // under the pointer, whichever is nearer. Coordinates are screen coordinates.
+    private insertTarget(desktop: Desktop, columns: Column[], cursor: { x: number, y: number }): InsertTarget | null {
+        if (columns.length === 0) {
+            return { column: 0, tile: null, rect: null };
         }
         const grid = desktop.grid;
-        const columns = grid.getColumns();
-        this.tileClient(client, grid);
-        const window = this.findTiledWindow(kwinClient);
-        if (window === null || columns.length === 0) {
-            return;
-        }
-
         const gap = grid.config.gapsInnerHorizontal;
-        const cursor = Workspace.cursorPos;
-        const offsetX = desktop.tilingArea.x - desktop.getScrollX();
+        const gapV = grid.config.gapsInnerVertical;
+        const area = desktop.tilingArea;
+        const offsetX = area.x - desktop.getScrollX();
         const xs = columns.map(column => column.getLeft() + offsetX - gap / 2);
         xs.push(columns[columns.length - 1].getRight() + offsetX + gap / 2);
         let closest = 0;
@@ -176,25 +193,23 @@ class ClientManager {
                 columnIndex = i;
             }
         }
-        let tileGap: { windowIndex: number, distance: number } | null = null;
+        let tileGap: { windowIndex: number, distance: number, y: number } | null = null;
         if (columnIndex >= 0 && cursor.x < xs[columns.length]) {
-            const column = columns[columnIndex];
-            const windows = column.getWindows();
-            const gapV = grid.config.gapsInnerVertical;
-            if (column.isTabbed()) {
-                const active = column.getWindowToFocus();
+            const windows = columns[columnIndex].getWindows();
+            if (columns[columnIndex].isTabbed()) {
+                const active = columns[columnIndex].getWindowToFocus();
                 const index = windows.indexOf(active);
                 const top = active.client.kwinClient.frameGeometry.y - gapV / 2;
                 const bottom = top + active.height + gapV;
                 tileGap = Math.abs(top - cursor.y) <= Math.abs(bottom - cursor.y) ?
-                    { windowIndex: index, distance: Math.abs(top - cursor.y) } :
-                    { windowIndex: index + 1, distance: Math.abs(bottom - cursor.y) };
+                    { windowIndex: index, distance: Math.abs(top - cursor.y), y: top + gapV / 2 } :
+                    { windowIndex: index + 1, distance: Math.abs(bottom - cursor.y), y: bottom - gapV / 2 };
             } else {
-                let y = desktop.tilingArea.y - gapV / 2;
+                let y = area.y - gapV / 2;
                 for (let j = 0; j <= windows.length; j++) {
                     const distance = Math.abs(y - cursor.y);
                     if (tileGap === null || distance < tileGap.distance) {
-                        tileGap = { windowIndex: j, distance: distance };
+                        tileGap = { windowIndex: j, distance: distance, y: y + gapV / 2 };
                     }
                     if (j < windows.length) {
                         y += windows[j].height + gapV;
@@ -204,11 +219,74 @@ class ClientManager {
         }
         const columnDistance = Math.abs(xs[closest] - cursor.x);
         if (tileGap !== null && columnDistance > tileGap.distance) {
+            // InColumn hint (niri insert_hint_area): 150 px tall at the top or bottom of the column, 300 px between windows
             const column = columns[columnIndex];
-            const above = column.getWindows()[tileGap.windowIndex - 1] ?? null;
+            const count = column.getWindows().length;
+            const x = column.getLeft() + offsetX;
+            const w = column.getWidth();
+            let h = 150, y = tileGap.y;
+            if (tileGap.windowIndex === 0) {
+                // 150 at the top
+            } else if (tileGap.windowIndex === count) {
+                y = tileGap.y - 150 - gapV;
+                if (column.isTabbed()) {
+                    y = tileGap.y + gapV / 2 - 150;
+                }
+            } else {
+                h = 300;
+                y = tileGap.y - gapV / 2 - 150;
+            }
+            return { column: columnIndex, tile: tileGap.windowIndex, rect: { x: x, y: y, width: w, height: h } };
+        }
+        // NewColumn hint: 300 px wide, centred on the gap, inset by the gap at the top and bottom
+        const gapsOuter = gapV;
+        let hx = xs[closest] + gap / 2 - 150 - gap / 2;
+        if (closest === 0) {
+            hx = xs[0] + gap / 2 - 300 - gap;
+        } else if (closest === columns.length) {
+            hx = xs[closest] + gap / 2;
+        }
+        return { column: closest, tile: null, rect: { x: hx, y: area.y + gapsOuter, width: 300, height: area.height - gapsOuter * 2 } };
+    }
+
+    private updateInsertHint(kwinClient: KwinClient) {
+        const client = this.clientMap.get(kwinClient);
+        if (client === undefined || !(client.stateManager.getState() instanceof ClientState.Floating)) {
+            setInsertHint(null);
+            return;
+        }
+        const desktop = this.desktopManager.getDesktopForClient(kwinClient);
+        if (desktop === undefined) {
+            setInsertHint(null);
+            return;
+        }
+        const target = this.insertTarget(desktop, desktop.grid.getColumns(), Workspace.cursorPos);
+        setInsertHint(target === null ? null : target.rect, String(kwinClient.internalId));
+    }
+
+    private dropTile(kwinClient: KwinClient) {
+        const client = this.clientMap.get(kwinClient);
+        if (client === undefined || !(client.stateManager.getState() instanceof ClientState.Floating) || !Clients.canTileEver(kwinClient)) {
+            return;
+        }
+        const desktop = this.desktopManager.getDesktopForClient(kwinClient);
+        if (desktop === undefined) {
+            return;
+        }
+        const grid = desktop.grid;
+        const columns = grid.getColumns();
+        const target = this.insertTarget(desktop, columns, Workspace.cursorPos); // before the window joins the grid
+        this.tileClient(client, grid);
+        const window = this.findTiledWindow(kwinClient);
+        if (window === null || target === null || columns.length === 0) {
+            return;
+        }
+        if (target.tile !== null) {
+            const column = columns[target.column];
+            const above = column.getWindows()[target.tile - 1] ?? null;
             window.moveToColumn(column, true, FocusPassing.Type.None, above);
         } else {
-            grid.moveColumn(window.column, closest === 0 ? null : columns[closest - 1]);
+            grid.moveColumn(window.column, target.column === 0 ? null : columns[target.column - 1]);
         }
         window.focus();
     }
@@ -302,9 +380,18 @@ class ClientManager {
             if (desktop === undefined) {
                 return;
             }
+            // niri remembers the floating size and position of a window that goes to the tiling layout
+            const frame = kwinClient.frameGeometry;
+            this.floatingFrames.set(kwinClient, { x: frame.x.round(), y: frame.y.round(), width: frame.width.round(), height: frame.height.round() });
             client.stateManager.setState(() => new ClientState.Tiled(this.world, client, desktop.grid), FocusPassing.Type.None);
         } else if (clientState instanceof ClientState.Tiled) {
-            client.stateManager.setState(() => new ClientState.Floating(this.world, client, this.config, true), FocusPassing.Type.None);
+            const saved = this.floatingFrames.get(kwinClient);
+            client.stateManager.setState(() => new ClientState.Floating(this.world, client, this.config, saved === undefined), FocusPassing.Type.None);
+            if (saved !== undefined) {
+                const area = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
+                const { x, y } = ClientManager.clampFloatingPosition(area, saved.x, saved.y, saved.width, saved.height);
+                client.place(x, y, saved.width, saved.height);
+            }
         }
     }
 
@@ -454,7 +541,18 @@ class ClientManager {
         }
     }
 
-    // niri moves floating windows by a fixed step, the window stays inside the work area
+    // niri's Data::recompute_logical_pos: a floating window may go partly off-screen, but at least a quarter of it
+    // (10 to 75 px) stays inside the work area, on every side
+    private static clampFloatingPosition(area: QmlRect, x: number, y: number, width: number, height: number) {
+        const minOnScreenX = Math.min(Math.max(width / 4, 10), 75);
+        const minOnScreenY = Math.min(Math.max(height / 4, 10), 75);
+        return {
+            x: Math.min(Math.max(x, area.x - (width - minOnScreenX)), rectRight(area) - minOnScreenX),
+            y: Math.min(Math.max(y, area.y - (height - minOnScreenY)), rectBottom(area) - minOnScreenY),
+        };
+    }
+
+    // niri moves floating windows by a fixed step (move-window-* on the floating layer)
     public moveFloatingClient(kwinClient: KwinClient, dx: number, dy: number) {
         const client = this.clientMap.get(kwinClient);
         if (client === undefined || !this.isFloating(kwinClient)) {
@@ -464,9 +562,8 @@ class ClientManager {
         const frame = kwinClient.frameGeometry;
         const width = frame.width.round();
         const height = frame.height.round();
-        const x = Math.max(area.x, Math.min(frame.x.round() + dx, rectRight(area) - width));
-        const y = Math.max(area.y, Math.min(frame.y.round() + dy, rectBottom(area) - height));
-        client.place(x, y, width, height);
+        const pos = ClientManager.clampFloatingPosition(area, frame.x.round() + dx, frame.y.round() + dy, width, height);
+        client.place(pos.x, pos.y, width, height);
         return true;
     }
 
@@ -488,11 +585,7 @@ class ClientManager {
         size = Math.max(size, min);
         const width = horizontal ? size : frame.width.round();
         const height = horizontal ? frame.height.round() : size;
-        // niri's Data::recompute_logical_pos: at least a quarter of the window (10..75 px) stays on screen
-        const minOnScreenX = Math.min(Math.max(width / 4, 10), 75);
-        const minOnScreenY = Math.min(Math.max(height / 4, 10), 75);
-        const x = Math.min(Math.max(frame.x.round(), area.x - (width - minOnScreenX)), rectRight(area) - minOnScreenX);
-        const y = Math.min(Math.max(frame.y.round(), area.y - (height - minOnScreenY)), rectBottom(area) - minOnScreenY);
+        const { x, y } = ClientManager.clampFloatingPosition(area, frame.x.round(), frame.y.round(), width, height);
         client.place(x, y, width, height);
     }
 
@@ -583,4 +676,10 @@ namespace ClientManager {
         gapsInnerHorizontal: number;
         dropToTile: boolean;
     }
+}
+
+interface InsertTarget {
+    column: number;
+    tile: number | null; // index of the gap inside the column, or null for a new column
+    rect: { x: number, y: number, width: number, height: number } | null;
 }

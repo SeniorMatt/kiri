@@ -10,6 +10,14 @@ class Desktop {
     private static readonly GESTURE_MIN_PROGRESS = 0.05;
     private gestureMaxAmount = 0;
     private gestureRight = true;
+    // raw-swipe mode (compiled effect kiri_swipe): finger travel in units, like niri's SwipeTracker
+    private gestureRaw = false;
+    private gestureRawPos = 0;
+    private gestureTargetColumn: Column|null = null;
+    private gestureRawHistory: { delta: number, time: number }[] = [];
+    private static readonly RAW_HISTORY_MS = 150; // niri HISTORY_LIMIT
+    private static readonly RAW_DECELERATION = 0.997; // niri DECELERATION_TOUCHPAD, per millisecond
+    private static readonly RAW_WORKING_AREA_MOVEMENT = 1200; // niri VIEW_GESTURE_WORKING_AREA_MOVEMENT
     private dirty: boolean;
     private dirtyScroll: boolean;
     private dirtyPins: boolean;
@@ -189,12 +197,78 @@ class Desktop {
         this.gestureVelocity.add(now, this.scrollX);
     }
 
+    // niri's view_offset_gesture_update for a touchpad: the view moves working_width / 1200 per unit of finger
+    // travel, with no cap, and follows the fingers past the ends
+    public gestureRawUpdate(delta: number, time: number) {
+        if (!this.config.gestureScroll) {
+            return;
+        }
+        if (this.gestureScrollXInitial === null) {
+            this.gestureScrollXInitial = this.scrollX;
+            this.gestureRaw = true;
+            this.gestureTargetColumn = null;
+            this.gestureRawPos = 0;
+            this.gestureRawHistory = [];
+        }
+        this.gestureRawPos += delta;
+        this.gestureRawHistory.push({ delta: delta, time: time });
+        while (this.gestureRawHistory.length > 1 && time > this.gestureRawHistory[0].time + Desktop.RAW_HISTORY_MS) {
+            this.gestureRawHistory.shift();
+        }
+        this.setScroll(this.gestureScrollXInitial + this.getRawScale() * this.gestureRawPos, true);
+    }
+
+    // scroll pixels per unit of finger travel, signed by the invert setting
+    private getRawScale() {
+        return (this.config.gestureScrollInvert ? -1 : 1) * this.getWorkingWidth() / Desktop.RAW_WORKING_AREA_MOVEMENT;
+    }
+
+    // niri's view_offset_gesture_end: project the release velocity, pick the closest snapping point, focus the
+    // furthest column towards the swipe that is fully on screen there. Returns where the view should settle
+    // (a scroll position) and how fast the view moves at the release (scroll pixels per second).
+    public getRawRelease(): { from: number, to: number, velocity: number } {
+        const history = this.gestureRawHistory;
+        let velocity = 0; // units per second
+        if (history.length > 1 && history[history.length - 1].time > history[0].time) {
+            const total = history.reduce((sum, e) => sum + e.delta, 0);
+            velocity = total / ((history[history.length - 1].time - history[0].time) / 1000);
+        }
+        const scale = this.getRawScale();
+        const viewVelocity = velocity * scale;
+        const projected = -viewVelocity / (1000 * Math.log(Desktop.RAW_DECELERATION));
+        this.gestureRight = projected >= 0;
+
+        const marginLeft = this.config.marginLeft;
+        // niri's view position: the column at screen x = p has view position gridX - p
+        const columns = this.grid.getColumns();
+        const result = NiriSnap.choose({
+            columns: columns.map(c => ({ x: c.getLeft(), width: c.getWidth() })),
+            viewWidth: this.getWorkingWidth(),
+            gaps: marginLeft,
+            center: this.isCenteringFocusedColumn() ? "always" : this.config.scroller instanceof OnOverflowScroller ? "on-overflow" : "never",
+            currentView: this.scrollX - marginLeft,
+            targetView: this.scrollX - marginLeft + projected,
+        });
+        if (result === null) {
+            return { from: this.scrollX, to: this.scrollX, velocity: 0 };
+        }
+        this.gestureTargetColumn = columns[result.column];
+        return { from: this.scrollX, to: result.view + marginLeft, velocity: result.retargeted ? 0 : viewVelocity };
+    }
+
+    public isRawGesture() {
+        return this.gestureRaw && this.gestureScrollXInitial !== null;
+    }
+
     public isGestureScrolling() {
         return this.gestureScrollXInitial !== null;
     }
 
     // Fingers lifted: the column-aligned scroll position to settle on, taking the swipe velocity into account.
     public getGestureSettleTarget(now: number) {
+        if (this.gestureRaw) {
+            return this.getRawRelease().to;
+        }
         // niri-style: a column's left edge at the left edge of the screen, or the ends of the grid
         const candidates: number[] = [this.clampScrollX(-Infinity), this.clampScrollX(Infinity)];
         for (const column of this.grid.getColumns()) {
@@ -210,7 +284,7 @@ class Desktop {
 
     // A gesture that never got past a few units was KWin guessing the axis of a vertical swipe: put it back, no focus change.
     public gestureScrollAbortIfAccidental() {
-        if (this.gestureScrollXInitial === null || this.gestureMaxAmount >= Desktop.GESTURE_MIN_PROGRESS) {
+        if (this.gestureRaw || this.gestureScrollXInitial === null || this.gestureMaxAmount >= Desktop.GESTURE_MIN_PROGRESS) {
             return false;
         }
         this.setScroll(this.gestureScrollXInitial, false);
@@ -224,17 +298,20 @@ class Desktop {
 
     // niri: after a swipe, the column furthest in the swipe's direction that is fully on screen gets focus,
     // also when all columns fit on the screen and the view did not move
-    public gestureScrollFinish(focusedWindow: Window|null, focusedUntiled = false) {
+    public gestureScrollFinish(focusedWindow: Window|null, focusedUntiled = false, mayFocus = true) {
         if (this.gestureScrollXInitial === null) {
             return;
         }
         this.gestureScrollXInitial = null;
+        this.gestureRaw = false;
 
         const visibleRange = this.getCurrentVisibleRange();
-        const focusTargetColumn = this.gestureRight ?
+        const targetColumn = this.gestureTargetColumn;
+        this.gestureTargetColumn = null;
+        const focusTargetColumn = targetColumn !== null && targetColumn.grid === this.grid ? targetColumn : this.gestureRight ?
             this.grid.getRightmostVisibleColumn(visibleRange) :
             this.grid.getLeftmostVisibleColumn(visibleRange);
-        if (focusTargetColumn === null) {
+        if (focusTargetColumn === null || !mayFocus) {
             return;
         }
         if (focusedUntiled || focusedWindow === null || focusedWindow.column !== focusTargetColumn) {

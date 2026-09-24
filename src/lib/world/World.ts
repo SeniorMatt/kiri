@@ -8,7 +8,9 @@ class World {
     private readonly screenResizedDelayer: Delayer;
     private readonly gestureEndDelayer: Delayer;
     private readonly gestureAnimationTimer: QmlTimer;
-    private gestureAnimation: { from: number, to: number, start: number } | null = null;
+    // the desktop a swipe started on: it keeps the swipe if the current desktop changes while the fingers are down
+    private gestureDesktop: Desktop|null = null;
+    private gestureAnimation: { from: number, to: number, start: number, spring: NiriSpring|null } | null = null;
     private readonly gestureSettleDuration: number;
     private readonly gestureDesktopSwitch: boolean;
     private readonly closeRelayoutDelayer: Delayer;
@@ -115,6 +117,7 @@ class World {
             reMaximize: config.reMaximize,
             tileMaximized: config.tileMaximized,
             tileFullScreen: config.tileFullScreen,
+            hideTitlebars: config.hideTitlebars,
             skipSwitcher: config.skipSwitcher,
             tiledKeepBelow: config.tiledKeepBelow,
             maximizedKeepAbove: config.floatingKeepAbove,
@@ -377,15 +380,70 @@ class World {
         this.closeRelayoutDelayer.run();
     }
 
+    // a swipe is in progress or settling: niri's focus-follows-mouse does not switch windows then
+    public isScrollBusy() {
+        if (this.gestureAnimation !== null) {
+            return true;
+        }
+        const desktop = this.getGestureDesktop();
+        return desktop !== undefined && desktop.isGestureScrolling();
+    }
+
+    private getGestureDesktop() {
+        return this.gestureDesktop !== null ? this.gestureDesktop : this.desktopManager.getCurrentDesktop();
+    }
+
+    // a swipe that settles on a desktop which is not the current one any more ends there, a new swipe starts on the current one
+    private endGestureOnOtherDesktop() {
+        if (this.gestureDesktop !== null && this.gestureAnimation !== null && this.gestureDesktop !== this.desktopManager.getCurrentDesktop()) {
+            const desktop = this.gestureDesktop;
+            const animation = this.gestureAnimation;
+            this.stopGestureAnimation();
+            this.do(() => desktop.setScroll(animation.to, animation.spring !== null));
+            this.gestureAnimationDone();
+        }
+    }
+
     public gestureScroll(amount: number) {
         this.gestureEndDelayer.stop();
+        this.endGestureOnOtherDesktop();
         this.stopGestureAnimation();
         this.do((clientManager, desktopManager) => {
-            const currentDesktop = desktopManager.getCurrentDesktop();
+            const currentDesktop = this.getGestureDesktop();
             if (currentDesktop !== undefined) {
+                this.gestureDesktop = currentDesktop;
                 currentDesktop.gestureScroll(amount, Date.now());
             }
         });
+    }
+
+    // Raw swipe from the compiled effect kiri_swipe (the JSON of its poll()): the uncapped finger travel of a
+    // 3-finger horizontal swipe, with timestamps. KWin's own progress (capped at 200 units) is ignored then.
+    public gestureRaw(json: string) {
+        let swipe: { phase: string, end: boolean, ev: number[][] };
+        try {
+            swipe = JSON.parse(json);
+        } catch (error: any) {
+            return;
+        }
+        if (swipe.phase === "h" && swipe.ev.length > 0) {
+            this.gestureEndDelayer.stop();
+            this.endGestureOnOtherDesktop();
+            this.stopGestureAnimation();
+            this.do((clientManager, desktopManager) => {
+                const currentDesktop = this.getGestureDesktop();
+                if (currentDesktop !== undefined) {
+                    this.gestureDesktop = currentDesktop;
+                    for (const event of swipe.ev) {
+                        currentDesktop.gestureRawUpdate(event[1], event[0]);
+                    }
+                }
+            });
+        }
+        if (swipe.end) {
+            this.gestureEndDelayer.stop();
+            this.gestureRelease();
+        }
     }
 
     // `activated` means the fingers were lifted, `cancelled` may also be just a change of swipe direction
@@ -399,39 +457,45 @@ class World {
     }
 
     private gestureRelease() {
-        const desktop = this.desktopManager.getCurrentDesktop();
+        const desktop = this.getGestureDesktop();
         if (desktop === undefined || !desktop.isGestureScrolling()) {
+            this.gestureDesktop = null;
             return;
         }
         let accidental = false;
         this.do(() => { accidental = desktop.gestureScrollAbortIfAccidental(); });
         if (accidental) {
+            this.gestureDesktop = null;
             return;
         }
+        // a raw swipe (kiri_swipe) settles like niri: a spring from the release position with the release velocity
+        const raw = desktop.isRawGesture() ? desktop.getRawRelease() : null;
         const from = desktop.getScrollX();
-        const to = desktop.getGestureSettleTarget(Date.now());
-        if (from === to || this.gestureSettleDuration === 0) {
+        const to = raw !== null ? raw.to : desktop.getGestureSettleTarget(Date.now());
+        if ((raw === null && from === to) || this.gestureSettleDuration === 0) {
             this.do((clientManager, desktopManager) => {
-                desktop.setScroll(to, false);
+                desktop.setScroll(to, raw !== null);
             });
             this.gestureAnimationDone();
             return;
         }
-        this.gestureAnimation = { from: from, to: to, start: Date.now() };
+        this.gestureAnimation = { from: from, to: to, start: Date.now(), spring: raw !== null ? niriViewSpring(from, to, raw.velocity) : null };
         this.gestureAnimationTimer.start();
     }
 
     private gestureAnimationStep() {
         const animation = this.gestureAnimation;
-        const desktop = this.desktopManager.getCurrentDesktop();
+        const desktop = this.getGestureDesktop();
         if (animation === null || desktop === undefined) {
             this.stopGestureAnimation();
             return;
         }
-        const t = (Date.now() - animation.start) / this.gestureSettleDuration;
-        const x = animation.from + (animation.to - animation.from) * easeOutCubic(t);
-        this.do(() => desktop.setScroll(x, false));
-        if (t >= 1) {
+        const spring = animation.spring;
+        const t = spring !== null ? (Date.now() - animation.start) / 1000 / spring.duration : (Date.now() - animation.start) / this.gestureSettleDuration;
+        const x = spring !== null ? spring.value((Date.now() - animation.start) / 1000) : animation.from + (animation.to - animation.from) * easeOutCubic(t);
+        // a raw swipe's target may be outside of what the clamper allows (niri's snaps do not ask it)
+        this.do(() => desktop.setScroll(x, spring !== null));
+        if (t >= 1 || (spring !== null && spring.duration === 0)) {
             this.stopGestureAnimation();
             this.gestureAnimationDone();
         }
@@ -445,10 +509,12 @@ class World {
     private gestureAnimationDone() {
         this.do((clientManager, desktopManager) => {
             const focusedWindow = Workspace.activeWindow === null ? null : clientManager.findTiledWindow(Workspace.activeWindow);
-            const currentDesktop = desktopManager.getCurrentDesktop();
+            const currentDesktop = this.getGestureDesktop();
+            this.gestureDesktop = null;
             if (currentDesktop !== undefined) {
-                // an untiled focused window (a full-screen game) is left by the gesture as well
-                currentDesktop.gestureScrollFinish(focusedWindow, Workspace.activeWindow !== null && focusedWindow === null);
+                // an untiled focused window (a full-screen game) is left by the gesture as well; the focus does not
+                // follow a swipe on a desktop that is no longer the current one, that would switch back to it
+                currentDesktop.gestureScrollFinish(focusedWindow, Workspace.activeWindow !== null && focusedWindow === null, currentDesktop === desktopManager.getCurrentDesktop());
             }
         });
     }

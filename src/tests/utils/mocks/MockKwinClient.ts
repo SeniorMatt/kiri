@@ -18,6 +18,8 @@ class MockKwinClient {
     public readonly normalWindow: boolean = true;
     public readonly managed: boolean = true;
     public readonly popupWindow: boolean = false;
+    public readonly appletPopup: boolean = false;
+    public readonly dialog: boolean = false;
     public readonly modal: boolean = false;
     public readonly pid = 1;
 
@@ -47,6 +49,7 @@ class MockKwinClient {
     private windowedFrameGeometry: MockQmlRect;
     private windowed = true;
     private hasBorder = true;
+    private _noBorder = false;
 
     constructor(
         private _frameGeometry: MockQmlRect = new MockQmlRect(10, 10, 100, 200),
@@ -86,8 +89,21 @@ class MockKwinClient {
         );
     }
 
+    public get noBorder() {
+        return this._noBorder;
+    }
+
+    // like KWin: the request is ignored while the window is full-screen, and the frame geometry stays as it is
+    public set noBorder(noBorder: boolean) {
+        if (!this._fullScreen) {
+            this._noBorder = noBorder;
+        }
+    }
+
     public get clientGeometry() {
-        if (this.hasBorder) {
+        if (this.hasBorder && this._noBorder) {
+            return this.frameGeometry;
+        } else if (this.hasBorder) {
             return new MockQmlRect(
                 this.frameGeometry.x + MockKwinClient.borderThickness,
                 this.frameGeometry.y + MockKwinClient.borderThickness,
@@ -131,7 +147,11 @@ class MockKwinClient {
             this.windowed = false;
         }
 
-        runReorder(
+        // On Wayland KWin sets the full-screen flag when the client acknowledges the request, before the frame of the
+        // new size arrives: without a title bar (where a screen-sized frame looks like full-screen geometry) the
+        // flag comes first when a window enters full-screen mode
+        const run = fullScreen && this._noBorder ? (...fs: (() => void)[]) => fs.forEach(f => f()) : runReorder;
+        run(
             () => {
                 this._fullScreen = fullScreen;
                 if (fullScreen !== oldFullScreen) {

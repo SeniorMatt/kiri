@@ -52,17 +52,42 @@ tests.register("Move keys move floating windows", 1, () => {
     qtMock.fireShortcut("window-move-up");
     Assert.equalArrays(frame(), start);
 
-    // stays inside the work area
-    for (let i = 0; i < 30; i++) {
+    // niri lets a floating window go partly off-screen: at least clamp(size/4, 10, 75) px stay in the work area
+    const width = Math.round(floating.getFrameGeometryCopy().width);
+    const height = Math.round(floating.getFrameGeometryCopy().height);
+    const keepX = Math.min(Math.max(width / 4, 10), 75);
+    const keepY = Math.min(Math.max(height / 4, 10), 75);
+    for (let i = 0; i < 40; i++) {
         qtMock.fireShortcut("column-move-left");
         qtMock.fireShortcut("window-move-up");
     }
-    Assert.equalArrays(frame(), [screen.x, screen.y]);
-    for (let i = 0; i < 30; i++) {
+    Assert.equalArrays(frame(), [Math.round(screen.x - (width - keepX)), Math.round(screen.y - (height - keepY))]);
+    for (let i = 0; i < 80; i++) {
         qtMock.fireShortcut("column-move-right");
         qtMock.fireShortcut("window-move-down");
     }
-    Assert.equalArrays(frame(), [rectRight(screen) - 100, rectBottom(screen) - Math.round(floating.getFrameGeometryCopy().height)]);
+    Assert.equalArrays(frame(), [Math.round(rectRight(screen) - keepX), Math.round(rectBottom(screen) - keepY)]);
+    // and back in again
+    qtMock.fireShortcut("column-move-left");
+    Assert.equal(frame()[0], Math.round(rectRight(screen) - keepX) - 50);
+});
+
+tests.register("Resizing a floating window keeps the niri minimum on screen", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [tiled, floating] = workspaceMock.createClients(2);
+    workspaceMock.activeWindow = floating;
+    qtMock.fireShortcut("window-toggle-floating");
+    workspaceMock.activeWindow = floating;
+    floating.frameGeometry = new MockQmlRect(rectRight(screen) - 120, 100, 100, 100);
+    qtMock.fireShortcut("column-width-increase");
+    const f = floating.getFrameGeometryCopy();
+    Assert.assert(f.width > 100);
+    Assert.assert(f.x < rectRight(screen) - 120 + 1 && f.x >= rectRight(screen) - 120 - 1, { message: "top-left stays, the window may stick out" });
+    // a window wider than the screen can be moved so that only its minimum (75 px) shows
+    for (let i = 0; i < 80; i++) {
+        qtMock.fireShortcut("column-move-right");
+    }
+    Assert.equal(Math.round(floating.getFrameGeometryCopy().x), Math.round(rectRight(screen) - Math.min(Math.max(f.width / 4, 10), 75)));
 });
 
 tests.register("Closing a full-screen window focuses a neighbour", 5, () => {
@@ -295,4 +320,24 @@ tests.register("Size keys resize floating windows like niri", 1, () => {
 
     // the tiled layout is left alone
     Assert.equalRects(tiled.getFrameGeometryCopy(), tiledBefore);
+});
+
+tests.register("Floating window returns with its old size and position", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [tiled, floating] = workspaceMock.createClientsWithFrames(
+        new MockQmlRect(0, 0, 100, 100), new MockQmlRect(300, 300, 100, 100));
+    workspaceMock.activeWindow = floating;
+    qtMock.fireShortcut("window-toggle-floating");
+    workspaceMock.activeWindow = floating;
+    qtMock.fireShortcut("column-move-right");
+    qtMock.fireShortcut("window-move-down");
+    const frame = () => {
+        const f = floating.getFrameGeometryCopy();
+        return [Math.round(f.x), Math.round(f.y), Math.round(f.width), Math.round(f.height)];
+    };
+    const before = frame();
+
+    qtMock.fireShortcut("window-toggle-floating"); // tile
+    qtMock.fireShortcut("window-toggle-floating"); // float again
+    Assert.equalArrays(frame(), before);
 });

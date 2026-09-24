@@ -14,8 +14,8 @@ let gapH: number;
 let gapV: number;
 let runLog: string[];
 
-function init(config: Config) {
-    screen = new MockQmlRect(0, 0, 800, 600);
+function init(config: Config, screenSize: { width: number, height: number } = { width: 800, height: 600 }) {
+    screen = new MockQmlRect(0, 0, screenSize.width, screenSize.height);
     tilingArea = new MockQmlRect(
         config.gapsOuterLeft,
         config.gapsOuterTop,

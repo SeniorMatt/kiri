@@ -59,6 +59,7 @@ tests.register("NiriImport", 1, () => {
             border { on; width 3 }
             tab-indicator { width 6; gap 2; position "top"; length total-proportion=0.7; hide-when-single-tab; active-color "red" }
         }
+        prefer-no-csd
         window-rule { geometry-corner-radius 12 }
         window-rule {
             match app-id="^mpv$" title="^Video"
@@ -82,6 +83,7 @@ tests.register("NiriImport", 1, () => {
     `, '[{"class":"mine","tile":false}]');
     const s = result.settings;
     Assert.equal(s["cursorFollowsFocus"], true);
+    Assert.equal(s["hideTitlebars"], true);
     Assert.equal(s["gapsInnerHorizontal"], 10);
     Assert.equal(s["gapsInnerVertical"], 10);
     Assert.equal(s["gapsOuterLeft"], 30);

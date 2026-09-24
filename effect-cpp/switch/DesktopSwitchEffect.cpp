@@ -20,6 +20,10 @@
 // KConfigSkeleton
 
 #include <QDBusConnection>
+#include <QTimer>
+
+#include "input.h"
+#include "input_event.h"
 
 #include <cmath>
 
@@ -37,6 +41,7 @@ DesktopSwitchEffect::DesktopSwitchEffect()
 {
     reconfigure(ReconfigureAll);
     QDBusConnection::sessionBus().registerObject(QStringLiteral("/KiriDesktopSwitch"), this, QDBusConnection::ExportScriptableSlots);
+    input()->installInputEventSpy(this);
 
     connect(effects, &EffectsHandler::desktopChanged,
             this, &DesktopSwitchEffect::desktopChanged);
@@ -68,6 +73,7 @@ DesktopSwitchEffect::DesktopSwitchEffect()
 
 DesktopSwitchEffect::~DesktopSwitchEffect()
 {
+    input()->uninstallInputEventSpy(this);
     QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/KiriDesktopSwitch"));
     finishedSwitching();
 }
@@ -151,6 +157,11 @@ void DesktopSwitchScreen::prePaintScreen(ScreenPrePaintData &data)
     case State::ActiveAnimation: {
         const std::chrono::nanoseconds timeDelta = m_clock.tick(data.view);
 
+        if (m_niriAnim) {
+            m_niriElapsed += timeDelta.count() / 1e9;
+            m_paintCtx.position = visualPosition();
+            break;
+        }
         m_motionX.advance(timeDelta);
         m_motionY.advance(timeDelta);
 
@@ -279,12 +290,12 @@ bool DesktopSwitchScreen::paintWindow(const RenderTarget &renderTarget, const Re
     const int gridWidth = effects->desktopGridWidth();
     const int gridHeight = effects->desktopGridHeight();
 
-    QPointF drawPosition = forcePositivePosition(m_paintCtx.position);
-    drawPosition = m_paintCtx.wrap ? constrainToDrawableRange(drawPosition) : drawPosition;
+    // without wrapping the rubber band may put the position a little outside of the grid
+    QPointF drawPosition = m_paintCtx.wrap ? constrainToDrawableRange(forcePositivePosition(m_paintCtx.position)) : m_paintCtx.position;
 
     // If we're wrapping, draw the desktop in the second position.
-    const bool wrappingX = drawPosition.x() > gridWidth - 1;
-    const bool wrappingY = drawPosition.y() > gridHeight - 1;
+    const bool wrappingX = m_paintCtx.wrap && drawPosition.x() > gridWidth - 1;
+    const bool wrappingY = m_paintCtx.wrap && drawPosition.y() > gridHeight - 1;
 
     const auto screens = effects->screens();
 
@@ -342,7 +353,9 @@ void DesktopSwitchEffect::postPaintScreen()
 
 void DesktopSwitchScreen::postPaintScreen()
 {
-    if (m_state == State::ActiveAnimation && !m_motionX.isMoving() && !m_motionY.isMoving()) {
+    if (m_state == State::ActiveAnimation && m_niriAnim && m_niriSpring.isDone(m_niriElapsed)) {
+        finishedSwitching();
+    } else if (m_state == State::ActiveAnimation && !m_niriAnim && !m_motionX.isMoving() && !m_motionY.isMoving()) {
         finishedSwitching();
     }
 }
@@ -381,6 +394,7 @@ void DesktopSwitchScreen::startAnimation(const QPointF &oldPos, VirtualDesktop *
     }
 
     m_state = State::ActiveAnimation;
+    m_niriAnim = false;
     m_movingWindow = movingWindow;
 
     m_startPos = oldPos;
@@ -409,6 +423,9 @@ QPointF DesktopSwitchScreen::visualPosition() const
 {
     switch (m_state) {
     case State::ActiveAnimation: {
+        if (m_niriAnim) {
+            return QPointF(m_niriX, m_niriSpring.value(m_niriElapsed));
+        }
         const QSize virtualSpaceSize = effects->virtualScreenSize();
         return QPointF(m_motionX.position() / virtualSpaceSize.width(), m_motionY.position() / virtualSpaceSize.height());
     }
@@ -471,6 +488,12 @@ void DesktopSwitchScreen::finishedSwitching()
 
 void DesktopSwitchEffect::desktopChanged(VirtualDesktop *old, VirtualDesktop *current, EffectWindow *with, LogicalOutput *screen)
 {
+    if (m_swipePhase == SwipePhase::Pending || m_swipePhase == SwipePhase::Vertical) {
+        if (m_swipeReleasePending) {
+            QTimer::singleShot(0, this, &DesktopSwitchEffect::swipeApplyRelease);
+        }
+        return; // the swipe end decides, see swipeFinish
+    }
     if (m_switchingActivity || (effects->hasActiveFullScreenEffect() && effects->activeFullScreenEffect() != this)) {
         return;
     }
@@ -496,8 +519,7 @@ void DesktopSwitchScreen::desktopChanged(VirtualDesktop *old, VirtualDesktop *cu
         break;
 
     case State::ActiveAnimation: {
-        const QSize virtualSpaceSize = effects->virtualScreenSize();
-        previousPos = QPointF(m_motionX.position() / virtualSpaceSize.width(), m_motionY.position() / virtualSpaceSize.height());
+        previousPos = visualPosition();
         break;
     }
 
@@ -511,6 +533,9 @@ void DesktopSwitchScreen::desktopChanged(VirtualDesktop *old, VirtualDesktop *cu
 
 void DesktopSwitchEffect::desktopChanging(VirtualDesktop *old, QPointF desktopOffset, EffectWindow *with, LogicalOutput *output)
 {
+    if (m_swipePhase == SwipePhase::Pending || m_swipePhase == SwipePhase::Vertical) {
+        return;
+    }
     if (effects->hasActiveFullScreenEffect() && effects->activeFullScreenEffect() != this) {
         return;
     }
@@ -542,6 +567,7 @@ void DesktopSwitchScreen::desktopChanging(VirtualDesktop *old, QPointF desktopOf
         m_gestureBase = QPointF();
     }
     m_state = State::ActiveGesture;
+    m_niriAnim = false;
     m_movingWindow = with;
 
     m_gesturePos.setX(gridPos.x() + desktopOffset.x() + m_gestureBase.x());
@@ -579,6 +605,12 @@ QString DesktopSwitchEffect::debugPosition()
 
 void DesktopSwitchEffect::desktopChangingCancelled()
 {
+    if (m_swipePhase == SwipePhase::Pending || m_swipePhase == SwipePhase::Vertical) {
+        if (m_swipeReleasePending) {
+            QTimer::singleShot(0, this, &DesktopSwitchEffect::swipeApplyRelease);
+        }
+        return;
+    }
     // If the fingers have been lifted and the current desktop didn't change, start animation
     // to move back to the original virtual desktop.
     if (effects->activeFullScreenEffect() == this) {
@@ -733,6 +765,150 @@ QPointF DesktopSwitchScreen::constrainToDrawableRange(QPointF p)
     p.setX(fmod(p.x(), effects->desktopGridWidth()));
     p.setY(fmod(p.y(), effects->desktopGridHeight()));
     return p;
+}
+
+void DesktopSwitchScreen::niriGesture(double row)
+{
+    if (m_state == State::Inactive) {
+        prepareSwitching();
+    }
+    m_state = State::ActiveGesture;
+    m_niriAnim = false;
+    m_movingWindow = nullptr;
+    m_gesturePos = QPointF(effects->desktopGridCoords(effects->currentDesktop(m_screen)).x(), row);
+    effects->addRepaint(m_screen->geometry());
+}
+
+void DesktopSwitchScreen::startNiriAnimation(double fromRow, int toRow, double velocity)
+{
+    if (m_state == State::Inactive) {
+        prepareSwitching();
+    }
+    // the animation speed setting scales time, like in reconfigure()
+    const double factor = std::max<double>(effects->animationTimeFactor(), 0.01);
+    m_niriSpring = NiriAnim::Spring(fromRow, toRow, velocity / factor, NiriAnim::Defaults::workspaceDamping,
+                                    NiriAnim::Defaults::workspaceStiffness / (factor * factor), NiriAnim::Defaults::workspaceEpsilon);
+    m_niriElapsed = 0.0;
+    m_niriX = effects->desktopGridCoords(effects->currentDesktop(m_screen)).x();
+    m_niriAnim = true;
+    m_state = State::ActiveAnimation;
+    m_movingWindow = nullptr;
+    m_clock.reset();
+    effects->addRepaint(m_screen->geometry());
+}
+
+// ---- niri's touchpad swipe, from the raw events. See the header.
+
+// niri: "Threshold copied from GNOME Shell."
+static constexpr double AxisLockDistance = 16.0;
+
+void DesktopSwitchEffect::swipeGestureBegin(PointerSwipeGestureBeginEvent *event)
+{
+    if (m_swipeReleasePending) {
+        swipeApplyRelease(); // the previous swipe was released a moment ago
+    }
+    m_swipeCumulative = QPointF();
+    m_swipeUnaccel.reset();
+    const bool column = effects->desktopGridWidth() == 1 && effects->desktopGridHeight() > 1;
+    m_swipePhase = (event->fingerCount == 3 && column) ? SwipePhase::Pending : SwipePhase::Idle;
+}
+
+void DesktopSwitchEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event)
+{
+    if (m_swipePhase == SwipePhase::Idle || m_swipePhase == SwipePhase::Other) {
+        return;
+    }
+    const double ms = event->time.count() / 1000.0;
+    double ux, uy;
+    m_swipeUnaccel.apply(event->delta.x(), event->delta.y(), ms, ux, uy);
+    if (m_swipePhase == SwipePhase::Pending) {
+        m_swipeCumulative += QPointF(ux, uy);
+        if (m_swipeCumulative.x() * m_swipeCumulative.x() + m_swipeCumulative.y() * m_swipeCumulative.y() < AxisLockDistance * AxisLockDistance) {
+            return;
+        }
+        if (std::abs(m_swipeCumulative.x()) > std::abs(m_swipeCumulative.y())) {
+            m_swipePhase = SwipePhase::Other; // the horizontal swipe is the script's (kiri_swipe)
+            return;
+        }
+        m_swipePhase = SwipePhase::Vertical;
+        LogicalOutput *output = effects->activeScreen();
+        const int row = effects->desktopGridCoords(effects->currentDesktop(output)).y();
+        double current = row;
+        if (DesktopSwitchScreen *screen = getDesktopSwitchScreen(output); screen && screen->isActive()) {
+            current = screen->visualPosition().y(); // catch the animation that is still running
+        }
+        m_swipeCenter = row;
+        m_swipeGesture.begin(row, current, effects->desktopGridHeight());
+    }
+    // fingers up is the next desktop below, like in KWin's own swipe
+    const double idx = m_swipeGesture.update(-uy, ms);
+    swipeUpdateScreen(idx);
+}
+
+void DesktopSwitchEffect::swipeUpdateScreen(double row)
+{
+    LogicalOutput *output = effects->activeScreen();
+    if (effects->hasActiveFullScreenEffect() && effects->activeFullScreenEffect() != this) {
+        return;
+    }
+    if (!isActive()) {
+        const QList<EffectWindow *> windows = effects->stackingOrder();
+        for (EffectWindow *w : windows) {
+            w->setData(WindowForceBackgroundContrastRole, QVariant(true));
+            w->setData(WindowForceBlurRole, QVariant(true));
+        }
+    }
+    auto result = m_slideEffectScreens.tryEmplace(output, this, output);
+    result.iterator->niriGesture(row);
+    effects->setActiveFullScreenEffect(this);
+}
+
+void DesktopSwitchEffect::swipeGestureEnd(PointerSwipeGestureEndEvent *event)
+{
+    swipeFinish(event->time);
+}
+
+void DesktopSwitchEffect::swipeGestureCancelled(PointerSwipeGestureCancelEvent *event)
+{
+    swipeFinish(event->time); // niri ends the gesture on cancel as well
+}
+
+void DesktopSwitchEffect::swipeFinish(std::chrono::microseconds time)
+{
+    const SwipePhase phase = m_swipePhase;
+    if (phase != SwipePhase::Pending && phase != SwipePhase::Vertical) {
+        m_swipePhase = SwipePhase::Idle;
+        return;
+    }
+    if (phase == SwipePhase::Pending) {
+        m_swipePhase = SwipePhase::Idle; // never got to 16 units: not a swipe
+        return;
+    }
+    m_swipeRelease = m_swipeGesture.end(time.count() / 1000.0);
+    m_swipeReleasePending = true;
+    // KWin's own release handling runs after the spies and may switch to another desktop (its own threshold,
+    // always one step) or cancel; whichever it does is announced by desktopChanged or desktopChangingCancelled,
+    // and then the desktop niri picks is put right, animating from where the desktops are on screen now.
+    // If KWin did not see the swipe at all, the timer does it.
+    QTimer::singleShot(60, this, &DesktopSwitchEffect::swipeApplyRelease);
+}
+
+void DesktopSwitchEffect::swipeApplyRelease()
+{
+    if (!m_swipeReleasePending) {
+        return;
+    }
+    m_swipeReleasePending = false;
+    m_swipePhase = SwipePhase::Idle;
+    const auto release = m_swipeRelease;
+    LogicalOutput *output = effects->activeScreen();
+    VirtualDesktop *target = effects->desktopAtCoords(QPoint(0, release.target));
+    if (target && effects->currentDesktop(output) != target) {
+        effects->setCurrentDesktop(target);
+    }
+    auto result = m_slideEffectScreens.tryEmplace(output, this, output);
+    result.iterator->startNiriAnimation(release.from, release.target, release.velocity);
+    effects->setActiveFullScreenEffect(this);
 }
 
 DesktopSwitchScreen *DesktopSwitchEffect::getDesktopSwitchScreen(LogicalOutput *screen)

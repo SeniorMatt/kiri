@@ -14,6 +14,8 @@ interface Workspace {
     readonly activeScreen: Output;
     readonly windows: KwinClient[];
     readonly cursorPos: Readonly<QmlPoint>;
+    readonly stackingOrder: KwinClient[];
+    readonly cursorPosChanged: QSignal<[]>;
 
     activeWindow: KwinClient|null;
 
@@ -77,12 +79,15 @@ interface KwinClient {
     readonly normalWindow: boolean;
     readonly managed: boolean;
     readonly popupWindow: boolean;
+    readonly appletPopup: boolean;
+    readonly dialog: boolean;
     readonly modal: boolean;
     readonly pid: number;
 
     fullScreen: boolean;
     activities: string[]; // empty array means all activities
     skipSwitcher: boolean;
+    noBorder: boolean; // no title bar and frame (server-side decorations); KWin ignores changes while full-screen
     keepAbove: boolean;
     keepBelow: boolean;
     minimized: boolean;

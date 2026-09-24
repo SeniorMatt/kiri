@@ -49,7 +49,7 @@ delete_group() {
 
 # ---- stop everything (the script gives Plasma's borrowed shortcuts back when it stops) ------------------
 w Plugins kiriEnabled false
-for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion; do
+for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe; do
     d Plugins ${e}Enabled
     q org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e
 done
@@ -61,8 +61,15 @@ d Plugins kwin4_effect_geometry_changeEnabled
 for e in fade scale glide maximize; do
     d Plugins ${e}Enabled
 done
+# the focus policy Kiri replaced with "Click to focus"
+policy=$(kreadconfig6 --file kwinrc --group Kiri-install --key focusPolicyBefore)
+if [ -n "$policy" ]; then
+    w Windows FocusPolicy "$policy"
+    d Kiri-install focusPolicyBefore
+fi
 d Kiri-install effectsEnabled
 d Kiri-install motionEnabled
+d Kiri-install swipeEnabled
 q org.kde.KWin /KWin org.kde.KWin.reconfigure
 q org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect slide
 q org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect kwin4_effect_geometry_change

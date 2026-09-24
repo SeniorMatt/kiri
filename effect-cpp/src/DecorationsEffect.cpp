@@ -302,6 +302,89 @@ void Effect::reloadSettings(const QString &)
     KWin::effects->addRepaintFull();
 }
 
+void Effect::setInsertHint(const QString &json)
+{
+    // {"r": [x, y, w, h], "w": "{uuid}"}: the hint rectangle and the window being dragged; anything else clears it
+    const QJsonObject object = QJsonDocument::fromJson(json.toUtf8()).object();
+    const QJsonArray a = object.value(QStringLiteral("r")).toArray();
+    const KWin::RectF hint = a.size() == 4 ? KWin::RectF(a[0].toDouble(), a[1].toDouble(), a[2].toDouble(), a[3].toDouble()) : KWin::RectF();
+    const QUuid dragged = QUuid::fromString(object.value(QStringLiteral("w")).toString());
+    if (hint == m_insertHint && dragged == m_hintWindow) {
+        return;
+    }
+    if (!m_insertHint.isEmpty()) {
+        KWin::effects->addRepaint(m_insertHint);
+    }
+    m_insertHint = hint;
+    m_hintWindow = dragged;
+    if (!m_insertHint.isEmpty()) {
+        KWin::effects->addRepaint(m_insertHint);
+    }
+}
+
+// niri's insert hint (config insert-hint, default colour rgba(127, 200, 255, 128)): filled, with the dragged
+// window's corner radius plus its border width, drawn with the ring shader's fill mode.
+void Effect::drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion)
+{
+    if (m_insertHint.isEmpty() || deviceRegion.isEmpty()) {
+        return;
+    }
+    const double radius = std::min<double>(m_settings.cornerRadius + (m_settings.borderEnabled ? m_settings.borderWidth : 0),
+                                           std::min(m_insertHint.width(), m_insertHint.height()) / 2);
+    KWin::ShaderManager::instance()->pushShader(m_ringShader.get());
+    m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, viewport.projectionMatrix());
+    m_ringShader->setUniform("rect", QVector4D(m_insertHint.x(), m_insertHint.y(), m_insertHint.width(), m_insertHint.height()));
+    m_ringShader->setUniform("radius", float(radius));
+    m_ringShader->setUniform("borderWidth", 0.0f);
+    m_ringShader->setUniform("ringWidth", 0.0f);
+    m_ringShader->setUniform("borderColor", QVector4D(0, 0, 0, 0));
+    m_ringShader->setUniform("ringColor", QVector4D(0, 0, 0, 0));
+    m_ringShader->setUniform("fillColor", QVector4D(127 / 255.0, 200 / 255.0, 1.0, 128 / 255.0));
+    m_ringShader->setUniform("pixel", float(1.0 / viewport.scale()));
+    std::vector<QVector2D> vertices;
+    for (const KWin::Rect &deviceRect : deviceRegion.rects()) {
+        const KWin::RectF part = viewport.mapFromDeviceCoordinates(KWin::RectF(deviceRect)).intersected(m_insertHint);
+        if (part.isEmpty()) {
+            continue;
+        }
+        const QVector2D tl(part.left(), part.top()), tr(part.right(), part.top());
+        const QVector2D bl(part.left(), part.bottom()), br(part.right(), part.bottom());
+        for (const QVector2D &v : {tl, tr, bl, bl, tr, br}) {
+            vertices.push_back(v);
+        }
+    }
+    if (!vertices.empty()) {
+        KWin::GLVertexBuffer *vbo = KWin::GLVertexBuffer::streamingBuffer();
+        vbo->reset();
+        vbo->setVertices(vertices);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        vbo->render(GL_TRIANGLES);
+        glDisable(GL_BLEND);
+    }
+    m_ringShader->setUniform("fillColor", QVector4D(0, 0, 0, 0));
+    KWin::ShaderManager::instance()->popShader();
+}
+
+// The hint is drawn over everything except the dragged window (drawWindow draws it under that one, so the
+// window, translucent while it is loose, stays on top of its own hint like in niri).
+bool Effect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, int mask, const KWin::Region &deviceRegion, KWin::LogicalOutput *screen)
+{
+    const bool result = OffscreenEffect::paintScreen(renderTarget, viewport, mask, deviceRegion, screen);
+    if (!m_insertHint.isEmpty() && isActive()) {
+        KWin::Region region = deviceRegion;
+        if (!m_hintWindow.isNull()) {
+            for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
+                if (w->internalId() == m_hintWindow) {
+                    region = region.subtracted(viewport.mapToDeviceCoordinatesAligned(w->frameGeometry()));
+                }
+            }
+        }
+        drawInsertHint(viewport, region);
+    }
+    return result;
+}
+
 void Effect::setTabGroups(const QString &json)
 {
     QList<TabGroup> groups;
@@ -499,6 +582,9 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
         data.setYTranslation(data.yTranslation() + visualIt->y() - w->frameGeometry().y());
     }
 
+    if (!m_insertHint.isEmpty() && !m_hintWindow.isNull() && w->internalId() == m_hintWindow && isActive() && !w->data(CaptureRole).toBool()) {
+        drawInsertHint(viewport, deviceRegion); // under the dragged window
+    }
     const bool result = OffscreenEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
     if (w->data(CaptureRole).toBool()) {
         return result; // kiri_motion is taking a snapshot of the window: the ring and tab indicator are not part of it
@@ -636,6 +722,7 @@ void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *
     m_ringShader->setUniform("ringWidth", float(ringWidth));
     m_ringShader->setUniform("borderColor", premultiplied(borderColor));
     m_ringShader->setUniform("ringColor", premultiplied(m_settings.ringColor));
+    m_ringShader->setUniform("fillColor", QVector4D(0, 0, 0, 0));
     m_ringShader->setUniform("pixel", float(1.0 / viewport.scale()));
 
     // only the parts of the ring KWin is repainting right now, so nothing is blended twice

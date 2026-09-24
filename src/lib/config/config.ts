@@ -14,6 +14,8 @@ interface Config {
     untileOnDrag: boolean;
     dropToTile: boolean;
     cursorFollowsFocus: boolean;
+    focusFollowsMouse: boolean;
+    focusFollowsMouseMaxScroll: number;
     tabbedColumnsByDefault: boolean;
     tabIndicatorEnabled: boolean;
     tabIndicatorWidth: number;
@@ -25,6 +27,7 @@ interface Config {
     reMaximize: boolean;
     tileMaximized: boolean;
     tileFullScreen: boolean;
+    hideTitlebars: boolean;
     skipSwitcher: boolean;
     scrollingLazy: boolean;
     scrollingCentered: boolean;

@@ -12,5 +12,7 @@ function getDefaultConfig(): Config {
     config.centerGridWhenFits = true;
     config.defaultColumnWidth = "";
     config.dropToTile = false;
+    config.focusFollowsMouse = false;
+    config.hideTitlebars = false; // the tests were written for windows with title bars; hideTitlebars.ts turns it on
     return config;
 }

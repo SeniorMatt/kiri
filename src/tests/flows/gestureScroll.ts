@@ -126,3 +126,63 @@ tests.register("Gesture scroll: a column's right edge is a snap point too", 1, (
     const leftAligned = clients.some(c => c.getActualFrameGeometry().x === area.x);
     Assert.assert(aligned || leftAligned, { message: "settles on an edge-aligned view" });
 });
+
+tests.register("Gesture scroll (raw swipe): no cap, 1:1 at working width / 1200 per unit, and back", 1, () => {
+    const config = getDefaultConfig();
+    config.gestureScroll = true;
+    config.gestureSettleDuration = 0;
+    const { qtMock, workspaceMock, world } = init(config);
+
+    const clients = workspaceMock.createClientsWithWidths(600, 600, 600, 600);
+    workspaceMock.activeWindow = clients[0];
+    const x0 = clients[0].getActualFrameGeometry().x;
+    const perUnit = screen.width / 1200; // the working area: the screen, here
+    const swipe = (events: number[][], phase = "h", end = false) =>
+        world.gestureRaw(JSON.stringify({ id: 1, phase: phase, end: end, ev: events }));
+
+    // 500 units in 10 ms steps: far past KWin's cap of 200 units, still following 1:1
+    const events: number[][] = [];
+    for (let i = 0; i < 25; i++) {
+        events.push([1000 + i * 10, 20]);
+    }
+    swipe(events);
+    Assert.assert(Math.abs((x0 - clients[0].getActualFrameGeometry().x) - 500 * perUnit) < 1, { message: "500 units should move the view 500 * working/1200 px" });
+    // reversing moves at once, no dead zone
+    swipe([[1250, -20], [1260, -20]]);
+    Assert.assert(Math.abs((x0 - clients[0].getActualFrameGeometry().x) - 460 * perUnit) < 1, { message: "reverse follows at once" });
+});
+
+tests.register("Gesture scroll (raw swipe): wobble before the axis lock and vertical swipes do nothing", 1, () => {
+    const config = getDefaultConfig();
+    config.gestureScroll = true;
+    config.gestureSettleDuration = 0;
+    const { qtMock, workspaceMock, world } = init(config);
+
+    const clients = workspaceMock.createClientsWithWidths(300, 300, 300);
+    workspaceMock.activeWindow = clients[0];
+    const x0 = clients[0].getActualFrameGeometry().x;
+    // a vertical swipe: the effect reports phase v and no events
+    world.gestureRaw(JSON.stringify({ id: 1, phase: "p", end: false, ev: [] }));
+    world.gestureRaw(JSON.stringify({ id: 1, phase: "v", end: true, ev: [] }));
+    Assert.equal(workspaceMock.activeWindow, clients[0]);
+    Assert.equal(clients[0].getActualFrameGeometry().x, x0);
+});
+
+tests.register("Gesture scroll (raw swipe): a fast fling projects to a further column", 1, () => {
+    const config = getDefaultConfig();
+    config.gestureScroll = true;
+    config.gestureSettleDuration = 0;
+    const { qtMock, workspaceMock, world } = init(config);
+
+    const clients = workspaceMock.createClientsWithWidths(600, 600, 600, 600, 600);
+    workspaceMock.activeWindow = clients[0];
+    const events: number[][] = [];
+    for (let i = 0; i < 8; i++) {
+        events.push([1000 + i * 8, 14]);
+    }
+    events.push([1064, 0]); // fingers up, no pause
+    world.gestureRaw(JSON.stringify({ id: 1, phase: "h", end: true, ev: events }));
+    // fast: ~1750 units/s -> projects about 580 units further; lands on a column edge beyond the first neighbour
+    const focused = clients.indexOf(workspaceMock.activeWindow as any);
+    Assert.assert(focused >= 1, { message: "the fling should focus a later column" });
+});

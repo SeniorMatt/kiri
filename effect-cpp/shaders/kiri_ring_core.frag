@@ -12,6 +12,7 @@ uniform float borderWidth;
 uniform float ringWidth;  // the ring starts where the border ends
 uniform vec4 borderColor; // straight (not premultiplied) alpha
 uniform vec4 ringColor;
+uniform vec4 fillColor;   // fills the inside of the rounded rectangle too (niri's insert hint), alpha 0 = off
 uniform float pixel;      // size of one device pixel in logical pixels, the antialiasing width
 
 float roundedRectDistance(vec2 p, vec4 r, float rad)
@@ -31,5 +32,6 @@ void main()
     float d = roundedRectDistance(pos, rect, radius);
     float b = borderWidth > 0.0 ? band(d, 0.0, borderWidth) * borderColor.a : 0.0;
     float r = ringWidth > 0.0 ? band(d, borderWidth, borderWidth + ringWidth) * ringColor.a : 0.0;
-    fragColor = vec4(borderColor.rgb * b + ringColor.rgb * r, b + r);
+    float f = fillColor.a > 0.0 ? clamp(0.5 - d / pixel, 0.0, 1.0) * fillColor.a : 0.0;
+    fragColor = vec4(borderColor.rgb * b + ringColor.rgb * r + fillColor.rgb * f, b + r + f);
 }

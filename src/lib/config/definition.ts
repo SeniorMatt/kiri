@@ -130,6 +130,16 @@ const configDef = [
         default: true,
     },
     {
+        name: "focusFollowsMouse", // needs KWin's focus policy on "Click to focus" (install.sh sets it)
+        type: "Bool",
+        default: true,
+    },
+    {
+        name: "focusFollowsMouseMaxScroll", // niri's max-scroll-amount, percent of the screen width; 100 = no limit
+        type: "UInt",
+        default: 100,
+    },
+    {
         name: "cursorFollowsFocus",
         type: "Bool",
         default: false,
@@ -187,6 +197,11 @@ const configDef = [
     },
     {
         name: "tileFullScreen",
+        type: "Bool",
+        default: true,
+    },
+    {
+        name: "hideTitlebars",
         type: "Bool",
         default: true,
     },

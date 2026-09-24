@@ -476,6 +476,7 @@ def read_settings_inner(path, warn):
         if any(child(tab, c) for c in ("active-color", "inactive-color", "active-gradient", "inactive-gradient", "place-within-column")):
             warn("tab-indicator colours and place-within-column (Kiri has no such options)")
 
+    out["hideTitlebars"] = bool(find(nodes, "prefer-no-csd"))
     for blk in find(nodes, "input"):
         if child(blk, "warp-mouse-to-focus"):
             out["cursorFollowsFocus"] = True

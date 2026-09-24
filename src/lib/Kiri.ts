@@ -42,6 +42,19 @@ interface TabIndicator {
 }
 
 let lastTabIndicatorsJson = "[]";
+// niri does not focus a window the pointer reaches over the tab indicator
+function isOverTabIndicator(x: number, y: number) {
+    let over = false;
+    tabIndicatorsByDesktop.forEach(list => {
+        for (const indicator of list) {
+            if (x >= indicator.x && x < indicator.x + indicator.width && y >= indicator.y && y < indicator.y + indicator.height) {
+                over = true;
+            }
+        }
+    });
+    return over;
+}
+
 let lastTabGroupsJson = "[]";
 const tabIndicatorsByDesktop = new Map<any, TabIndicator[]>();
 
@@ -103,19 +116,42 @@ function setVisualPosition(id: string, position: [number, number] | null) {
     }
 }
 
+// niri's insert hint while a window is dragged: the screen rectangle (null = none) the compiled effect draws
+let lastInsertHintJson = "null";
+
+function setInsertHint(rect: { x: number, y: number, width: number, height: number } | null, windowId = "") {
+    if (typeof qmlBase === "undefined") {
+        return; // tests
+    }
+    const json = rect === null ? "null" : JSON.stringify({
+        r: [Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height)],
+        w: windowId, // the dragged window, so the effect draws the hint under it
+    });
+    if (json !== lastInsertHintJson) {
+        lastInsertHintJson = json;
+        (qmlBase as any).insertHint = json;
+    }
+}
+
 // Owns the World and rebuilds it when the settings change
 class Kiri {
     private world: World;
     private configJson: string;
+    private focusFollowsMouse: FocusFollowsMouse | null;
 
     constructor(private config: Config, world = new World(config)) {
         setRingConfig(config);
         this.configJson = JSON.stringify(config);
         this.world = world;
+        this.focusFollowsMouse = config.focusFollowsMouse ? new FocusFollowsMouse(() => this.world.isScrollBusy(), config.focusFollowsMouseMaxScroll) : null;
     }
 
     public gestureScroll(amount: number) {
         this.world.gestureScroll(amount);
+    }
+
+    public gestureRaw(json: string) {
+        this.world.gestureRaw(json);
     }
 
     public gestureScrollFinish(delayed: boolean) {
@@ -150,6 +186,8 @@ class Kiri {
             this.world = new World(config, keyBindings, layout);
             this.config = config;
             this.configJson = configJson;
+            this.focusFollowsMouse?.destroy();
+            this.focusFollowsMouse = config.focusFollowsMouse ? new FocusFollowsMouse(() => this.world.isScrollBusy(), config.focusFollowsMouseMaxScroll) : null;
             setRingConfig(config);
         } catch (error: any) {
             log("failed to apply the new settings, going back to the old ones:", error, error.stack);

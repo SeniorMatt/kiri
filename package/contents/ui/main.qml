@@ -16,6 +16,7 @@ Item {
     // JSON of every desktop's tabbed columns, for the compiled effect that paints their indicators
     property string tabGroups: "[]"
     property string visualPositions: "{}"
+    property string insertHint: "null"
     // true while the C++ effect kiri_decorations is loaded: it paints the ring and borders (and rounds corners)
     // with the window itself, so these QML windows are only the fallback
     property bool decorationsEffect: false
@@ -62,6 +63,68 @@ Item {
         }
     }
 
+    // true while the compiled effect kiri_swipe is loaded: it hands over the raw, uncapped 3-finger swipe,
+    // which replaces KWin's handler progress (capped at 200 units) for scrolling
+    property bool swipeEffect: false
+    property bool swipePollPending: false
+    function checkSwipeEffect() {
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/Effects",
+                iface: "org.kde.kwin.Effects",
+                member: "isEffectLoaded",
+                arguments: [new DBus.string("kiri_swipe")],
+                signature: "(s)",
+            },
+            (reply) => {
+                const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
+                qmlBase.swipeEffect = value === true;
+            },
+            (error) => { qmlBase.swipeEffect = false; },
+        );
+    }
+    // Scripts cannot receive calls, so while fingers are on the touchpad the script asks the effect for the
+    // swipe events it has seen since the last question. Started by any 3-finger handler below.
+    function startSwipePoll() {
+        if (swipeEffect) {
+            swipeTimer.running = true;
+        }
+    }
+    function pollSwipe() {
+        if (swipePollPending) {
+            return;
+        }
+        swipePollPending = true;
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriSwipe",
+                iface: "org.kde.kwin.KWin.SwipeEffect",
+                member: "poll",
+                arguments: [],
+                signature: "()",
+            },
+            (reply) => {
+                qmlBase.swipePollPending = false;
+                const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
+                if (typeof value !== "string") {
+                    return;
+                }
+                qmlBase.karouselInstance.gestureRaw(value);
+                if (value.indexOf("\"phase\":\"i\"") !== -1) {
+                    swipeTimer.running = false;
+                }
+            },
+            (error) => { qmlBase.swipePollPending = false; swipeTimer.running = false; },
+        );
+    }
+    Timer {
+        id: swipeTimer
+        interval: 8
+        repeat: true
+        onTriggered: qmlBase.pollSwipe()
+    }
     property int decorationsChecks: 0
     // the compiled effect not being there is normal on a script-only install; a KWin update can also break it
     function noteDecorationsEffect(loaded) {
@@ -124,6 +187,21 @@ Item {
         );
     }
 
+    function sendInsertHint() {
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriDecorations",
+                iface: "org.kde.kiri.Decorations",
+                member: "setInsertHint",
+                arguments: [new DBus.string(qmlBase.insertHint)],
+                signature: "(s)",
+            },
+            () => {},
+            (error) => {},
+        );
+    }
+
     function sendVisualPositions() {
         DBus.SessionBus.asyncCall(
             {
@@ -141,6 +219,7 @@ Item {
 
     onTabGroupsChanged: if (decorationsEffect) sendTabGroups()
     onVisualPositionsChanged: if (decorationsEffect) sendVisualPositions()
+    onInsertHintChanged: if (decorationsEffect) sendInsertHint()
     onDecorationsEffectChanged: if (decorationsEffect) { sendTabGroups(); sendVisualPositions(); }
 
     Timer {
@@ -148,7 +227,7 @@ Item {
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: qmlBase.checkDecorationsEffect()
+        onTriggered: { qmlBase.checkDecorationsEffect(); qmlBase.checkSwipeEffect(); }
     }
 
     // borders switched on or off in the settings
@@ -276,17 +355,17 @@ Item {
     SwipeGestureHandler {
         direction: SwipeGestureHandler.Direction.Left
         fingerCount: 3
-        onActivated: qmlBase.karouselInstance.gestureScrollFinish(false)
-        onCancelled: qmlBase.karouselInstance.gestureScrollFinish(true)
-        onProgressChanged: qmlBase.karouselInstance.gestureScroll(-progress)
+        onActivated: if (!qmlBase.swipeEffect) qmlBase.karouselInstance.gestureScrollFinish(false)
+        onCancelled: if (!qmlBase.swipeEffect) qmlBase.karouselInstance.gestureScrollFinish(true)
+        onProgressChanged: if (qmlBase.swipeEffect) qmlBase.startSwipePoll(); else qmlBase.karouselInstance.gestureScroll(-progress)
     }
 
     SwipeGestureHandler {
         direction: SwipeGestureHandler.Direction.Right
         fingerCount: 3
-        onActivated: qmlBase.karouselInstance.gestureScrollFinish(false)
-        onCancelled: qmlBase.karouselInstance.gestureScrollFinish(true)
-        onProgressChanged: qmlBase.karouselInstance.gestureScroll(progress)
+        onActivated: if (!qmlBase.swipeEffect) qmlBase.karouselInstance.gestureScrollFinish(false)
+        onCancelled: if (!qmlBase.swipeEffect) qmlBase.karouselInstance.gestureScrollFinish(true)
+        onProgressChanged: if (qmlBase.swipeEffect) qmlBase.startSwipePoll(); else qmlBase.karouselInstance.gestureScroll(progress)
     }
 
     // With desktops in rows, KWin's own vertical swipe (animated by kiri_desktop_switch) already switches desktops,
@@ -294,12 +373,14 @@ Item {
     SwipeGestureHandler {
         direction: SwipeGestureHandler.Direction.Up
         fingerCount: 3
+        onProgressChanged: qmlBase.startSwipePoll()
         onActivated: if (Workspace.desktopGridHeight <= 1) qmlBase.karouselInstance.gestureSwitchDesktop(1)
     }
 
     SwipeGestureHandler {
         direction: SwipeGestureHandler.Direction.Down
         fingerCount: 3
+        onProgressChanged: qmlBase.startSwipePoll()
         onActivated: if (Workspace.desktopGridHeight <= 1) qmlBase.karouselInstance.gestureSwitchDesktop(-1)
     }
 
