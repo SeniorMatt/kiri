@@ -1,6 +1,7 @@
 class DesktopManager {
     private readonly desktops: Map<string, Desktop>; // key is activityId|desktopId
     private selectedScreen: Output;
+    private preferredScreenName: string; // like niri's workspaces, the grid returns to its output when it comes back
     private kwinActivities: Set<string>;
     private kwinDesktops: Set<KwinDesktop>;
 
@@ -16,6 +17,7 @@ class DesktopManager {
         this.layoutConfig = layoutConfig;
         this.desktops = new Map();
         this.selectedScreen = Workspace.activeScreen;
+        this.preferredScreenName = Workspace.activeScreen.name;
         this.kwinActivities = new Set(Workspace.activities);
         this.kwinDesktops = new Set(Workspace.desktops);
     }
@@ -86,8 +88,22 @@ class DesktopManager {
         this.kwinDesktops = newDesktops;
     }
 
+    // an explicit choice (the move-to-screen action)
     public selectScreen(screen: Output) {
         this.selectedScreen = screen;
+        this.preferredScreenName = screen.name;
+    }
+
+    // The outputs changed (hot-plug, lock, sleep, wake). The active screen is no guide then (it is briefly wrong on
+    // wake), so the grid keeps its output, goes back to it when it reappears, and only leaves it when it is gone.
+    public onScreensChanged() {
+        const screens = Workspace.screens;
+        const preferred = screens.find(screen => screen.name === this.preferredScreenName);
+        if (preferred !== undefined) {
+            this.selectedScreen = preferred;
+        } else if (!screens.includes(this.selectedScreen)) {
+            this.selectedScreen = Workspace.activeScreen;
+        }
     }
 
     private removeActivity(activity: string) {

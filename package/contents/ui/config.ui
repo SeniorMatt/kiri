@@ -1584,314 +1584,340 @@ org\.kde\.dolphin=800px</string></property></widget></item></layout></widget></i
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="127" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 1</string></property></widget></item>
-<item row="127" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_1">
+<item row="127" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop down, below the next one</string></property></widget></item>
+<item row="127" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_move_down">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="127" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_1">
+<item row="127" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_move_down">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="128" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 2</string></property></widget></item>
-<item row="128" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_2">
+<item row="128" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop up, above the previous one</string></property></widget></item>
+<item row="128" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_move_up">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="128" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_2">
+<item row="128" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_move_up">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="129" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 3</string></property></widget></item>
-<item row="129" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_3">
+<item row="129" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 1</string></property></widget></item>
+<item row="129" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_1">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="129" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_3">
+<item row="129" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_1">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="130" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 4</string></property></widget></item>
-<item row="130" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_4">
+<item row="130" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 2</string></property></widget></item>
+<item row="130" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_2">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="130" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_4">
+<item row="130" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_2">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="131" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 5</string></property></widget></item>
-<item row="131" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_5">
+<item row="131" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 3</string></property></widget></item>
+<item row="131" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_3">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="131" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_5">
+<item row="131" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_3">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="132" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 6</string></property></widget></item>
-<item row="132" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_6">
+<item row="132" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 4</string></property></widget></item>
+<item row="132" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_4">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="132" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_6">
+<item row="132" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_4">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="133" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 7</string></property></widget></item>
-<item row="133" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_7">
+<item row="133" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 5</string></property></widget></item>
+<item row="133" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_5">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="133" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_7">
+<item row="133" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_5">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="134" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 8</string></property></widget></item>
-<item row="134" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_8">
+<item row="134" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 6</string></property></widget></item>
+<item row="134" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_6">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="134" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_8">
+<item row="134" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_6">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="135" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 9</string></property></widget></item>
-<item row="135" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_9">
+<item row="135" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 7</string></property></widget></item>
+<item row="135" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_7">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="135" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_9">
+<item row="135" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_7">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="136" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 1</string></property></widget></item>
-<item row="136" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_1">
+<item row="136" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 8</string></property></widget></item>
+<item row="136" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_8">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="136" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_1">
+<item row="136" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_8">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="137" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 2</string></property></widget></item>
-<item row="137" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_2">
+<item row="137" column="0"><widget class="QLabel"><property name="text"><string>Switch to desktop 9</string></property></widget></item>
+<item row="137" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_9">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="137" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_2">
+<item row="137" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_9">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="138" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 3</string></property></widget></item>
-<item row="138" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_3">
+<item row="138" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 1</string></property></widget></item>
+<item row="138" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_1">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="138" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_3">
+<item row="138" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_1">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="139" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 4</string></property></widget></item>
-<item row="139" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_4">
+<item row="139" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 2</string></property></widget></item>
+<item row="139" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_2">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="139" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_4">
+<item row="139" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_2">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="140" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 5</string></property></widget></item>
-<item row="140" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_5">
+<item row="140" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 3</string></property></widget></item>
+<item row="140" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_3">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="140" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_5">
+<item row="140" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_3">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="141" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 6</string></property></widget></item>
-<item row="141" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_6">
+<item row="141" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 4</string></property></widget></item>
+<item row="141" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_4">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="141" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_6">
+<item row="141" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_4">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="142" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 7</string></property></widget></item>
-<item row="142" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_7">
+<item row="142" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 5</string></property></widget></item>
+<item row="142" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_5">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="142" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_7">
+<item row="142" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_5">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="143" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 8</string></property></widget></item>
-<item row="143" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_8">
+<item row="143" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 6</string></property></widget></item>
+<item row="143" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_6">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="143" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_8">
+<item row="143" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_6">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="144" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 9</string></property></widget></item>
-<item row="144" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_9">
+<item row="144" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 7</string></property></widget></item>
+<item row="144" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_7">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="144" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_9">
+<item row="144" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_7">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="145" column="0" colspan="3"><widget class="QLabel"><property name="text"><string>&lt;b&gt;Other&lt;/b&gt;</string></property></widget></item>
-<item row="146" column="0"><widget class="QLabel"><property name="text"><string>Toggle floating</string></property></widget></item>
-<item row="146" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_toggle_floating">
+<item row="145" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 8</string></property></widget></item>
+<item row="145" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_8">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="146" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_toggle_floating">
+<item row="145" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_8">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="147" column="0"><widget class="QLabel"><property name="text"><string>Switch focus between floating and tiled windows</string></property></widget></item>
-<item row="147" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_switch_focus_floating_tiling">
+<item row="146" column="0"><widget class="QLabel"><property name="text"><string>Move this and all following columns to desktop 9</string></property></widget></item>
+<item row="146" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_tail_move_to_desktop_9">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="147" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_switch_focus_floating_tiling">
+<item row="146" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_tail_move_to_desktop_9">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="148" column="0"><widget class="QLabel"><property name="text"><string>Close window</string></property></widget></item>
-<item row="148" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_close">
+<item row="147" column="0" colspan="3"><widget class="QLabel"><property name="text"><string>&lt;b&gt;Other&lt;/b&gt;</string></property></widget></item>
+<item row="148" column="0"><widget class="QLabel"><property name="text"><string>Toggle floating</string></property></widget></item>
+<item row="148" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_toggle_floating">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="148" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_close">
+<item row="148" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_toggle_floating">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="149" column="0"><widget class="QLabel"><property name="text"><string>Toggle full-screen</string></property></widget></item>
-<item row="149" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_toggle_fullscreen">
+<item row="149" column="0"><widget class="QLabel"><property name="text"><string>Switch focus between floating and tiled windows</string></property></widget></item>
+<item row="149" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_switch_focus_floating_tiling">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="149" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_toggle_fullscreen">
+<item row="149" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_switch_focus_floating_tiling">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="150" column="0"><widget class="QLabel"><property name="text"><string>Maximize window to the screen edges</string></property></widget></item>
-<item row="150" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_maximize_to_edges">
+<item row="150" column="0"><widget class="QLabel"><property name="text"><string>Close window</string></property></widget></item>
+<item row="150" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_close">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="150" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_maximize_to_edges">
+<item row="150" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_close">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="151" column="0"><widget class="QLabel"><property name="text"><string>Open the overview</string></property></widget></item>
-<item row="151" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_overview">
+<item row="151" column="0"><widget class="QLabel"><property name="text"><string>Toggle full-screen</string></property></widget></item>
+<item row="151" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_toggle_fullscreen">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="151" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_overview">
+<item row="151" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_toggle_fullscreen">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="152" column="0"><widget class="QLabel"><property name="text"><string>Maximize window to the screen edges</string></property></widget></item>
+<item row="152" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_maximize_to_edges">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="152" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_maximize_to_edges">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="153" column="0"><widget class="QLabel"><property name="text"><string>Toggle the overview</string></property></widget></item>
+<item row="153" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_overview">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="153" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_overview">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>

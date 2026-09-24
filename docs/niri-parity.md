@@ -41,6 +41,11 @@ focus-column-left/right/first/last and focus-window-up/down (no wrapping); focus
 - Window rules: open-focused, open-maximized, open-fullscreen, min/max-width, block-out-from: not audited.
 - Visual: a window that slides out to the left while a full-screen window slides in is not painted (see below).
 
+## Overview (kiri_overview)
+
+- Done like niri: zoom 0.5, gap 0.1 of the height times zoom, backdrop #262626, workspace shadow, the open/close and desktop-switch springs, the 4-finger swipe (300 units, velocity projection), wheel and right-drag scrolling, click to activate, drag with the insert hint (in a column, new column) and drop on another desktop, Esc / Meta+O to close.
+- Differs: windows are plain thumbnails (no rounded corners or shadows); while a window is dragged the others in its column do not grow into the gap; floating windows are shown and clickable but not draggable; no new desktop by dropping between desktops (KWin desktops are fixed); no hot corner; the keys of the overview (focus-*, move-*) do not reach Kiri while it is open, only Up/Down (desktop), Enter, Esc, Meta+O and typing in the search field; the 4-finger gesture needs Plasma's own Overview off (install.sh does that).
+
 ## Impossible in KWin
 
 - Per-monitor workspaces and focus-monitor-*, move-*-to-monitor-*, move-workspace-to-monitor-*: desktops are shared by all monitors; the grid sits on one screen.

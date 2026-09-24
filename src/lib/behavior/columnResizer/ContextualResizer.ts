@@ -23,20 +23,24 @@ class ContextualResizer {
         const leftSpace = leftVisibleColumn.getLeft() - visibleRange.getLeft();
         const rightSpace = visibleRange.getRight() - rightVisibleColumn.getRight();
 
+        const presets = this.presetWidths.getWidths(minWidth, maxWidth, desktop.tilingArea.width);
+        const nominalWidth = column.getNominalWidth();
         const newWidth = findMinPositive(
             [
                 column.getWidth() + leftSpace + rightSpace,
                 column.getWidth() + leftSpace + rightSpace + leftVisibleColumn.getWidth() + grid.config.gapsInnerHorizontal,
                 column.getWidth() + leftSpace + rightSpace + rightVisibleColumn.getWidth() + grid.config.gapsInnerHorizontal,
-                ...this.presetWidths.getWidths(minWidth, maxWidth, desktop.tilingArea.width),
+                ...presets,
             ],
-            width => width - column.getWidth(),
+            // presets are compared with the width that was asked for and with niri's 1 px allowance, the client may have rounded it down
+            width => presets.includes(width) ? width - nominalWidth - 1 : width - column.getWidth(),
         );
         if (newWidth === undefined) {
             return;
         }
 
         column.setWidth(newWidth, true);
+        column.setPresetIndex(presets.indexOf(newWidth), presets);
         desktop.scrollCenterVisible(column);
     }
 
@@ -71,19 +75,22 @@ class ContextualResizer {
         const leftOffScreen = leftOffScreenColumn === null ? 0 : leftOffScreenColumn.getWidth() + grid.config.gapsInnerHorizontal - unusedWidth;
         const rightOffScreen = rightOffScreenColumn === null ? 0 : rightOffScreenColumn.getWidth() + grid.config.gapsInnerHorizontal - unusedWidth;
 
+        const presets = this.presetWidths.getWidths(minWidth, maxWidth, desktop.tilingArea.width);
+        const nominalWidth = column.getNominalWidth();
         const newWidth = findMinPositive(
             [
                 column.getWidth() - leftOffScreen,
                 column.getWidth() - rightOffScreen,
-                ...this.presetWidths.getWidths(minWidth, maxWidth, desktop.tilingArea.width),
+                ...presets,
             ],
-            width => column.getWidth() - width,
+            width => presets.includes(width) ? nominalWidth - width - 1 : column.getWidth() - width,
         );
         if (newWidth === undefined) {
             return;
         }
 
         column.setWidth(newWidth, true);
+        column.setPresetIndex(presets.indexOf(newWidth), presets);
         desktop.scrollCenterVisible(column);
     }
 

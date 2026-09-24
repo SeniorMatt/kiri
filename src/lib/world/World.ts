@@ -16,9 +16,9 @@ class World {
     private readonly closeRelayoutDelayer: Delayer;
     private readonly closeRelayoutDelay: number;
     private arrangeHeld = false;
-    private readonly dynamicDesktops: boolean;
-    private updatingDesktops = false;
+    public readonly dynamicDesktops: DynamicDesktops;
     private currentDesktop: KwinDesktop|null = null;
+    private overview!: Overview;
     public previousDesktop: KwinDesktop|null = null; // niri's focus-workspace-previous
 
     // `keyBindings` and `layout` are given when Kiri reloads its settings: the shortcuts stay registered
@@ -28,8 +28,7 @@ class World {
         this.workspaceSignalManager = initWorkspaceSignalHandlers(this, focusPasser);
 
         let presetWidths = {
-            next: (currentWidth: number, minWidth: number, maxWidth: number, tilingAreaWidth: number) => currentWidth,
-            prev: (currentWidth: number, minWidth: number, maxWidth: number, tilingAreaWidth: number) => currentWidth,
+            cycle: (column: Column, forwards: boolean) => {},
             getWidths: (minWidth: number, maxWidth: number, tilingAreaWidth: number): number[] => [],
         };
         try {
@@ -68,6 +67,7 @@ class World {
             presetHeights: presetHeights,
             verticalResizeStep: config.verticalResizeStep,
             columnResizer: config.scrollingCentered ? new RawResizer(presetWidths) : new ContextualResizer(presetWidths),
+            clampDesktopIndex: (index: number) => this.dynamicDesktops.clampIndex(index),
         };
         if (keyBindings === null) {
             this.keyBindings = new KeyBindings(this, actionsConfig, config.shortcutKeys);
@@ -93,7 +93,6 @@ class World {
         this.gestureAnimationTimer.repeat = true;
         this.gestureAnimationTimer.triggered.connect(() => this.gestureAnimationStep());
 
-        this.dynamicDesktops = config.dynamicDesktops;
         this.closeRelayoutDelay = config.closeRelayoutDelay;
         this.closeRelayoutDelayer = new Delayer(config.closeRelayoutDelay, () => {
             this.arrangeHeld = false;
@@ -143,6 +142,8 @@ class World {
             new DesktopFilter(config.tiledDesktops),
         );
         this.clientManager = new ClientManager(config, this, this.desktopManager, this.pinManager);
+        this.dynamicDesktops = new DynamicDesktops(config.dynamicDesktops, desktop => this.clientManager.isDesktopOccupied(desktop));
+        this.overview = new Overview(this, this.clientManager, this.desktopManager);
         this.addExistingClients(layout);
         if (layout !== null) {
             this.restoreLayout(layout);
@@ -241,29 +242,8 @@ class World {
         }
     }
 
-    // niri's dynamic workspaces: there is always one empty desktop at the bottom, and empty ones in between are removed
-    private updateDynamicDesktops() {
-        if (!this.dynamicDesktops || this.updatingDesktops) {
-            return;
-        }
-        this.updatingDesktops = true;
-        try {
-            const desktops = Workspace.desktops;
-            if (this.clientManager.isDesktopOccupied(desktops[desktops.length - 1])) {
-                Workspace.createDesktop(desktops.length, "Desktop " + (desktops.length + 1));
-            }
-            for (const desktop of Workspace.desktops.slice(0, -1)) {
-                if (desktop !== Workspace.currentDesktop && !this.clientManager.isDesktopOccupied(desktop)) {
-                    Workspace.removeDesktop(desktop);
-                }
-            }
-        } finally {
-            this.updatingDesktops = false;
-        }
-    }
-
     private update() {
-        this.updateDynamicDesktops();
+        this.dynamicDesktops.update();
         if (this.arrangeHeld) {
             return;
         }
@@ -420,10 +400,22 @@ class World {
     // Raw swipe from the compiled effect kiri_swipe (the JSON of its poll()): the uncapped finger travel of a
     // 3-finger horizontal swipe, with timestamps. KWin's own progress (capped at 200 units) is ignored then.
     public gestureRaw(json: string) {
-        let swipe: { phase: string, end: boolean, ev: number[][] };
+        let swipe: { phase: string, end: boolean, ev: number[][], f?: number };
         try {
             swipe = JSON.parse(json);
         } catch (error: any) {
+            return;
+        }
+        if (swipe.f === 4) {
+            // 4 fingers: niri's overview gesture (vertical)
+            if (overviewEffectLoaded()) {
+                if (swipe.phase === "v") {
+                    this.overview.gestureUpdate(swipe.ev);
+                }
+                if (swipe.end) {
+                    this.overview.gestureEnd();
+                }
+            }
             return;
         }
         if (swipe.phase === "h" && swipe.ev.length > 0) {
@@ -444,6 +436,17 @@ class World {
             this.gestureEndDelayer.stop();
             this.gestureRelease();
         }
+    }
+
+    // niri's toggle-overview: the compiled effect draws it, without the effect Plasma's own Overview opens
+    public toggleOverview() {
+        if (!this.overview.toggle()) {
+            kglobalaccel.call("/component/kwin", "org.kde.kglobalaccel.Component", "invokeShortcut", ["s"], ["Overview"], () => {});
+        }
+    }
+
+    public overviewPoll(json: string) {
+        this.overview.poll(json);
     }
 
     // `activated` means the fingers were lifted, `cancelled` may also be just a change of swipe direction
@@ -537,6 +540,7 @@ class World {
     }
 
     public destroy() {
+        this.overview.close();
         this.gestureEndDelayer.destroy();
         this.gestureAnimationTimer.destroy();
         this.closeRelayoutDelayer.destroy();

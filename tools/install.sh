@@ -43,7 +43,7 @@ if $build && [ -d "$cpp" ]; then
     if cmake -S "$cpp" -B "$builddir" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr >"$builddir/log.txt" 2>&1 &&
         cmake --build "$builddir" -j "$(nproc)" >>"$builddir/log.txt" 2>&1; then
         # let KWin let go of the old plugins before replacing the files
-        for e in kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe; do
+        for e in kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
             qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
         done
         # remove first: a new file instead of overwriting one KWin may have mapped
@@ -52,7 +52,7 @@ if $build && [ -d "$cpp" ]; then
         done
         $SUDO cmake --install "$builddir" >>"$builddir/log.txt" 2>&1
         compiled=true
-        echo "Built and installed the compiled effects (kiri_decorations, kiri_desktop_switch, kiri_motion)."
+        echo "Built and installed the compiled effects (kiri_decorations, kiri_desktop_switch, kiri_motion, kiri_swipe, kiri_overview)."
     else
         echo "Building the compiled effects failed, see $builddir/log.txt. Kiri still works without them." >&2
     fi
@@ -60,6 +60,13 @@ fi
 
 # ---- the script and the animation effect ---------------------------------------------------------------
 kpackagetool6 --type=KWin/Script --upgrade "$root/package" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Script --install "$root/package"
+if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key overviewEnabled)" != done ]; then
+    # added with the overview: niri's overview (Meta+O, 4-finger swipe up). Plasma's own Overview has the same 4-finger
+    # swipe and would open on top of it, so it is switched off once; uninstall.sh switches it back on
+    w Plugins kiri_overviewEnabled true
+    w Plugins overviewEnabled false
+    w Kiri-install overviewEnabled done
+fi
 if $compiled; then
     # kiri_motion replaces the kiri_animations script effect; with both on every window animates twice, so the
     # fallback is not installed at all and doesn't show up in Desktop Effects
@@ -134,7 +141,9 @@ if qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1; then
                 qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
         done
     fi
-    for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe; do
+    [ "$(kreadconfig6 --file kwinrc --group Plugins --key overviewEnabled)" = false ] &&
+        qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect overview >/dev/null 2>&1 || true
+    for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
         qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
         # only the ones that are switched on (the script effect is the fallback and stays off beside kiri_motion)
         [ "$(kreadconfig6 --file kwinrc --group Plugins --key ${e}Enabled)" = false ] && continue

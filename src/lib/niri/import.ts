@@ -64,6 +64,8 @@ namespace NiriImport {
         "center-window": "grid-scroll-focused",
         "center-visible-columns": "column-center-visible",
         "focus-workspace-previous": "desktop-previous-used",
+        "move-workspace-down": "desktop-move-down",
+        "move-workspace-up": "desktop-move-up",
         "move-window-to-floating": "window-move-to-floating",
         "move-window-to-tiling": "window-move-to-tiling",
         "focus-floating": "focus-floating",
@@ -446,6 +448,7 @@ namespace NiriImport {
         }
 
         out["hideTitlebars"] = Kdl.find(nodes, "prefer-no-csd").length > 0;
+        out["dynamicDesktops"] = true; // niri always has dynamic workspaces
         for (const block of Kdl.find(nodes, "input")) {
             if (Kdl.child(block, "warp-mouse-to-focus")) {
                 out["cursorFollowsFocus"] = true;

@@ -291,3 +291,29 @@ tests.register("Focus and move windows", 1, () => {
         Assert.equal((workspaceMock.activeWindow as MockKwinClient).getActualFrameGeometry().width, width);
     });
 }
+
+tests.register("The grid keeps its output when the active screen changes briefly (wake)", 1, () => {
+    const { workspaceMock, world } = init(getDefaultConfig());
+    const first = workspaceMock.activeScreen;
+    const second: Output = { __brand: "Output", name: "HDMI-1" };
+    workspaceMock.screens = [first, second];
+    const selected = () => {
+        let result: Output | undefined;
+        world.do((clientManager, desktopManager) => result = (desktopManager as any).selectedScreen);
+        return result;
+    };
+    Assert.equal(selected(), first);
+
+    workspaceMock.activeScreen = second; // wrong for a moment on wake
+    workspaceMock.screensChanged.fire();
+    Assert.equal(selected(), first, { message: "the grid must stay on its output" });
+
+    workspaceMock.screens = [second]; // its output is gone
+    workspaceMock.screensChanged.fire();
+    Assert.equal(selected(), second);
+
+    const back: Output = { __brand: "Output", name: "DP-1" }; // and comes back
+    workspaceMock.screens = [back, second];
+    workspaceMock.screensChanged.fire();
+    Assert.equal(selected(), back);
+});

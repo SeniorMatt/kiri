@@ -6,6 +6,8 @@ class ClientWrapper {
     private maximizedMode: MaximizedMode | undefined;
     private readonly manipulatingGeometry: Doer;
     private lastPlacement: QmlRect | null; // workaround for issue #19
+    public ownNoBorder: boolean | null = null; // the window's own noBorder while Kiri hides its title bar (see Tiled)
+    public keepTitlebarHidden = false; // set while a dragged window passes through the floating state
 
     constructor(
         public readonly kwinClient: KwinClient,
@@ -133,6 +135,14 @@ class ClientWrapper {
         this.manipulatingGeometry.do(() => {
             this.kwinClient.noBorder = noBorder;
         });
+    }
+
+    // gives the window its own title bar setting back (after a drag that did not end in the grid)
+    public restoreTitlebar() {
+        if (this.ownNoBorder !== null) {
+            this.setNoBorder(this.ownNoBorder);
+            this.ownNoBorder = null;
+        }
     }
 
     public getMaximizedMode() {

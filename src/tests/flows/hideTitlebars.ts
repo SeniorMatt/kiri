@@ -85,3 +85,51 @@ tests.register("Without title bars, a window that leaves full-screen mode goes b
         Assert.equal(game.noBorder, true);
     }
 });
+
+tests.register("A dragged window keeps its title bar hidden; a drop as floating brings it back", 5, () => {
+    for (const dropToTile of [true, false]) {
+        const config = getDefaultConfig();
+        config.hideTitlebars = true;
+        config.untileOnDrag = true;
+        config.dropToTile = dropToTile;
+        const { workspaceMock, world } = init(config);
+        const own = new MockKwinClient(new MockQmlRect(0, 0, 300, 300));
+        own.noBorder = true; // the window's own value is kept through a drag
+        const [a] = workspaceMock.createClients(1);
+        workspaceMock.createWindows(own);
+        for (const client of [a, own]) {
+            const frame = client.getFrameGeometryCopy();
+            client.move = true;
+            workspaceMock.cursorPos = new MockQmlPoint(frame.x, frame.y);
+            client.interactiveMoveResizeStarted.fire();
+            workspaceMock.cursorPos = new MockQmlPoint(frame.x + 400, frame.y + 20);
+            frame.x += 400;
+            frame.y += 20;
+            client.frameGeometry = frame;
+            world.do((clientManager, desktopManager) => {
+                Assert.notTiledClient(clientManager, client);
+            });
+            Assert.equal(client.noBorder, true, { message: "hidden while it is dragged" });
+            client.move = false;
+            client.interactiveMoveResizeFinished.fire();
+            if (dropToTile) {
+                world.do((clientManager, desktopManager) => {
+                    Assert.tiledClient(clientManager, client);
+                });
+                Assert.equal(client.noBorder, true);
+            } else {
+                Assert.equal(client.noBorder, client === own, { message: "dropped as floating: the window's own value is back" });
+            }
+        }
+        if (dropToTile) {
+            // a real float restores the window's own value, not the hidden one
+            workspaceMock.activeWindow = own;
+            const qt = Qt as MockQt;
+            qt.fireShortcut("window-toggle-floating");
+            Assert.equal(own.noBorder, true);
+            workspaceMock.activeWindow = a;
+            qt.fireShortcut("window-toggle-floating");
+            Assert.equal(a.noBorder, false);
+        }
+    }
+});

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Removes what install.sh put on this machine: the Kiri script, the kiri_animations effect, the compiled
-# effects (kiri_decorations, kiri_desktop_switch, kiri_motion) and the build cache, and turns Plasma's own effects back on.
+# effects (kiri_decorations, kiri_desktop_switch, kiri_motion, kiri_swipe, kiri_overview) and the build cache, and turns Plasma's own effects back on.
 # It asks first, then asks again whether to delete your Kiri settings and shortcuts too. Keep them if you only
 # want Kiri gone for a while: installing it again brings everything back as it was.
 #   ./uninstall.sh
@@ -49,7 +49,7 @@ delete_group() {
 
 # ---- stop everything (the script gives Plasma's borrowed shortcuts back when it stops) ------------------
 w Plugins kiriEnabled false
-for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe; do
+for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
     d Plugins ${e}Enabled
     q org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e
 done
@@ -70,9 +70,12 @@ fi
 d Kiri-install effectsEnabled
 d Kiri-install motionEnabled
 d Kiri-install swipeEnabled
+d Kiri-install overviewEnabled
+d Plugins overviewEnabled # Plasma's own Overview is on by default again
 q org.kde.KWin /KWin org.kde.KWin.reconfigure
 q org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect slide
 q org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect kwin4_effect_geometry_change
+q org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect overview
 for e in scale maximize; do # the ones Plasma has on by default (Fade and Glide are off unless chosen)
     q org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect $e
 done

@@ -7,7 +7,8 @@ class MockWorkspace {
         { __brand: "KwinDesktop", id: "desktop2", name: "Desktop 2" },
     ];
     public currentActivity = this.activities[0];
-    public activeScreen: Output = { __brand: "Output" };
+    public activeScreen: Output = { __brand: "Output", name: "DP-1" };
+    public screens: Output[] = [this.activeScreen];
     public readonly windows: MockKwinClient[] = [];
     public cursorPos = new MockQmlPoint(0, 0);
 

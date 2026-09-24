@@ -76,6 +76,8 @@ tests.register("NiriImport", 1, () => {
             Mod+Minus { set-column-width "-10%"; }
             Mod+Equal { set-column-width "+10%"; }
             Mod+Q { close-window; }
+            Mod+Ctrl+Shift+Page_Down { move-workspace-down; }
+            Mod+Ctrl+Shift+Page_Up { move-workspace-up; }
             Mod+T { spawn "alacritty"; }
             Mod+WheelScrollDown { focus-workspace-down; }
             /-Mod+X { close-window; }
@@ -121,6 +123,8 @@ tests.register("NiriImport", 1, () => {
         "column-width-decrease": ["Meta+-"],
         "column-width-increase": ["Meta+="],
         "window-close": ["Meta+Q"],
+        "desktop-move-down": ["Meta+Ctrl+Shift+PgDown"],
+        "desktop-move-up": ["Meta+Ctrl+Shift+PgUp"],
     }));
     Assert.equal(result.skipped.length, 3); // spawn, wheel, tab indicator colours
 

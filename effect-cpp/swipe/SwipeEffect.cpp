@@ -40,7 +40,8 @@ void SwipeEffect::swipeGestureBegin(PointerSwipeGestureBeginEvent *event)
     const TouchpadConfig config = TouchpadConfig::read();
     m_unaccel.setProfile(config.flat, config.speed);
     m_natural = config.natural;
-    if (event->fingerCount == 3) {
+    if (event->fingerCount == 3 || event->fingerCount == 4) {
+        m_fingers = event->fingerCount;
         m_phase = Phase::Pending;
         m_id++;
     } else {
@@ -63,8 +64,12 @@ void SwipeEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event)
             // like niri, the travel before the lock is dropped; the view starts with this event's delta
         }
     }
-    if (m_phase == Phase::Horizontal) {
+    // 3 fingers: the horizontal travel scrolls the view; 4 fingers: the vertical travel opens the overview
+    if (m_phase == Phase::Horizontal && m_fingers == 3) {
         m_queue.append({event->time.count() / 1000.0, m_natural ? -ux : ux}); // niri inverts the delta with natural scrolling
+    } else if (m_phase == Phase::Vertical && m_fingers == 4) {
+        // niri's overview gesture uses the delta as the touchpad reports it (uninverted_delta_y), not the natural-scrolling one
+        m_queue.append({event->time.count() / 1000.0, uy});
     }
 }
 
@@ -91,10 +96,11 @@ void SwipeEffect::swipeGestureCancelled(PointerSwipeGestureCancelEvent *event)
 QString SwipeEffect::poll()
 {
     static const char phases[] = {'i', 'p', 'h', 'v'};
-    QString out = QStringLiteral("{\"id\":%1,\"phase\":\"%2\",\"end\":%3,\"ev\":[")
+    QString out = QStringLiteral("{\"id\":%1,\"f\":%4,\"phase\":\"%2\",\"end\":%3,\"ev\":[")
                       .arg(m_id)
                       .arg(QLatin1Char(phases[static_cast<int>(m_phase)]))
-                      .arg(m_ended ? QStringLiteral("true") : QStringLiteral("false"));
+                      .arg(m_ended ? QStringLiteral("true") : QStringLiteral("false"))
+                      .arg(m_fingers);
     for (int i = 0; i < m_queue.size(); i++) {
         out += QStringLiteral("%1[%2,%3]").arg(i ? QStringLiteral(",") : QString()).arg(m_queue[i].ms, 0, 'f', 3).arg(m_queue[i].dx, 0, 'f', 4);
     }

@@ -3,7 +3,7 @@
 
     KWin hands scripts a swipe only as `progress`, capped at 200 units of finger travel and split per direction.
     This effect spies on the input events instead (InputEventSpy sees every event, uncapped, and does not
-    consume it) and keeps the niri state machine: three fingers only, the axis is chosen once the travel
+    consume it) and keeps the niri state machine: three fingers (horizontal travel) or four (vertical travel, the overview), the axis is chosen once the travel
     reaches 16 units (copied from GNOME Shell by niri), and from then on every horizontal delta is queued.
     The Kiri script polls `poll()` over D-Bus (scripts cannot receive calls) and drives the view itself.
 */
@@ -36,7 +36,7 @@ public:
     void swipeGestureCancelled(PointerSwipeGestureCancelEvent *event) override;
 
 public Q_SLOTS:
-    // {"id":<swipe number>,"phase":"i|p|h|v","end":<bool>,"ev":[[ms, dx], ...]}; drains the queue.
+    // {"id":<swipe number>,"f":<fingers>,"phase":"i|p|h|v","end":<bool>,"ev":[[ms, dx or dy], ...]}; drains the queue.
     // i idle (no 3-finger swipe), p pending (axis not chosen yet), h horizontal, v vertical.
     Q_SCRIPTABLE QString poll();
 
@@ -46,6 +46,7 @@ private:
     void finish(std::chrono::microseconds time);
 
     Phase m_phase = Phase::Idle;
+    int m_fingers = 3;
     QPointF m_cumulative;
     NiriSwipe::Unaccelerate m_unaccel;
     bool m_natural = false;

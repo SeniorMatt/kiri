@@ -133,6 +133,34 @@ function setInsertHint(rect: { x: number, y: number, width: number, height: numb
     }
 }
 
+// The compiled effect kiri_overview (niri's overview) is driven through main.qml: a call is a JSON
+// {m: method, a: argument, n: counter}, answers come back through Kiri.overviewPoll()
+let overviewCallSeq = 0;
+const overviewCalls: { member: string, arg: string }[] = []; // what tests look at
+let overviewPollingFlag = false;
+
+function overviewEffectLoaded() {
+    return typeof qmlBase === "undefined" ? true : (qmlBase as any).overviewEffect === true;
+}
+
+function overviewCall(member: string, arg: string) {
+    if (typeof qmlBase === "undefined") {
+        overviewCalls.push({ member: member, arg: arg });
+        if (overviewCalls.length > 200) {
+            overviewCalls.shift();
+        }
+        return;
+    }
+    (qmlBase as any).overviewCall = JSON.stringify({ m: member, a: arg, n: ++overviewCallSeq });
+}
+
+function setOverviewPolling(polling: boolean) {
+    overviewPollingFlag = polling;
+    if (typeof qmlBase !== "undefined") {
+        (qmlBase as any).overviewPolling = polling;
+    }
+}
+
 // Owns the World and rebuilds it when the settings change
 class Kiri {
     private world: World;
@@ -156,6 +184,10 @@ class Kiri {
 
     public gestureScrollFinish(delayed: boolean) {
         this.world.gestureScrollFinish(delayed);
+    }
+
+    public overviewPoll(json: string) {
+        this.world.overviewPoll(json);
     }
 
     public gestureSwitchDesktop(offset: number) {

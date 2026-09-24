@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Authors": [ { "Name": "Senior Matthew" } ],
+        "Category": "Window Management",
+        "Description": "niri's overview: every desktop zoomed out and stacked, with its windows where Kiri placed them",
+        "EnabledByDefault": true,
+        "License": "GPL-3.0",
+        "Name": "Kiri overview",
+        "Version": "0.9.1",
+        "Website": "https://github.com/SeniorMatt/kiri"
+    }
+}

@@ -13,6 +13,7 @@ function getDefaultConfig(): Config {
     config.defaultColumnWidth = "";
     config.dropToTile = false;
     config.focusFollowsMouse = false;
+    config.dynamicDesktops = false; // dynamicDesktops.ts turns it on
     config.hideTitlebars = false; // the tests were written for windows with title bars; hideTitlebars.ts turns it on
     return config;
 }

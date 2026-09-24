@@ -66,6 +66,12 @@ Item {
     // true while the compiled effect kiri_swipe is loaded: it hands over the raw, uncapped 3-finger swipe,
     // which replaces KWin's handler progress (capped at 200 units) for scrolling
     property bool swipeEffect: false
+    // true while the compiled effect kiri_overview (niri's overview) is loaded. The script drives it: a call is a
+    // JSON {m: method, a: string argument, n: counter}, and while it is open the script polls it for what happened
+    property bool overviewEffect: false
+    property string overviewCall: ""
+    property bool overviewPolling: false
+    property bool overviewPollPending: false
     property bool swipePollPending: false
     function checkSwipeEffect() {
         DBus.SessionBus.asyncCall(
@@ -84,6 +90,72 @@ Item {
             (error) => { qmlBase.swipeEffect = false; },
         );
     }
+    function checkOverviewEffect() {
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/Effects",
+                iface: "org.kde.kwin.Effects",
+                member: "isEffectLoaded",
+                arguments: [new DBus.string("kiri_overview")],
+                signature: "(s)",
+            },
+            (reply) => {
+                const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
+                qmlBase.overviewEffect = value === true;
+            },
+            (error) => { qmlBase.overviewEffect = false; },
+        );
+    }
+    onOverviewCallChanged: {
+        if (overviewCall === "") {
+            return;
+        }
+        const call = JSON.parse(overviewCall);
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriOverview",
+                iface: "org.kde.kiri.Overview",
+                member: call.m,
+                arguments: call.a === "" ? [] : [new DBus.string(call.a)],
+                signature: call.a === "" ? "()" : "(s)",
+            },
+            () => {},
+            (error) => {},
+        );
+    }
+    function pollOverview() {
+        if (overviewPollPending) {
+            return;
+        }
+        overviewPollPending = true;
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriOverview",
+                iface: "org.kde.kiri.Overview",
+                member: "poll",
+                arguments: [],
+                signature: "()",
+            },
+            (reply) => {
+                qmlBase.overviewPollPending = false;
+                const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
+                if (typeof value === "string") {
+                    qmlBase.karouselInstance.overviewPoll(value);
+                }
+            },
+            (error) => { qmlBase.overviewPollPending = false; qmlBase.overviewPolling = false; },
+        );
+    }
+    Timer {
+        interval: 40
+        repeat: true
+        running: qmlBase.overviewPolling
+        onTriggered: qmlBase.pollOverview()
+    }
+
     // Scripts cannot receive calls, so while fingers are on the touchpad the script asks the effect for the
     // swipe events it has seen since the last question. Started by any 3-finger handler below.
     function startSwipePoll() {
@@ -227,7 +299,7 @@ Item {
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: { qmlBase.checkDecorationsEffect(); qmlBase.checkSwipeEffect(); }
+        onTriggered: { qmlBase.checkDecorationsEffect(); qmlBase.checkSwipeEffect(); qmlBase.checkOverviewEffect(); }
     }
 
     // borders switched on or off in the settings
@@ -382,6 +454,21 @@ Item {
         fingerCount: 3
         onProgressChanged: qmlBase.startSwipePoll()
         onActivated: if (Workspace.desktopGridHeight <= 1) qmlBase.karouselInstance.gestureSwitchDesktop(-1)
+    }
+
+    // 4 fingers up/down: niri's overview gesture. KWin only reports 200 units of progress per handler, so these
+    // just start the polling of kiri_swipe, which sees the raw swipe (the script then drives kiri_overview).
+    // KWin's own Overview must be off (install.sh does that), it has the same 4-finger binding.
+    SwipeGestureHandler {
+        direction: SwipeGestureHandler.Direction.Up
+        fingerCount: 4
+        onProgressChanged: qmlBase.startSwipePoll()
+    }
+
+    SwipeGestureHandler {
+        direction: SwipeGestureHandler.Direction.Down
+        fingerCount: 4
+        onProgressChanged: qmlBase.startSwipePoll()
     }
 
     KGlobalAccelBridge {

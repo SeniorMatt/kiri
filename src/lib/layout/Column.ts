@@ -3,6 +3,8 @@ class Column {
     public gridX: number;
     public widthBeforeMaximize: number|undefined;
     private width: number; // TODO: increase column width to contain transients
+    private presetIndex: number|undefined; // like niri's preset_width_idx: where the preset cycling stands; any other width change forgets it
+    private presetWidth: number|undefined; // the width that was asked for when `presetIndex` was set; clients may snap to a smaller one
     private readonly windows: LinkedList<Window>;
     private tabbed: boolean;
     private focusTaker: Window|null;
@@ -126,8 +128,12 @@ class Column {
         return Math.max(minMaxWidth, this.getMinWidth()); // max width mustn't be lower than min width
     }
 
-    public setWidth(width: number, setPreferred: boolean) {
+    public setWidth(width: number, setPreferred: boolean, keepPreset = false) {
         width = clamp(width, this.getMinWidth(), this.getMaxWidth());
+        if (!keepPreset) {
+            this.presetIndex = undefined;
+            this.presetWidth = undefined;
+        }
         if (width === this.width) {
             return;
         }
@@ -141,11 +147,28 @@ class Column {
         this.grid.onColumnWidthChanged(this);
     }
 
+    // remembers that the width was just set to `widths[index]` where `widths` is the list of presets that is cycled through
+    public setPresetIndex(index: number, widths: number[]) {
+        this.presetIndex = index >= 0 && index < widths.length ? index : undefined;
+        this.presetWidth = this.presetIndex === undefined ? undefined : widths[this.presetIndex];
+    }
+
+    public getPresetIndex() {
+        return this.fillsWidth() ? undefined : this.presetIndex;
+    }
+
+    // the width the user asked for with the last preset; the client may have snapped to a slightly smaller one
+    public getNominalWidth() {
+        return this.getPresetIndex() !== undefined ? this.presetWidth! : this.getWidth();
+    }
+
     public adjustWidth(widthDelta: number, setPreferred: boolean) {
         this.setWidth(this.width + widthDelta, setPreferred);
     }
 
     public updateWidth() {
+        this.presetIndex = undefined;
+        this.presetWidth = undefined;
         let minErr = Infinity;
         let closestPreferredWidth = this.width;
         for (const window of this.windows.iterator()) {
@@ -155,7 +178,7 @@ class Column {
                 closestPreferredWidth = window.client.preferredWidth;
             }
         }
-        this.setWidth(closestPreferredWidth, false);
+        this.setWidth(closestPreferredWidth, false, true);
     }
 
     // returns x position of left edge in grid space

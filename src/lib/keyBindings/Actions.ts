@@ -510,13 +510,11 @@ class Actions {
     };
 
     public readonly cyclePresetWidths = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        const nextWidth = this.config.presetWidths.next(column.getWidth(), column.getMinWidth(), column.getMaxWidth(), grid.desktop.tilingArea.width);
-        column.setWidth(nextWidth, true);
+        this.config.presetWidths.cycle(column, true);
     };
 
     public readonly cyclePresetWidthsReverse = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        const nextWidth = this.config.presetWidths.prev(column.getWidth(), column.getMinWidth(), column.getMaxWidth(), grid.desktop.tilingArea.width);
-        column.setWidth(nextWidth, true);
+        this.config.presetWidths.cycle(column, false);
     };
 
     // niri's expand-column-to-available-width: the column takes the screen space that no other visible column uses
@@ -831,6 +829,7 @@ class Actions {
     // like niri: the column goes to the right of the target's active column, the target becomes the current
     // desktop and the moved column keeps the focus
     public readonly columnMoveToDesktop = (desktopIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        desktopIndex = this.config.clampDesktopIndex(desktopIndex);
         const newGrid = this.getOtherGrid(desktopIndex, dm, oldGrid);
         if (newGrid === null) {
             return;
@@ -844,6 +843,7 @@ class Actions {
     };
 
     public readonly windowMoveToDesktop = (desktopIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        desktopIndex = this.config.clampDesktopIndex(desktopIndex);
         if (column.getWindowCount() === 1) {
             this.columnMoveToDesktop(desktopIndex, cm, dm, window, column, oldGrid);
             return;
@@ -910,6 +910,7 @@ class Actions {
     };
 
     public readonly tailMoveToDesktop = (desktopIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        desktopIndex = this.config.clampDesktopIndex(desktopIndex);
         const kwinDesktop = Workspace.desktops[desktopIndex];
         if (kwinDesktop === undefined) {
             return;
@@ -955,14 +956,14 @@ namespace Actions {
         columnWidthStep: number;
         windowHeightStep: number;
         presetWidths: {
-            next: (currentWidth: number, minWidth: number, maxWidth: number, tilingAreaWidth: number) => number;
-            prev: (currentWidth: number, minWidth: number, maxWidth: number, tilingAreaWidth: number) => number
+            cycle: (column: Column, forwards: boolean) => void;
         };
         verticalResizeStep: number;
         presetHeights: {
             getOrdered: (tilingAreaHeight: number) => number[];
         };
         columnResizer: ColumnResizer;
+        clampDesktopIndex: (index: number) => number; // niri: a desktop number past the last one means the last one
     }
 
     export interface ColumnResizer {

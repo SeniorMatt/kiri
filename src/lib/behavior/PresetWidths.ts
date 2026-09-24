@@ -5,6 +5,36 @@ class PresetWidths {
         this.presets = PresetWidths.parsePresetWidths(presetWidths, spacing);
     }
 
+    // like niri's toggle_width: after a preset was applied, the next press goes by index, however the client rounded
+    // the size; otherwise the first preset that is more than 1 px (fractional scaling allowance) past the current width
+    public cycle(column: Column, forwards: boolean) {
+        const widths = this.getWidths(column.getMinWidth(), column.getMaxWidth(), column.grid.desktop.tilingArea.width);
+        const len = widths.length;
+        if (len === 0) {
+            return;
+        }
+        const current = column.getWidth();
+        let index = column.getPresetIndex();
+        if (index !== undefined && index < len) {
+            index = (index + (forwards ? 1 : len - 1)) % len;
+        } else if (forwards) {
+            index = widths.findIndex(width => current + 1 < width);
+            if (index < 0) {
+                index = 0;
+            }
+        } else {
+            index = len - 1;
+            while (index >= 0 && !(widths[index] + 1 < current)) {
+                index--;
+            }
+            if (index < 0) {
+                index = len - 1;
+            }
+        }
+        column.setWidth(widths[index], true);
+        column.setPresetIndex(index, widths);
+    }
+
     public next(currentWidth: number, minWidth: number, maxWidth: number, tilingAreaWidth: number) {
         const widths = this.getWidths(minWidth, maxWidth, tilingAreaWidth);
         const nextIndex = widths.findIndex(width => width > currentWidth);

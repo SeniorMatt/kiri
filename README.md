@@ -46,7 +46,7 @@ They're in System Settings > Shortcuts > Kiri, and the defaults follow niri's, e
     Meta+W                         toggle tabbed column
     Meta+V                         toggle floating
     Meta+Q                         close window
-    Meta+O                         overview
+    Meta+O                         overview (also: 4-finger swipe up)
 
 To use the keys from your niri config, run `tools/niri2kiri.py ~/.config/niri/config.kdl` and paste what it prints over the `[kiri]` section of `~/.config/kglobalshortcutsrc`, then log in again. Kiri has to have been enabled once before.
 

@@ -61,6 +61,8 @@ extra_rows = [
     ("window_height_cycle_presets_reverse", "Increase window height by a share of the screen", "window_height_increase"),
     ("window_height_increase", "Decrease window height by a share of the screen", "window_height_decrease"),
     ("desktop_previous", "Switch back to the previously used desktop", "desktop_previous_used"),
+    ("desktop_previous_used", "Move the current desktop down, below the next one", "desktop_move_down"),
+    ("desktop_move_down", "Move the current desktop up, above the previous one", "desktop_move_up"),
 ]
 for after, label, key in extra_rows:
     for _, rows in sections:

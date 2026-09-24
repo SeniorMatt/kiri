@@ -81,6 +81,8 @@ ACTIONS = {
     "center-window": "grid-scroll-focused",
     "center-visible-columns": "column-center-visible",
     "focus-workspace-previous": "desktop-previous-used",
+    "move-workspace-down": "desktop-move-down",
+    "move-workspace-up": "desktop-move-up",
     "move-window-to-floating": "window-move-to-floating",
     "move-window-to-tiling": "window-move-to-tiling",
     "focus-floating": "focus-floating",
@@ -545,6 +547,7 @@ def read_settings_inner(path, warn):
             warn("tab-indicator colours and place-within-column (Kiri has no such options)")
 
     out["hideTitlebars"] = bool(find(nodes, "prefer-no-csd"))
+    out["dynamicDesktops"] = True  # niri always has dynamic workspaces
     for blk in find(nodes, "input"):
         if child(blk, "warp-mouse-to-focus"):
             out["cursorFollowsFocus"] = True

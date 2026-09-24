@@ -4,29 +4,25 @@ class RawResizer {
     ) {}
 
     public increaseWidth(column: Column) {
-        const newWidth = findMinPositive(
-            [
-                ...this.presetWidths.getWidths(column.getMinWidth(), column.getMaxWidth(), column.grid.desktop.tilingArea.width),
-            ],
-            width => width - column.getWidth(),
-        );
+        const widths = this.presetWidths.getWidths(column.getMinWidth(), column.getMaxWidth(), column.grid.desktop.tilingArea.width);
+        const current = column.getNominalWidth();
+        const newWidth = findMinPositive(widths, width => width - current - 1); // 1 px allowance, like niri
         if (newWidth === undefined) {
             return;
         }
         column.setWidth(newWidth, true);
+        column.setPresetIndex(widths.indexOf(newWidth), widths);
     }
 
     public decreaseWidth(column: Column) {
-        const newWidth = findMinPositive(
-            [
-                ...this.presetWidths.getWidths(column.getMinWidth(), column.getMaxWidth(), column.grid.desktop.tilingArea.width),
-            ],
-            width => column.getWidth() - width,
-        );
+        const widths = this.presetWidths.getWidths(column.getMinWidth(), column.getMaxWidth(), column.grid.desktop.tilingArea.width);
+        const current = column.getNominalWidth();
+        const newWidth = findMinPositive(widths, width => current - width - 1);
         if (newWidth === undefined) {
             return;
         }
         column.setWidth(newWidth, true);
+        column.setPresetIndex(widths.indexOf(newWidth), widths);
     }
 
     public maximizeWidth(column: Column) {

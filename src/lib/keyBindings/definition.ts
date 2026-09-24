@@ -480,6 +480,18 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => switchToDesktop(currentDesktopIndex() - 1),
         },
         {
+            name: "desktop-move-down",
+            description: "Move the current desktop down, below the next one",
+            defaultKeys: ["Meta+Shift+PgDown", "Meta+Shift+U"],
+            action: () => world.do((clientManager, desktopManager) => world.dynamicDesktops.moveCurrent(desktopManager, 1)),
+        },
+        {
+            name: "desktop-move-up",
+            description: "Move the current desktop up, above the previous one",
+            defaultKeys: ["Meta+Shift+PgUp", "Meta+Shift+I"],
+            action: () => world.do((clientManager, desktopManager) => world.dynamicDesktops.moveCurrent(desktopManager, -1)),
+        },
+        {
             name: "window-close",
             description: "Close window",
             defaultKeys: ["Meta+Q", "Alt+F4"],
@@ -498,9 +510,9 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         },
         {
             name: "overview",
-            description: "Open the overview",
+            description: "Toggle the overview",
             defaultKeys: ["Meta+O"],
-            action: () => kglobalaccel.call("/component/kwin", "org.kde.kglobalaccel.Component", "invokeShortcut", ["s"], ["Overview"], () => {}),
+            action: () => world.toggleOverview(),
         },
     ];
 }
@@ -529,7 +541,7 @@ function getNumKeyBindings(world: World, actions: Actions): NumKeyBinding[] {
             name: "desktop-{}",
             description: "Switch to desktop {}",
             defaultModifiers: "Meta",
-            action: (i: number) => switchToDesktop(i),
+            action: (i: number) => switchToDesktop(actions.config.clampDesktopIndex(i)),
         },
         {
             name: "focus-{}",

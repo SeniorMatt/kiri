@@ -4,11 +4,10 @@ Rough list, in order.
 
 - Touchpad gestures like niri: three fingers left/right to scroll, up/down to switch desktop.
 - Virtual desktops as niri's vertical workspaces, with an empty one always at the bottom.
-- A key to open KWin's Overview. Maybe a zoomed-out view later.
+- niri's overview (kiri_overview): zoomed-out desktops with live thumbnails, Meta+O and the 4-finger swipe.
 
 - Per-monitor desktops (KWin 6.8's PerOutputVirtualDesktops): follow each monitor's own current desktop.
 - niri's dynamic desktops: always one empty desktop at the bottom, empty ones removed.
-- A niri-style overview as a QML effect: zoomed-out desktops with live thumbnails.
 
 After that:
 

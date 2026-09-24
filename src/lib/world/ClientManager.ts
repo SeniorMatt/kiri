@@ -227,13 +227,20 @@ class ClientManager {
         setVisualPosition(String(kwinClient.internalId), null); // the rubber band is over
         // no limitHeight: the dragged window keeps the size it had in the grid, like niri's moving tile
         if (!(client.stateManager.getState() instanceof ClientState.Floating)) {
-            client.stateManager.setState(() => new ClientState.Floating(this.world, client, this.config, false), FocusPassing.Type.None);
+            // niri never shows a title bar, so the dragged window keeps it hidden; only a drop as floating brings it back
+            client.keepTitlebarHidden = true;
+            try {
+                client.stateManager.setState(() => new ClientState.Floating(this.world, client, this.config, false), FocusPassing.Type.None);
+            } finally {
+                client.keepTitlebarHidden = false;
+            }
         }
         if (!this.config.dropToTile) {
             const done = new SignalManager();
             done.connect(kwinClient.interactiveMoveResizeFinished, () => {
                 done.destroy();
                 kwinClient.opacity = opacityBefore;
+                client.restoreTitlebar();
             });
             return;
         }
@@ -245,6 +252,9 @@ class ClientManager {
             kwinClient.opacity = opacityBefore;
             setInsertHint(null);
             this.world.do(() => this.dropTile(kwinClient));
+            if (!(client.stateManager.getState() instanceof ClientState.Tiled)) {
+                client.restoreTitlebar(); // dropped as a floating window
+            }
         });
         update();
     }
@@ -725,6 +735,70 @@ class ClientManager {
         }
         this.resizeFloatingClient(kwinClient, horizontal, presets[index]);
         indices.set(kwinClient, index);
+    }
+
+    public findClientById(id: string): KwinClient | undefined {
+        for (const kwinClient of this.clientMap.keys()) {
+            if (String(kwinClient.internalId) === id) {
+                return kwinClient;
+            }
+        }
+        return undefined;
+    }
+
+    // the floating windows to show for a desktop in the overview; a window on every desktop is shown on the current one
+    public getFloatingOnDesktop(kwinDesktop: KwinDesktop) {
+        const result: KwinClient[] = [];
+        for (const kwinClient of this.clientMap.keys()) {
+            if (!this.isFloating(kwinClient) || kwinClient.minimized || !(kwinClient.normalWindow || kwinClient.dialog)) {
+                continue;
+            }
+            const there = kwinClient.desktops.length === 0 ? kwinDesktop === Workspace.currentDesktop : kwinClient.desktops.includes(kwinDesktop);
+            if (there) {
+                result.push(kwinClient);
+            }
+        }
+        return result;
+    }
+
+    // A tiled window dropped in the overview. `columnIndex` and `tile` count the target desktop's columns without
+    // the dragged window (a column it leaves alone is gone): `tile` >= 0 is a gap inside that column, -1 a new
+    // column to the left of the column at `columnIndex`. The window may come from another desktop.
+    public overviewDrop(kwinClient: KwinClient, kwinDesktop: KwinDesktop, columnIndex: number, tile: number) {
+        const window = this.findTiledWindow(kwinClient);
+        const desktop = this.desktopManager.getDesktopInCurrentActivity(kwinDesktop);
+        if (window === null || desktop === undefined) {
+            return;
+        }
+        const grid = desktop.grid;
+        const oldColumn = window.column;
+        const others = grid.getColumns().filter(column => !(column === oldColumn && column.getWindowCount() === 1));
+        const wasFocused = window.isFocused();
+        const pass = wasFocused ? FocusPassing.Type.Immediate : FocusPassing.Type.None;
+        if (tile >= 0 && others.length > 0) {
+            const column = others[Math.max(0, Math.min(columnIndex, others.length - 1))];
+            const windows = column.getWindows().filter(w => w !== window);
+            const index = Math.max(0, Math.min(tile, windows.length));
+            if (column === oldColumn) {
+                const current = column.getWindows().indexOf(window);
+                for (let i = current; i > index; i--) {
+                    column.moveWindowUp(window);
+                }
+                for (let i = current; i < index; i++) {
+                    column.moveWindowDown(window);
+                }
+            } else {
+                window.moveToColumn(column, true, pass, index === 0 ? null : windows[index - 1]);
+            }
+        } else {
+            const left = columnIndex <= 0 || others.length === 0 ? null : others[Math.min(columnIndex, others.length) - 1];
+            const newColumn = new Column(grid, left);
+            window.moveToColumn(newColumn, true, pass);
+        }
+        if (kwinClient.desktops.length !== 1 || kwinClient.desktops[0] !== kwinDesktop) {
+            kwinClient.desktops = [kwinDesktop];
+        }
+        window.focus();
     }
 
     public findTiledWindow(kwinClient: KwinClient) {

@@ -7,7 +7,10 @@ namespace ClientState {
         private static readonly maxExternalFrameGeometryChangedIntervalMs = 1000;
 
         constructor(world: World, client: ClientWrapper, grid: Grid) {
-            this.defaultState = { skipSwitcher: client.kwinClient.skipSwitcher, noBorder: client.kwinClient.noBorder };
+            if (client.ownNoBorder === null) {
+                client.ownNoBorder = client.kwinClient.noBorder; // kept while a drag takes the window out of the grid and back
+            }
+            this.defaultState = { skipSwitcher: client.kwinClient.skipSwitcher, noBorder: client.ownNoBorder };
             Tiled.prepareClientForTiling(client, grid.config);
 
             const previousColumn = grid.getLastFocusedColumn();
@@ -307,8 +310,9 @@ namespace ClientState {
                 client.kwinClient.opacity = 1.0;
             }
             client.setFullScreen(false);
-            if (config.hideTitlebars) {
+            if (config.hideTitlebars && !client.keepTitlebarHidden) {
                 client.setNoBorder(defaultState.noBorder);
+                client.ownNoBorder = null;
             }
             if (client.kwinClient.tile === null) {
                 client.setMaximize(false, false);
