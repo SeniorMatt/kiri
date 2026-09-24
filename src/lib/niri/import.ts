@@ -278,6 +278,28 @@ namespace NiriImport {
         return regex.startsWith("^") ? regex.substring(1) : ".*" + regex;
     }
 
+    // One match or exclude line as a Kiri matcher; undefined when it uses a matcher Kiri has no data for
+    function matchOf(node: Kdl.Node, warn: (msg: string) => void): Record<string, any>|undefined {
+        const entry: Record<string, any> = {};
+        if (node.props["app-id"]) {
+            entry["class"] = anchored(node.props["app-id"]);
+        }
+        if (node.props["title"]) {
+            entry["caption"] = anchored(node.props["title"]);
+        }
+        for (const [niri, kiri] of [["is-floating", "isFloating"], ["is-active", "isActive"], ["is-focused", "isFocused"]]) {
+            if (node.props[niri] !== undefined) {
+                entry[kiri] = node.props[niri] === "true";
+            }
+        }
+        const unknown = Object.keys(node.props).filter(name => !["app-id", "title", "is-floating", "is-active", "is-focused"].includes(name));
+        if (unknown.length > 0) {
+            warn(`window-rule matcher ${unknown.join(", ")} (a ${node.name} line that uses it is ignored)`);
+            return undefined;
+        }
+        return entry;
+    }
+
     function windowRules(nodes: Kdl.Node[], warn: (msg: string) => void) {
         const rules: Record<string, any>[] = [];
         for (const rule of Kdl.find(nodes, "window-rule")) {
@@ -285,25 +307,38 @@ namespace NiriImport {
             const floatingNode = Kdl.child(rule, "open-floating");
             const floating = floatingNode !== undefined && floatingNode.args[0] !== "false";
             const width = size(Kdl.child(rule, "default-column-width"));
-            if (Kdl.find(rule.children, "exclude").length > 0) {
-                warn("window-rule 'exclude' lines ignored");
-            }
-            if (matches.length === 0 || !(floating || width !== undefined)) {
+            const height = size(Kdl.child(rule, "default-window-height"));
+            const fullscreenNode = Kdl.child(rule, "open-fullscreen");
+            const fullscreen = fullscreenNode === undefined ? undefined : fullscreenNode.args[0] !== "false";
+            if (matches.length === 0 || !(floating || width !== undefined || height !== undefined || fullscreen !== undefined)) {
                 continue;
             }
-            for (const match of matches) {
-                const entry: Record<string, any> = {};
-                if (match.props["app-id"]) {
-                    entry["class"] = anchored(match.props["app-id"]);
+            const excludes: Record<string, any>[] = [];
+            for (const exclude of Kdl.find(rule.children, "exclude")) {
+                const entry = matchOf(exclude, warn);
+                if (entry !== undefined) {
+                    excludes.push(entry);
                 }
-                if (match.props["title"]) {
-                    entry["caption"] = anchored(match.props["title"]);
+            }
+            for (const match of matches) {
+                const entry = matchOf(match, warn);
+                if (entry === undefined) {
+                    continue;
                 }
                 if (floating) {
                     entry["tile"] = false;
                 }
                 if (width !== undefined) {
                     entry["width"] = width;
+                }
+                if (height !== undefined) {
+                    entry["height"] = height;
+                }
+                if (fullscreen !== undefined) {
+                    entry["fullscreen"] = fullscreen;
+                }
+                if (excludes.length > 0) {
+                    entry["exclude"] = excludes;
                 }
                 rules.push(entry);
             }

@@ -420,7 +420,7 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             name: "grid-scroll-focused",
             description: "Center focused window",
             defaultKeys: ["Meta+C"],
-            action: () => world.doIfTiledFocused(actions.gridScrollFocused),
+            action: () => world.doIfTiledFocusedOrFloating(actions.gridScrollFocused, actions.floatingCenter),
         },
         {
             name: "grid-scroll-left-column",

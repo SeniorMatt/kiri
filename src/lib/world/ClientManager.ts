@@ -32,7 +32,23 @@ class ClientManager {
         }
         this.windowRuleEnforcer = new WindowRuleEnforcer(
             [...getSimpleWindowRules(config.floatClasses, config.tileClasses, config.columnWidthRules), ...parsedWindowRules],
-            config.tileFullScreen, config.defaultColumnWidth, config.gapsInnerHorizontal);
+            config.tileFullScreen, config.defaultColumnWidth, config.gapsInnerHorizontal,
+            {
+                isFloating: kwinClient => this.isFloating(kwinClient),
+                isFocused: kwinClient => Workspace.activeWindow === kwinClient,
+                isActive: kwinClient => this.isActiveWindow(kwinClient),
+            },
+            config.gapsInnerVertical);
+    }
+
+    // niri's is-active: the window that is active on its desktop (the one that has the focus there, or got it last)
+    private isActiveWindow(kwinClient: KwinClient) {
+        if (Workspace.activeWindow === kwinClient) {
+            return true;
+        }
+        const desktop = this.desktopManager.getDesktopForClient(kwinClient);
+        const column = desktop?.grid.getLastFocusedColumn() ?? null;
+        return column !== null && column.getWindowToFocus().client.kwinClient === kwinClient;
     }
 
     // `existing` is for windows that were already open when Kiri started, they keep their width
@@ -60,7 +76,15 @@ class ClientManager {
                         client.preferredWidth = width;
                     }
                 }
-                return new ClientState.Tiled(this.world, client, desktop!.grid);
+                const state = new ClientState.Tiled(this.world, client, desktop!.grid);
+                if (!existing) {
+                    // niri's default-window-height
+                    const height = this.windowRuleEnforcer.getWindowHeight(kwinClient, desktop!.tilingArea.height);
+                    if (height !== null) {
+                        state.window.column.setFixedHeight(state.window, height, null);
+                    }
+                }
+                return state;
             };
         } else {
             log("window not tiled:", JSON.stringify({
@@ -80,6 +104,58 @@ class ClientManager {
             this.windowRuleEnforcer.initClientSignalManager(this.world, kwinClient),
         );
         this.clientMap.set(kwinClient, client);
+
+        if (!existing) {
+            this.applyOpenRules(client);
+        }
+    }
+
+    // niri's open-fullscreen, and the size and the centering of a new window that a float rule (open-floating) matches
+    private applyOpenRules(client: ClientWrapper) {
+        const kwinClient = client.kwinClient;
+        const state = client.stateManager.getState();
+        if (state instanceof ClientState.Floating) {
+            const area = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
+            const size = this.windowRuleEnforcer.getFloatingSize(kwinClient, area);
+            if (size !== null) {
+                const frame = kwinClient.frameGeometry;
+                const min = kwinClient.minSize;
+                const max = kwinClient.maxSize;
+                const fit = (value: number, minimum: number, maximum: number) => {
+                    value = Math.max(1, Math.round(value));
+                    return Math.max(maximum > 0 ? Math.min(value, Math.floor(maximum)) : value, Math.ceil(minimum));
+                };
+                const width = size.width === undefined ? frame.width.round() : fit(size.width, min.width, max.width);
+                const height = size.height === undefined ? frame.height.round() : fit(size.height, min.height, max.height);
+                const { x, y } = ClientManager.centerInArea(area, width, height);
+                client.place(x, y, width, height);
+            }
+        }
+        if (state instanceof ClientState.Tiled && this.windowRuleEnforcer.shouldOpenFullScreen(kwinClient)) {
+            client.setFullScreen(true);
+        }
+    }
+
+    // niri's center_preferring_top_left_in_area: centered, but a window larger than the area keeps its top-left corner
+    public static centerInArea(area: QmlRect, width: number, height: number) {
+        return {
+            x: Math.round(area.x + Math.max((area.width - width) / 2, 0)),
+            y: Math.round(area.y + Math.max((area.height - height) / 2, 0)),
+        };
+    }
+
+    // niri's center-window / center-column on the floating layer
+    public centerFloatingClient(kwinClient: KwinClient) {
+        const client = this.clientMap.get(kwinClient);
+        if (client === undefined || !this.isFloating(kwinClient)) {
+            return;
+        }
+        const area = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
+        const frame = kwinClient.frameGeometry;
+        const width = frame.width.round();
+        const height = frame.height.round();
+        const { x, y } = ClientManager.centerInArea(area, width, height);
+        client.place(x, y, width, height);
     }
 
     public removeClient(kwinClient: KwinClient, passFocus: FocusPassing.Type) {

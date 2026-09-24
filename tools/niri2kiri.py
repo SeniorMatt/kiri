@@ -4,6 +4,9 @@
 Usage: niri2kiri.py config.kdl [kglobalshortcutsrc]            print the [kiri] shortcut section
        niri2kiri.py config.kdl --settings                      print the [Script-kiri] settings section
        niri2kiri.py config.kdl [kglobalshortcutsrc] --apply    write both with kwriteconfig6
+       niri2kiri.py config.kdl --input [--apply]               the niri `input` block for Plasma: show (or, with --apply, write)
+                                                               touchpad natural-scroll/tap/accel-profile (kcminputrc), key repeat
+                                                               (kcminputrc) and xkb layouts/options (kxkbrc). Only with --input.
 
 Kiri has to have run once, so its actions are already in kglobalshortcutsrc.
 Settings apply live; shortcuts need a new login. Things Kiri can't do are listed on stderr.
@@ -385,6 +388,27 @@ def default_rules():
         return None
 
 
+KNOWN_MATCHERS = {"app-id": "class", "title": "caption", "is-floating": "isFloating", "is-active": "isActive", "is-focused": "isFocused"}
+
+
+def match_of(node, warn):
+    """One match or exclude line as a Kiri matcher; None when it uses a matcher Kiri has no data for."""
+    props = node[2]
+    unknown = [k for k in props if k not in KNOWN_MATCHERS]
+    if unknown:
+        warn(f"window-rule matcher {', '.join(unknown)} (a {node[0]} line that uses it is ignored)")
+        return None
+    entry = {}
+    for niri, kiri in KNOWN_MATCHERS.items():
+        if niri in props:
+            if kiri in ("class", "caption"):
+                if props[niri]:
+                    entry[kiri] = anchored(props[niri])
+            else:
+                entry[kiri] = props[niri] == "true"
+    return entry
+
+
 def window_rules(nodes, warn):
     rules = []
     for rule in find(nodes, "window-rule"):
@@ -392,19 +416,26 @@ def window_rules(nodes, warn):
         floating = child(rule, "open-floating")
         floating = floating if floating and floating[1][:1] != ["false"] else None
         width = size(child(rule, "default-column-width"))
-        if child(rule, "exclude") or find(rule[3], "exclude"):
-            warn("window-rule 'exclude' lines ignored")
-        if not matches or not (floating or width):
+        height = size(child(rule, "default-window-height"))
+        fullscreen = child(rule, "open-fullscreen")
+        fullscreen = None if fullscreen is None else fullscreen[1][:1] != ["false"]
+        if not matches or not (floating or width or height or fullscreen is not None):
             continue
+        excludes = [e for e in (match_of(x, warn) for x in find(rule[3], "exclude")) if e is not None]
         for m in matches:
-            props = m[2]
-            entry = {"class": anchored(props["app-id"]) if "app-id" in props else None,
-                     "caption": anchored(props["title"]) if "title" in props else None}
-            entry = {k: v for k, v in entry.items() if v}
+            entry = match_of(m, warn)
+            if entry is None:
+                continue
             if floating:
                 entry["tile"] = False
             if width:
                 entry["width"] = width
+            if height:
+                entry["height"] = height
+            if fullscreen is not None:
+                entry["fullscreen"] = fullscreen
+            if excludes:
+                entry["exclude"] = excludes
             rules.append(entry)
     return rules
 
@@ -492,6 +523,70 @@ def read_settings_inner(path, warn):
     return out
 
 
+# ---- the niri `input` block, only with --input ----
+
+def touchpads():
+    """(vendor, product, name) of the touchpads in /proc/bus/input/devices; Plasma keys them by decimal ids."""
+    found = []
+    try:
+        blocks = Path("/proc/bus/input/devices").read_text().split("\n\n")
+    except OSError:
+        return found
+    for block in blocks:
+        ident = re.search(r"Vendor=([0-9a-f]+) Product=([0-9a-f]+)", block, re.I)
+        name = re.search(r'^N: Name="(.*)"', block, re.M)
+        if ident and name and re.search(r"touch\s*pad", name.group(1), re.I) and "mouse" in block:
+            found.append((int(ident.group(1), 16), int(ident.group(2), 16), name.group(1)))
+    return found
+
+
+def read_input(path, warn):
+    """[(file, [group, ...], key, value)] for kwriteconfig6, from niri's input block."""
+    out = []
+    for blk in find(parse_kdl(path), "input"):
+        kb = child(blk, "keyboard")
+        if kb:
+            xkb = child(kb, "xkb")
+            if xkb:
+                layout, variant, options = (child(xkb, n) for n in ("layout", "variant", "options"))
+                if layout and layout[1]:
+                    count = layout[1][0].count(",") + 1
+                    out.append(("kxkbrc", ["Layout"], "Use", True))
+                    out.append(("kxkbrc", ["Layout"], "LayoutList", layout[1][0]))
+                    out.append(("kxkbrc", ["Layout"], "VariantList", variant[1][0] if variant and variant[1] else "," * (count - 1)))
+                if options and options[1]:
+                    out.append(("kxkbrc", ["Layout"], "ResetOldOptions", True))
+                    out.append(("kxkbrc", ["Layout"], "Options", options[1][0]))
+                if child(xkb, "model") or child(xkb, "rules"):
+                    warn("input keyboard xkb model/rules (Plasma keeps its own)")
+            delay, rate = child(kb, "repeat-delay"), child(kb, "repeat-rate")
+            if delay and number(delay[1]) is not None or rate and number(rate[1]) is not None:
+                out.append(("kcminputrc", ["Keyboard"], "KeyRepeat", "repeat"))
+            if delay and number(delay[1]) is not None:
+                out.append(("kcminputrc", ["Keyboard"], "RepeatDelay", number(delay[1])))
+            if rate and number(rate[1]) is not None:
+                out.append(("kcminputrc", ["Keyboard"], "RepeatRate", number(rate[1])))
+        tp = child(blk, "touchpad")
+        if tp:
+            keys = []
+            if child(tp, "natural-scroll"):
+                keys.append(("NaturalScroll", True))
+            if child(tp, "tap"):
+                keys.append(("TapToClick", True))
+            profile = child(tp, "accel-profile")
+            if profile and profile[1]:
+                flat = profile[1][0] == "flat"
+                keys += [("PointerAccelerationProfileFlat", flat), ("PointerAccelerationProfileAdaptive", not flat)]
+            if keys:
+                devices = touchpads()
+                if not devices:
+                    warn("input touchpad: no touchpad found in /proc/bus/input/devices")
+                for vendor, product, name in devices:
+                    for key, value in keys:
+                        out.append(("kcminputrc", ["Libinput", str(vendor), str(product), name], key, value))
+    return out
+
+
 def fmt(value):
     if isinstance(value, bool):
         return "true" if value else "false"
@@ -499,7 +594,11 @@ def fmt(value):
 
 
 def kwrite(file, group, key, value):
-    args = ["kwriteconfig6", "--file", file, "--group", group, "--key", key]
+    groups = [group] if isinstance(group, str) else group
+    args = ["kwriteconfig6", "--file", file]
+    for g in groups:
+        args += ["--group", g]
+    args += ["--key", key]
     if isinstance(value, bool):
         args += ["--type", "bool", str(value).lower()]
     else:
@@ -511,11 +610,23 @@ def main():
     argv = sys.argv[1:]
     flags = {a for a in argv if a.startswith("--")}
     pos = [a for a in argv if not a.startswith("--")]
-    if not 1 <= len(pos) <= 2 or flags - {"--settings", "--apply"}:
+    if not 1 <= len(pos) <= 2 or flags - {"--settings", "--apply", "--input"}:
         sys.exit(__doc__.strip())
     shortcuts_file = pos[1] if len(pos) == 2 else "~/.config/kglobalshortcutsrc"
     warn = lambda msg: print("# skipped:", msg, file=sys.stderr)
 
+    if "--input" in flags:
+        changes = read_input(pos[0], warn)
+        for file, groups, key, value in changes:
+            print(f"{file} [{']['.join(groups)}] {key}={fmt(value)}")
+        if "--apply" in flags:
+            for file, groups, key, value in changes:
+                kwrite(file, groups, key, value)
+            print("\nDone. Key repeat and layouts apply after a new login, touchpad settings at once or after a replug.")
+        else:
+            print("(nothing written; add --apply)")
+        if flags <= {"--input", "--apply"}:
+            return
     if "--settings" in flags or "--apply" in flags:
         settings = read_settings(pos[0], warn)
     if "--apply" in flags:

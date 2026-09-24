@@ -51,3 +51,43 @@ tests.register("simple window rules", 1, () => {
         { message: "unexpected simple rules: " + classes.join(",") },
     );
 });
+
+tests.register("window rule matchers: is-floating, is-active, is-focused and exclude", 1, () => {
+    screen = new MockQmlRect(0, 0, 800, 600);
+    Workspace = new MockWorkspace();
+    const state = { floating: false, active: false, focused: false };
+    const context = {
+        isFloating: () => state.floating,
+        isActive: () => state.active,
+        isFocused: () => state.focused,
+    };
+    const client: any = {
+        normalWindow: true, transient: false, modal: false, managed: true, pid: 1, moveable: true, resizeable: true,
+        popupWindow: false, fullScreen: false, resourceClass: "app", caption: "Main window",
+    };
+    const rules: WindowRule[] = [
+        { class: "app", caption: undefined, tile: false, isFloating: false, isFocused: true },
+        { class: "app", caption: undefined, tile: false, caption2: undefined, exclude: [{ caption: "Main.*" }] } as any,
+    ];
+    const enforcer = new WindowRuleEnforcer(rules, true, "", 0, context);
+    Assert.equal(enforcer.shouldTile(client), true); // not focused; the second rule is excluded by the caption
+    state.focused = true;
+    Assert.equal(enforcer.shouldTile(client), false);
+    state.floating = true;
+    Assert.equal(enforcer.shouldTile(client), true); // is-floating=false does not match a floating window
+    state.floating = false;
+    client.caption = "Other";
+    state.focused = false;
+    Assert.equal(enforcer.shouldTile(client), false); // the second rule applies now
+
+    const active = new WindowRuleEnforcer([{ class: "app", caption: undefined, tile: false, isActive: true }], true, "", 0, context);
+    Assert.equal(active.shouldTile(client), true);
+    state.active = true;
+    Assert.equal(active.shouldTile(client), false);
+
+    const sizes = new WindowRuleEnforcer([{ class: "app", caption: undefined, tile: false, width: "50%", height: "300px" }], true);
+    const area = new MockQmlRect(0, 0, 800, 600);
+    Assert.equal(JSON.stringify(sizes.getFloatingSize(client, area)), JSON.stringify({ width: 400, height: 300 }));
+    client.resourceClass = "none";
+    Assert.equal(sizes.getFloatingSize(client, area), null);
+});

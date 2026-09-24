@@ -165,3 +165,36 @@ tests.register("NiriImport", 1, () => {
         console.log("owner's config:", Object.keys(mine.settings).length, "settings,", Object.keys(mine.shortcutKeys).length, "actions bound,", mine.skipped.length, "skipped");
     }
 });
+
+tests.register("NiriImport window rules: open-fullscreen, default-window-height, matchers and exclude", 1, () => {
+    const result = NiriImport.parse(`
+        window-rule {
+            match app-id=r#"^fl64\\.exe$"#
+            open-fullscreen true
+        }
+        window-rule {
+            match app-id="dev.noctalia.Noctalia"
+            open-floating true
+            default-column-width { fixed 1080; }
+            default-window-height { fixed 920; }
+        }
+        window-rule {
+            match app-id="firefox" is-floating=false is-focused=true
+            match app-id="mpv" is-urgent=true
+            exclude app-id="firefox" title="Private"
+            default-window-height { proportion 0.5; }
+        }
+    `);
+    const rules = JSON.parse(result.settings["windowRules"]);
+    Assert.equal(rules.length, 3);
+    Assert.equal(rules[0].fullscreen, true);
+    Assert.equal(rules[0].class, "fl64\\.exe");
+    Assert.equal(rules[1].tile, false);
+    Assert.equal(rules[1].width, "1080px");
+    Assert.equal(rules[1].height, "920px");
+    Assert.equal(rules[2].isFloating, false);
+    Assert.equal(rules[2].isFocused, true);
+    Assert.equal(rules[2].height, "50%");
+    Assert.equal(rules[2].exclude[0].caption, ".*Private.*");
+    Assert.assert(result.skipped.some(line => line.includes("is-urgent")));
+});

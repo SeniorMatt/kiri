@@ -727,6 +727,11 @@ class Actions {
         grid.desktop.scrollToColumn(lastColumn, false);
     };
 
+    // niri's center-window and center-column on the floating layer: the window is centered in the work area
+    public readonly floatingCenter = (cm: ClientManager, active: KwinClient) => {
+        cm.centerFloatingClient(active);
+    };
+
     // niri's center-column: always centers the focused column (no toggling back)
     public readonly gridScrollFocused = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         grid.desktop.scrollCenterRange(column);
