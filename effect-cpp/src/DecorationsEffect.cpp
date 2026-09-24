@@ -207,16 +207,18 @@ Effect::~Effect()
 }
 
 // Mouse wheel navigation like niri's binds. KWin scripts can't bind the wheel, so this effect does and asks
-// Kiri's own shortcuts to do the work through kglobalaccel. All of them share one 150 ms cooldown, like niri's.
-void Effect::wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection direction, const QString &shortcut)
+// Kiri's own shortcuts to do the work through kglobalaccel. Every bind has its own cooldown like niri's
+// `cooldown-ms` (150 ms on the workspace binds in niri's default config, none on the horizontal ones).
+void Effect::wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection direction, const QString &shortcut, int cooldownMs)
 {
     auto action = std::make_unique<QAction>();
-    connect(action.get(), &QAction::triggered, this, [this, shortcut] {
+    auto cooldown = std::make_shared<QElapsedTimer>();
+    connect(action.get(), &QAction::triggered, this, [this, shortcut, cooldown, cooldownMs] {
         qCDebug(KIRI_DECO) << "wheel" << shortcut << m_settings.kiriEnabled;
-        if (!m_settings.kiriEnabled || (m_wheelCooldown.isValid() && m_wheelCooldown.elapsed() < 150)) {
+        if (!m_settings.kiriEnabled || (cooldownMs > 0 && cooldown->isValid() && cooldown->elapsed() < cooldownMs)) {
             return;
         }
-        m_wheelCooldown.start();
+        cooldown->start();
         QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/component/kiri"),
                                                               QStringLiteral("org.kde.kglobalaccel.Component"), QStringLiteral("invokeShortcut"));
         message << shortcut;
@@ -246,18 +248,18 @@ void Effect::registerWheelShortcuts()
     const Qt::KeyboardModifiers metaCtrl = Qt::MetaModifier | Qt::ControlModifier;
     const Qt::KeyboardModifiers metaShift = Qt::MetaModifier | Qt::ShiftModifier;
     const Qt::KeyboardModifiers metaCtrlShift = Qt::MetaModifier | Qt::ControlModifier | Qt::ShiftModifier;
-    wheel(meta, KWin::PointerAxisDown, QStringLiteral("desktop-next"));
-    wheel(meta, KWin::PointerAxisUp, QStringLiteral("desktop-previous"));
-    wheel(metaCtrl, KWin::PointerAxisDown, QStringLiteral("column-move-to-next-desktop"));
-    wheel(metaCtrl, KWin::PointerAxisUp, QStringLiteral("column-move-to-previous-desktop"));
-    wheel(meta, KWin::PointerAxisRight, QStringLiteral("focus-right"));
-    wheel(meta, KWin::PointerAxisLeft, QStringLiteral("focus-left"));
-    wheel(metaCtrl, KWin::PointerAxisRight, QStringLiteral("column-move-right"));
-    wheel(metaCtrl, KWin::PointerAxisLeft, QStringLiteral("column-move-left"));
-    wheel(metaShift, KWin::PointerAxisDown, QStringLiteral("focus-right"));
-    wheel(metaShift, KWin::PointerAxisUp, QStringLiteral("focus-left"));
-    wheel(metaCtrlShift, KWin::PointerAxisDown, QStringLiteral("column-move-right"));
-    wheel(metaCtrlShift, KWin::PointerAxisUp, QStringLiteral("column-move-left"));
+    wheel(meta, KWin::PointerAxisDown, QStringLiteral("desktop-next"), 150);
+    wheel(meta, KWin::PointerAxisUp, QStringLiteral("desktop-previous"), 150);
+    wheel(metaCtrl, KWin::PointerAxisDown, QStringLiteral("column-move-to-next-desktop"), 150);
+    wheel(metaCtrl, KWin::PointerAxisUp, QStringLiteral("column-move-to-previous-desktop"), 150);
+    wheel(meta, KWin::PointerAxisRight, QStringLiteral("focus-right"), 0);
+    wheel(meta, KWin::PointerAxisLeft, QStringLiteral("focus-left"), 0);
+    wheel(metaCtrl, KWin::PointerAxisRight, QStringLiteral("column-move-right"), 0);
+    wheel(metaCtrl, KWin::PointerAxisLeft, QStringLiteral("column-move-left"), 0);
+    wheel(metaShift, KWin::PointerAxisDown, QStringLiteral("focus-right"), 0);
+    wheel(metaShift, KWin::PointerAxisUp, QStringLiteral("focus-left"), 0);
+    wheel(metaCtrlShift, KWin::PointerAxisDown, QStringLiteral("column-move-right"), 0);
+    wheel(metaCtrlShift, KWin::PointerAxisUp, QStringLiteral("column-move-left"), 0);
 }
 
 bool Effect::supported()

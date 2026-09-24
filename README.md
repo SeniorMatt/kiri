@@ -50,7 +50,7 @@ They're in System Settings > Shortcuts > Kiri, and the defaults follow niri's, e
 
 To use the keys from your niri config, run `tools/niri2kiri.py ~/.config/niri/config.kdl` and paste what it prints over the `[kiri]` section of `~/.config/kglobalshortcutsrc`, then log in again. Kiri has to have been enabled once before.
 
-To take your niri `layout`, `window-rule`s and keys in one go, run `tools/niri2kiri.py ~/.config/niri/config.kdl --apply`. Settings apply live, shortcuts after a new login. `--settings` prints just the settings (`[Script-kiri]` in `kwinrc`), and anything Kiri can't map is listed on stderr.
+To take your niri `layout`, `window-rule`s and keys in one go, run `tools/niri2kiri.py ~/.config/niri/config.kdl --apply`. Settings and shortcut keys apply live. `--settings` prints just the settings (`[Script-kiri]` in `kwinrc`), and anything Kiri can't map is listed on stderr.
 
 While Kiri is running, Plasma shortcuts on the same keys are switched off. Nothing is changed in your settings, they work again as soon as Kiri is disabled.
 

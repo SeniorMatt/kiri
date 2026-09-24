@@ -24,6 +24,7 @@
 
 #include "input.h"
 #include "input_event.h"
+#include "../common/TouchpadConfig.h"
 
 #include <cmath>
 
@@ -809,6 +810,9 @@ void DesktopSwitchEffect::swipeGestureBegin(PointerSwipeGestureBeginEvent *event
     }
     m_swipeCumulative = QPointF();
     m_swipeUnaccel.reset();
+    const TouchpadConfig config = TouchpadConfig::read();
+    m_swipeUnaccel.setProfile(config.flat, config.speed);
+    m_swipeNatural = config.natural;
     const bool column = effects->desktopGridWidth() == 1 && effects->desktopGridHeight() > 1;
     m_swipePhase = (event->fingerCount == 3 && column) ? SwipePhase::Pending : SwipePhase::Idle;
 }
@@ -840,8 +844,8 @@ void DesktopSwitchEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *eve
         m_swipeCenter = row;
         m_swipeGesture.begin(row, current, effects->desktopGridHeight());
     }
-    // fingers up is the next desktop below, like in KWin's own swipe
-    const double idx = m_swipeGesture.update(-uy, ms);
+    // niri: fingers down is the next workspace, and the delta is inverted with natural scrolling (fingers up)
+    const double idx = m_swipeGesture.update(m_swipeNatural ? -uy : uy, ms);
     swipeUpdateScreen(idx);
 }
 

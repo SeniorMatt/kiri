@@ -91,6 +91,20 @@ for icon in "$data/icons/hicolor/scalable/apps/kiri.svg" "$data/icons/hicolor/48
     [ -L "$icon" ] && rm -f "$icon"
 done
 
+# ---- the command shortcuts niri2kiri.py made from niri's spawn binds --------------------------------------
+removed_binds=false
+for f in "$data"/applications/kiri-bind-*.desktop; do
+    [ -f "$f" ] && grep -q '^X-Kiri-Niri-Bind=true' "$f" || continue
+    rm -f "$f"
+    removed_binds=true
+    # the key the user may have changed in System Settings is stored under [services]
+    $purge && delete_group "$config/kglobalshortcutsrc" "services][$(basename "$f")"
+done
+if $removed_binds; then
+    command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+    echo "Removed the command shortcuts made from niri's spawn binds."
+fi
+
 # ---- settings and shortcuts ------------------------------------------------------------------------------
 if $purge; then
     # kglobalaccel forgets shortcuts of a component that is no longer running

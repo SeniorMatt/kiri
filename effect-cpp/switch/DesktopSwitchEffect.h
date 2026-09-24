@@ -205,6 +205,7 @@ private:
     NiriSwipe::Unaccelerate m_swipeUnaccel;
     NiriSwipe::WorkspaceGesture m_swipeGesture;
     int m_swipeCenter = 0;
+    bool m_swipeNatural = false;
     NiriSwipe::WorkspaceGesture::Release m_swipeRelease{};
     bool m_swipeReleasePending = false;
 

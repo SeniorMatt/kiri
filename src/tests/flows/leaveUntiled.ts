@@ -43,3 +43,21 @@ tests.register("Window with full-screen geometry but no full-screen flag is tile
     qtMock.fireShortcut("focus-right");
     Assert.equal(workspaceMock.activeWindow, game);
 });
+
+tests.register("A window on two desktops for a moment is tiled again afterwards", 2, () => {
+    const { workspaceMock, world } = init(getDefaultConfig());
+    const [client] = workspaceMock.createClients(1);
+    const desktop = client.desktops[0];
+    const other = workspaceMock.desktops.find(d => d !== desktop)!;
+    MockQmlTimer.deferred = true;
+    try {
+        client.desktops = [desktop, other]; // the Pager drags the window to another desktop
+        world.do(clientManager => Assert.notTiledClient(clientManager, client));
+        client.desktops = [other];
+        world.do(clientManager => Assert.notTiledClient(clientManager, client)); // debounced
+        MockQmlTimer.flush();
+        world.do(clientManager => Assert.tiledClient(clientManager, client));
+    } finally {
+        MockQmlTimer.deferred = false;
+    }
+});

@@ -35,10 +35,35 @@ tests.register("External resize", 1, () => {
         Assert.equalRects(client.getActualFrameGeometry(), getClientDesiredFrame(200), { message: "We should give up and let the client have its desired frame" });
     }
 
-    timeControl(addTime => {
-        testExternalResizing();
-        addTime(1000);
-        // the concession has expired, let's test again
-        testExternalResizing();
-    });
+    MockQmlTimer.deferred = true; // the relayout that follows a rate limited burst waits
+    try {
+        timeControl(addTime => {
+            testExternalResizing();
+            addTime(1000);
+            // the concession has expired, let's test again
+            testExternalResizing();
+        });
+    } finally {
+        MockQmlTimer.deferred = false;
+    }
+});
+
+tests.register("A rate limited external resize gets one relayout afterwards", 1, () => {
+    const { workspaceMock } = init(getDefaultConfig());
+    const [client] = workspaceMock.createClientsWithFrames(new MockQmlRect(10, 10, 100, 200));
+    const tiled = client.getActualFrameGeometry();
+    MockQmlTimer.deferred = true;
+    try {
+        timeControl(() => {
+            for (const width of [110, 120, 130, 140, 200]) {
+                client.frameGeometry = new MockQmlRect(10, 10, width, 200);
+            }
+            Assert.equal(client.getActualFrameGeometry().width, 200); // the last event was dropped
+            MockQmlTimer.flush();
+            Assert.equal(client.getActualFrameGeometry().x, Math.round((tilingArea.width - 140) / 2) + tilingArea.x);
+        });
+    } finally {
+        MockQmlTimer.deferred = false;
+    }
+    Assert.equal(tiled.width, 100);
 });

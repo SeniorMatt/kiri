@@ -6,7 +6,9 @@ class ClientMatcher {
     }
 
     public matches(kwinClient: KwinClient) {
-        return this.regex.test(ClientMatcher.getClientString(kwinClient));
+        // a rule's class matches the window's resourceClass or its resourceName
+        return this.regex.test(ClientMatcher.getClientString(kwinClient)) ||
+            this.regex.test(ClientMatcher.getRuleString(kwinClient.resourceName, kwinClient.caption));
     }
 
     public static getClientString(kwinClient: KwinClient) {

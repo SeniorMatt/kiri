@@ -17,3 +17,5 @@ workspace position after every event, where it settles, and the release spring s
 
 Not here: real libinput recordings (none were available), the real-KWin replay (kiri_gesturesim with a `replay`
 method that injects the events with their timestamps).
+
+Run `cpp_swipe --check [--flat] [--speed S] TRACES`: flat at speed 0 and -0.5 must be exact, adaptive at 0.3 within the tolerance printed.

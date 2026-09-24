@@ -6,6 +6,7 @@
 #include "input.h"
 #include "input_event.h"
 #include "../common/NiriSwipe.h"
+#include "../common/TouchpadConfig.h"
 
 namespace KWin
 {
@@ -36,6 +37,9 @@ void SwipeEffect::swipeGestureBegin(PointerSwipeGestureBeginEvent *event)
     m_ended = false;
     m_cumulative = QPointF();
     m_unaccel.reset();
+    const TouchpadConfig config = TouchpadConfig::read();
+    m_unaccel.setProfile(config.flat, config.speed);
+    m_natural = config.natural;
     if (event->fingerCount == 3) {
         m_phase = Phase::Pending;
         m_id++;
@@ -60,7 +64,7 @@ void SwipeEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event)
         }
     }
     if (m_phase == Phase::Horizontal) {
-        m_queue.append({event->time.count() / 1000.0, ux});
+        m_queue.append({event->time.count() / 1000.0, m_natural ? -ux : ux}); // niri inverts the delta with natural scrolling
     }
 }
 

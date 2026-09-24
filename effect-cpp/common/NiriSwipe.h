@@ -150,8 +150,10 @@ private:
 // The accelerated delta is the unaccelerated one times factor(speed) / 0.9, with the speed in mm/s of the
 // finger. This takes the speed from the last few events (libinput averages its velocity over a few events
 // too) and solves delta_accel = delta_unaccel * ratio(speed(delta_unaccel)) for delta_unaccel.
-// Assumes the default pointer speed (0) and the adaptive profile; with the flat profile the deltas are
-// already what niri sees, and set(false) turns this off.
+// Follows the touchpad's configuration (setProfile): the adaptive profile is scaled by libinput's speed factor
+// pow(speed + 1, 2.38) * 0.95 + 0.05. With the flat profile libinput's "unaccelerated" delta is the very same
+// constant-factor delta as the accelerated one (filter-touchpad-flat.c, accelerator_filter_constant_touchpad_flat:
+// "gestures end up having the same movement as pointer motion"), so there is nothing to undo, whatever the speed.
 class Unaccelerate
 {
 public:
@@ -172,6 +174,14 @@ public:
         return factor / baseline;
     }
 
+    static double speedFactor(double speed) { return std::pow(speed + 1.0, 2.38) * 0.95 + 0.05; }
+
+    // the touchpad's acceleration profile and speed setting (-1 to 1)
+    void setProfile(bool flat, double speed)
+    {
+        m_flat = flat;
+        m_speedFactor = speedFactor(std::clamp(speed, -1.0, 1.0));
+    }
     void setEnabled(bool on) { m_enabled = on; }
     void reset()
     {
@@ -184,7 +194,7 @@ public:
         ux = ax;
         uy = ay;
         const double a = std::hypot(ax, ay);
-        if (!m_enabled || a == 0.0) {
+        if (!m_enabled || m_flat || a == 0.0) {
             record(0.0, timeMs);
             return;
         }
@@ -198,8 +208,8 @@ public:
         }
         const double span = std::max(timeMs - t0, 1.0);
         // bisection on |u|: g(u) = u * ratio(speed(u)) increases with u
-        auto g = [&](double u) { return u * ratio((dist + u) / UnitsPerMm / (span / 1000.0)); };
-        double lo = a / 5.5, hi = a / 0.32;
+        auto g = [&](double u) { return u * ratio((dist + u) / UnitsPerMm / (span / 1000.0)) * m_speedFactor; };
+        double lo = a / (5.5 * m_speedFactor), hi = a / (0.32 * m_speedFactor);
         for (int i = 0; i < 50; i++) {
             const double mid = 0.5 * (lo + hi);
             (g(mid) < a ? lo : hi) = mid;
@@ -231,6 +241,8 @@ private:
         }
     }
     bool m_enabled = true;
+    bool m_flat = false;
+    double m_speedFactor = 1.0;
     std::deque<Ev> m_events;
 };
 

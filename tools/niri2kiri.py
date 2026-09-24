@@ -4,16 +4,22 @@
 Usage: niri2kiri.py config.kdl [kglobalshortcutsrc]            print the [kiri] shortcut section
        niri2kiri.py config.kdl --settings                      print the [Script-kiri] settings section
        niri2kiri.py config.kdl [kglobalshortcutsrc] --apply    write both with kwriteconfig6
+       niri2kiri.py config.kdl --apply                         also makes Plasma command shortcuts of the spawn / spawn-sh binds
+                                                               (~/.local/share/applications/kiri-bind-*.desktop with X-KDE-Shortcuts);
+                                                               --no-spawn leaves them out, --remove-spawn removes them again and stops
        niri2kiri.py config.kdl --input [--apply]               the niri `input` block for Plasma: show (or, with --apply, write)
                                                                touchpad natural-scroll/tap/accel-profile (kcminputrc), key repeat
                                                                (kcminputrc) and xkb layouts/options (kxkbrc). Only with --input.
 
-Kiri has to have run once, so its actions are already in kglobalshortcutsrc.
-Settings apply live; shortcuts need a new login. Things Kiri can't do are listed on stderr.
+With --apply the keys go into Kiri's own key fields (kwinrc [Script-kiri], key1_<action> and key2_<action>), which a
+running Kiri picks up like its other settings: no new login needed. Without --apply the [kiri] section for
+kglobalshortcutsrc is printed (Kiri has to have run once for that). Things Kiri can't do are listed on stderr.
 """
 import colorsys
 import json
+import os
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -252,11 +258,42 @@ def read_binds(path):
             else:
                 action = ACTIONS.get(name)
             kiri_key = convert_key(key)
+            if name in ("spawn", "spawn-sh"):
+                continue  # read_spawns takes these
             if action is None or kiri_key is None:
                 skipped.append(f"{key} {' '.join([name] + args)}")
                 continue
             binds.setdefault(action, []).append(kiri_key)
     return binds, skipped, steps
+
+
+def key_fields(binds):
+    """kwinrc [Script-kiri] fields for the binds: Kiri has a primary and an alternate key field per action."""
+    fields = {}
+    for action, keys in binds.items():
+        name = action.replace("-", "_")
+        for slot, key in enumerate(keys[:2], start=1):
+            fields[f"key{slot}_{name}"] = key
+        if len(keys) > 2:
+            print(f"# skipped: {action} has {len(keys)} keys, Kiri keeps the first two", file=sys.stderr)
+    return fields
+
+
+def stale_key_fields(kwinrc, keep):
+    """key fields in kwinrc [Script-kiri] that the niri config no longer sets (an earlier run wrote them)."""
+    stale, inside = [], False
+    try:
+        lines = Path(kwinrc).expanduser().read_text().splitlines()
+    except OSError:
+        return stale
+    for line in lines:
+        if line.startswith("["):
+            inside = line.strip() == "[Script-kiri]"
+        elif inside and re.match(r"key[12]_\w+=", line):
+            name = line.split("=", 1)[0]
+            if name not in keep:
+                stale.append(name)
+    return stale
 
 
 def read_kiri_section(path):
@@ -523,6 +560,122 @@ def read_settings_inner(path, warn):
     return out
 
 
+# ---- spawn / spawn-sh binds: Plasma command shortcuts ----
+# kglobalacceld turns every application .desktop file that has X-KDE-Shortcuts into a shortcut component while it runs
+# (it looks again whenever the service cache changes), so no restart or login is needed. The files are ours alone:
+# they carry a marker line, are written only when they change, and each run removes the ones the niri config no longer has.
+
+SPAWN_MARKER = "X-Kiri-Niri-Bind=true"
+XF86_KEYS = {
+    "xf86audioraisevolume": "Volume Up", "xf86audiolowervolume": "Volume Down", "xf86audiomute": "Volume Mute",
+    "xf86audiomicmute": "Microphone Mute", "xf86audioplay": "Media Play", "xf86audiopause": "Media Pause",
+    "xf86audiostop": "Media Stop", "xf86audioprev": "Media Previous", "xf86audionext": "Media Next",
+    "xf86monbrightnessup": "Monitor Brightness Up", "xf86monbrightnessdown": "Monitor Brightness Down",
+    "xf86kbdbrightnessup": "Keyboard Brightness Up", "xf86kbdbrightnessdown": "Keyboard Brightness Down",
+    "xf86launch1": "Launch (1)", "xf86mail": "Launch Mail", "xf86calculator": "Launch Calculator",
+}
+
+
+def spawn_key(niri_key):
+    """Qt key name for a bind that starts a program; like convert_key, plus the XF86 media keys."""
+    key = convert_key(niri_key)
+    if key is None:
+        *mods, last = niri_key.split("+")
+        if last.lower() in XF86_KEYS and all(m.lower() in MODIFIERS for m in mods):
+            order = ["Meta", "Ctrl", "Alt", "Shift"]
+            key = "+".join(sorted({MODIFIERS[m.lower()] for m in mods}, key=order.index) + [XF86_KEYS[last.lower()]])
+    return key
+
+
+def read_spawns(path, warn):
+    """[(kiri_key, args)] of the spawn and spawn-sh binds; args is the command line as a list."""
+    spawns = []
+    for blk in find(parse_kdl(path), "binds"):
+        for key, _, _, cmds in blk[3]:
+            if not cmds or cmds[0][0] not in ("spawn", "spawn-sh") or not cmds[0][1]:
+                continue
+            name, args = cmds[0][0], cmds[0][1]
+            kiri_key = spawn_key(key)
+            if kiri_key is None or "," in kiri_key:
+                warn(f"bind {key} {name} {' '.join(args)}")
+                continue
+            if name == "spawn-sh":
+                args = ["sh", "-c", " ".join(args)]
+            elif args[0].startswith("~/"):
+                args = [str(Path.home() / args[0][2:])] + args[1:]
+            spawns.append((kiri_key, args))
+    return spawns
+
+
+def exec_arg(arg):
+    """One argument of a .desktop Exec line: quoted when it needs it (the Desktop Entry rules)."""
+    arg = arg.replace("%", "%%")
+    if re.fullmatch(r"[A-Za-z0-9_./:=@+,-]+", arg):
+        return arg
+    return '"' + re.sub(r'(["`$\\])', r"\\\1", arg) + '"'
+
+
+def desktop_string(value):
+    return value.replace("\\", "\\\\")  # the file format reads \\ as one backslash
+
+
+def spawn_files(spawns):
+    """{file name: text}, one per bound key."""
+    files = {}
+    for kiri_key, args in spawns:
+        slug = "".join(c if c.isalnum() else f"_{ord(c):x}_" for c in kiri_key)
+        name = f"kiri-bind-{slug}.desktop"
+        command = shlex.join(args)
+        text = "\n".join([
+            "[Desktop Entry]",
+            "# Made by niri2kiri.py from a niri bind; rewritten on every run, removed with --remove-spawn.",
+            "Type=Application",
+            "Name=" + desktop_string(f"{command}"),
+            "Exec=" + desktop_string(" ".join(exec_arg(a) for a in args)),
+            "NoDisplay=true",
+            "StartupNotify=false",
+            "X-KDE-GlobalAccel-CommandShortcut=true",
+            "X-KDE-Shortcuts=" + kiri_key,
+            SPAWN_MARKER,
+            "",
+        ])
+        files[name] = text
+    return files
+
+
+def spawn_dir():
+    return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "applications"
+
+
+def generated_spawn_files(directory):
+    return [f for f in sorted(directory.glob("kiri-bind-*.desktop")) if SPAWN_MARKER in f.read_text()] if directory.is_dir() else []
+
+
+def apply_spawns(files, dry):
+    """Writes the files that changed, removes the stale ones; returns what it did, for printing."""
+    directory = spawn_dir()
+    done = []
+    for old in generated_spawn_files(directory):
+        if old.name not in files:
+            done.append(f"remove {old}")
+            if not dry:
+                old.unlink()
+    for name, text in files.items():
+        target = directory / name
+        if not target.exists() or target.read_text() != text:
+            done.append(f"write {target}")
+            if not dry:
+                directory.mkdir(parents=True, exist_ok=True)
+                target.write_text(text)
+    if done and not dry:
+        # kglobalacceld notices the changed service cache and registers (or drops) the shortcuts
+        try:
+            subprocess.run(["kbuildsycoca6", "--noincremental"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            print("# kbuildsycoca6 not found: the shortcuts appear after the next login", file=sys.stderr)
+    return done
+
+
 # ---- the niri `input` block, only with --input ----
 
 def touchpads():
@@ -610,11 +763,15 @@ def main():
     argv = sys.argv[1:]
     flags = {a for a in argv if a.startswith("--")}
     pos = [a for a in argv if not a.startswith("--")]
-    if not 1 <= len(pos) <= 2 or flags - {"--settings", "--apply", "--input"}:
+    if not 1 <= len(pos) <= 2 or flags - {"--settings", "--apply", "--input", "--no-spawn", "--remove-spawn"}:
         sys.exit(__doc__.strip())
     shortcuts_file = pos[1] if len(pos) == 2 else "~/.config/kglobalshortcutsrc"
     warn = lambda msg: print("# skipped:", msg, file=sys.stderr)
 
+    if "--remove-spawn" in flags:
+        for line in apply_spawns({}, dry=False):
+            print(line)
+        return
     if "--input" in flags:
         changes = read_input(pos[0], warn)
         for file, groups, key, value in changes:
@@ -630,19 +787,24 @@ def main():
     if "--settings" in flags or "--apply" in flags:
         settings = read_settings(pos[0], warn)
     if "--apply" in flags:
-        shortcuts = shortcut_lines(pos[0], shortcuts_file, warn)
+        binds, skipped, _ = read_binds(pos[0])
+        for line in skipped:
+            warn("bind " + line)
+        fields = key_fields(binds)
+        stale = stale_key_fields(Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")) / "kwinrc", fields)
         print("kwinrc [Script-kiri]:")
-        for key, value in settings.items():
+        for key, value in {**settings, **fields}.items():
             print(f"  {key}={fmt(value)}")
-        print("kglobalshortcutsrc [kiri]:")
-        for key, value in shortcuts.items():
-            if not value.startswith("none,"):
-                print(f"  {key}={value}")
-        for key, value in settings.items():
+        for key in stale:
+            print(f"  {key} removed")
+        for key, value in {**settings, **fields}.items():
             kwrite("kwinrc", "Script-kiri", key, value)
-        for key, value in shortcuts.items():
-            kwrite("kglobalshortcutsrc", "kiri", key, value)
-        print("\nDone. Settings apply live; shortcuts need a new login.")
+        for key in stale:
+            subprocess.run(["kwriteconfig6", "--file", "kwinrc", "--group", "Script-kiri", "--key", key, "--delete"], check=True)
+        if "--no-spawn" not in flags:
+            for line in apply_spawns(spawn_files(read_spawns(pos[0], warn)), dry=False):
+                print(line)
+        print("\nDone. Kiri picks up settings and shortcut keys at once, no new login.")
     elif "--settings" in flags:
         print("[Script-kiri]")
         for key, value in settings.items():

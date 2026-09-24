@@ -75,6 +75,7 @@ interface KwinClient {
     readonly maximizable: boolean;
     readonly output: Output;
     readonly resourceClass: string;
+    readonly resourceName: string;
     readonly dock: boolean;
     readonly normalWindow: boolean;
     readonly managed: boolean;

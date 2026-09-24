@@ -3,6 +3,7 @@ namespace ClientState {
         public readonly window: Window;
         private readonly defaultState: Tiled.WindowState;
         private readonly signalManager: SignalManager;
+        private readonly relayoutDelayer: Delayer;
         private static readonly maxExternalFrameGeometryChangedIntervalMs = 1000;
 
         constructor(world: World, client: ClientWrapper, grid: Grid) {
@@ -16,11 +17,16 @@ namespace ClientState {
             grid.onColumnOpened(column, previousColumn, scrollX);
 
             this.window = window;
-            this.signalManager = Tiled.initSignalManager(world, window, grid.config);
+            // one relayout after a burst of external geometry changes that was rate limited
+            this.relayoutDelayer = new Delayer(Tiled.maxExternalFrameGeometryChangedIntervalMs, () => {
+                world.do(() => window.column.grid.desktop.onLayoutChanged());
+            });
+            this.signalManager = Tiled.initSignalManager(world, window, grid.config, this.relayoutDelayer);
         }
 
         public destroy(passFocus: FocusPassing.Type) {
             this.signalManager.destroy();
+            this.relayoutDelayer.destroy();
 
             const window = this.window;
             const grid = window.column.grid;
@@ -30,7 +36,7 @@ namespace ClientState {
             Tiled.restoreClientAfterTiling(client, grid.config, this.defaultState, grid.desktop.clientArea);
         }
 
-        private static initSignalManager(world: World, window: Window, config: LayoutConfig) {
+        private static initSignalManager(world: World, window: Window, config: LayoutConfig, relayoutDelayer: Delayer) {
             const client = window.client;
             const kwinClient = client.kwinClient;
             const manager = new SignalManager();
@@ -39,8 +45,9 @@ namespace ClientState {
                 world.do((clientManager, desktopManager) => {
                     const desktop = desktopManager.getDesktopForClient(kwinClient);
                     if (desktop === undefined) {
-                        // windows on multiple desktops are not supported
-                        clientManager.floatClient(client);
+                        // windows on multiple desktops are not supported; it may only be a transient state (lock,
+                        // sleep, the Pager), so the window is tiled again when the desktop settles
+                        clientManager.floatClient(client, true);
                         return;
                     }
                     Tiled.moveWindowToGrid(window, desktop.grid);
@@ -51,8 +58,8 @@ namespace ClientState {
                 world.do((clientManager, desktopManager) => {
                     const desktop = desktopManager.getDesktopForClient(kwinClient);
                     if (desktop === undefined) {
-                        // windows on multiple activities are not supported
-                        clientManager.floatClient(client);
+                        // windows on multiple activities are not supported (see above)
+                        clientManager.floatClient(client, true);
                         return;
                     }
                     Tiled.moveWindowToGrid(window, desktop.grid);
@@ -199,6 +206,8 @@ namespace ClientState {
                 ) {
                     if (externalFrameGeometryChangedRateLimiter.acquire()) {
                         world.do(() => window.onFrameGeometryChanged());
+                    } else {
+                        relayoutDelayer.run();
                     }
                 }
             });

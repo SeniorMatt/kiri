@@ -94,24 +94,60 @@ static void emitAnim(const NiriAnim::Spring &sp, double endMs, std::ostream &o)
     o << ']';
 }
 
+// For each trace: accelerate like libinput for the given profile and speed, undo it like the effects do, and compare.
+// Flat has to be exact; adaptive is an estimate (libinput averages its velocity over a variable number of events),
+// so the events may be off by 15 % of the travel in sum and the net travel by 6 %.
+static int runCheck(const std::vector<const char *> &paths, bool flat, double speed)
+{
+    double worstTotal = 0, worstNet = 0; int bad = 0;
+    for (const char *p : paths) {
+        Trace t = parse(p);
+        Li::Filter lf; lf.reset(t.ev.empty() ? 0 : t.ev[0].t - 8);
+        NiriSwipe::Unaccelerate un; un.setProfile(flat, speed);
+        double sumTrue = 0, sumErr = 0, net = 0, netTrue = 0;
+        for (const Ev &e : t.ev) {
+            double ax = e.x, ay = e.y;
+            if (!flat) {
+                double r = lf.feed(e.x / NiriSwipe::Unaccelerate::UnitsPerMm, e.y / NiriSwipe::Unaccelerate::UnitsPerMm, e.t) * NiriSwipe::Unaccelerate::speedFactor(speed);
+                ax *= r; ay *= r;
+            }
+            double ux, uy; un.apply(ax, ay, e.t, ux, uy);
+            sumTrue += std::fabs(e.x); sumErr += std::fabs(ux - e.x); net += ux; netTrue += e.x;
+            if (flat && (ux != e.x || uy != e.y)) bad++;
+        }
+        double total = sumTrue > 0 ? sumErr / sumTrue : 0;
+        worstTotal = std::max(worstTotal, total);
+        const double netErr = sumTrue > 0 ? std::fabs(net - netTrue) / sumTrue : 0;
+        worstNet = std::max(worstNet, netErr);
+        if (!flat && (total > 0.15 || netErr > 0.06)) bad++;
+    }
+    std::printf("%s speed %.2f: %zu traces, worst per-event error %.3f of the travel, worst net error %.3f, %s\n", flat ? "flat" : "adaptive", speed, paths.size(), worstTotal, worstNet, bad ? "FAIL" : "ok");
+    return bad ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
-    bool events = false, accelOnly = false; const char *path = nullptr; bool unaccel = true; bool accel = true;
+    bool events = false, accelOnly = false, check = false, flat = false; double speed = 0.0; std::vector<const char *> paths; const char *path = nullptr; bool unaccel = true; bool accel = true;
     for (int i = 1; i < argc; i++) {
         if (!std::strcmp(argv[i], "--events")) events = true;
         else if (!std::strcmp(argv[i], "--no-unaccel")) unaccel = false;
-        else if (!std::strcmp(argv[i], "--flat")) accel = false;
+        else if (!std::strcmp(argv[i], "--no-accel")) accel = false;
+        else if (!std::strcmp(argv[i], "--flat")) flat = true;
+        else if (!std::strcmp(argv[i], "--speed") && i + 1 < argc) speed = std::atof(argv[++i]);
+        else if (!std::strcmp(argv[i], "--check")) check = true;
         else if (!std::strcmp(argv[i], "--accel-only")) { accelOnly = true; events = true; unaccel = false; }
-        else path = argv[i];
+        else { path = argv[i]; paths.push_back(argv[i]); }
     }
+    if (check) return runCheck(paths, flat, speed);
     Trace t = parse(path);
     Li::Filter lf; lf.reset(t.ev.empty() ? 0 : t.ev[0].t - 8);
-    NiriSwipe::Unaccelerate un; un.setEnabled(unaccel);
+    NiriSwipe::Unaccelerate un; un.setEnabled(unaccel); un.setProfile(flat, speed);
     std::vector<Ev> out; double maxrel = 0;
     for (const Ev &e : t.ev) {
         double ax = e.x, ay = e.y;
-        if (accel) {
-            double r = lf.feed(e.x / NiriSwipe::Unaccelerate::UnitsPerMm, e.y / NiriSwipe::Unaccelerate::UnitsPerMm, e.t);
+        if (accel && !flat) { // the flat filter's "unaccelerated" delta is its accelerated one
+            double r = lf.feed(e.x / NiriSwipe::Unaccelerate::UnitsPerMm, e.y / NiriSwipe::Unaccelerate::UnitsPerMm, e.t)
+                * NiriSwipe::Unaccelerate::speedFactor(speed);
             ax *= r; ay *= r;
         }
         double ux, uy; un.apply(ax, ay, e.t, ux, uy);

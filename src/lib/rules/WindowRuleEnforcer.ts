@@ -198,15 +198,25 @@ class WindowRuleEnforcer {
     }
 
     public initClientSignalManager(world: World, kwinClient: KwinClient) {
-        if (!this.followCaption.test(kwinClient.resourceClass)) {
+        if (!this.followCaption.test(kwinClient.resourceClass) && !this.followCaption.test(kwinClient.resourceName)) {
             return null;
         }
 
         const enforcer = this;
         const manager = new SignalManager();
+        let lastShouldTile = enforcer.shouldTile(kwinClient);
         manager.connect(kwinClient.captionChanged, () => {
+            // only a caption that changes what the rules say acts, and never over the user's own float/tile toggle
+            const ruleResult = enforcer.shouldTile(kwinClient);
+            if (ruleResult === lastShouldTile) {
+                return;
+            }
+            lastShouldTile = ruleResult;
             const shouldTile = Clients.canTileNow(kwinClient) && enforcer.shouldTile(kwinClient);
             world.do((clientManager, desktopManager) => {
+                if (clientManager.wasToggledManually(kwinClient)) {
+                    return;
+                }
                 const desktop = desktopManager.getDesktopForClient(kwinClient);
                 if (shouldTile && desktop !== undefined) {
                     clientManager.tileKwinClient(kwinClient, desktop.grid);

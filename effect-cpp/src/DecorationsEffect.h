@@ -109,7 +109,7 @@ public Q_SLOTS:
 private:
     void loadSettings();
     void registerWheelShortcuts();
-    void wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection direction, const QString &shortcut);
+    void wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection direction, const QString &shortcut, int cooldownMs);
     bool decorated(KWin::EffectWindow *w) const;
     double radiusFor(KWin::EffectWindow *w) const;
     double expandedProgress(KWin::EffectWindow *w) const;
@@ -143,7 +143,6 @@ private:
     std::chrono::steady_clock::time_point m_clockStart = std::chrono::steady_clock::now();
     double m_frameTime = 0;
     std::vector<std::unique_ptr<QAction>> m_wheelActions;
-    QElapsedTimer m_wheelCooldown;
 };
 
 } // namespace KiriDecorations

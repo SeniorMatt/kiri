@@ -250,3 +250,27 @@ tests.register("niri's defaults: new windows are half as wide, columns aligned l
     Assert.equal(client0.getActualFrameGeometry().x, tilingArea.x);
     Assert.equal(client1.getActualFrameGeometry().x, tilingArea.x + halfWidth + gapH);
 });
+
+tests.register("Shortcut keys from the settings or a pasted niri config apply without a new login", 1, () => {
+    const config = getDefaultConfig();
+    const { world } = init(config);
+    const settings: any = Object.assign({}, config);
+    KWin = { __brand: "KWin", readConfig: (key: string, defaultValue: any) => settings[key] ?? defaultValue };
+    const kiri = new Kiri(config, world);
+    const accel = kglobalaccel as MockKGlobalAccel;
+
+    // what niri2kiri --apply writes: key fields in kwinrc
+    settings.key1_focus_left = "Meta+Alt+J";
+    settings.key2_focus_left = "Meta+Alt+K";
+    Assert.equal(kiri.reloadConfig(), true);
+    Assert.equal(String(accel.registered.get("focus-left")), String([parseKeySequence("Meta+Alt+J"), parseKeySequence("Meta+Alt+K")]));
+
+    // a niri config pasted into the settings
+    settings.key1_focus_left = "";
+    settings.key2_focus_left = "";
+    settings.niriConfigEnabled = true;
+    settings.niriConfig = "binds { Mod+Alt+H { focus-column-left; } }";
+    Assert.equal(kiri.reloadConfig(), true);
+    Assert.assert(accel.registered.get("focus-left")!.includes(parseKeySequence("Meta+Alt+H")!));
+    Assert.equal(accel.registered.get("focus-left")!.includes(parseKeySequence("Meta+Alt+J")!), false);
+});

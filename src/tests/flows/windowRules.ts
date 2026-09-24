@@ -81,3 +81,43 @@ tests.register("center-window centers a floating window like niri", 3, () => {
     Assert.equal(frame.x, 300);
     Assert.equal(frame.y, Math.round((screen.height - frame.height) / 2));
 });
+
+tests.register("A rule on resourceName matches", 3, () => {
+    const config = getDefaultConfig();
+    config.windowRules = '[{ "class": "konsolefloat", "tile": false }]';
+    const { workspaceMock, world } = init(config);
+    const client = createClassClient("konsole");
+    client.resourceName = "konsolefloat";
+    const normal = createClassClient("konsole");
+    normal.resourceName = "konsole";
+    workspaceMock.createWindows(client, normal);
+    world.do((clientManager, desktopManager) => {
+        Assert.notTiledClient(clientManager, client);
+        Assert.tiledClient(clientManager, normal);
+    });
+    Assert.equal(client.resourceClass, "konsole");
+});
+
+tests.register("A caption change keeps a manual float toggle", 3, () => {
+    const config = getDefaultConfig();
+    config.windowRules = '[{ "class": "browser", "caption": "Video", "tile": false }]';
+    const { qtMock, workspaceMock, world } = init(config);
+    const client = createClassClient("browser");
+    workspaceMock.createWindows(client);
+    workspaceMock.activeWindow = client;
+    qtMock.fireShortcut("window-toggle-floating");
+    world.do(clientManager => Assert.notTiledClient(clientManager, client));
+    client.caption = "Other page";
+    client.captionChanged.fire();
+    world.do(clientManager => Assert.notTiledClient(clientManager, client));
+
+    // a window that was not toggled still follows its caption rule
+    const second = createClassClient("browser");
+    workspaceMock.createWindows(second);
+    second.caption = "Video";
+    second.captionChanged.fire();
+    world.do(clientManager => Assert.notTiledClient(clientManager, second));
+    second.caption = "Home";
+    second.captionChanged.fire();
+    world.do(clientManager => Assert.tiledClient(clientManager, second));
+});

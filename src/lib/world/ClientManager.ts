@@ -107,6 +107,10 @@ class ClientManager {
 
         if (!existing) {
             this.applyOpenRules(client);
+            if (!kwinClient.dock) {
+                // niri warps the cursor to a newly opened window that it activates (warp-mouse-to-focus)
+                KiriFocus.mark(kwinClient);
+            }
         }
     }
 
@@ -174,6 +178,7 @@ class ClientManager {
         }
         client.destroy(passFocus);
         this.clientMap.delete(kwinClient);
+        this.toggledManually.delete(kwinClient);
         this.focusStamps.delete(kwinClient);
         this.floatingFrames.delete(kwinClient);
     }
@@ -374,11 +379,12 @@ class ClientManager {
         client.stateManager.setState(() => new ClientState.Tiled(this.world, client, grid), FocusPassing.Type.None);
     }
 
-    public floatClient(client: ClientWrapper) {
+    // `recoverTiling`: the window is only floated because it is on no single desktop right now; it goes back to the grid
+    public floatClient(client: ClientWrapper, recoverTiling = false) {
         if (client.stateManager.getState() instanceof ClientState.Floating) {
             return;
         }
-        client.stateManager.setState(() => new ClientState.Floating(this.world, client, this.config, true), FocusPassing.Type.None);
+        client.stateManager.setState(() => new ClientState.Floating(this.world, client, this.config, !recoverTiling, false, recoverTiling), FocusPassing.Type.None);
     }
 
     public tileKwinClient(kwinClient: KwinClient, grid: Grid) {
@@ -443,11 +449,19 @@ class ClientManager {
         client.stateManager.setState(() => new ClientState.Tiled(this.world, client, desktop.grid), FocusPassing.Type.None);
     }
 
+    private readonly toggledManually = new Set<KwinClient>();
+
+    // the user floated or tiled this window with the toggle: caption rules leave it alone
+    public wasToggledManually(kwinClient: KwinClient) {
+        return this.toggledManually.has(kwinClient);
+    }
+
     public toggleFloatingClient(kwinClient: KwinClient) {
         const client = this.clientMap.get(kwinClient);
         if (client === undefined) {
             return;
         }
+        this.toggledManually.add(kwinClient);
 
         const clientState = client.stateManager.getState();
         if ((clientState instanceof ClientState.Floating || clientState instanceof ClientState.Pinned) && Clients.canTileEver(kwinClient)) {

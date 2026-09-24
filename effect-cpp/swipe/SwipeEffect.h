@@ -48,6 +48,7 @@ private:
     Phase m_phase = Phase::Idle;
     QPointF m_cumulative;
     NiriSwipe::Unaccelerate m_unaccel;
+    bool m_natural = false;
     int m_id = 0;
     bool m_ended = false;
     QList<Sample> m_queue;

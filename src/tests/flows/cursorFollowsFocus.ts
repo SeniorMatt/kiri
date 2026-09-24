@@ -49,3 +49,22 @@ tests.register("Cursor follows focus: pointer focus never warps", 10, () => {
     qtMock.fireShortcut("focus-1");
     Assert.assert(rectContainsPoint(client1.getActualFrameGeometry(), Workspace.cursorPos), { message: "Keyboard focus should still warp" });
 });
+
+tests.register("Cursor follows focus: a newly opened window gets the cursor", 5, () => {
+    const config = getDefaultConfig();
+    config.cursorFollowsFocus = true;
+    const { workspaceMock } = init(config);
+    const [client1] = workspaceMock.createClients(1);
+    workspaceMock.cursorPos = new MockQmlPoint(5, 5); // outside the window
+    Assert.assert(!rectContainsPoint(client1.getActualFrameGeometry(), Workspace.cursorPos), { message: "invalid test setup" });
+    const [client2] = workspaceMock.createClients(1);
+    Assert.assert(rectContainsPoint(client2.getActualFrameGeometry(), Workspace.cursorPos));
+
+    // without the option the cursor stays
+    const off = getDefaultConfig();
+    const second = init(off);
+    second.workspaceMock.createClients(1);
+    second.workspaceMock.cursorPos = new MockQmlPoint(5, 5);
+    second.workspaceMock.createClients(1);
+    Assert.assert(pointEquals(Workspace.cursorPos, new MockQmlPoint(5, 5)));
+});
