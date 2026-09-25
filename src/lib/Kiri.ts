@@ -161,6 +161,26 @@ function setOverviewPolling(polling: boolean) {
     }
 }
 
+// Calls `callback` with the pointer buttons that are held now (Qt::MouseButtons bits). Scripts can't see them, so the compiled
+// effect is asked, which takes a moment; without the effect nothing is known and no button counts as held.
+function queryPointerButtons(callback: (buttons: number) => void) {
+    if (typeof qmlBase === "undefined") {
+        callback(0); // tests
+        return;
+    }
+    (qmlBase as any).queryPointerButtons(callback);
+}
+
+// Calls `callback` with whether the window is an X11 (Xwayland) window. KWin's script API does not say, so the compiled
+// effect is asked; without it nothing is known and the window counts as a Wayland one.
+function queryX11Window(kwinClient: KwinClient, callback: (x11: boolean) => void) {
+    if (typeof qmlBase === "undefined") {
+        callback((kwinClient as any).x11 !== false); // tests
+        return;
+    }
+    (qmlBase as any).queryX11Window(String(kwinClient.internalId), callback);
+}
+
 // Owns the World and rebuilds it when the settings change
 class Kiri {
     private world: World;

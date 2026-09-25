@@ -274,6 +274,54 @@ Item {
         );
     }
 
+    // Whether a window is an X11 one, from the compiled effect (scripts cannot tell). Calls callback(false) when the
+    // effect is not loaded or does not answer.
+    function queryX11Window(id, callback) {
+        if (!decorationsEffect) {
+            callback(false);
+            return;
+        }
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriDecorations",
+                iface: "org.kde.kiri.Decorations",
+                member: "isX11Window",
+                arguments: [new DBus.string(id)],
+                signature: "(s)",
+            },
+            (reply) => {
+                const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
+                callback(value === true);
+            },
+            (error) => callback(false),
+        );
+    }
+
+    // Qt::MouseButtons held right now, from the compiled effect (it sees the input; scripts don't). Calls
+    // callback(0) when the effect is not loaded or does not answer.
+    function queryPointerButtons(callback) {
+        if (!decorationsEffect) {
+            callback(0);
+            return;
+        }
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriDecorations",
+                iface: "org.kde.kiri.Decorations",
+                member: "pointerButtons",
+                arguments: [],
+                signature: "()",
+            },
+            (reply) => {
+                const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
+                callback(typeof value === "number" ? value : 0);
+            },
+            (error) => callback(0),
+        );
+    }
+
     function sendVisualPositions() {
         DBus.SessionBus.asyncCall(
             {

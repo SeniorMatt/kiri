@@ -9,6 +9,13 @@ class Grid {
     // focus back to the column left of it when it is closed, as long as nothing else was focused in between
     private opened: { column: Column, previous: Column, scrollX: number } | null = null;
     private returnTo: { column: Column, scrollX: number } | null = null;
+    // niri's view_offset_to_restore: when the active column goes full-screen or maximized, the view offset it had
+    // (relative to the column) is kept, and restored when the column is back to its normal size. It is dropped as soon
+    // as the active column changes, the column moves or is closed, or the column gets back to normal by a window leaving it.
+    private viewRestore: { column: Column, offset: number } | null = null;
+    // where the view was just before the focus last moved to another column (a closing window's neighbour is often
+    // focused by KWin before the close is reported)
+    private focusMemo: { from: Column, scrollX: number, time: number } | null = null;
     private width: number;
     private userResized = false; // a user resize happened since the layout was last settled
     private userResize: boolean; // is any part of the grid being resized by the user
@@ -27,19 +34,77 @@ class Grid {
             // this delay prevents windows' contents from freezing after resizing
             this.desktop.onLayoutChanged();
             const focused = this.getLastFocusedColumn();
-            if (focused !== null && this.userResized) {
-                this.desktop.recenterWhileResizing(focused, true);
-            }
+            const resized = this.userResized;
             this.userResized = false;
-            this.desktop.autoAdjustScroll();
+            if (focused !== null && resized) {
+                this.desktop.recenterWhileResizing(focused, true);
+                // niri's interactive_resize_end: the view moves only to bring the column into view; a column that is
+                // fully visible leaves the view where the drag put it (no snapping back to the grid's edges)
+                if (!Range.contains(this.desktop.getCurrentVisibleRange(), focused)) {
+                    this.desktop.autoAdjustScroll();
+                }
+            } else {
+                this.desktop.autoAdjustScroll();
+            }
             this.desktop.arrange();
         });
+    }
+
+    // the x of the column in a grid where it has its normal size, in grid space
+    private getNaturalLeft(column: Column) {
+        const left = this.columns.getPrev(column);
+        return left === null ? 0 : left.getRight() + left.getOverflow()[1] + this.config.gapsInnerHorizontal;
+    }
+
+    // `column` just stopped having its normal size (a window in it went full-screen or maximized) while the view was at `scrollX`
+    public onColumnSizingLeftNormal(column: Column, scrollX: number) {
+        if (column === this.getLastFocusedColumn()) {
+            this.viewRestore = { column: column, offset: scrollX - this.getNaturalLeft(column) };
+        }
+    }
+
+    // `column` is back to its normal size: niri takes the stored offset whatever the situation, and puts the view back
+    // unless the user is resizing or swiping
+    public onColumnSizingBecameNormal(column: Column) {
+        if (column !== this.getLastFocusedColumn()) {
+            return;
+        }
+        const restore = this.viewRestore;
+        this.viewRestore = null;
+        if (restore === null || restore.column !== column || this.userResize || this.desktop.isGestureScrolling()) {
+            return;
+        }
+        this.desktop.setScroll(this.getNaturalLeft(column) + restore.offset, false);
+        this.desktop.scrollToColumn(column, false); // like niri: still make sure the column is in view
+    }
+
+    public clearViewRestore(column?: Column) {
+        if (column === undefined || (this.viewRestore !== null && this.viewRestore.column === column)) {
+            this.viewRestore = null;
+        }
+    }
+
+    public getViewRestoreOffset(column: Column) {
+        return this.viewRestore !== null && this.viewRestore.column === column ? this.viewRestore.offset : null;
+    }
+
+    public setViewRestoreOffset(column: Column, offset: number) {
+        if (column === this.getLastFocusedColumn()) {
+            this.viewRestore = { column: column, offset: offset };
+        }
+    }
+
+    // the scroll position before the focus moved away from `column`, if that was just now
+    public getScrollBeforeFocusLeft(column: Column) {
+        const memo = this.focusMemo;
+        return memo !== null && memo.from === column && Date.now() - memo.time < 200 ? memo.scrollX : null;
     }
 
     public moveColumn(column: Column, leftColumn: Column|null) {
         if (column === leftColumn) {
             return;
         }
+        this.viewRestore = null;
         const movedLeft = leftColumn === null ? true : column.isToTheRightOf(leftColumn);
         const firstMovedColumn = movedLeft ? column : this.getRightColumn(column);
         this.columns.move(column, leftColumn);
@@ -49,6 +114,7 @@ class Grid {
     }
 
     public moveColumnLeft(column: Column) {
+        this.viewRestore = null;
         this.columns.moveBack(column);
         this.columnsSetX(column);
         this.desktop.onLayoutChanged();
@@ -209,6 +275,9 @@ class Grid {
         if (this.opened !== null && this.opened.column === column) {
             this.opened = null;
         }
+        if (this.viewRestore !== null && this.viewRestore.column === column) {
+            this.viewRestore = null;
+        }
         if (column === this.lastFocusedColumn) {
             this.lastFocusedColumn = columnToFocus;
             this.returnTo = null;
@@ -253,6 +322,8 @@ class Grid {
         const previous = this.getLastFocusedColumn();
         if (column !== this.lastFocusedColumn) {
             this.previousFocusedColumn = this.lastFocusedColumn;
+            this.viewRestore = null;
+            this.focusMemo = this.lastFocusedColumn === null ? null : { from: this.lastFocusedColumn, scrollX: this.desktop.getScrollX(), time: Date.now() };
             this.returnTo = null;
             if (this.opened !== null && this.opened.column === column) {
                 this.returnTo = { column: this.opened.previous, scrollX: this.opened.scrollX };
@@ -278,6 +349,9 @@ class Grid {
 
     public onUserResizeFinished() {
         this.userResize = false;
+        for (const column of this.columns.iterator()) {
+            column.clearUserResizeTarget();
+        }
         this.userResizeFinishedDelayer.run();
     }
 

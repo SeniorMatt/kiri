@@ -1,6 +1,6 @@
 // niri's focus-follows-mouse, done by Kiri itself (KWin is set to click-to-focus): hovering a window activates it, but
 // not while a Plasma popup (the launcher, the system tray, ...) or KRunner is open, because the popup closes as soon
-// as it loses focus. Like niri, only a change of the window under the pointer activates, and layout animations that
+// as it loses focus, and not while a pointer button is held (niri skips the grab). Like niri, only a change of the window under the pointer activates, and layout animations that
 // slide a window under a still pointer do not (cursorPosChanged only fires when the pointer moves).
 class FocusFollowsMouse {
     private hover: KwinClient | null = null;
@@ -31,7 +31,13 @@ class FocusFollowsMouse {
         if (this.maxScroll < 100 && FocusFollowsMouse.scrollAmount(window) > this.maxScroll) {
             return;
         }
-        Workspace.activeWindow = window;
+        // niri does nothing while the pointer is grabbed (handle_focus_follows_mouse): a held button means a
+        // drag or drag and drop, which must not move the focus and scroll the view
+        queryPointerButtons(buttons => {
+            if (buttons === 0 && this.hover === window && window !== Workspace.activeWindow) {
+                Workspace.activeWindow = window;
+            }
+        });
     }
 
     // how far the view has to scroll to show the whole window, in percent of the screen width

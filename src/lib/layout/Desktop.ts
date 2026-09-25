@@ -44,6 +44,17 @@ class Desktop {
         this.tilingArea = Desktop.getTilingArea(this.clientArea, kwinDesktop, pinManager, config);
     }
 
+    // the time of the latest screen size or dock change; windows are resized by KWin around it
+    private screenChangedAt = -Infinity;
+
+    public onScreenChanged() {
+        this.screenChangedAt = Date.now();
+    }
+
+    public isScreenSettling() {
+        return Date.now() - this.screenChangedAt < 3000;
+    }
+
     private updateArea() {
         const newClientArea = Desktop.getClientArea(this.getScreen(), this.kwinDesktop);
         if (rectEquals(newClientArea, this.clientArea) && !this.dirtyPins) {
@@ -125,13 +136,21 @@ class Desktop {
         this.scrollToColumn(focusedColumn, false);
     }
 
-    // While the user resizes a column (and when they let go): columns that fit on the screen together stay
-    // centered as a group (a lone column is a group of one); otherwise the scroller decides.
+    // While the user resizes a column (and when they let go): like niri, the view only keeps the resized column centered
+    // when niri would center it (center-focused-column "always", or a lone column with always-center-single-column).
+    // Otherwise the view stays where it is, apart from following the left edge; the focused column is brought into
+    // view when the pointer is released (niri's interactive_resize_end). The "center when everything fits" setting and
+    // the centering scrollers (not niri's) also keep the columns that fit on the screen centered as a group.
     public recenterWhileResizing(column: Column, focused: boolean) {
-        if (this.grid.getWidth() <= this.tilingArea.width) {
+        const clamper = this.config.clamper;
+        if ((clamper instanceof CenterClamper || (clamper instanceof EdgeClamper && clamper.centerWhenFits)) && this.grid.getWidth() <= this.tilingArea.width) {
             this.setScroll(Math.round((this.grid.getWidth() - this.tilingArea.width) / 2), true);
-        } else if (focused && this.config.scroller instanceof CenteredScroller) {
-            this.scrollToColumn(column, true);
+        } else if (focused && this.isCenteringFocusedColumn()) {
+            if (column.getWidth() < this.tilingArea.width) {
+                this.setScroll(Math.round(column.getLeft() - (this.tilingArea.width - column.getWidth()) / 2), true);
+            } else {
+                this.scrollToColumn(column, true);
+            }
         }
     }
 

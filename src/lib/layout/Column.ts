@@ -7,7 +7,11 @@ class Column {
     private presetWidth: number|undefined; // the width that was asked for when `presetIndex` was set; clients may snap to a smaller one
     private readonly windows: LinkedList<Window>;
     private tabbed: boolean;
+    private normalSizing = true; // niri's sizing_mode is normal: no window is full-screen or maximized in the grid
     private focusTaker: Window|null;
+    // while the user resizes one of the windows: the geometry the pointer asks for, before the client has committed
+    // it. The other windows of the column are sent there at once (niri sends all the configures of a resize together)
+    private userResizeTarget: { window: Window, x: number, width: number } | null = null;
     private static readonly minWidth = 40;
     private static readonly minHeight = 40;
 
@@ -92,6 +96,29 @@ class Column {
             }
         }
         return false;
+    }
+
+    public isNormalSizing() {
+        for (const window of this.windows.iterator()) {
+            if (window.fillsWidth() || window.fillsHeight()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // A window of the column changed its full-screen or maximized state while the view was at `scrollX`.
+    // Returns true when the column is back to its normal size, then the caller restores the view once the layout is updated.
+    public updateSizingMode(scrollX: number) {
+        const normal = this.isNormalSizing();
+        if (normal === this.normalSizing) {
+            return false;
+        }
+        this.normalSizing = normal;
+        if (!normal) {
+            this.grid.onColumnSizingLeftNormal(this, scrollX);
+        }
+        return normal;
     }
 
     // returns how far the column's windows reach past its left and right edges
@@ -211,6 +238,29 @@ class Column {
         }
         this.grid.desktop.adjustScroll(-leftEdgeDeltaStep, true);
         this.grid.desktop.recenterWhileResizing(this, this.grid.getLastFocusedColumn() === this);
+    }
+
+    // the pointer asks for `requested` (the window had `previous` at the last step): the column's windows get the new
+    // sizes now, without waiting for the resized client's commit. Other columns still follow the committed geometry.
+    public onUserResizeRequested(window: Window, requested: QmlRect, previous: QmlRect) {
+        this.userResizeTarget = {
+            window: window,
+            x: requested.x,
+            width: clamp(requested.width, this.getMinWidth(), this.getMaxWidth()),
+        };
+        if (requested.height !== previous.height) {
+            // like niri: the dragged window gets the height under the pointer and the rest of the column shares what is
+            // left; the top edge of the first window does nothing
+            const top = requested.y !== previous.y;
+            if (!(top && this.isTopWindow(window))) {
+                this.setFixedHeight(window, requested.height, null);
+            }
+        }
+        this.grid.desktop.onLayoutChanged();
+    }
+
+    public clearUserResizeTarget() {
+        this.userResizeTarget = null;
     }
 
     public isTopWindow(window: Window) {
@@ -421,8 +471,13 @@ class Column {
             return;
         }
         let y = this.grid.desktop.tilingArea.y;
+        const target = this.userResizeTarget;
         for (const window of this.windows.iterator()) {
-            window.arrange(x, y, this.getWidth(), window.height);
+            if (target !== null && window !== target.window) {
+                window.arrange(target.x, y, target.width, window.height);
+            } else {
+                window.arrange(x, y, this.getWidth(), window.height);
+            }
             y += window.height + this.grid.config.gapsInnerVertical;
         }
     }
@@ -525,6 +580,7 @@ class Column {
         }
 
         this.resizeWindows();
+        this.normalSizing = this.isNormalSizing(); // a window that arrives full-screen has no view offset to restore
 
         if (window.isFocused()) {
             this.onWindowFocused(window);
@@ -539,6 +595,14 @@ class Column {
         const windowToFocus = this.getBelowWindow(window) ?? this.getAboveWindow(window);
 
         this.windows.remove(window);
+        if (!lastWindow) {
+            // niri: when the column gets back to its normal size because a tile left it, nothing is restored
+            const normal = this.isNormalSizing();
+            if (normal && !this.normalSizing) {
+                this.grid.clearViewRestore(this);
+            }
+            this.normalSizing = normal;
+        }
 
         if (window === this.focusTaker) {
             this.focusTaker = windowToFocus;

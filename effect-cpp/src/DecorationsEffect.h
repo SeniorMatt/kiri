@@ -103,6 +103,10 @@ public Q_SLOTS:
     Q_SCRIPTABLE void setVisualPositions(const QString &json);
     // niri's insert hint while a window is dragged: {"r": [x, y, w, h] (screen coordinates), "w": "{uuid}" of the dragged window}, or "null"
     Q_SCRIPTABLE void setInsertHint(const QString &json);
+    // the pointer buttons held right now (Qt::MouseButtons bits), for Kiri's focus-follows-mouse: niri ignores the pointer while it is grabbed
+    Q_SCRIPTABLE int pointerButtons();
+    // whether the window "{uuid}" is an X11 (Xwayland) window: scripts cannot tell
+    Q_SCRIPTABLE bool isX11Window(const QString &id);
     // re-read Kiri's settings: KWin's settings page writes them without telling anyone, Kiri calls this after
     Q_SCRIPTABLE void reloadSettings(const QString &unused);
 
@@ -131,6 +135,16 @@ private:
     QList<TabGroup> m_tabGroups;
     QHash<QUuid, int> m_tabGroupOf;
     QHash<QUuid, QPointF> m_visualPositions;
+    // where a window was painted relative to its real place when its visual position ended (a drag that was let go
+    // or went past the threshold): the offset runs out with niri's window-movement spring instead of snapping
+    struct VisualRelease
+    {
+        QPointF offset;
+        double start = -1; // -1: waiting for the real window to move (Kiri puts it in its place a moment after the release)
+        double created = 0;
+    };
+    QHash<QUuid, QPointF> m_lastVisualOffset;
+    QHash<QUuid, VisualRelease> m_releasing;
     KWin::RectF m_insertHint; // empty = none
     QUuid m_hintWindow;       // the window being dragged
     void drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion);

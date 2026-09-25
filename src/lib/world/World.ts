@@ -360,6 +360,15 @@ class World {
         this.closeRelayoutDelayer.run();
     }
 
+    // A closed window may come back at once (see ClientManager.rememberClosed): nothing moves meanwhile
+    public holdArrange() {
+        this.arrangeHeld = true;
+    }
+
+    public releaseArrangeHold() {
+        this.arrangeHeld = false;
+    }
+
     // a swipe is in progress or settling: niri's focus-follows-mouse does not switch windows then
     public isScrollBusy() {
         if (this.gestureAnimation !== null) {
@@ -559,7 +568,12 @@ class World {
         }
     }
 
-    public onScreenResized() {
+    public onScreenResized(outputChanged = false) {
+        if (outputChanged) {
+            for (const desktop of this.desktopManager.getAllDesktops()) {
+                desktop.onScreenChanged();
+            }
+        }
         this.screenResizedDelayer.run();
     }
 }

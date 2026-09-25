@@ -147,6 +147,7 @@ class MockWorkspace {
                     frame.y -= delta.height;
                 }
             }
+            window.interactiveMoveResizeStepped.fire(frame.clone()); // KWin tells the geometry the pointer asks for, before the client commits it
             runOneOf(
                 () => window.getActualFrameGeometry().set(frame),
                 () => window.frameGeometry = frame,

@@ -36,7 +36,7 @@ tests.register("Single column stays centered while resizing", 6, () => {
                     const pos = visualPositions.get(String(client.internalId));
                     const centeredX = Math.round(tilingArea.x + (tilingArea.width - frame.width) / 2);
                     if (pos === undefined) {
-                        Assert.equal(frame.x, centeredX, { message: "already centered" });
+                        Assert.equal(frame.x, centeredX, { message: `already centered ${scroller} ${alwaysCenter} ${centerWhenFits} left=${leftSide} step ${i}` });
                     } else {
                         Assert.equal(pos[0], centeredX, { message: `visual x ${scroller} ${alwaysCenter} ${centerWhenFits} left=${leftSide} step ${i}` });
                     }
@@ -59,32 +59,51 @@ tests.register("Single column stays centered while resizing", 6, () => {
     }
 });
 
-tests.register("Columns that fit stay centered as a group while resizing", 4, () => {
-    for (const leftSide of [false, true]) {
-        const config = getDefaultConfig();
-        const { qtMock, workspaceMock } = init(config);
-        const [a, b] = workspaceMock.createClientsWithWidths(200, 200);
-        const frame = a.getFrameGeometryCopy();
-        workspaceMock.cursorPos = new MockQmlPoint(leftSide ? frame.x : rectRight(frame), frame.y + 10);
-        a.resize = true;
-        a.interactiveMoveResizeStarted.fire();
-        for (let i = 0; i < 3; i++) {
-            frame.width += 20;
-            if (leftSide) {
-                frame.x -= 20;
+// niri keeps the view where it is while a column is resized (the left edge or the right edge stays, whichever is not
+// dragged), however few columns there are; only "center when everything fits" (Karousel's setting) centers the group
+tests.register("Columns that fit stay put while resizing, unless the grid is centered", 8, () => {
+    for (const centerGridWhenFits of [false, true]) {
+        for (const leftSide of [false, true]) {
+            const config = getDefaultConfig();
+            config.centerGridWhenFits = centerGridWhenFits;
+            const { qtMock, workspaceMock } = init(config);
+            const [a, b] = workspaceMock.createClientsWithWidths(200, 200);
+            const start = a.getFrameGeometryCopy();
+            const frame = a.getFrameGeometryCopy();
+            const bStart = b.getActualFrameGeometry().x;
+            workspaceMock.cursorPos = new MockQmlPoint(leftSide ? frame.x : rectRight(frame), frame.y + 10);
+            a.resize = true;
+            a.interactiveMoveResizeStarted.fire();
+            for (let i = 0; i < 3; i++) {
+                frame.width += 20;
+                if (leftSide) {
+                    frame.x -= 20;
+                }
+                a.interactiveMoveResizeStepped.fire(frame);
+                a.frameGeometry = frame;
+                const message = `step ${i} left=${leftSide} centered=${centerGridWhenFits}`;
+                const fb = b.getActualFrameGeometry();
+                if (centerGridWhenFits) {
+                    const total = frame.width + gapH + fb.width;
+                    Assert.equal(fb.x, Math.round(tilingArea.x + (tilingArea.width - total) / 2) + frame.width + gapH, { message: `neighbour follows, group centered ${message}` });
+                } else if (leftSide) {
+                    Assert.equal(fb.x, bStart, { message: `the right edge stays, the neighbour does not move ${message}` });
+                } else {
+                    Assert.equal(fb.x, start.x + frame.width + gapH, { message: `the left edge stays, the neighbour follows ${message}` });
+                }
             }
-            a.frameGeometry = frame;
-            // the neighbour moves live, so that the group stays centered
-            const total = frame.width + gapH + b.getActualFrameGeometry().width;
-            Assert.equal(b.getActualFrameGeometry().x, Math.round(tilingArea.x + (tilingArea.width - total) / 2) + frame.width + gapH, { message: `neighbour follows step ${i} left=${leftSide}` });
+            a.resize = false;
+            a.interactiveMoveResizeFinished.fire();
+            qtMock.fireShortcut("focus-right");
+            const fa = a.getActualFrameGeometry(), fb = b.getActualFrameGeometry();
+            Assert.equal(fa.width, frame.width, { message: `the new width sticks after release left=${leftSide}` });
+            Assert.equal(fb.width, 200, { message: "neighbour width unchanged" });
+            if (centerGridWhenFits) {
+                const left = fa.x, right = rectRight(fb);
+                Assert.between(Math.abs((left - tilingArea.x) - (tilingArea.x + tilingArea.width - right)), 0, 1, { message: "group centered after resize" });
+            } else {
+                Assert.equal(fb.x - rectRight(fa), gapH, { message: `columns keep their gap after release left=${leftSide}` });
+            }
         }
-        a.resize = false;
-        a.interactiveMoveResizeFinished.fire();
-        qtMock.fireShortcut("focus-right");
-        const fa = a.getActualFrameGeometry(), fb = b.getActualFrameGeometry();
-        Assert.equal(fa.width, frame.width, { message: `the new width sticks after release left=${leftSide}` });
-        Assert.equal(fb.width, 200, { message: "neighbour width unchanged" });
-        const left = fa.x, right = rectRight(fb);
-        Assert.between(Math.abs((left - tilingArea.x) - (tilingArea.x + tilingArea.width - right)), 0, 1, { message: "group centered after resize" });
     }
 });

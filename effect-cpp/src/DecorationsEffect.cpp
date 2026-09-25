@@ -6,6 +6,7 @@
 #include "DecorationsEffect.h"
 
 #include <core/output.h>
+#include <input.h>
 #include <core/pixelgrid.h>
 #include <core/renderviewport.h>
 #include <effect/effecthandler.h>
@@ -17,6 +18,7 @@
 #include <KConfigGroup>
 #include <KSharedConfig>
 
+#include <QDateTime>
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCall>
@@ -31,6 +33,7 @@
 #include <epoxy/gl.h>
 
 Q_LOGGING_CATEGORY(KIRI_DECO, "kiri.decorations", QtWarningMsg)
+Q_LOGGING_CATEGORY(KIRI_PAINT, "kiri.decorations.paint", QtWarningMsg) // per-frame painted geometry, for measuring
 
 namespace KiriDecorations
 {
@@ -137,6 +140,17 @@ void Effect::postPaintScreen()
             ++it;
         }
     }
+    for (auto it = m_releasing.begin(); it != m_releasing.end();) {
+        if (it->start < 0 && m_frameTime - it->created > 0.3) {
+            it->start = m_frameTime; // the window never moved: the offset runs out where it is
+        }
+        if (it->start >= 0 && (speed <= 0 || NiriAnim::moveSpring().isDone((m_frameTime - it->start) * speed))) {
+            it = m_releasing.erase(it);
+        } else {
+            again = true;
+            ++it;
+        }
+    }
     if (again) {
         KWin::effects->addRepaintFull();
     }
@@ -177,7 +191,22 @@ Effect::Effect()
         }
     });
     auto watch = [this](KWin::EffectWindow *w) {
+        // The pointer was let go: Kiri puts the window in its place and clears the visual position by D-Bus, which can arrive
+        // after the real geometry has changed (and kiri_motion has started to animate it). The offset between where the
+        // window was painted and its real place is taken here, while that real place is still the one it was painted for.
+        connect(w, &KWin::EffectWindow::windowFinishUserMovedResized, this, [this](KWin::EffectWindow *w) {
+            const QUuid id = w->internalId();
+            if (m_visualPositions.contains(id) && m_lastVisualOffset.contains(id)) {
+                m_releasing.insert(id, VisualRelease{m_lastVisualOffset.value(id), -1, clock()});
+                m_visualPositions.remove(id);
+                m_lastVisualOffset.remove(id);
+                KWin::effects->addRepaintFull();
+            }
+        });
         connect(w, &KWin::EffectWindow::windowFrameGeometryChanged, this, [this](KWin::EffectWindow *w, const KWin::RectF &old) {
+            if (auto release = m_releasing.find(w->internalId()); release != m_releasing.end() && release->start < 0 && old.topLeft() != w->frameGeometry().topLeft()) {
+                release->start = clock(); // the real window is where it belongs now: the offset to the old place runs out from here
+            }
             // the ring is outside of what KWin repaints for the window itself
             const double reach = this->reach();
             KWin::effects->addRepaint(old.adjusted(-reach, -reach, reach, reach));
@@ -302,6 +331,17 @@ void Effect::reloadSettings(const QString &)
 {
     loadSettings();
     KWin::effects->addRepaintFull();
+}
+
+int Effect::pointerButtons()
+{
+    return KWin::input() ? int(KWin::input()->qtButtonStates()) : 0;
+}
+
+bool Effect::isX11Window(const QString &id)
+{
+    const KWin::EffectWindow *w = KWin::effects->findWindow(QUuid(id));
+    return w && w->isX11Client();
 }
 
 void Effect::setInsertHint(const QString &json)
@@ -458,8 +498,24 @@ void Effect::setVisualPositions(const QString &json)
         }
     };
     repaint(m_visualPositions);
+    // niri's animate_move_from: when the painted place stops being decided by Kiri (the pointer let go, or the window
+    // left the grid), what is left of the offset to the real place is animated away
+    for (auto it = m_visualPositions.cbegin(); it != m_visualPositions.cend(); ++it) {
+        if (!positions.contains(it.key()) && m_lastVisualOffset.contains(it.key())) {
+            m_releasing.insert(it.key(), VisualRelease{m_lastVisualOffset.value(it.key()), -1, clock()});
+        }
+    }
+    for (auto it = positions.cbegin(); it != positions.cend(); ++it) {
+        m_releasing.remove(it.key());
+    }
+    for (auto it = m_lastVisualOffset.begin(); it != m_lastVisualOffset.end();) {
+        it = positions.contains(it.key()) ? std::next(it) : m_lastVisualOffset.erase(it);
+    }
     m_visualPositions = positions;
     repaint(m_visualPositions);
+    if (!m_releasing.isEmpty()) {
+        KWin::effects->addRepaintFull();
+    }
 }
 
 double Effect::reach() const
@@ -552,7 +608,7 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     if (radiusFor(w) > 0) {
         data.setTranslucent(); // the cut corners show what is behind the window
     }
-    if (m_visualPositions.contains(w->internalId())) {
+    if (m_visualPositions.contains(w->internalId()) || m_releasing.contains(w->internalId())) {
         data.setTransformed(); // painted somewhere else than where KWin thinks it is
     }
     OffscreenEffect::prePaintWindow(view, w, data);
@@ -582,10 +638,25 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
     if (visualIt != m_visualPositions.constEnd()) {
         data.setXTranslation(data.xTranslation() + visualIt->x() - w->frameGeometry().x());
         data.setYTranslation(data.yTranslation() + visualIt->y() - w->frameGeometry().y());
+        m_lastVisualOffset.insert(w->internalId(), QPointF(visualIt->x() - w->frameGeometry().x(), visualIt->y() - w->frameGeometry().y()));
+    } else if (const auto releaseIt = m_releasing.constFind(w->internalId()); releaseIt != m_releasing.constEnd()) {
+        const double factor = KWin::effects->animationTimeFactor();
+        const double k = releaseIt->start < 0 ? 1.0 : (factor > 0 ? NiriAnim::moveSpring().value((m_frameTime - releaseIt->start) / factor) : 0);
+        data.setXTranslation(data.xTranslation() + releaseIt->offset.x() * k);
+        data.setYTranslation(data.yTranslation() + releaseIt->offset.y() * k);
     }
 
     if (!m_insertHint.isEmpty() && !m_hintWindow.isNull() && w->internalId() == m_hintWindow && isActive() && !w->data(CaptureRole).toBool()) {
         drawInsertHint(viewport, deviceRegion); // under the dragged window
+    }
+    if (KIRI_PAINT().isDebugEnabled() && w->isNormalWindow() && !w->data(CaptureRole).toBool()) {
+        // where the window really ends up on screen (after the visual position and kiri_motion's animation), for measuring
+        const KWin::RectF f = w->frameGeometry();
+        qCDebug(KIRI_PAINT).noquote() << "PD" << QDateTime::currentMSecsSinceEpoch() << qint64(m_frameTime * 1000) << w->caption()
+                                      << qRound(f.x() + data.xTranslation()) << qRound(f.y() + data.yTranslation())
+                                      << qRound(f.width() * data.xScale()) << qRound(f.height() * data.yScale())
+                                      << "frame" << qRound(f.x()) << qRound(f.y()) << qRound(f.width()) << qRound(f.height())
+                                      << "cur" << qRound(KWin::effects->cursorPos().x()) << qRound(KWin::effects->cursorPos().y());
     }
     const bool result = OffscreenEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
     if (w->data(CaptureRole).toBool()) {

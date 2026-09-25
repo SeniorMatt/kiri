@@ -6,6 +6,8 @@ class MockQmlTimer {
 
     // tests can hold timers back (to look at the state before they fire) and fire them later with `flush`
     public static deferred = false;
+    // timers with one of these intervals are held back too, while `deferred` is off
+    public static readonly deferIntervals = new Set<number>();
     private static pending = new Set<MockQmlTimer>();
 
     public static flush() {
@@ -25,7 +27,7 @@ class MockQmlTimer {
     }
 
     public restart() {
-        if (MockQmlTimer.deferred) {
+        if (MockQmlTimer.deferred || MockQmlTimer.deferIntervals.has(this.interval)) {
             MockQmlTimer.pending.add(this);
             return;
         }

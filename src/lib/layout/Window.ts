@@ -10,7 +10,7 @@ class Window {
     public readonly focusedState: Window.State;
     private skipArrange: boolean;
 
-    constructor(client: ClientWrapper, column: Column) {
+    constructor(client: ClientWrapper, column: Column, after?: Window|null) {
         this.client = client;
         this.height = client.kwinClient.frameGeometry.height.round();
 
@@ -26,7 +26,7 @@ class Window {
         this.column = column;
         this.skipArrange = this.isMaximizedOutsideGrid();
         this.updateLayering();
-        column.onWindowAdded(this, true);
+        column.onWindowAdded(this, true, after);
     }
 
     // `after` puts the window right below that window of the target column (null: at the top); without it, `bottom` decides
@@ -70,7 +70,7 @@ class Window {
                 height = fillArea.height;
             }
         }
-        this.client.place(x, y, width, height);
+        this.client.place(x, y, width, height, this.column.grid.isUserResizing());
     }
 
     private shouldReMaximize() {
@@ -150,6 +150,7 @@ class Window {
     }
 
     private onMaximizedOrFullScreenChanged() {
+        const scrollBefore = this.column.grid.desktop.getScrollX();
         this.skipArrange = this.isMaximizedOutsideGrid();
         this.updateLayering();
         if ((this.fillsWidth() || this.fillsHeight()) && this.column.getWindowCount() > 1 && !this.column.isTabbed()) {
@@ -157,8 +158,12 @@ class Window {
             const newColumn = new Column(this.column.grid, this.column);
             this.moveToColumn(newColumn, true, FocusPassing.Type.None);
         }
+        const backToNormal = this.column.updateSizingMode(scrollBefore); // niri: remember the view when going full-screen
         this.column.grid.onColumnWidthChanged(this.column);
         this.column.grid.desktop.onLayoutChanged();
+        if (backToNormal) {
+            this.column.grid.onColumnSizingBecameNormal(this.column); // niri: ... and restore it when leaving full-screen
+        }
     }
 
     private updateLayering() {
@@ -223,7 +228,9 @@ class Window {
 
     public onFrameGeometryChanged() {
         const newGeometry = this.client.kwinClient.frameGeometry;
-        if (!Clients.isFrameFullScreenSize(this.client.kwinClient)) {
+        // while outputs come and go KWin squeezes windows into whatever screen is left; their widths are not wanted and
+        // must not replace the column's proportion, which brings the width back with the screen
+        if (!Clients.isFrameFullScreenSize(this.client.kwinClient) && !this.column.grid.desktop.isScreenSettling()) {
             this.column.setWidth(newGeometry.width.round(), true, true); // the preset stays: clients may snap to a slightly different size
         }
         this.column.grid.desktop.onLayoutChanged();

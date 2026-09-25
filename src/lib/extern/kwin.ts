@@ -106,6 +106,7 @@ interface KwinClient {
     readonly captionChanged: QSignal<[]>;
     readonly tileChanged: QSignal<[]>;
     readonly interactiveMoveResizeStarted: QSignal<[]>;
+    readonly interactiveMoveResizeStepped: QSignal<[geometry: QmlRect]>; // the geometry the pointer asks for, before the client has committed it
     readonly interactiveMoveResizeFinished: QSignal<[]>;
     readonly frameGeometryChanged: QSignal<[oldGeometry: QmlRect]>;
 

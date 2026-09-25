@@ -22,7 +22,8 @@ class MockKwinClient {
     public readonly appletPopup: boolean = false;
     public readonly dialog: boolean = false;
     public readonly modal: boolean = false;
-    public readonly pid = 1;
+    public pid = 1;
+    public x11 = true; // Kiri asks the compiled effect; tests answer from here
 
     private _maximizedVertically = false;
     private _maximizedHorizontally = false;
@@ -44,6 +45,7 @@ class MockKwinClient {
     public readonly captionChanged = new MockQSignal<[]>();
     public readonly tileChanged = new MockQSignal<[]>();
     public readonly interactiveMoveResizeStarted = new MockQSignal<[]>();
+    public readonly interactiveMoveResizeStepped = new MockQSignal<[geometry: QmlRect]>();
     public readonly interactiveMoveResizeFinished = new MockQSignal<[]>();
     public readonly frameGeometryChanged = new MockQSignal<[oldGeometry: QmlRect]>();
 
@@ -199,6 +201,21 @@ class MockKwinClient {
         return this._frameGeometry;
     }
 
+    // a slow client: a new size only takes effect when it commits it (commitRequestedGeometry), a plain move at once
+    public slowClient = false;
+    public requestedGeometries: MockQmlRect[] = []; // every size that was asked for and has not been committed
+
+    public commitRequestedGeometry() {
+        const requested = this.requestedGeometries.pop();
+        this.requestedGeometries = [];
+        if (requested !== undefined) {
+            this.committing = true;
+            this.frameGeometry = requested;
+        }
+    }
+
+    private committing = false;
+
     // for Karousel
     public get frameGeometry() {
         return new MockQmlRect(
@@ -206,11 +223,20 @@ class MockKwinClient {
             this._frameGeometry.y + randomJitter(),
             this._frameGeometry.width + randomJitter(),
             this._frameGeometry.height + randomJitter(),
-            this.frameGeometryChanged.fire.bind(this.frameGeometryChanged),
+            this.slowClient ? () => {} : this.frameGeometryChanged.fire.bind(this.frameGeometryChanged), // a slow client's change waits for its commit
         );
     }
 
     public set frameGeometry(frameGeometry: MockQmlRect) {
+        const commit = this.committing;
+        this.committing = false; // only this assignment is the commit, whatever the signal makes Kiri ask for next waits again
+        if (this.slowClient && !commit && (Math.round(frameGeometry.width) !== Math.round(this._frameGeometry.width) || Math.round(frameGeometry.height) !== Math.round(this._frameGeometry.height))) {
+            const last = this.requestedGeometries[this.requestedGeometries.length - 1];
+            if (last === undefined || !rectEquals(last, frameGeometry)) {
+                this.requestedGeometries.push(new MockQmlRect(frameGeometry.x, frameGeometry.y, frameGeometry.width, frameGeometry.height));
+            }
+            return;
+        }
         const oldFrameGeometry = this._frameGeometry;
         this._frameGeometry = new MockQmlRect(
             frameGeometry.x,

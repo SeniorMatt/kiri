@@ -1,5 +1,27 @@
 const ringCaption = "kiri-ring";
 
+// A tiled X11 window that is closed and mapped again right away by the same process is the same window to the user: SDL
+// on X11 unmaps and maps its window when a game goes full-screen, and KWin deletes the old window and makes a new one.
+// The place, the full-screen state and the focus of the closed window wait this long for such a window.
+const remapHoldMs = 300;
+// only windows that are, were or just became full-screen are expected to come back
+const remapRecentMs = 2000;
+
+interface ClosedSlot {
+    pid: number;
+    resourceClass: string;
+    time: number;
+    placement: ClientState.Tiled.Placement;
+    preferredWidth: number;
+    fullScreen: boolean;
+    maximizedMode: MaximizedMode;
+    viewRestoreOffset: number|null;
+    focused: boolean; // had the focus, or lost it to KWin's pick a moment before the close was reported
+    grid: Grid;
+    scrollX: number; // where the view was while the window had the focus
+    focusCounter: number;
+}
+
 class ClientManager {
     private readonly config: ClientManager.Config;
     private readonly clientMap: Map<KwinClient, ClientWrapper>;
@@ -9,6 +31,8 @@ class ClientManager {
     private focusCounter = 0;
     private readonly floatingFrames = new Map<KwinClient, { x: number, y: number, width: number, height: number }>();
     private readonly windowRuleEnforcer: WindowRuleEnforcer;
+    private closedSlot: ClosedSlot|null = null;
+    private readonly remapTimer: Delayer;
 
     constructor(
         config: Config,
@@ -30,6 +54,7 @@ class ClientManager {
             notificationInvalidWindowRules.sendEvent();
             log("failed to parse windowRules:", error);
         }
+        this.remapTimer = new Delayer(remapHoldMs, () => this.world.do(() => this.expireClosedSlot()));
         this.windowRuleEnforcer = new WindowRuleEnforcer(
             [...getSimpleWindowRules(config.floatClasses, config.tileClasses, config.columnWidthRules), ...parsedWindowRules],
             config.tileFullScreen, config.defaultColumnWidth, config.gapsInnerHorizontal,
@@ -58,6 +83,7 @@ class ClientManager {
         }
         console.assert(!this.hasClient(kwinClient));
 
+        const slot = this.takeClosedSlot(kwinClient);
         let constructState: (client: ClientWrapper) => ClientState.State;
         let desktop: Desktop | undefined;
         if (kwinClient.dock) {
@@ -70,13 +96,15 @@ class ClientManager {
             Clients.makeTileable(kwinClient);
             console.assert(Clients.canTileNow(kwinClient));
             constructState = (client: ClientWrapper) => {
-                if (!existing) {
+                if (slot !== null) {
+                    client.preferredWidth = slot.preferredWidth;
+                } else if (!existing) {
                     const width = this.windowRuleEnforcer.getColumnWidth(kwinClient, desktop!.tilingArea.width);
                     if (width !== null) {
                         client.preferredWidth = width;
                     }
                 }
-                const state = new ClientState.Tiled(this.world, client, desktop!.grid);
+                const state = new ClientState.Tiled(this.world, client, desktop!.grid, slot !== null && slot.grid === desktop!.grid ? slot.placement : undefined);
                 if (!existing) {
                     // niri's default-window-height
                     const height = this.windowRuleEnforcer.getWindowHeight(kwinClient, desktop!.tilingArea.height);
@@ -104,6 +132,11 @@ class ClientManager {
             this.windowRuleEnforcer.initClientSignalManager(this.world, kwinClient),
         );
         this.clientMap.set(kwinClient, client);
+        if (slot !== null) {
+            client.x11 = true; // the same X11 window again
+        } else {
+            queryX11Window(kwinClient, x11 => { client.x11 = x11; });
+        }
 
         if (!existing) {
             this.applyOpenRules(client);
@@ -112,13 +145,16 @@ class ClientManager {
                 KiriFocus.mark(kwinClient);
             }
         }
+        if (slot !== null) {
+            this.fillClosedSlot(slot, kwinClient, client);
+        }
     }
 
     // niri's open-fullscreen, and the size and the centering of a new window that a float rule (open-floating) matches
     private applyOpenRules(client: ClientWrapper) {
         const kwinClient = client.kwinClient;
         const state = client.stateManager.getState();
-        if (state instanceof ClientState.Floating) {
+        if (state instanceof ClientState.Floating && !Clients.placesItself(kwinClient)) {
             const area = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
             const size = this.windowRuleEnforcer.getFloatingSize(kwinClient, area);
             if (size !== null) {
@@ -162,7 +198,109 @@ class ClientManager {
         client.place(x, y, width, height);
     }
 
-    public removeClient(kwinClient: KwinClient, passFocus: FocusPassing.Type) {
+    // The window just came back: it takes the state and the focus of the one that was closed, and the view stays
+    private fillClosedSlot(slot: ClosedSlot, kwinClient: KwinClient, client: ClientWrapper) {
+        this.remapTimer.stop();
+        this.world.releaseArrangeHold();
+        const window = this.findTiledWindow(kwinClient);
+        if (window === null) {
+            return;
+        }
+        if (slot.fullScreen) {
+            client.setFullScreen(true);
+        } else if (slot.maximizedMode !== MaximizedMode.Unmaximized) {
+            client.setMaximize(
+                slot.maximizedMode === MaximizedMode.Horizontally || slot.maximizedMode === MaximizedMode.Maximized,
+                slot.maximizedMode === MaximizedMode.Vertically || slot.maximizedMode === MaximizedMode.Maximized,
+            );
+        }
+        if (slot.viewRestoreOffset !== null) {
+            window.column.grid.setViewRestoreOffset(window.column, slot.viewRestoreOffset); // the view before the window went full-screen
+        }
+        if (slot.focused) {
+            window.focus();
+            window.column.grid.desktop.setScroll(slot.scrollX, true);
+        }
+    }
+
+    private takeClosedSlot(kwinClient: KwinClient) {
+        const slot = this.closedSlot;
+        if (slot === null) {
+            return null;
+        }
+        if (Date.now() - slot.time > remapHoldMs) {
+            this.expireClosedSlot();
+            return null;
+        }
+        if (slot.pid !== kwinClient.pid || slot.resourceClass !== kwinClient.resourceClass) {
+            return null;
+        }
+        this.closedSlot = null;
+        return slot;
+    }
+
+    public hasClosedSlot() {
+        return this.closedSlot !== null;
+    }
+
+    // No window came back: the focus goes where it would have gone when the window was closed
+    private expireClosedSlot() {
+        const slot = this.closedSlot;
+        this.closedSlot = null;
+        this.remapTimer.stop();
+        this.world.releaseArrangeHold();
+        if (slot === null) {
+            return;
+        }
+        const grid = slot.grid;
+        if (slot.focused && this.focusCounter === slot.focusCounter) {
+            const target = grid.getLastFocusedWindow(); // the grid has picked the window that takes the place
+            if (target !== null) {
+                target.focus();
+            }
+        }
+        grid.desktop.autoAdjustScroll();
+    }
+
+    // Remembers the place of a window that is being closed and that may come back. Returns false for any other window.
+    private rememberClosed(kwinClient: KwinClient, client: ClientWrapper) {
+        const window = this.findTiledWindow(kwinClient);
+        const now = Date.now();
+        if (window === null || !client.x11 || kwinClient.pid <= 0 || kwinClient.resourceClass === "" ||
+            !(kwinClient.fullScreen || client.fullScreenSeen || now - client.createdAt < remapRecentMs)) {
+            return false;
+        }
+        if (this.closedSlot !== null) {
+            this.expireClosedSlot();
+        }
+        const column = window.column;
+        const grid = column.grid;
+        const desktop = grid.desktop;
+        const scrollBefore = grid.getScrollBeforeFocusLeft(column);
+        const focused = kwinClient === this.lastFocusedClient || scrollBefore !== null;
+        this.closedSlot = {
+            pid: kwinClient.pid,
+            resourceClass: kwinClient.resourceClass,
+            time: now,
+            placement: {
+                column: column.getWindowCount() > 1 ? column : null,
+                after: column.getAboveWindow(window),
+                leftColumn: grid.getLeftColumn(column),
+            },
+            preferredWidth: client.preferredWidth,
+            fullScreen: kwinClient.fullScreen,
+            maximizedMode: client.getMaximizedMode() ?? MaximizedMode.Unmaximized,
+            viewRestoreOffset: grid.getViewRestoreOffset(column),
+            focused: focused,
+            grid: grid,
+            scrollX: scrollBefore ?? desktop.getScrollX(),
+            focusCounter: this.focusCounter,
+        };
+        return true;
+    }
+
+    // `mayReturn`: the window was closed by KWin, and a window of the same process may be mapped right away
+    public removeClient(kwinClient: KwinClient, passFocus: FocusPassing.Type, mayReturn = false) {
         if (!this.hasClient(kwinClient)) {
             return;
         }
@@ -176,11 +314,21 @@ class ClientManager {
         if (kwinClient !== this.lastFocusedClient && !focusLost) {
             passFocus = FocusPassing.Type.None;
         }
-        client.destroy(passFocus);
+        const held = mayReturn && this.rememberClosed(kwinClient, client);
+        client.destroy(held ? FocusPassing.Type.None : passFocus);
         this.clientMap.delete(kwinClient);
         this.toggledManually.delete(kwinClient);
         this.focusStamps.delete(kwinClient);
         this.floatingFrames.delete(kwinClient);
+        this.floatingFocusOrder = this.floatingFocusOrder.filter(c => c !== kwinClient);
+        setVisualPosition(String(kwinClient.internalId), null); // a window that closes in the middle of a resize
+        if (held) {
+            const slot = this.closedSlot!;
+            // like the window being still there: the focus stays, the view stays and nothing moves
+            slot.grid.desktop.setScroll(slot.scrollX, true);
+            this.world.holdArrange();
+            this.remapTimer.run();
+        }
     }
 
     private findTransientFor(kwinClient: KwinClient) {
@@ -528,7 +676,12 @@ class ClientManager {
         }
         const window = this.findTiledWindow(kwinClient);
         if (window !== null) {
+            // a window that may come back keeps the view; KWin's pick of a neighbour must not scroll to it
+            const held = this.closedSlot !== null ? window.column.grid.desktop.getScrollX() : null;
             window.onFocused();
+            if (held !== null) {
+                window.column.grid.desktop.setScroll(held, true);
+            }
         }
         if (warp && (window !== null || this.isFloating(kwinClient))) {
             if (window !== null) {
@@ -828,6 +981,7 @@ class ClientManager {
     }
 
     public destroy() {
+        this.remapTimer.destroy();
         this.removeAllClients();
     }
 }

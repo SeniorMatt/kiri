@@ -169,3 +169,90 @@ tests.register("Column width is kept after leaving full-screen mode", 5, () => {
     Assert.equal(b.getActualFrameGeometry().width, 400);
     Assert.equal(a.getActualFrameGeometry().width, 300);
 });
+
+// niri sends the new sizes of all the windows of a column in one go and layouts the other columns from what the
+// windows have committed: the neighbours below must not wait for the resized client, the columns beside must not
+// run ahead of it (that opens gaps)
+tests.register("Resize: the column follows the pointer's step, the other columns the commit", 14, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock } = init(config);
+    const [left, top, bottom] = workspaceMock.createClientsWithWidths(300, 300, 200);
+    qtMock.fireShortcut("window-move-left");
+    const [far] = workspaceMock.createClientsWithWidths(250);
+    const topStart = top.getFrameGeometryCopy();
+    const bottomStart = bottom.getFrameGeometryCopy();
+    const farStart = far.getFrameGeometryCopy();
+    Assert.equal(bottomStart.x, topStart.x);
+
+    top.slowClient = true;
+    bottom.slowClient = true;
+    workspaceMock.cursorPos = new MockQmlPoint(rectRight(topStart), rectBottom(topStart));
+    top.resize = true;
+    top.interactiveMoveResizeStarted.fire();
+
+    const request = (dw: number, dh: number) => {
+        const requested = new MockQmlRect(topStart.x, topStart.y, topStart.width + dw, topStart.height + dh);
+        top.interactiveMoveResizeStepped.fire(requested);
+        top.frameGeometry = requested; // the slow client has not committed it
+        return requested;
+    };
+
+    const requested = request(30, 20);
+    // the dragged window still has its old size, but the one below already has the new width and its new place
+    Assert.equal(top.getActualFrameGeometry().width, topStart.width);
+    Assert.rect(bottom.requestedGeometries[bottom.requestedGeometries.length - 1], topStart.x, topStart.y + requested.height + gapV, requested.width, tilingArea.y + tilingArea.height - (topStart.y + requested.height + gapV));
+    // the columns beside wait for the commit
+    Assert.equal(far.getActualFrameGeometry().x, farStart.x, { message: "the column on the right has not moved yet" });
+    Assert.equal(left.getActualFrameGeometry().x, left.getActualFrameGeometry().x);
+
+    // more steps while the one below has not committed: it is not sent a queue of sizes
+    request(50, 30);
+    request(70, 40);
+    Assert.equal(bottom.requestedGeometries.length, 1, { message: "a client that has not committed is not sent another size" });
+
+    // the resized client commits: the column on the right follows, and the one below gets the newest size
+    top.commitRequestedGeometry();
+    Assert.equal(rectRight(top.getActualFrameGeometry()), rectRight(topStart) + 70);
+    Assert.equal(far.getActualFrameGeometry().x, farStart.x + 70, { message: "the column on the right follows the commit" });
+    bottom.commitRequestedGeometry();
+    Assert.equal(bottom.requestedGeometries.length, 1, { message: "the newest size is sent as soon as the previous one is committed" });
+    Assert.equal(bottom.requestedGeometries[0].width, topStart.width + 70);
+    Assert.equal(bottom.requestedGeometries[0].y, topStart.y + topStart.height + 40 + gapV);
+
+    // let go: everything ends up where the last step said
+    top.resize = false;
+    top.interactiveMoveResizeFinished.fire();
+    bottom.commitRequestedGeometry();
+    const t = top.getActualFrameGeometry();
+    const b = bottom.getActualFrameGeometry();
+    Assert.equal(t.height, topStart.height + 40);
+    Assert.equal(b.width, t.width);
+    Assert.equal(b.y, t.y + t.height + gapV);
+    Assert.equal(rectBottom(b), tilingArea.y + tilingArea.height);
+});
+
+tests.register("Resize from the left edge: the right edge stays and the window below follows the step", 6, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false; // niri keeps the view where it is
+    const { qtMock, workspaceMock } = init(config);
+    const [, top, bottom] = workspaceMock.createClientsWithWidths(300, 300, 200);
+    qtMock.fireShortcut("window-move-left");
+    workspaceMock.activeWindow = top;
+    const topStart = top.getFrameGeometryCopy();
+    top.slowClient = true;
+    workspaceMock.cursorPos = new MockQmlPoint(topStart.x, rectBottom(topStart));
+    top.resize = true;
+    top.interactiveMoveResizeStarted.fire();
+    const requested = new MockQmlRect(topStart.x - 40, topStart.y, topStart.width + 40, topStart.height);
+    top.interactiveMoveResizeStepped.fire(requested);
+    top.frameGeometry = requested;
+    const b = bottom.getActualFrameGeometry();
+    Assert.equal(b.x, topStart.x - 40, { message: "the window below follows the left edge" });
+    Assert.equal(b.width, topStart.width + 40);
+    top.commitRequestedGeometry();
+    top.resize = false;
+    top.interactiveMoveResizeFinished.fire();
+    Assert.equal(rectRight(top.getActualFrameGeometry()), rectRight(topStart), { message: "the right edge stayed" });
+    Assert.equal(rectRight(bottom.getActualFrameGeometry()), rectRight(topStart), { message: "the right edge of the window below stayed too" });
+});

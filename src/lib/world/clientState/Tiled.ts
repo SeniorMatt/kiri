@@ -6,18 +6,30 @@ namespace ClientState {
         private readonly relayoutDelayer: Delayer;
         private static readonly maxExternalFrameGeometryChangedIntervalMs = 1000;
 
-        constructor(world: World, client: ClientWrapper, grid: Grid) {
+        // `placement` puts the window where a window that was just closed and mapped again was
+        constructor(world: World, client: ClientWrapper, grid: Grid, placement?: Tiled.Placement) {
             if (client.ownNoBorder === null) {
                 client.ownNoBorder = client.kwinClient.noBorder; // kept while a drag takes the window out of the grid and back
             }
             this.defaultState = { skipSwitcher: client.kwinClient.skipSwitcher, noBorder: client.ownNoBorder };
             Tiled.prepareClientForTiling(client, grid.config);
 
-            const previousColumn = grid.getLastFocusedColumn();
-            const scrollX = grid.desktop.getScrollX();
-            const column = new Column(grid, previousColumn ?? grid.getLastColumn());
-            const window = new Window(client, column);
-            grid.onColumnOpened(column, previousColumn, scrollX);
+            let column: Column;
+            let window: Window;
+            if (placement !== undefined && placement.column !== null && grid.hasColumn(placement.column)) {
+                column = placement.column;
+                const after = placement.after === null ? null : column.getWindows().includes(placement.after) ? placement.after : undefined;
+                window = new Window(client, column, after);
+            } else if (placement !== undefined) {
+                column = new Column(grid, placement.leftColumn !== null && grid.hasColumn(placement.leftColumn) ? placement.leftColumn : grid.getLastColumn());
+                window = new Window(client, column);
+            } else {
+                const previousColumn = grid.getLastFocusedColumn();
+                const scrollX = grid.desktop.getScrollX();
+                column = new Column(grid, previousColumn ?? grid.getLastColumn());
+                window = new Window(client, column);
+                grid.onColumnOpened(column, previousColumn, scrollX);
+            }
 
             this.window = window;
             // one relayout after a burst of external geometry changes that was rate limited
@@ -86,6 +98,8 @@ namespace ClientState {
             let resizing = false;
             let resizeStartWidth = 0;
             let resizeNeighbor: { column: Column, startWidth: number } | undefined;
+            let resizeRequest: QmlRect | null = null; // the geometry the pointer asked for at the last step
+            let resizeStepped = false; // KWin reports the pointer's steps; the committed geometry is then only used for the width
             let dragStart: { x: number, y: number } | null = null;
             let dragLimit = 0;
             let dragHome = { x: 0, y: 0 };
@@ -103,6 +117,8 @@ namespace ClientState {
 
                 if (kwinClient.resize) {
                     resizing = true;
+                    resizeRequest = roundQtRect(kwinClient.frameGeometry);
+                    resizeStepped = false;
                     resizeStartWidth = window.column.getWidth();
                     if (config.resizeNeighborColumn) {
                         const resizeNeighborColumn = Tiled.getResizeNeighborColumn(window);
@@ -117,6 +133,20 @@ namespace ClientState {
                 }
             });
 
+            // niri sends the new sizes of all the windows of a column together, as soon as the pointer moves. KWin only
+            // tells about the resized window's new size when its client has committed it, which is later, and the
+            // neighbours would then start only from there. The step has the geometry the pointer asks for.
+            manager.connect(kwinClient.interactiveMoveResizeStepped, (geometry: QmlRect) => {
+                if (!resizing || resizeRequest === null) {
+                    return;
+                }
+                resizeStepped = true;
+                const requested = roundQtRect(geometry);
+                const previous = resizeRequest;
+                resizeRequest = requested;
+                world.do(() => window.column.onUserResizeRequested(window, requested, previous));
+            });
+
             manager.connect(kwinClient.interactiveMoveResizeFinished, () => {
                 dragStart = null;
                 setVisualPosition(String(kwinClient.internalId), null);
@@ -126,6 +156,7 @@ namespace ClientState {
                 }
                 if (resizing) {
                     resizing = false;
+                    resizeRequest = null;
                     resizeNeighbor = undefined;
                     window.column.grid.onUserResizeFinished();
                 }
@@ -189,7 +220,7 @@ namespace ClientState {
                                 resizeNeighbor,
                             );
                         }
-                        if (newGeometry.height !== oldGeometry.height) {
+                        if (!resizeStepped && newGeometry.height !== oldGeometry.height) {
                             // like niri: the dragged window gets the height under the pointer and the rest of
                             // the column shares what is left; the top edge of the first window does nothing
                             const top = newGeometry.y !== oldGeometry.y;
@@ -198,6 +229,9 @@ namespace ClientState {
                             }
                         }
                     });
+                } else if (window.column.grid.isUserResizing() && !client.isManipulatingGeometry(newGeometry)) {
+                    // this window has committed a size it was sent while another one is being resized: it may have a newer one waiting
+                    world.do(() => window.column.grid.desktop.onLayoutChanged());
                 } else if (
                     !window.column.grid.isUserResizing() &&
                     !client.isManipulatingGeometry(newGeometry) &&
@@ -321,7 +355,13 @@ namespace ClientState {
         }
     }
 
-    namespace Tiled {
+    export namespace Tiled {
+        export interface Placement {
+            column: Column|null; // the column the window was in, if it still exists and the window was not alone in it
+            after: Window|null; // the window above it in that column
+            leftColumn: Column|null; // otherwise: the column to the left of where its own column was
+        }
+
         export interface WindowState {
             skipSwitcher: boolean;
             noBorder: boolean;

@@ -8,6 +8,12 @@ class ClientWrapper {
     private lastPlacement: QmlRect | null; // workaround for issue #19
     public ownNoBorder: boolean | null = null; // the window's own noBorder while Kiri hides its title bar (see Tiled)
     public keepTitlebarHidden = false; // set while a dragged window passes through the floating state
+    public readonly createdAt = Date.now();
+    public x11 = false; // an Xwayland window (known a moment after it is created, see ClientManager.addClient)
+    public fullScreenSeen: boolean; // has been full-screen at some point (or is)
+    private lastPlacementTime = 0;
+    private awaitingCommit = false; // a size was requested and the client has not committed anything since
+    private static readonly maxConfigureWaitMs = 100;
 
     constructor(
         public readonly kwinClient: KwinClient,
@@ -21,6 +27,7 @@ class ClientWrapper {
         if (transientFor !== null) {
             transientFor.addTransient(this);
         }
+        this.fullScreenSeen = kwinClient.fullScreen;
         this.signalManager = ClientWrapper.initSignalManager(this);
         this.rulesSignalManager = rulesSignalManager;
         this.preferredWidth = kwinClient.frameGeometry.width.round();
@@ -29,24 +36,34 @@ class ClientWrapper {
         this.stateManager = new ClientState.Manager(constructInitialState(this));
     }
 
-    public place(x: number, y: number, width: number, height: number) {
+    // `throttle`: like niri's configure throttling while a window is resized by the user, a client that has not yet
+    // committed the size it was last given is not sent another one; it gets the latest when it has committed
+    // (otherwise a slow client builds up a queue of sizes and keeps changing size long after the pointer stopped)
+    public place(x: number, y: number, width: number, height: number, throttle = false) {
         this.manipulatingGeometry.do(() => {
             if (this.kwinClient.resize) {
                 // The window is being manually resized: KWin recomputes its geometry from the pointer at every
                 // step, so moving it would fight with the user. Only tell the effect where to paint it.
+                // The view only ever moves sideways, and the window below the pointer should stay where KWin has it
+                // vertically (the neighbours already have their new sizes, this window's height is still being committed).
                 const frame = this.kwinClient.frameGeometry;
-                const moved = frame.x.round() !== x || frame.y.round() !== y;
-                setVisualPosition(String(this.kwinClient.internalId), moved ? [x, y] : null);
+                const moved = frame.x.round() !== x;
+                setVisualPosition(String(this.kwinClient.internalId), moved ? [x, frame.y.round()] : null);
                 return;
             }
             setVisualPosition(String(this.kwinClient.internalId), null);
-            this.lastPlacement = Qt.rect(x, y, width, height);
             const current = this.kwinClient.frameGeometry;
+            if (throttle && this.awaitingCommit && Date.now() - this.lastPlacementTime < ClientWrapper.maxConfigureWaitMs) {
+                return; // still waiting for the commit of the previous size
+            }
+            this.lastPlacement = Qt.rect(x, y, width, height);
             if (current.x === x && current.y === y && current.width === width && current.height === height) {
                 // nothing to do; a repeated set makes some Xwayland clients redraw (black flashes)
                 return;
             }
-            this.kwinClient.frameGeometry = this.lastPlacement;
+            this.lastPlacementTime = Date.now();
+            this.awaitingCommit = current.width !== width || current.height !== height;
+            this.kwinClient.frameGeometry = this.lastPlacement; // a commit that happens at once clears awaitingCommit
             if (this.kwinClient.frameGeometry !== this.lastPlacement) {
                 // frameGeometry assignment failed. This sometimes happens on Wayland
                 // when a window is off-screen, effectively making it stuck there.
@@ -203,6 +220,15 @@ class ClientWrapper {
     private static initSignalManager(client: ClientWrapper) {
         const manager = new SignalManager();
 
+        manager.connect(client.kwinClient.fullScreenChanged, () => {
+            if (client.kwinClient.fullScreen) {
+                client.fullScreenSeen = true;
+            }
+        });
+
+        manager.connect(client.kwinClient.frameGeometryChanged, () => {
+            client.awaitingCommit = false;
+        });
         manager.connect(client.kwinClient.maximizedAboutToChange, (maximizedMode: MaximizedMode) => {
             if (maximizedMode !== MaximizedMode.Unmaximized && client.kwinClient.tile !== null) {
                 client.kwinClient.tile = null;

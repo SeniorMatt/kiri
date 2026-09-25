@@ -57,6 +57,19 @@ tests.register("Float rule sizes and centers a new window (default-window-height
     Assert.equal(hugeClient.getActualFrameGeometry().width, 1000);
 });
 
+tests.register("Plasma's own windows keep the place plasmashell gives them", 3, () => {
+    const { workspaceMock, world } = init(getDefaultConfig());
+    for (const resourceClass of ["org.kde.plasmashell", "plasmashell", "krunner", "org.kde.krunner"]) {
+        const frame = new MockQmlRect(1200, 700, 300, 90); // a notification at the bottom right
+        const client = createClassClient(resourceClass, frame);
+        workspaceMock.createWindows(client);
+        world.do((clientManager, desktopManager) => {
+            Assert.notTiledClient(clientManager, client);
+        });
+        Assert.equalRects(client.getActualFrameGeometry(), frame);
+    }
+});
+
 tests.register("default-window-height for a tiled window", 3, () => {
     const config = getDefaultConfig();
     config.windowRules = '[{ "class": "short", "height": "50%" }]';

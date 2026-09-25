@@ -8,6 +8,13 @@ namespace Clients {
         return prohibitedClasses.includes(kwinClient.resourceClass);
     }
 
+    // Plasma's own windows (notifications, OSDs, KRunner, the launcher and other popups) put themselves where they
+    // belong, e.g. next to the panel, and the default window rules make them float, so Kiri must not move them
+    export function placesItself(kwinClient: KwinClient) {
+        return !(kwinClient.normalWindow || kwinClient.dialog) || !kwinClient.moveable ||
+            /^(org\.kde\.)?(plasmashell|krunner)$/.test(kwinClient.resourceClass);
+    }
+
     export function canTileEver(kwinClient: KwinClient) {
         const shapeable = (kwinClient.moveable && kwinClient.resizeable) || kwinClient.fullScreen; // full-screen windows may become shapeable after exiting full-screen mode
         return shapeable &&

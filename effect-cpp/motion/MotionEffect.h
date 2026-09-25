@@ -16,6 +16,7 @@
 #include <scene/item.h>
 
 #include <QHash>
+#include <QString>
 #include <QPointF>
 #include <QSizeF>
 
@@ -47,6 +48,8 @@ struct WindowState
     std::optional<KWin::EffectWindowDeletedRef> deletedRef;
     std::shared_ptr<KWin::ItemEffect> itemEffect;
     KWin::RectF closedFrame;
+    int pid = 0; // of a closing window, to find the window that replaces it
+    QString windowClass;
 
     double created = 0;
     double lastChange = -1;
@@ -95,6 +98,9 @@ private:
     double m_frameTime = 0;
     bool m_capturing = false;
     double m_speed = 1;
+    KWin::EffectWindow *m_resizedWindow = nullptr; // the window the user is resizing (or was, until windowDeleted)
+    double m_userResizeEnd = -1; // when the last interactive resize ended
+    bool resizeSettling(double t) const;
 };
 
 } // namespace KiriMotion

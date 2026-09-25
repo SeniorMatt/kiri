@@ -10,8 +10,8 @@ function initWorkspaceSignalHandlers(world: World, focusPasser: FocusPassing.Pas
     manager.connect(Workspace.windowRemoved, (kwinClient: KwinClient) => {
         world.do((clientManager, desktopManager) => {
             const wasTiled = clientManager.findTiledWindow(kwinClient) !== null;
-            clientManager.removeClient(kwinClient, FocusPassing.Type.Immediate);
-            if (wasTiled) {
+            clientManager.removeClient(kwinClient, FocusPassing.Type.Immediate, true);
+            if (wasTiled && !clientManager.hasClosedSlot()) {
                 world.holdArrangeForClose();
             }
         });
@@ -56,7 +56,7 @@ function initWorkspaceSignalHandlers(world: World, focusPasser: FocusPassing.Pas
     });
 
     manager.connect(Workspace.virtualScreenSizeChanged, () => {
-        world.onScreenResized();
+        world.onScreenResized(true);
     });
 
     return manager;

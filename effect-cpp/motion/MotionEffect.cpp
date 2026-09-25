@@ -24,7 +24,13 @@ constexpr double ResizeThreshold = 10; // px, niri's RESIZE_ANIMATION_THRESHOLD
 constexpr double StreamGap = 0.030; // changes closer than this count as one continuous stream (touchpad scrolling)
 constexpr int StreamLength = 2;
 constexpr double StreamMinDuration = 0.060; // a chain shorter than this is a few layout passes of one action, not a scroll
+constexpr double SettleAfterUserResize = 0.3; // clients still commit the last sizes of an interactive resize this long after the button is released
 constexpr double SettleAfterOpen = 0.05; // Kiri places a new window right after it appears; that is no movement
+// SDL on X11 unmaps and maps a window again when a game goes full-screen: KWin closes the window and opens a new one.
+// An X11 window that is full-screen or was opened a moment ago keeps its last picture, unchanged, this long before it
+// closes (a Wayland window never does); a window of the same process and class that is mapped meanwhile replaces it without any animation.
+constexpr double RemapHold = 0.3;
+constexpr double RemapRecent = 2.0;
 } // namespace
 
 Effect::Effect()
@@ -34,6 +40,9 @@ Effect::Effect()
     connect(KWin::effects, &KWin::EffectsHandler::windowClosed, this, &Effect::onClosed);
     connect(KWin::effects, &KWin::EffectsHandler::windowDeleted, this, [this](KWin::EffectWindow *w) {
         m_windows.remove(w);
+        if (w == m_resizedWindow) {
+            m_resizedWindow = nullptr;
+        }
     });
     for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
         manage(w);
@@ -88,6 +97,14 @@ bool Effect::blocksDirectScanout() const
     return false;
 }
 
+// A window that is entirely off every screen cannot be seen, so neither a snapshot of it nor an animation is needed.
+// Kiri parks most of the columns off screen and moves them with every scroll.
+static bool offScreen(const KWin::RectF &frame)
+{
+    const KWin::Rect screens = KWin::effects->virtualScreenGeometry();
+    return frame.right() <= screens.left() || frame.left() >= screens.right() + 1 || frame.bottom() <= screens.top() || frame.top() >= screens.bottom() + 1;
+}
+
 bool Effect::animatable(KWin::EffectWindow *w) const
 {
     if (!w->isManaged() || w->isPopupWindow() || w->isLockScreen() || w->isOutline() || w->isSpecialWindow()) {
@@ -116,6 +133,15 @@ void Effect::manage(KWin::EffectWindow *w)
     connect(w, &KWin::EffectWindow::windowStartUserMovedResized, this, [this](KWin::EffectWindow *w) {
         if (auto it = m_windows.find(w); it != m_windows.end()) {
             stopWindow(w, *it);
+        }
+        if (w->isUserResize()) {
+            m_resizedWindow = w;
+        }
+    });
+    connect(w, &KWin::EffectWindow::windowFinishUserMovedResized, this, [this](KWin::EffectWindow *w) {
+        if (w == m_resizedWindow) {
+            m_resizedWindow = nullptr;
+            m_userResizeEnd = now();
         }
     });
 }
@@ -158,7 +184,9 @@ void Effect::onAboutToChange(KWin::EffectWindow *w)
     s.lastRequest = t;
     s.requestStreak = fast ? s.requestStreak + 1 : 0;
     if (m_speed <= 0 || s.snapshot || s.closeStart >= 0 || s.requestStreak >= StreamLength || t - s.created < SettleAfterOpen
-        || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()) {
+        || anyUserResize() || resizeSettling(t) // the other windows get their sizes at once while a resize goes on
+        || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()
+        || (!s.moving && !s.resizing && offScreen(w->frameGeometry()))) {
         return;
     }
     takeSnapshot(w, s);
@@ -167,6 +195,24 @@ void Effect::onAboutToChange(KWin::EffectWindow *w)
 void Effect::onAdded(KWin::EffectWindow *w)
 {
     manage(w);
+    // the same window mapped again: the old picture goes at once and the new window does not animate its opening
+    const double t = now();
+    KWin::EffectWindow *old = nullptr;
+    for (auto it = m_windows.begin(); it != m_windows.end(); ++it) {
+        const WindowState &o = it.value();
+        if (it.key() != w && o.closeStart > t && o.pid > 0 && o.pid == w->pid() && o.windowClass == w->windowClass()) {
+            old = it.key();
+            break;
+        }
+    }
+    if (old) {
+        WindowState &o = m_windows[old];
+        o.closeStart = -1;
+        o.itemEffect.reset();
+        old->setData(KWin::WindowClosedGrabRole, QVariant());
+        o.deletedRef.reset(); // windowDeleted erases the state
+        return;
+    }
     if (m_speed <= 0 || !animatable(w) || !w->isVisible() || KWin::effects->activeFullScreenEffect()) {
         return;
     }
@@ -201,6 +247,11 @@ void Effect::onClosed(KWin::EffectWindow *w)
     }
     s.deletedRef.emplace(w);
     s.closeStart = now();
+    s.pid = w->pid();
+    s.windowClass = w->windowClass();
+    if (s.pid > 0 && w->isX11Client() && (w->isFullScreen() || s.closeStart - s.created < RemapRecent)) {
+        s.closeStart += RemapHold; // painted as it was until then: the close animation starts when no window came back
+    }
     if (!s.itemEffect) {
         s.itemEffect = std::make_shared<KWin::ItemEffect>(w->windowItem());
     }
@@ -225,6 +276,13 @@ QSizeF Effect::paintedSize(const WindowState &s, const KWin::RectF &frame, doubl
     const double p = NiriAnim::resizeSpring().value((t - s.resizeStart) * m_speed);
     return QSizeF(std::max(1.0, s.sizeFrom.width() + (frame.width() - s.sizeFrom.width()) * p),
                   std::max(1.0, s.sizeFrom.height() + (frame.height() - s.sizeFrom.height()) * p));
+}
+
+// the sizes that the windows around a resized one still have to commit after the pointer is let go are not animated: like
+// niri's interactive resize, they just are the new size (the view moving to show the column afterwards still is animated)
+bool Effect::resizeSettling(double t) const
+{
+    return m_userResizeEnd >= 0 && t - m_userResizeEnd < SettleAfterUserResize;
 }
 
 bool Effect::anyUserResize() const
@@ -255,6 +313,7 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
     }
 
     if (m_speed <= 0 || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()
+        || (!s.moving && !s.resizing && offScreen(old) && offScreen(frame)) // moving between two places nobody sees
         || anyUserResize() // like niri's interactive resize (animate = false): the neighbours follow the mouse at once
         || s.closeStart >= 0 || t - s.created < SettleAfterOpen || (s.streak >= StreamLength && t - s.streamStart >= StreamMinDuration) || old.isEmpty() || frame.isEmpty()) {
         stopWindow(w, s);
@@ -278,7 +337,13 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
 
     // resize: only when the size changed by more than niri's threshold; the old contents are kept as a snapshot
     const double change = std::max(std::fabs(frame.width() - visualSize.width()), std::fabs(frame.height() - visualSize.height()));
-    if (change > ResizeThreshold) {
+    if (resizeSettling(t)) {
+        s.resizing = false;
+        if (s.snapshot) {
+            unredirect(w);
+            s.snapshot = false;
+        }
+    } else if (change > ResizeThreshold) {
         if (!s.snapshot) {
             takeSnapshot(w, s); // no request was seen: this is as good as it gets (the new buffer may already be in)
         }
