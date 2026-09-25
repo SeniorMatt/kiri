@@ -553,6 +553,7 @@ class World {
         this.gestureEndDelayer.destroy();
         this.gestureAnimationTimer.destroy();
         this.closeRelayoutDelayer.destroy();
+        this.screenResizedDelayer.destroy();
         this.workspaceSignalManager.destroy();
         if (!this.keyBindingsReleased) {
             this.keyBindings.destroy();
