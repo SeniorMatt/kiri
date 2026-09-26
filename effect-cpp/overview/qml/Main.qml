@@ -220,7 +220,7 @@ FocusScope {
             return;
         }
         const d = lay.desktops[di];
-        const shift = d.scroll - offsetOf(d.id, d.scroll);
+        const shift = d.scroll - offsetOf(d.id, d.scroll); // hint rects are in layout space
         const cur = { x: (dragX - x0) / zm - shift, y: (dragY - wsY(di)) / zm };
         const t = insertTarget(d, cur, dragWid);
         hint = { di: di, did: d.id, col: t.col, tile: t.tile, rect: t.rect, shift: shift };
@@ -254,8 +254,10 @@ FocusScope {
                 anchors.fill: parent
                 color: "black"
                 // niri workspace-shadow: offset 0/10, softness 40, spread 10, #00000050, normalised to 1080 px
-                shadow.size: 40 * (root.height / 1080) * root.zm + 10 * (root.height / 1080) * root.zm
-                shadow.yOffset: 10 * (root.height / 1080) * root.zm
+                // sized for the open zoom: resizing the shadow every frame of the zoom rebuilds its geometry, the fade
+                // with the progress is enough
+                shadow.size: 50 * (root.height / 1080) * root.effect.zoom
+                shadow.yOffset: 10 * (root.height / 1080) * root.effect.zoom
                 shadow.color: Qt.rgba(0, 0, 0, 0x50 / 255 * root.pc)
             }
             KWinComponents.DesktopBackground {
@@ -294,8 +296,10 @@ FocusScope {
 
             property bool ready: false
             Component.onCompleted: Qt.callLater(() => { ready = true; })
-            // layout-driven changes (reflow, resize) animate; zoom and scrolling do not
-            property real ax: rx
+            // layout-driven changes (reflow, resize) animate; zoom and scrolling do not. ax is in content space (the
+            // position without the view scroll), so a scroll change (focus moving) never goes through the Behavior: the
+            // effect's offset spring moves every tile smoothly instead of the tile jumping and then animating back.
+            property real ax: rx + lscroll
             property real ay: ry
             property real aw: rw
             property real ah: rh
@@ -325,7 +329,7 @@ FocusScope {
             }
             Behavior on closeUp { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
-            readonly property real shift: lscroll - root.offsetOf(did, lscroll)
+            readonly property real shift: -root.offsetOf(did, lscroll)
             x: root.x0 + (ax + shift + closeUp) * root.zm + offX
             y: root.wsY(di) + ay * root.zm + offY
             width: aw * root.zm
