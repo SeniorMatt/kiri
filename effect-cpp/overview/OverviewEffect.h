@@ -129,6 +129,7 @@ private:
     QVariantMap m_viewOffsets;
     QElapsedTimer m_clock;
     qint64 m_lastFrame = 0;
+    qint64 m_anim = 0; // animation clock (ms), see prePaintScreen
     qint64 m_frames = 0;
     qint64 m_frameSum = 0;
     qint64 m_frameMax = 0;

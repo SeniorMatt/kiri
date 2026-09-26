@@ -68,7 +68,7 @@ void OverviewEffect::setSearchText(const QString &text)
 void OverviewEffect::startProgress(double to, double velocity)
 {
     m_progressSpring = makeSpring(m_progress, to, velocity, 800);
-    m_progressStart = now();
+    m_progressStart = m_anim;
     m_progressAnimating = true;
     effects->addRepaintFull();
 }
@@ -77,7 +77,7 @@ void OverviewEffect::startWorkspace(double to)
 {
     m_wsTarget = to;
     m_wsSpring = makeSpring(m_wsIndex, to, 0, 1000);
-    m_wsStart = now();
+    m_wsStart = m_anim;
     m_wsAnimating = true;
     effects->addRepaintFull();
 }
@@ -88,7 +88,7 @@ double OverviewEffect::seconds(qint64 start) const
 {
     const double factor = effects->animationTimeFactor();
     const double speed = factor > 0 ? 1.0 / factor : 1e6;
-    return (now() - start) / 1000.0 * speed;
+    return (m_anim - start) / 1000.0 * speed;
 }
 
 void OverviewEffect::logFrames()
@@ -145,7 +145,7 @@ bool OverviewEffect::tick()
         Scroll &sc = it.value();
         if (!sc.animating && t >= sc.localUntil && std::abs(sc.shown - sc.target) > 0.5) {
             sc.spring = makeSpring(sc.shown, sc.target, 0, 800);
-            sc.start = t;
+            sc.start = m_anim;
             sc.animating = true;
         }
         if (sc.animating) {
@@ -177,6 +177,9 @@ void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
             m_frameSum += t - m_lastFrame;
             m_frameMax = std::max<qint64>(m_frameMax, t - m_lastFrame);
         }
+        // The springs run on their own clock that advances at most 100 ms per frame: building the scene
+        // on the first frame, or any hitch, must not make the zoom skip ahead (it would look like a teleport).
+        m_anim += (m_lastFrame > 0) ? std::min<qint64>(t - m_lastFrame, 100) : 0;
         m_lastFrame = t;
         if (tick()) {
             effects->addRepaintFull();
@@ -216,7 +219,7 @@ void OverviewEffect::applyLayout(const QString &layout)
             it->target = scroll;
             if (t >= it->localUntil) {
                 it->spring = makeSpring(it->shown, scroll, 0, 800);
-                it->start = t;
+                it->start = m_anim;
                 it->animating = true;
             }
         }
@@ -279,7 +282,8 @@ QString OverviewEffect::open(const QString &layout)
         m_layoutCurrent = -1;
     }
     applyLayout(layout);
-    if (!m_open || m_gesture) {
+    // not running counts as closed whatever m_open says (a gesture let go at p = 0 used to leave it set: no open ever)
+    if (!isRunning() || !m_open || m_gesture) {
         startOpen();
     }
     return QStringLiteral("ok");
@@ -292,6 +296,9 @@ QString OverviewEffect::close()
         m_gesture = false;
         startProgress(0.0, 0);
         Q_EMIT closingChanged();
+    } else if (!isRunning()) {
+        m_open = false;
+        m_gesture = false;
     }
     return QStringLiteral("ok");
 }
@@ -343,9 +350,14 @@ QString OverviewEffect::gesture(const QString &json)
         const bool open = obj.value(QStringLiteral("settle")).toBool();
         const double v = obj.value(QStringLiteral("v")).toDouble();
         m_gesture = false;
-        m_open = open;
         if (isRunning()) {
+            m_open = open;
             startProgress(open ? 1.0 : 0.0, v);
+        } else if (open && !effects->isScreenLocked()) {
+            // let go at p = 0 on "open": the scene is not up yet
+            startOpen();
+        } else {
+            m_open = false;
         }
         Q_EMIT closingChanged();
     }
