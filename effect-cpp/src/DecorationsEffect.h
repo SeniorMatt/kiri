@@ -107,6 +107,9 @@ public Q_SLOTS:
     Q_SCRIPTABLE int pointerButtons();
     // whether the window "{uuid}" is an X11 (Xwayland) window: scripts cannot tell
     Q_SCRIPTABLE bool isX11Window(const QString &id);
+    // KWin shrinks its desktop grid's row count when desktops are removed and never grows it back, so
+    // desktops Kiri adds end up side by side; Kiri sets one row per desktop (niri's vertical workspaces)
+    Q_SCRIPTABLE void setDesktopRows(const QString &rows);
     // re-read Kiri's settings: KWin's settings page writes them without telling anyone, Kiri calls this after
     Q_SCRIPTABLE void reloadSettings(const QString &unused);
 

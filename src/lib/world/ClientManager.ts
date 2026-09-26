@@ -267,7 +267,8 @@ class ClientManager {
         const window = this.findTiledWindow(kwinClient);
         const now = Date.now();
         if (window === null || !client.x11 || kwinClient.pid <= 0 || kwinClient.resourceClass === "" ||
-            !(kwinClient.fullScreen || client.fullScreenSeen || now - client.createdAt < remapRecentMs)) {
+            !(kwinClient.fullScreen || client.fullScreenSeen || (client.getMaximizedMode() ?? MaximizedMode.Unmaximized) !== MaximizedMode.Unmaximized ||
+                client.maximizedSeen || now - client.createdAt < remapRecentMs)) {
             return false;
         }
         if (this.closedSlot !== null) {
@@ -351,8 +352,19 @@ class ClientManager {
         }
         if (client.stateManager.getState() instanceof ClientState.Tiled) {
             const passFocus = kwinClient === this.lastFocusedClient ? FocusPassing.Type.Immediate : FocusPassing.Type.None;
+            // restoring the window from the task bar puts it back in its old place if the neighbours are still there
+            const window = this.findTiledWindow(kwinClient);
+            const slot = window === null ? null : {
+                grid: window.column.grid,
+                placement: {
+                    column: window.column.getWindowCount() > 1 ? window.column : null,
+                    after: window.column.getAboveWindow(window),
+                    leftColumn: window.column.grid.getLeftColumn(window.column),
+                    atStart: window.column.grid.getLeftColumn(window.column) === null,
+                },
+            };
             client.stateManager.setState(
-                () => new ClientState.TiledMinimized(this.world, client),
+                () => new ClientState.TiledMinimized(this.world, client, slot),
                 passFocus,
             );
         }
@@ -530,11 +542,11 @@ class ClientManager {
         window.focus();
     }
 
-    public tileClient(client: ClientWrapper, grid: Grid) {
+    public tileClient(client: ClientWrapper, grid: Grid, placement?: ClientState.Tiled.Placement) {
         if (client.stateManager.getState() instanceof ClientState.Tiled) {
             return;
         }
-        client.stateManager.setState(() => new ClientState.Tiled(this.world, client, grid), FocusPassing.Type.None);
+        client.stateManager.setState(() => new ClientState.Tiled(this.world, client, grid, placement), FocusPassing.Type.None);
     }
 
     // `recoverTiling`: the window is only floated because it is on no single desktop right now; it goes back to the grid

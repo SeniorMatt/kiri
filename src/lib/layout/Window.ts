@@ -50,6 +50,9 @@ class Window {
             // window is maximized or full-screen outside of the grid, prevent fighting with the user
             return;
         }
+        if (this.client.isFightingLayout()) {
+            return; // a game that answers every move with a new full-screen or maximize request stays where it is
+        }
 
         if (this.isFocused() && this.shouldReMaximize()) {
             // do this here rather than in `onFocused` to ensure it happens after placement

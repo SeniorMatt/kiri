@@ -149,3 +149,24 @@
         finish();
     });
 }
+
+// Stardew Valley (X11) answers being scrolled off screen while unfocused by dropping full-screen and asking for it again
+// a moment later, forever. After three such changes Kiri leaves the window where it is until it gets the focus.
+tests.register("Unfocused window that keeps flipping full-screen is left alone", 10, () => {
+    const config = getDefaultConfig();
+    config.tileFullScreen = true;
+    const { workspaceMock } = init(config);
+    const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
+    workspaceMock.activeWindow = a;
+    a.fullScreen = true;
+    workspaceMock.activeWindow = b;
+    const before = a.getActualFrameGeometry().x;
+    for (let i = 0; i < 8; i++) {
+        a.fullScreen = i % 2 === 1; // the game drops full-screen, then asks for it again
+    }
+    Assert.equalRects(a.getActualFrameGeometry(), screen, { message: "Kiri no longer scrolls it off screen (was at x=" + before + ")" });
+    Assert.equal(Workspace.activeWindow, b, { message: "the focused window keeps the focus" });
+    workspaceMock.activeWindow = a;
+    a.fullScreen = true;
+    Assert.equalRects(a.getActualFrameGeometry(), screen, { message: "focused again, it is full-screen in the layout" });
+});

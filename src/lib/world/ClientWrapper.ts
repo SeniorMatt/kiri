@@ -1,4 +1,6 @@
 class ClientWrapper {
+    private static readonly stateFlipWindowMs = 2000;
+    private static readonly fightHoldMs = 5000;
     public readonly stateManager: ClientState.Manager;
     private readonly transients: ClientWrapper[];
     private readonly signalManager: SignalManager;
@@ -11,6 +13,12 @@ class ClientWrapper {
     public readonly createdAt = Date.now();
     public x11 = false; // an Xwayland window (known a moment after it is created, see ClientManager.addClient)
     public fullScreenSeen: boolean; // has been full-screen at some point (or is)
+    public maximizedSeen = false; // has been maximized at some point (or is)
+    // Some games (Stardew Valley on X11) set full-screen or maximized again by themselves whenever Kiri moves or
+    // resizes them while they are not focused, and drop it again a moment later, forever. Three such changes within
+    // stateFlipWindowMs mean the window fights the layout: Kiri then leaves its geometry alone until it is focused.
+    private stateFlips: number[] = [];
+    private fightingUntil = 0;
     private lastPlacementTime = 0;
     private awaitingCommit = false; // a size was requested and the client has not committed anything since
     private static readonly maxConfigureWaitMs = 100;
@@ -128,6 +136,9 @@ class ClientWrapper {
             }
         }
 
+        if (horizontally || vertically) {
+            this.maximizedSeen = true;
+        }
         this.manipulatingGeometry.do(() => {
             this.kwinClient.setMaximize(vertically, horizontally);
         });
@@ -162,8 +173,49 @@ class ClientWrapper {
         }
     }
 
+    private noteStateFlip() {
+        if (this.isFocused()) {
+            this.stateFlips = [];
+            return;
+        }
+        const now = Date.now();
+        this.stateFlips = this.stateFlips.filter(time => now - time < ClientWrapper.stateFlipWindowMs);
+        this.stateFlips.push(now);
+        if (this.stateFlips.length >= 3) {
+            this.fightingUntil = now + ClientWrapper.fightHoldMs;
+        }
+    }
+
+    // the window fights the layout (see stateFlips) and is not focused: Kiri does not move or resize it
+    public isFightingLayout() {
+        if (this.fightingUntil === 0) {
+            return false;
+        }
+        if (this.isFocused()) {
+            this.fightingUntil = 0;
+            this.stateFlips = [];
+            return false;
+        }
+        if (Date.now() < this.fightingUntil) {
+            return true;
+        }
+        this.fightingUntil = 0;
+        return false;
+    }
+
     public getMaximizedMode() {
         return this.maximizedMode;
+    }
+
+    // Where Kiri last put the window, if KWin moved it somewhere else without changing its size, e.g. KWin pulls
+    // windows that are far off screen back to the screen edge when the desktop changes; null in every other case
+    public getMovedByKwinFrom(newGeometry: QmlRect): QmlRect | null {
+        const placed = this.lastPlacement;
+        if (placed === null || placed.width !== newGeometry.width || placed.height !== newGeometry.height ||
+            (placed.x === newGeometry.x && placed.y === newGeometry.y)) {
+            return null;
+        }
+        return placed;
     }
 
     public isManipulatingGeometry(newGeometry: QmlRect | null) {
@@ -224,6 +276,14 @@ class ClientWrapper {
             if (client.kwinClient.fullScreen) {
                 client.fullScreenSeen = true;
             }
+            client.noteStateFlip();
+        });
+
+        manager.connect(client.kwinClient.maximizedAboutToChange, (mode: MaximizedMode) => {
+            if (mode !== MaximizedMode.Unmaximized) {
+                client.maximizedSeen = true;
+            }
+            client.noteStateFlip();
         });
 
         manager.connect(client.kwinClient.frameGeometryChanged, () => {

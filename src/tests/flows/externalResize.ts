@@ -67,3 +67,22 @@ tests.register("A rate limited external resize gets one relayout afterwards", 1,
     }
     Assert.equal(tiled.width, 100);
 });
+
+tests.register("Windows that KWin pulls back to the screen edge are put back at once, however many", 1, () => {
+    const { workspaceMock } = init(getDefaultConfig());
+    const clients = workspaceMock.createClientsWithFrames(...[0, 1, 2, 3, 4, 5, 6, 7].map(() => new MockQmlRect(10, 10, 100, 200)));
+    const slots = clients.map(client => client.getActualFrameGeometry());
+    // KWin moves every window to the edge in one burst after the desktop changed: same size, other place
+    MockQmlTimer.deferred = true; // the rate limited relayout would only come later
+    try {
+        for (const client of clients) {
+            const frame = client.getActualFrameGeometry();
+            client.frameGeometry = new MockQmlRect(-frame.width + 100, frame.y, frame.width, frame.height);
+        }
+    } finally {
+        MockQmlTimer.deferred = false;
+    }
+    clients.forEach((client, i) => {
+        Assert.equalRects(client.getActualFrameGeometry(), slots[i], { message: "window " + i + " should be back in its slot" });
+    });
+});

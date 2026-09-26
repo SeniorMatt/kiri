@@ -6,7 +6,7 @@
         "EnabledByDefault": true,
         "License": "GPL-3.0",
         "Name": "Kiri touchpad swipe",
-        "Version": "0.9.1",
+        "Version": "0.10",
         "Website": "https://github.com/SeniorMatt/kiri"
     }
 }

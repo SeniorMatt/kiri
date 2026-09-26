@@ -161,6 +161,14 @@ function setOverviewPolling(polling: boolean) {
     }
 }
 
+// Puts every desktop in its own row of KWin's desktop grid (through the compiled effect; the script API can't)
+function setDesktopRows(rows: number) {
+    if (typeof qmlBase === "undefined") {
+        return; // tests
+    }
+    (qmlBase as any).setDesktopRows(rows);
+}
+
 // Calls `callback` with the pointer buttons that are held now (Qt::MouseButtons bits). Scripts can't see them, so the compiled
 // effect is asked, which takes a moment; without the effect nothing is known and no button counts as held.
 function queryPointerButtons(callback: (buttons: number) => void) {
@@ -176,6 +184,11 @@ function queryPointerButtons(callback: (buttons: number) => void) {
 function queryX11Window(kwinClient: KwinClient, callback: (x11: boolean) => void) {
     if (typeof qmlBase === "undefined") {
         callback((kwinClient as any).x11 !== false); // tests
+        return;
+    }
+    // the script engine names a window object after its C++ class ("KWin::X11Window(0x...)"), which needs no effect
+    if (/X11Window/.test(String(kwinClient))) {
+        callback(true);
         return;
     }
     (qmlBase as any).queryX11Window(String(kwinClient.internalId), callback);

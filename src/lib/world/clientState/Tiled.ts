@@ -21,7 +21,8 @@ namespace ClientState {
                 const after = placement.after === null ? null : column.getWindows().includes(placement.after) ? placement.after : undefined;
                 window = new Window(client, column, after);
             } else if (placement !== undefined) {
-                column = new Column(grid, placement.leftColumn !== null && grid.hasColumn(placement.leftColumn) ? placement.leftColumn : grid.getLastColumn());
+                const left = placement.leftColumn !== null && grid.hasColumn(placement.leftColumn) ? placement.leftColumn : placement.leftColumn === null && placement.atStart === true ? null : grid.getLastColumn();
+                column = new Column(grid, left);
                 window = new Window(client, column);
             } else {
                 const previousColumn = grid.getLastFocusedColumn();
@@ -241,7 +242,17 @@ namespace ClientState {
                     // frame then); KWin sets the full-screen flag before the frame of a window that enters it.
                     (!Clients.isFullScreenGeometry(kwinClient) || (config.hideTitlebars && !kwinClient.fullScreen)) // not using `kwinClient.fullScreen` because it may not be set yet at this point
                 ) {
-                    if (externalFrameGeometryChangedRateLimiter.acquire()) {
+                    const placed = kwinClient.move ? null : client.getMovedByKwinFrom(newGeometry);
+                    if (placed !== null) {
+                        // only the position changed, to a place that is not Kiri's: put the window back, the rest of the
+                        // layout is fine (and the rate limit below must not leave the other windows of the burst misplaced)
+                        if (Clients.isOnVirtualDesktop(kwinClient, Workspace.currentDesktop)) {
+                            client.place(placed.x, placed.y, placed.width, placed.height);
+                        } else {
+                            // not shown now (KWin does this to the desktop it leaves): the next arrange puts it back
+                            window.column.grid.desktop.onLayoutChanged();
+                        }
+                    } else if (externalFrameGeometryChangedRateLimiter.acquire()) {
                         world.do(() => window.onFrameGeometryChanged());
                     } else {
                         relayoutDelayer.run();
@@ -360,6 +371,7 @@ namespace ClientState {
             column: Column|null; // the column the window was in, if it still exists and the window was not alone in it
             after: Window|null; // the window above it in that column
             leftColumn: Column|null; // otherwise: the column to the left of where its own column was
+            atStart?: boolean; // there was none: its own column was the first one
         }
 
         export interface WindowState {

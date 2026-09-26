@@ -276,6 +276,24 @@ Item {
 
     // Whether a window is an X11 one, from the compiled effect (scripts cannot tell). Calls callback(false) when the
     // effect is not loaded or does not answer.
+    function setDesktopRows(rows) {
+        if (!decorationsEffect) {
+            return;
+        }
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriDecorations",
+                iface: "org.kde.kiri.Decorations",
+                member: "setDesktopRows",
+                arguments: [new DBus.string(String(rows))],
+                signature: "(s)",
+            },
+            (reply) => {},
+            (error) => {},
+        );
+    }
+
     function queryX11Window(id, callback) {
         if (!decorationsEffect) {
             callback(false);

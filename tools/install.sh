@@ -58,6 +58,9 @@ if $build && [ -d "$cpp" ]; then
     fi
 fi
 
+# kwinrc writer (defined before first use: /usr/bin/w exists, so a late definition fails silently)
+w() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" "$3"; }
+
 # ---- the script and the animation effect ---------------------------------------------------------------
 kpackagetool6 --type=KWin/Script --upgrade "$root/package" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Script --install "$root/package"
 if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key overviewEnabled)" != done ]; then
@@ -77,7 +80,6 @@ else
 fi
 
 # ---- turn things on ------------------------------------------------------------------------------------
-w() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" "$3"; }
 w Plugins kiriEnabled true
 if ! $compiled && [ "$(kreadconfig6 --file kwinrc --group Plugins --key kiri_animationsEnabled)" != false ]; then
     w Plugins kiri_animationsEnabled true
@@ -88,6 +90,12 @@ if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key effec
     w Plugins kiri_desktop_switchEnabled true
     w Plugins slideEnabled false
     w Kiri-install effectsEnabled done
+fi
+if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key decorations010)" != done ]; then
+    # 0.10: titlebar hiding, the drag outline, focus follows mouse and the full-screen fix all need kiri_decorations,
+    # so it is turned on once again for people who had it off
+    w Plugins kiri_decorationsEnabled true
+    w Kiri-install decorations010 done
 fi
 if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key swipeEnabled)" != done ]; then
     # added in 0.9.1: turned on once, also for people who installed an older version

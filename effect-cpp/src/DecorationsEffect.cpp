@@ -7,6 +7,7 @@
 
 #include <core/output.h>
 #include <input.h>
+#include <virtualdesktops.h>
 #include <core/pixelgrid.h>
 #include <core/renderviewport.h>
 #include <effect/effecthandler.h>
@@ -336,6 +337,16 @@ void Effect::reloadSettings(const QString &)
 int Effect::pointerButtons()
 {
     return KWin::input() ? int(KWin::input()->qtButtonStates()) : 0;
+}
+
+void Effect::setDesktopRows(const QString &rows)
+{
+    bool ok = false;
+    const uint n = rows.toUInt(&ok);
+    auto *manager = KWin::VirtualDesktopManager::self();
+    if (ok && n > 0 && n <= manager->count() && manager->rows() != n) {
+        manager->setRows(n);
+    }
 }
 
 bool Effect::isX11Window(const QString &id)

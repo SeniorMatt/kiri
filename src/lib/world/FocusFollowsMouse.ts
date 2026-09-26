@@ -59,14 +59,16 @@ class FocusFollowsMouse {
     }
 
     private static topWindowAt(point: Readonly<QmlPoint>) {
+        // runs for every pointer event: the cheap geometry test comes first, so that only the windows under the
+        // pointer pay for the desktops list
         const stack = Workspace.stackingOrder;
         for (let i = stack.length - 1; i >= 0; i--) {
             const window = stack[i];
             const g = window.frameGeometry;
-            if (window.minimized || (window.desktops.length > 0 && window.desktops.indexOf(Workspace.currentDesktop) < 0)) {
+            if (point.x < g.x || point.x >= g.x + g.width || point.y < g.y || point.y >= g.y + g.height) {
                 continue;
             }
-            if (point.x >= g.x && point.x < g.x + g.width && point.y >= g.y && point.y < g.y + g.height) {
+            if (!window.minimized && (window.desktops.length === 0 || window.desktops.indexOf(Workspace.currentDesktop) >= 0)) {
                 return window;
             }
         }

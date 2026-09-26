@@ -28,6 +28,7 @@ class DynamicDesktops {
                     Workspace.removeDesktop(desktop);
                 }
             }
+            setDesktopRows(Workspace.desktops.length);
         } finally {
             this.suspended = false;
         }
