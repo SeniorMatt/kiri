@@ -180,3 +180,29 @@ tests.register("Overview: 4-finger swipe follows the fingers and settles", 1, ()
     Assert.assert(open.v > 0, { message: "with the velocity of the swipe" });
 });
 tests.run();
+
+tests.register("Overview: Meta+O keeps working after cancelled swipes and early polls", 1, () => {
+    const config = getDefaultConfig();
+    const { qtMock, workspaceMock, world } = init(config);
+    workspaceMock.createClientsWithWidths(300, 300);
+    overviewCalls.length = 0;
+    const swipe = (end: boolean) => world.gestureRaw(JSON.stringify({ phase: "v", f: 4, end: end, ev: end ? [] : [[0, -40]] }));
+    for (let i = 0; i < 50; i++) {
+        if (i % 3 === 0) {
+            swipe(false); // started, never ended
+            Assert.assert(overviewCalls[overviewCalls.length - 1].member === "gesture", { message: "the swipe reached the effect" });
+        }
+        const before = overviewCalls.filter(c => c.member === "toggle").length;
+        qtMock.fireShortcut("overview");
+        Assert.equal(overviewCalls.filter(c => c.member === "toggle").length, before + 1);
+        if (i % 2 === 0) {
+            overviewPoll(world, [], i % 4 === 0); // polls that arrive at any state
+        }
+        if (i % 5 === 0) {
+            overviewPoll(world, [{ t: "activate", w: "nope", d: workspaceMock.desktops[0].id }]);
+        }
+    }
+    swipe(true);
+    qtMock.fireShortcut("overview");
+    Assert.equal(overviewCalls[overviewCalls.length - 1].member, "toggle");
+});

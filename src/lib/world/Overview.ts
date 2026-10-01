@@ -34,6 +34,8 @@ class Overview {
         if (!overviewEffectLoaded()) {
             return false;
         }
+        // a swipe whose end never came must not keep the script in gesture mode
+        this.gesture = null;
         this.lastLayout = this.buildLayout();
         overviewCall("toggle", this.lastLayout);
         this.open = !this.open;
@@ -43,6 +45,7 @@ class Overview {
     }
 
     public close() {
+        this.gesture = null;
         if (this.open) {
             overviewCall("close", "");
             this.open = false;

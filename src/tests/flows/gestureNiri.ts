@@ -77,3 +77,55 @@ tests.register("Gesture swipe: the current desktop changes mid-swipe", 1, () => 
     Assert.equal(workspaceMock.currentDesktop, workspaceMock.desktops[1]);
     Assert.equal(workspaceMock.activeWindow, client0, { message: "the focus must not follow a swipe of another desktop" });
 });
+
+// fingers coming down while the view still settles from the swipe before: the new swipe starts where the view is
+// (niri), it does not jump back to the old swipe's release position or inherit its position and velocity
+tests.register("Gesture swipe: a swipe that lands while the last one settles starts where the view is", 1, () => {
+    const config = getDefaultConfig();
+    config.gestureScroll = true;
+    const { qtMock, workspaceMock, world } = init(config, { width: 1600, height: 900 });
+    const clients = workspaceMock.createClientsWithWidths(800, 800, 800, 800, 800, 800);
+    workspaceMock.activeWindow = clients[0];
+    const desktop = (world as any).desktopManager.getCurrentDesktop() as Desktop;
+    const timer = (world as any).gestureAnimationTimer;
+    const realNow = Date.now;
+    try {
+        const swipe = (id: number, events: number[][], end: boolean) => world.gestureRaw(JSON.stringify({ id: id, phase: "h", end: end, ev: events }));
+        // a fast flick to the right (negative deltas scroll the view to the right)
+        let t = 1000;
+        for (let i = 0; i < 12; i++) {
+            Date.now = () => t;
+            swipe(1, [[t, -60]], false);
+            t += 8;
+        }
+        Date.now = () => t;
+        swipe(1, [[t, 0]], true);
+        Assert.assert((world as any).gestureAnimation !== null, { message: "the view settles" });
+        const releaseScroll = desktop.getScrollX();
+        for (let i = 0; i < 4; i++) {
+            t += 16;
+            Date.now = () => t;
+            timer.triggered.fire();
+        }
+        const mid = desktop.getScrollX();
+        Assert.assert(Math.abs(mid - releaseScroll) > 20, { message: "the view moves while settling" });
+
+        // slow tiny swipe 2: the view must stay close to where it was, and its own history is empty
+        t += 10;
+        Date.now = () => t;
+        swipe(2, [[t, 3]], false);
+        Assert.assert((world as any).gestureAnimation === null, { message: "the settle is cut" });
+        Assert.assert(Math.abs(desktop.getScrollX() - mid) < 10, { message: `the new swipe starts at ${mid}, is at ${desktop.getScrollX()}` });
+        t += 8;
+        Date.now = () => t;
+        swipe(2, [[t, 3]], false);
+        t += 8;
+        Date.now = () => t;
+        swipe(2, [[t, 0]], true);
+        const release = desktop.getRawRelease();
+        Assert.assert(Math.abs(release.velocity) < 1500, { message: `no velocity from the swipe before: ${release.velocity}` });
+        Assert.assert(Math.abs(release.from - mid) < 12, { message: "the release starts at the view position" });
+    } finally {
+        Date.now = realNow;
+    }
+});

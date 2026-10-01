@@ -10,6 +10,7 @@ class World {
     private readonly gestureAnimationTimer: QmlTimer;
     // the desktop a swipe started on: it keeps the swipe if the current desktop changes while the fingers are down
     private gestureDesktop: Desktop|null = null;
+    private gestureRawId: number|undefined = undefined;
     private gestureAnimation: { from: number, to: number, start: number, spring: NiriSpring|null } | null = null;
     private readonly gestureSettleDuration: number;
     private readonly gestureDesktopSwitch: boolean;
@@ -409,7 +410,7 @@ class World {
     // Raw swipe from the compiled effect kiri_swipe (the JSON of its poll()): the uncapped finger travel of a
     // 3-finger horizontal swipe, with timestamps. KWin's own progress (capped at 200 units) is ignored then.
     public gestureRaw(json: string) {
-        let swipe: { phase: string, end: boolean, ev: number[][], f?: number };
+        let swipe: { id?: number, phase: string, end: boolean, ev: number[][], f?: number };
         try {
             swipe = JSON.parse(json);
         } catch (error: any) {
@@ -430,6 +431,12 @@ class World {
         if (swipe.phase === "h" && swipe.ev.length > 0) {
             this.gestureEndDelayer.stop();
             this.endGestureOnOtherDesktop();
+            if (swipe.id !== this.gestureRawId) {
+                // the fingers came down again: a swipe never continues the position or the velocity of the one before
+                // it, not even when it lands while that one is still settling
+                this.gestureRawId = swipe.id;
+                this.cutGestureSettle();
+            }
             this.stopGestureAnimation();
             this.do((clientManager, desktopManager) => {
                 const currentDesktop = this.getGestureDesktop();
@@ -445,6 +452,20 @@ class World {
             this.gestureEndDelayer.stop();
             this.gestureRelease();
         }
+    }
+
+    // A new swipe starts on the view where it is right now, as niri's does: the one before it ends there (it
+    // gets its focus change, the view stays where it is), and none of its state is carried over.
+    private cutGestureSettle() {
+        const desktop = this.gestureDesktop;
+        if (desktop === null || !desktop.isGestureScrolling()) {
+            return;
+        }
+        const x = desktop.getScrollX();
+        this.stopGestureAnimation();
+        this.gestureAnimationDone();
+        // focusing the column the old swipe chose must not scroll the view away from the fingers
+        this.do(() => desktop.setScroll(x, true));
     }
 
     // niri's toggle-overview: the compiled effect draws it, without the effect Plasma's own Overview opens

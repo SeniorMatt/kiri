@@ -170,3 +170,19 @@ tests.register("Unfocused window that keeps flipping full-screen is left alone",
     a.fullScreen = true;
     Assert.equalRects(a.getActualFrameGeometry(), screen, { message: "focused again, it is full-screen in the layout" });
 });
+
+// A focus move that KWin doesn't take at once is retried for 200 ms when no window is focused; a desktop switch in that
+// time also leaves no window focused for a moment, and the retry must not pull the old window (and its desktop) back.
+tests.register("Desktop switch right after a focus move is not undone", 10, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
+    workspaceMock.activeWindow = a;
+    const passer = new FocusPassing.Passer();
+    passer.request(b);
+    const other = workspaceMock.desktops.find(desktop => !b.desktops.includes(desktop))!;
+    Workspace.currentDesktop = other;
+    workspaceMock.activeWindow = null;
+    passer.activate();
+    Assert.equal(Workspace.activeWindow, null, { message: "the window of the old desktop is not activated" });
+    Assert.equal(Workspace.currentDesktop, other, { message: "the switch stays" });
+});

@@ -72,6 +72,7 @@ Item {
     property string overviewCall: ""
     property bool overviewPolling: false
     property bool overviewPollPending: false
+    property double overviewPollSince: 0
     property bool swipePollPending: false
     function checkSwipeEffect() {
         DBus.SessionBus.asyncCall(
@@ -104,7 +105,7 @@ Item {
                 const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
                 qmlBase.overviewEffect = value === true;
             },
-            (error) => { qmlBase.overviewEffect = false; },
+            (error) => { /* a busy compositor times out: keep what is known, or Meta+O would fall back to Plasma's overview */ },
         );
     }
     onOverviewCallChanged: {
@@ -126,10 +127,12 @@ Item {
         );
     }
     function pollOverview() {
-        if (overviewPollPending) {
+        // a reply that never arrives must not stop the polling for good
+        if (overviewPollPending && Date.now() - overviewPollSince < 500) {
             return;
         }
         overviewPollPending = true;
+        overviewPollSince = Date.now();
         DBus.SessionBus.asyncCall(
             {
                 service: "org.kde.KWin",
@@ -146,7 +149,7 @@ Item {
                     qmlBase.karouselInstance.overviewPoll(value);
                 }
             },
-            (error) => { qmlBase.overviewPollPending = false; qmlBase.overviewPolling = false; },
+            (error) => { qmlBase.overviewPollPending = false; },
         );
     }
     Timer {

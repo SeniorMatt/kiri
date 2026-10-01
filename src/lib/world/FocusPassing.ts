@@ -27,7 +27,11 @@ namespace FocusPassing {
                 return;
             }
 
-            if (this.currentRequest.isExpired()) {
+            const target = this.currentRequest.target;
+            if (this.currentRequest.isExpired() ||
+                (target.desktops.length > 0 && !target.desktops.includes(Workspace.currentDesktop))) {
+                // a desktop switch also leaves no window focused for a moment; activating the window from the old
+                // desktop then would switch straight back to it
                 this.clear();
                 return;
             }
