@@ -486,6 +486,10 @@ class World {
         }
     }
 
+    public overviewWarm() {
+        this.overview.warm();
+    }
+
     public overviewPoll(json: string) {
         this.overview.poll(json);
     }

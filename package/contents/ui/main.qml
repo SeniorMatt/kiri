@@ -130,11 +130,22 @@ Item {
             },
             (reply) => {
                 const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
-                qmlBase.overviewEffect = value === true;
+                const loaded = value === true;
+                if (loaded && !qmlBase.overviewEffect) {
+                    overviewWarmTimer.restart();
+                }
+                qmlBase.overviewEffect = loaded;
             },
             (error) => { /* a busy compositor times out: keep what is known, or Meta+O would fall back to Plasma's overview */ },
         );
     }
+    // a moment after the effect has loaded, when the session is quiet: it builds its scene once, invisibly
+    Timer {
+        id: overviewWarmTimer
+        interval: 4000
+        onTriggered: if (qmlBase.overviewEffect && !qmlBase.overviewPolling) qmlBase.karouselInstance.overviewWarm()
+    }
+    property int overviewPollErrors: 0
     onOverviewCallChanged: {
         if (overviewCall === "") {
             return;
@@ -171,12 +182,17 @@ Item {
             },
             (reply) => {
                 qmlBase.overviewPollPending = false;
+                qmlBase.overviewPollErrors = 0;
                 const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
                 if (typeof value === "string") {
                     qmlBase.karouselInstance.overviewPoll(value);
                 }
             },
-            (error) => { qmlBase.overviewPollPending = false; },
+            (error) => {
+                qmlBase.overviewPollPending = false;
+                // a vanished effect must not leave the script in overview mode (no cursor warps) for ever
+                if (++qmlBase.overviewPollErrors >= 25) { qmlBase.overviewPollErrors = 0; qmlBase.overviewPolling = false; }
+            },
         );
     }
     Timer {

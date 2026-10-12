@@ -699,7 +699,7 @@ class ClientManager {
             if (window !== null) {
                 this.warpedToTiled = { client: kwinClient, time: Date.now() };
             }
-            moveCursorToFocus.call();
+            warpCursorToFocus();
         }
     }
 

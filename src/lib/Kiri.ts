@@ -170,6 +170,20 @@ function overviewEffectLoaded() {
     return typeof qmlBase === "undefined" ? true : (qmlBase as any).overviewEffect === true;
 }
 
+// true from the moment the overview is asked to open until it is closed again (the polling runs for that long):
+// the pointer is not warped to the focus and does not give the focus away then
+function overviewActive() {
+    return typeof qmlBase === "undefined" ? overviewPollingFlag : (qmlBase as any).overviewPolling === true;
+}
+
+// moves the pointer to the focused window (KWin's MoveMouseToFocus), except while the overview is up: it would move
+// the pointer under the overview's own tiles
+function warpCursorToFocus() {
+    if (!overviewActive()) {
+        moveCursorToFocus.call();
+    }
+}
+
 function overviewCall(member: string, arg: string) {
     if (typeof qmlBase === "undefined") {
         overviewCalls.push({ member: member, arg: arg });
@@ -244,6 +258,10 @@ class Kiri {
 
     public gestureScrollFinish(delayed: boolean) {
         this.world.gestureScrollFinish(delayed);
+    }
+
+    public overviewWarm() {
+        this.world.overviewWarm();
     }
 
     public overviewPoll(json: string) {

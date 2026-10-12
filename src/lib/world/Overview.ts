@@ -44,6 +44,14 @@ class Overview {
         return true;
     }
 
+    // asks the effect to build its scene invisibly once, so that the first real open does not stutter
+    public warm() {
+        if (!overviewEffectLoaded() || this.open || this.gesture !== null) {
+            return;
+        }
+        overviewCall("warm", this.buildLayout());
+    }
+
     public close() {
         this.gesture = null;
         if (this.open) {

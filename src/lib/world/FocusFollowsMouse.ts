@@ -17,6 +17,11 @@ class FocusFollowsMouse {
     }
 
     private onPointerMoved() {
+        if (overviewActive()) {
+            // the pointer is over the overview's tiles, not over the windows below them
+            this.hover = null;
+            return;
+        }
         const window = FocusFollowsMouse.topWindowAt(Workspace.cursorPos);
         if (window === this.hover) {
             return;

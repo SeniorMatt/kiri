@@ -26,6 +26,7 @@ function init(config: Config, screenSize: { width: number, height: number } = { 
     gapV = config.gapsInnerVertical;
     runLog = [];
 
+    setOverviewPolling(false); // a test that left the overview open must not change the next one
     const qtMock = new MockQt();
     const workspaceMock = new MockWorkspace();
 

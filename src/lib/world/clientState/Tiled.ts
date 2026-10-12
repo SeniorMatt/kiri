@@ -279,7 +279,7 @@ namespace ClientState {
                 // movement; the pointer goes with the window.
                 if (!kwinClient.fullScreen && Workspace.activeWindow === kwinClient &&
                     !rectContainsPoint(roundQtRect(kwinClient.frameGeometry), Workspace.cursorPos)) {
-                    moveCursorToFocus.call();
+                    warpCursorToFocus();
                 }
             });
 

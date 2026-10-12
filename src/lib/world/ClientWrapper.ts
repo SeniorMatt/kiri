@@ -20,6 +20,13 @@ class ClientWrapper {
     private stateFlips: number[] = [];
     private fightingUntil = 0;
     private lastPlacementTime = 0;
+    // Stardew Valley (SDL2 on X11) leaves full-screen mode by itself a moment after its full-screen window has been
+    // moved away from the screen (an unfocused full-screen window sits in its column, partly off screen), then asks for
+    // full-screen again, and every move starts it over. Once a window has done that, Kiri does not move it while it is
+    // full-screen and unfocused: it stays covering the screen below the other windows, which keeps it still.
+    private lastFullScreenMoveTime = 0;
+    private static readonly fullScreenEscapeMs = 1500;
+    public escapesFullScreenMove = false;
     private awaitingCommit = false; // a size was requested and the client has not committed anything since
     private static readonly maxConfigureWaitMs = 100;
 
@@ -70,6 +77,9 @@ class ClientWrapper {
                 return;
             }
             this.lastPlacementTime = Date.now();
+            if (this.kwinClient.fullScreen && (current.x !== x || current.y !== y)) {
+                this.lastFullScreenMoveTime = this.lastPlacementTime;
+            }
             this.awaitingCommit = current.width !== width || current.height !== height;
             this.kwinClient.frameGeometry = this.lastPlacement; // a commit that happens at once clears awaitingCommit
             if (this.kwinClient.frameGeometry !== this.lastPlacement) {
@@ -275,6 +285,9 @@ class ClientWrapper {
         manager.connect(client.kwinClient.fullScreenChanged, () => {
             if (client.kwinClient.fullScreen) {
                 client.fullScreenSeen = true;
+            }
+            if (!client.kwinClient.fullScreen && !client.isFocused() && Date.now() - client.lastFullScreenMoveTime < ClientWrapper.fullScreenEscapeMs) {
+                client.escapesFullScreenMove = true;
             }
             client.noteStateFlip();
         });

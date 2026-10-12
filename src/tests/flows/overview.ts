@@ -206,3 +206,46 @@ tests.register("Overview: Meta+O keeps working after cancelled swipes and early 
     qtMock.fireShortcut("overview");
     Assert.equal(overviewCalls[overviewCalls.length - 1].member, "toggle");
 });
+
+tests.register("Overview: no cursor warps and no focus follows mouse while it is up", 1, () => {
+    const config = getDefaultConfig();
+    config.cursorFollowsFocus = true;
+    const { qtMock, workspaceMock, world } = init(config);
+    const [a, b, c] = workspaceMock.createClientsWithWidths(300, 300, 300);
+    workspaceMock.stackingOrder.push(a, b, c);
+    const ffm = new FocusFollowsMouse(() => false, 100);
+    const originalQmlBase = qmlBase;
+    const base: any = { overviewEffect: true, overviewPolling: false, overviewCall: "", queryPointerButtons: (callback: (buttons: number) => void) => callback(0) };
+    qmlBase = base;
+    try {
+        const hover = (client: MockKwinClient) => {
+            const frame = client.getActualFrameGeometry();
+            workspaceMock.cursorPos = new MockQmlPoint(Math.floor(frame.x + frame.width / 2), Math.floor(frame.y + frame.height / 2));
+            workspaceMock.cursorPosChanged.fire();
+        };
+        workspaceMock.activeWindow = a;
+        hover(a);
+        qtMock.fireShortcut("overview");
+        Assert.assert(base.overviewPolling, { message: "the overview is up" });
+
+        // a drop makes Kiri focus the window: the pointer stays where it is
+        const before = new MockQmlPoint(workspaceMock.cursorPos.x, workspaceMock.cursorPos.y);
+        qtMock.fireShortcut("focus-right");
+        Assert.equal(workspaceMock.activeWindow, b);
+        Assert.equal(workspaceMock.cursorPos.x, before.x);
+        Assert.equal(workspaceMock.cursorPos.y, before.y);
+        // and hovering a window below the overview does not give it the focus
+        hover(c);
+        Assert.assert(workspaceMock.activeWindow === b, { message: "no focus follows mouse in the overview" });
+
+        // the overview is closed: both work again
+        base.overviewPolling = false;
+        hover(a);
+        Assert.assert(workspaceMock.activeWindow === a, { message: "focus follows the mouse again" });
+        qtMock.fireShortcut("focus-right");
+        Assert.assert(rectContainsPoint(b.getActualFrameGeometry(), workspaceMock.cursorPos), { message: "the cursor follows the focus again" });
+    } finally {
+        qmlBase = originalQmlBase;
+        ffm.destroy();
+    }
+});

@@ -17,6 +17,8 @@ FocusScope {
     focus: true
     // the first build of the scene right after login is invisible (the effect's warm())
     opacity: effect.warming ? 0.003 : 1
+    // and takes no clicks or keys meant for the windows under it
+    enabled: !effect.warming
 
     readonly property QtObject effect: KWinComponents.SceneView.effect
     readonly property QtObject targetScreen: KWinComponents.SceneView.screen
