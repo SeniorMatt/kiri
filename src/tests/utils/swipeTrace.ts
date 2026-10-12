@@ -82,6 +82,7 @@ namespace SwipeTrace {
         out.kind = "h";
         out.lock = found.index;
         const realNow = Date.now;
+        setSwipeVisualForTests(false); // the script's own settle is what is sampled here
         try {
             for (let i = 0; i < t.events.length; i++) {
                 const e = t.events[i];
@@ -119,6 +120,7 @@ namespace SwipeTrace {
             out.final_view = -(desktop.getScrollX() - marginLeft);
         } finally {
             Date.now = realNow;
+            setSwipeVisualForTests(true);
         }
         return out;
     }

@@ -218,12 +218,13 @@ class Desktop {
 
     // niri's view_offset_gesture_update for a touchpad: the view moves working_width / 1200 per unit of finger
     // travel, with no cap, and follows the fingers past the ends
-    public gestureRawUpdate(delta: number, time: number) {
+    public gestureRawUpdate(delta: number, time: number, startOffset = 0) {
         if (!this.config.gestureScroll) {
             return;
         }
         if (this.gestureScrollXInitial === null) {
-            this.gestureScrollXInitial = this.scrollX;
+            // the view starts where it is painted: the compiled effect may still show a settle that the layout is ahead of
+            this.gestureScrollXInitial = this.scrollX + startOffset;
             this.gestureRaw = true;
             this.gestureTargetColumn = null;
             this.gestureRawPos = 0;
@@ -235,6 +236,18 @@ class Desktop {
             this.gestureRawHistory.shift();
         }
         this.setScroll(this.gestureScrollXInitial + this.getRawScale() * this.gestureRawPos, true);
+    }
+
+    // what the compiled effect needs to paint a raw swipe at frame rate: the scroll per unit of finger travel and the
+    // windows that scroll
+    public getRawVisual() {
+        const ids: string[] = [];
+        for (const column of this.grid.getColumns()) {
+            for (const window of column.getWindows()) {
+                ids.push(String(window.client.kwinClient.internalId));
+            }
+        }
+        return { scale: this.getRawScale(), ids: ids };
     }
 
     // scroll pixels per unit of finger travel, signed by the invert setting

@@ -221,7 +221,7 @@ public:
     }
 
 private:
-    static constexpr int Window = 4;
+    static constexpr int Window = 2;
     static constexpr double DefaultIntervalMs = 8.0;
     struct Ev
     {

@@ -125,8 +125,32 @@ static int runCheck(const std::vector<const char *> &paths, bool flat, double sp
     return bad ? 1 : 0;
 }
 
+// `--check-real gestures.txt`: libinput's own accelerated and unaccelerated deltas of real swipes (li_replay output);
+// the effect's Unaccelerate, given only the accelerated ones, has to find the unaccelerated ones again.
+static int runCheckReal(const char *path)
+{
+    std::ifstream f(path); std::string line; NiriSwipe::Unaccelerate un; un.setProfile(false, 0.0);
+    double err = 0, travel = 0, net = 0, netTrue = 0; int swipes = 0;
+    auto flush = [&]() { net = 0; netTrue = 0; };
+    double worstNet = 0; double sumNetErr = 0; double sumTravel = 0;
+    while (std::getline(f, line)) {
+        std::istringstream s(line); std::string k; s >> k;
+        if (k == "B") { un.reset(); flush(); swipes++; }
+        else if (k == "U") {
+            double t, dx, dy, ux, uy; int fingers; s >> t >> fingers >> dx >> dy >> ux >> uy;
+            double ex, ey; un.apply(dx, dy, t / 1000.0, ex, ey);
+            err += std::fabs(ex - ux); travel += std::fabs(ux); net += ex; netTrue += ux;
+        } else if (k == "E") {
+            const double n = std::fabs(net - netTrue); worstNet = std::max(worstNet, n); sumNetErr += n; sumTravel += std::fabs(netTrue);
+        }
+    }
+    std::printf("real swipes: %d, per-event error %.3f of the travel, net error per swipe up to %.1f units (%.3f of the net travel)\n", swipes, err / travel, worstNet, sumNetErr / std::max(sumTravel, 1.0));
+    return (err / travel > 0.04 || sumNetErr / std::max(sumTravel, 1.0) > 0.03) ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
+    if (argc == 3 && !std::strcmp(argv[1], "--check-real")) return runCheckReal(argv[2]);
     bool events = false, accelOnly = false, check = false, flat = false; double speed = 0.0; std::vector<const char *> paths; const char *path = nullptr; bool unaccel = true; bool accel = true;
     for (int i = 1; i < argc; i++) {
         if (!std::strcmp(argv[i], "--events")) events = true;

@@ -74,6 +74,33 @@ Item {
     property bool overviewPollPending: false
     property double overviewPollSince: 0
     property bool swipePollPending: false
+    // the script's calls to kiri_swipe (begin / release / cancel of a raw swipe it paints itself): JSON {m, a, n};
+    // swipeVisual is the effect's answer to the last begin: true when it paints this swipe
+    property string swipeCall: ""
+    property bool swipeVisual: false
+    onSwipeCallChanged: {
+        if (swipeCall === "") {
+            return;
+        }
+        const call = JSON.parse(swipeCall);
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriSwipe",
+                iface: "org.kde.kwin.KWin.SwipeEffect",
+                member: "command",
+                arguments: [new DBus.string(call.a)],
+                signature: "(s)",
+            },
+            (reply) => {
+                if (call.m === "begin") {
+                    const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
+                    qmlBase.swipeVisual = value === true;
+                }
+            },
+            (error) => { if (call.m === "begin") { qmlBase.swipeVisual = false; } },
+        );
+    }
     function checkSwipeEffect() {
         DBus.SessionBus.asyncCall(
             {

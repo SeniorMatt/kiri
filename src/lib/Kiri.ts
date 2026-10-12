@@ -139,6 +139,33 @@ let overviewCallSeq = 0;
 const overviewCalls: { member: string, arg: string }[] = []; // what tests look at
 let overviewPollingFlag = false;
 
+// The compiled effect kiri_swipe paints a raw swipe itself (see SwipeEffect.h): the script tells it how the swipe
+// scrolls (begin) and settles (release), and it shifts the windows from where the layout has put them to where
+// the fingers (and then the spring) say they belong. A call is a JSON {m: method, a: JSON argument, n: counter}.
+let swipeCallSeq = 0;
+const swipeCalls: { member: string, arg: string }[] = []; // what tests look at
+let swipeVisualForTests = true;
+
+function setSwipeVisualForTests(on: boolean) {
+    swipeVisualForTests = on;
+}
+
+// true when the effect has taken this swipe over (it answers begin with true)
+function swipeVisualActive() {
+    return typeof qmlBase === "undefined" ? swipeVisualForTests : (qmlBase as any).swipeVisual === true;
+}
+
+function swipeCall(member: string, arg: object) {
+    if (typeof qmlBase === "undefined") {
+        swipeCalls.push({ member: member, arg: JSON.stringify(arg) });
+        if (swipeCalls.length > 200) {
+            swipeCalls.shift();
+        }
+        return;
+    }
+    (qmlBase as any).swipeCall = JSON.stringify({ m: member, a: JSON.stringify(Object.assign({ m: member }, arg)), n: ++swipeCallSeq });
+}
+
 function overviewEffectLoaded() {
     return typeof qmlBase === "undefined" ? true : (qmlBase as any).overviewEffect === true;
 }

@@ -79,52 +79,121 @@ tests.register("Gesture swipe: the current desktop changes mid-swipe", 1, () => 
 });
 
 // fingers coming down while the view still settles from the swipe before: the new swipe starts where the view is
-// (niri), it does not jump back to the old swipe's release position or inherit its position and velocity
-tests.register("Gesture swipe: a swipe that lands while the last one settles starts where the view is", 1, () => {
+// (niri), it does not jump back to the old swipe's release position or inherit its position and velocity.
+// With the compiled effect painting the swipe (visual) the layout is already at the end of the settle; the effect
+// says where it paints the view (d0), the swipe starts there.
+for (const visual of [false, true]) {
+    tests.register(`Gesture swipe: a swipe that lands while the last one settles starts where the view is (${visual ? "effect paints" : "script settles"})`, 1, () => {
+        const config = getDefaultConfig();
+        config.gestureScroll = true;
+        const { qtMock, workspaceMock, world } = init(config, { width: 1600, height: 900 });
+        const clients = workspaceMock.createClientsWithWidths(800, 800, 800, 800, 800, 800);
+        workspaceMock.activeWindow = clients[0];
+        const desktop = (world as any).desktopManager.getCurrentDesktop() as Desktop;
+        const timer = (world as any).gestureAnimationTimer;
+        const realNow = Date.now;
+        setSwipeVisualForTests(visual);
+        try {
+            const swipe = (id: number, events: number[][], end: boolean, d0 = 0) => world.gestureRaw(JSON.stringify({ id: id, phase: "h", end: end, ev: events, d0: d0 }));
+            let t = 1000;
+            for (let i = 0; i < 12; i++) {
+                Date.now = () => t;
+                swipe(1, [[t, -60]], false);
+                t += 8;
+            }
+            Date.now = () => t;
+            swipe(1, [[t, 0]], true);
+            Assert.assert((world as any).gestureAnimation !== null, { message: "the view settles" });
+            const releaseScroll = desktop.getScrollX();
+            for (let i = 0; i < 4; i++) {
+                t += 16;
+                Date.now = () => t;
+                timer.triggered.fire();
+            }
+            const mid = desktop.getScrollX();
+            if (visual) {
+                Assert.equal(mid, (world as any).gestureAnimation.to, { message: "the layout is at the end of the settle" });
+            } else {
+                Assert.assert(Math.abs(mid - releaseScroll) > 20, { message: "the view moves while settling" });
+            }
+
+            // slow tiny swipe 2: the view starts where the effect paints it (the layout's position, 130 px behind),
+            // and its own history is empty
+            const painted = visual ? mid - 130 : mid;
+            t += 10;
+            Date.now = () => t;
+            swipe(2, [[t, 3]], false, visual ? -130 : 0);
+            Assert.assert((world as any).gestureAnimation === null, { message: "the settle is cut" });
+            Assert.assert(Math.abs(desktop.getScrollX() - painted) < 10, { message: `the new swipe starts at ${painted}, is at ${desktop.getScrollX()}` });
+            t += 8;
+            Date.now = () => t;
+            swipe(2, [[t, 3]], false);
+            t += 8;
+            Date.now = () => t;
+            swipe(2, [[t, 0]], true);
+            const release = desktop.getRawRelease();
+            Assert.assert(Math.abs(release.velocity) < 1500, { message: `no velocity from the swipe before: ${release.velocity}` });
+            const anim = (world as any).gestureAnimation;
+            Assert.assert(anim !== null && Math.abs(anim.from - painted) < 20, { message: `the release starts at the view position ${anim === null ? null : anim.from} vs ${painted}` });
+        } finally {
+            Date.now = realNow;
+            setSwipeVisualForTests(true);
+        }
+    });
+}
+
+tests.register("Gesture swipe: the effect is told how the swipe scrolls and settles", 1, () => {
     const config = getDefaultConfig();
     config.gestureScroll = true;
     const { qtMock, workspaceMock, world } = init(config, { width: 1600, height: 900 });
-    const clients = workspaceMock.createClientsWithWidths(800, 800, 800, 800, 800, 800);
+    const clients = workspaceMock.createClientsWithWidths(800, 800, 800, 800);
     workspaceMock.activeWindow = clients[0];
-    const desktop = (world as any).desktopManager.getCurrentDesktop() as Desktop;
-    const timer = (world as any).gestureAnimationTimer;
     const realNow = Date.now;
+    swipeCalls.length = 0;
     try {
-        const swipe = (id: number, events: number[][], end: boolean) => world.gestureRaw(JSON.stringify({ id: id, phase: "h", end: end, ev: events }));
-        // a fast flick to the right (negative deltas scroll the view to the right)
-        let t = 1000;
-        for (let i = 0; i < 12; i++) {
+        const swipe = (events: number[][], end: boolean) => world.gestureRaw(JSON.stringify({ id: 7, phase: "h", end: end, ev: events }));
+        let t = 500;
+        for (let i = 0; i < 8; i++) {
             Date.now = () => t;
-            swipe(1, [[t, -60]], false);
+            swipe([[t, -40]], false);
             t += 8;
         }
         Date.now = () => t;
-        swipe(1, [[t, 0]], true);
-        Assert.assert((world as any).gestureAnimation !== null, { message: "the view settles" });
-        const releaseScroll = desktop.getScrollX();
-        for (let i = 0; i < 4; i++) {
-            t += 16;
-            Date.now = () => t;
-            timer.triggered.fire();
-        }
-        const mid = desktop.getScrollX();
-        Assert.assert(Math.abs(mid - releaseScroll) > 20, { message: "the view moves while settling" });
+        swipe([[t, 0]], true);
+        const begins = swipeCalls.filter(c => c.member === "begin");
+        Assert.equal(begins.length, 1, { message: "begin once per swipe" });
+        const begin = JSON.parse(begins[0].arg);
+        Assert.equal(begin.ids.length, 4);
+        Assert.assert(Math.abs(begin.scale) > 0.5, { message: "scroll per unit of travel" });
+        const release = swipeCalls.filter(c => c.member === "release");
+        Assert.equal(release.length, 1);
+        Assert.assert(JSON.parse(release[0].arg).to !== undefined);
+    } finally {
+        Date.now = realNow;
+    }
+});
 
-        // slow tiny swipe 2: the view must stay close to where it was, and its own history is empty
-        t += 10;
+// niri moves the focus to the column the swipe lands on when the fingers are lifted, not when the settle ends
+tests.register("Gesture swipe: the focus moves when the fingers are lifted", 1, () => {
+    const config = getDefaultConfig();
+    config.gestureScroll = true;
+    const { workspaceMock, world } = init(config, { width: 1600, height: 900 });
+    const clients = workspaceMock.createClientsWithWidths(800, 800, 800, 800, 800, 800);
+    workspaceMock.activeWindow = clients[0];
+    const realNow = Date.now;
+    setSwipeVisualForTests(true);
+    try {
+        const swipe = (events: number[][], end: boolean) => world.gestureRaw(JSON.stringify({ id: 9, phase: "h", end: end, ev: events }));
+        let t = 2000;
+        for (let i = 0; i < 12; i++) {
+            Date.now = () => t;
+            swipe([[t, 60]], false);
+            t += 8;
+        }
         Date.now = () => t;
-        swipe(2, [[t, 3]], false);
-        Assert.assert((world as any).gestureAnimation === null, { message: "the settle is cut" });
-        Assert.assert(Math.abs(desktop.getScrollX() - mid) < 10, { message: `the new swipe starts at ${mid}, is at ${desktop.getScrollX()}` });
-        t += 8;
-        Date.now = () => t;
-        swipe(2, [[t, 3]], false);
-        t += 8;
-        Date.now = () => t;
-        swipe(2, [[t, 0]], true);
-        const release = desktop.getRawRelease();
-        Assert.assert(Math.abs(release.velocity) < 1500, { message: `no velocity from the swipe before: ${release.velocity}` });
-        Assert.assert(Math.abs(release.from - mid) < 12, { message: "the release starts at the view position" });
+        swipe([[t, 0]], true);
+        Assert.assert((world as any).gestureAnimation !== null, { message: "the view still settles" });
+        Assert.assert(Workspace.activeWindow !== clients[0], { message: "but the focus has moved already" });
     } finally {
         Date.now = realNow;
     }

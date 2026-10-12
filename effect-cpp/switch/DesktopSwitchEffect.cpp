@@ -54,6 +54,13 @@ DesktopSwitchEffect::DesktopSwitchEffect()
             this, &DesktopSwitchEffect::windowAdded);
     connect(effects, &EffectsHandler::windowDeleted,
             this, &DesktopSwitchEffect::windowDeleted);
+    // another full-screen effect (the overview) takes over: the animation is cut short, like niri does
+    connect(effects, &EffectsHandler::activeFullScreenEffectChanged, this, [this]() {
+        if (isActive() && effects->activeFullScreenEffect() != this) {
+            finishedSwitching(false);
+            effects->addRepaintFull();
+        }
+    });
     connect(effects, &EffectsHandler::desktopAdded,
             this, &DesktopSwitchEffect::finishedSwitching);
     connect(effects, &EffectsHandler::desktopRemoved,
@@ -457,7 +464,7 @@ void DesktopSwitchScreen::prepareSwitching()
     }
 }
 
-void DesktopSwitchEffect::finishedSwitching()
+void DesktopSwitchEffect::finishedSwitching(bool releaseFullScreen)
 {
     for (DesktopSwitchScreen &slideScreen : m_slideEffectScreens) {
         slideScreen.finishedSwitching();
@@ -468,7 +475,9 @@ void DesktopSwitchEffect::finishedSwitching()
         w->setData(WindowForceBackgroundContrastRole, QVariant());
         w->setData(WindowForceBlurRole, QVariant());
     }
-    effects->setActiveFullScreenEffect(nullptr);
+    if (releaseFullScreen) {
+        effects->setActiveFullScreenEffect(nullptr);
+    }
 }
 
 void DesktopSwitchScreen::finishedSwitching()

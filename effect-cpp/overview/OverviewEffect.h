@@ -34,6 +34,8 @@ class OverviewEffect : public QuickSceneEffect
     Q_PROPERTY(QVariantMap viewOffsets READ viewOffsets NOTIFY viewOffsetsChanged)
     Q_PROPERTY(qreal zoom READ zoom CONSTANT)
     Q_PROPERTY(bool closing READ isClosing NOTIFY closingChanged)
+    // the invisible first build of the scene (see warm())
+    Q_PROPERTY(bool warming READ isWarming NOTIFY warmingChanged)
     Q_PROPERTY(QString searchText MEMBER m_searchText WRITE setSearchText NOTIFY searchTextChanged)
 
 public:
@@ -46,6 +48,7 @@ public:
     QVariantMap viewOffsets() const { return m_viewOffsets; }
     qreal zoom() const { return Zoom; }
     bool isClosing() const { return !m_open; }
+    bool isWarming() const { return m_warm; }
     void setSearchText(const QString &text);
 
     void prePaintScreen(ScreenPrePaintData &data) override;
@@ -59,6 +62,8 @@ public Q_SLOTS:
     // opens, or closes when it is open; `layout` is the layout JSON
     Q_SCRIPTABLE QString toggle(const QString &layout);
     Q_SCRIPTABLE QString open(const QString &layout);
+    // builds the scene invisibly for a moment so that the first real open is smooth
+    Q_SCRIPTABLE QString warm(const QString &layout);
     Q_SCRIPTABLE QString close();
     Q_SCRIPTABLE QString setLayout(const QString &layout);
     // {"p":0..1,"layout":{...}} follows the fingers; {"settle":true|false,"v":units/s} lets go
@@ -80,6 +85,7 @@ Q_SIGNALS:
     void wsIndexChanged();
     void viewOffsetsChanged();
     void closingChanged();
+    void warmingChanged();
     void searchTextChanged();
 
 private:
@@ -93,6 +99,7 @@ private:
         qint64 localUntil = 0; // the user is scrolling it: the layout does not move it
     };
 
+    bool acquire();
     void startOpen();
     void startProgress(double to, double velocity);
     void startWorkspace(double to);
@@ -129,6 +136,9 @@ private:
     QVariantMap m_viewOffsets;
     QElapsedTimer m_clock;
     qint64 m_lastFrame = 0;
+    bool m_warm = false;
+    qint64 m_openCall = 0;
+    qint64 m_noCloseUntil = 0; // after a drop, a click can not close the overview
     qint64 m_anim = 0; // animation clock (ms), see prePaintScreen
     qint64 m_frames = 0;
     qint64 m_frameSum = 0;

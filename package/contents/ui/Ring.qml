@@ -17,12 +17,23 @@ QtWin.Window {
 
     property var kw: null
 
+    // niri draws no ring or border around a window that is full-screen or fills its screen (maximize-window-to-edges);
+    // the compiled effect uses the same rule. Bound to the frame geometry, so it is back as soon as the window shrinks.
+    readonly property bool fillsScreen: {
+        const t = target;
+        if (t === null || t.output === null || t.output === undefined) {
+            return false;
+        }
+        const g = t.frameGeometry, o = t.output.geometry;
+        return g.width >= o.width - 0.5 && g.height >= o.height - 0.5;
+    }
+
     readonly property bool shown: {
         const t = target;
         if (!wanted || t === null || kw === null || ringWidth <= 0) {
             return false;
         }
-        if (!(t.normalWindow || t.dialog) || t.fullScreen || t.minimized || t.move || t.resize || t.deleted) {
+        if (!(t.normalWindow || t.dialog) || t.fullScreen || t.minimized || t.move || t.resize || t.deleted || fillsScreen) {
             return false;
         }
         return t.onAllDesktops || t.desktops.indexOf(Workspace.currentDesktop) >= 0;
@@ -66,9 +77,17 @@ QtWin.Window {
 
     Connections {
         target: Workspace
+        // hiding the ring closes its KWin window and showing it makes a new one, so every window with the ring's title
+        // is the ring's window now (not only the first one), or a ring that was hidden once stays unattached for good.
+        // KWin adds " <2>" to a title that is already used; "kiri-ring-b1" must not match "kiri-ring-b10".
         function onWindowAdded(w) {
-            if (ring.kw === null && w.caption.indexOf(ring.title) === 0) {
+            if (w.caption === ring.title || w.caption.indexOf(ring.title + " <") === 0) {
                 ring.attach(w);
+            }
+        }
+        function onWindowRemoved(w) {
+            if (w === ring.kw) {
+                ring.kw = null;
             }
         }
         function onWindowActivated(w) {

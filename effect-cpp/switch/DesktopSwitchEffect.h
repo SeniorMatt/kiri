@@ -193,7 +193,7 @@ private Q_SLOTS:
     void windowDeleted(EffectWindow *w);
 
 private:
-    void finishedSwitching();
+    void finishedSwitching(bool releaseFullScreen = true);
     DesktopSwitchScreen *getDesktopSwitchScreen(LogicalOutput *screen);
     void swipeFinish(std::chrono::microseconds time);
     void swipeApplyRelease();

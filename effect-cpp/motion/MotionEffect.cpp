@@ -44,6 +44,16 @@ Effect::Effect()
             m_resizedWindow = nullptr;
         }
     });
+    // the overview (or any full-screen effect) cuts the window animations short, like niri: the windows are at their
+    // final places at once, the thumbnails show them there
+    connect(KWin::effects, &KWin::EffectsHandler::activeFullScreenEffectChanged, this, [this]() {
+        if (KWin::effects->hasActiveFullScreenEffect()) {
+            for (auto it = m_windows.begin(); it != m_windows.end(); ++it) {
+                stopWindow(it.key(), it.value());
+            }
+            KWin::effects->addRepaintFull();
+        }
+    });
     for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
         manage(w);
     }
@@ -174,6 +184,9 @@ void Effect::takeSnapshot(KWin::EffectWindow *w, WindowState &s)
 // and by then the old contents are gone, so they are saved now, while the old buffer is still there.
 void Effect::onAboutToChange(KWin::EffectWindow *w)
 {
+    if (KWin::effects->property("kiriSwipeVisual").toBool()) {
+        return; // kiri_swipe paints a touchpad swipe itself, frame by frame
+    }
     auto it = m_windows.find(w);
     if (it == m_windows.end()) {
         return;
@@ -304,6 +317,12 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
     WindowState &s = *it;
     const double t = now();
     const KWin::RectF frame = w->frameGeometry();
+    if (KWin::effects->property("kiriSwipeVisual").toBool()) {
+        stopWindow(w, s);
+        s.lastChange = t;
+        s.lastSize = frame.size();
+        return;
+    }
 
     const bool fast = s.lastChange >= 0 && t - s.lastChange < StreamGap;
     s.lastChange = t;

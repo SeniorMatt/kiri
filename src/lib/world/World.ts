@@ -11,7 +11,8 @@ class World {
     // the desktop a swipe started on: it keeps the swipe if the current desktop changes while the fingers are down
     private gestureDesktop: Desktop|null = null;
     private gestureRawId: number|undefined = undefined;
-    private gestureAnimation: { from: number, to: number, start: number, spring: NiriSpring|null } | null = null;
+    private gestureVisualId: number|undefined = undefined;
+    private gestureAnimation: { from: number, to: number, start: number, spring: NiriSpring|null, visual?: boolean } | null = null;
     private readonly gestureSettleDuration: number;
     private readonly gestureDesktopSwitch: boolean;
     private readonly closeRelayoutDelayer: Delayer;
@@ -410,7 +411,7 @@ class World {
     // Raw swipe from the compiled effect kiri_swipe (the JSON of its poll()): the uncapped finger travel of a
     // 3-finger horizontal swipe, with timestamps. KWin's own progress (capped at 200 units) is ignored then.
     public gestureRaw(json: string) {
-        let swipe: { id?: number, phase: string, end: boolean, ev: number[][], f?: number };
+        let swipe: { id?: number, phase: string, end: boolean, ev: number[][], f?: number, d0?: number };
         try {
             swipe = JSON.parse(json);
         } catch (error: any) {
@@ -443,7 +444,11 @@ class World {
                 if (currentDesktop !== undefined) {
                     this.gestureDesktop = currentDesktop;
                     for (const event of swipe.ev) {
-                        currentDesktop.gestureRawUpdate(event[1], event[0]);
+                        currentDesktop.gestureRawUpdate(event[1], event[0], swipe.d0 === undefined ? 0 : swipe.d0);
+                    }
+                    if (this.gestureVisualId !== swipe.id && currentDesktop.isRawGesture()) {
+                        this.gestureVisualId = swipe.id;
+                        swipeCall("begin", currentDesktop.getRawVisual());
                     }
                 }
             });
@@ -505,14 +510,25 @@ class World {
         const raw = desktop.isRawGesture() ? desktop.getRawRelease() : null;
         const from = desktop.getScrollX();
         const to = raw !== null ? raw.to : desktop.getGestureSettleTarget(Date.now());
+        const visual = raw !== null && swipeVisualActive();
         if ((raw === null && from === to) || this.gestureSettleDuration === 0) {
             this.do((clientManager, desktopManager) => {
                 desktop.setScroll(to, raw !== null);
             });
+            if (visual) {
+                swipeCall("cancel", {});
+            }
             this.gestureAnimationDone();
             return;
         }
-        this.gestureAnimation = { from: from, to: to, start: Date.now(), spring: raw !== null ? niriViewSpring(from, to, raw.velocity) : null };
+        if (visual && raw !== null) {
+            // the effect paints the settle at frame rate, from where the fingers left the view; the layout is already where it ends
+            swipeCall("release", { from: from, to: to, v: raw.velocity });
+            this.do(() => desktop.setScroll(to, true));
+            // niri moves the focus when the fingers are lifted, not when the settle ends
+            this.gestureFocusTarget(desktop);
+        }
+        this.gestureAnimation = { from: from, to: to, start: Date.now(), spring: raw !== null ? niriViewSpring(from, to, raw.velocity) : null, visual: visual };
         this.gestureAnimationTimer.start();
     }
 
@@ -527,7 +543,9 @@ class World {
         const t = spring !== null ? (Date.now() - animation.start) / 1000 / spring.duration : (Date.now() - animation.start) / this.gestureSettleDuration;
         const x = spring !== null ? spring.value((Date.now() - animation.start) / 1000) : animation.from + (animation.to - animation.from) * easeOutCubic(t);
         // a raw swipe's target may be outside of what the clamper allows (niri's snaps do not ask it)
-        this.do(() => desktop.setScroll(x, spring !== null));
+        if (animation.visual !== true) {
+            this.do(() => desktop.setScroll(x, spring !== null));
+        }
         if (t >= 1 || (spring !== null && spring.duration === 0)) {
             this.stopGestureAnimation();
             this.gestureAnimationDone();
@@ -537,6 +555,13 @@ class World {
     private stopGestureAnimation() {
         this.gestureAnimation = null;
         this.gestureAnimationTimer.stop();
+    }
+
+    private gestureFocusTarget(desktop: Desktop) {
+        this.do((clientManager, desktopManager) => {
+            const focusedWindow = Workspace.activeWindow === null ? null : clientManager.findTiledWindow(Workspace.activeWindow);
+            desktop.gestureScrollFinish(focusedWindow, Workspace.activeWindow !== null && focusedWindow === null, desktop === desktopManager.getCurrentDesktop());
+        });
     }
 
     private gestureAnimationDone() {

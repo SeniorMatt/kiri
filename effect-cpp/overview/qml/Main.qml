@@ -15,6 +15,8 @@ import org.kde.plasma.extras as PlasmaExtras
 FocusScope {
     id: root
     focus: true
+    // the first build of the scene right after login is invisible (the effect's warm())
+    opacity: effect.warming ? 0.003 : 1
 
     readonly property QtObject effect: KWinComponents.SceneView.effect
     readonly property QtObject targetScreen: KWinComponents.SceneView.screen
@@ -353,6 +355,8 @@ FocusScope {
             }
 
             TapHandler {
+                // exclusive: the desktop and the backdrop under the tile must not see the same click
+                gesturePolicy: TapHandler.ReleaseWithinBounds
                 acceptedButtons: Qt.LeftButton
                 onTapped: root.effect.activateWindow(tile.wid, tile.did, tile.di)
             }

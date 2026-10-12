@@ -10,6 +10,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLoggingCategory>
+#include <QTimer>
 #include <QUrl>
 
 Q_LOGGING_CATEGORY(KIRI_OVERVIEW, "kiri.overview", QtWarningMsg)
@@ -180,6 +181,10 @@ void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
         // The springs run on their own clock that advances at most 100 ms per frame: building the scene
         // on the first frame, or any hitch, must not make the zoom skip ahead (it would look like a teleport).
         m_anim += (m_lastFrame > 0) ? std::min<qint64>(t - m_lastFrame, 100) : 0;
+        if (m_lastFrame == 0 && m_openCall > 0) {
+            qCDebug(KIRI_OVERVIEW) << "first frame" << t - m_openCall << "ms after the scene was started";
+            m_openCall = 0;
+        }
         m_lastFrame = t;
         if (tick()) {
             effects->addRepaintFull();
@@ -259,6 +264,22 @@ void OverviewEffect::applyLayout(const QString &layout)
 
 // ---- D-Bus -------------------------------------------------------------------------------------------------
 
+// Starts the scene. Another full-screen effect (the desktop switch animation) would make KWin refuse it, and niri
+// cuts such animations short when the overview opens: take its place, it ends itself when it sees that (see
+// DesktopSwitchEffect, activeFullScreenEffectChanged).
+bool OverviewEffect::acquire()
+{
+    if (isRunning()) {
+        return true;
+    }
+    if (effects->hasActiveFullScreenEffect() && effects->activeFullScreenEffect() != this) {
+        effects->setActiveFullScreenEffect(nullptr);
+    }
+    m_openCall = now();
+    setRunning(true);
+    return isRunning();
+}
+
 void OverviewEffect::startOpen()
 {
     if (effects->isScreenLocked()) {
@@ -267,13 +288,51 @@ void OverviewEffect::startOpen()
     const bool wasRunning = isRunning();
     m_open = true;
     m_gesture = false;
+    m_warm = false;
     if (!wasRunning) {
         m_progress = 0;
-        setRunning(true);
+        if (!acquire()) {
+            // refused: never stay in a state that thinks it is open (Meta+O would then do nothing)
+            m_open = false;
+            return;
+        }
         Q_EMIT progressChanged();
+    } else {
+        Q_EMIT warmingChanged();
     }
     startProgress(1.0, 0);
     Q_EMIT closingChanged();
+}
+
+// Builds the scene once, invisibly, shortly after login: the first real open otherwise pays for the QML and shader
+// compilation, the wallpapers and the window textures while the zoom is running.
+QString OverviewEffect::warm(const QString &layout)
+{
+    if (isRunning() || effects->isScreenLocked() || effects->hasActiveFullScreenEffect()) {
+        return QStringLiteral("busy");
+    }
+    m_layoutCurrent = -1;
+    applyLayout(layout);
+    m_open = false;
+    m_gesture = false;
+    m_progress = 0;
+    m_warm = true;
+    if (!acquire()) {
+        m_warm = false;
+        return QStringLiteral("refused");
+    }
+    Q_EMIT warmingChanged();
+    effects->addRepaintFull();
+    QTimer::singleShot(500, this, [this]() {
+        if (m_warm && isRunning() && !m_open && !m_gesture) {
+            m_warm = false;
+            m_progressAnimating = false;
+            setRunning(false);
+            logFrames();
+            Q_EMIT warmingChanged();
+        }
+    });
+    return QStringLiteral("ok");
 }
 
 QString OverviewEffect::open(const QString &layout)
@@ -335,8 +394,8 @@ QString OverviewEffect::gesture(const QString &json)
             return QStringLiteral("locked");
         }
         const double p = std::clamp(obj.value(QStringLiteral("p")).toDouble(), -0.05, 1.05);
-        if (!isRunning() && p != 0) {
-            setRunning(true);
+        if (!isRunning() && p != 0 && !acquire()) {
+            return QStringLiteral("refused");
         }
         m_gesture = true;
         m_open = true;
@@ -388,6 +447,9 @@ QString OverviewEffect::poll()
 
 void OverviewEffect::activateWindow(const QString &windowId, const QString &desktopId, int desktopIndex)
 {
+    if (now() < m_noCloseUntil) {
+        return; // the release of a drag, not a click
+    }
     queue(jsonString({{"t", "activate"}, {"w", windowId}, {"d", desktopId}}));
     m_pendingCurrent = desktopIndex;
     m_pendingUntil = now() + 600;
@@ -399,6 +461,9 @@ void OverviewEffect::activateWindow(const QString &windowId, const QString &desk
 
 void OverviewEffect::activateDesktop(int desktopIndex)
 {
+    if (now() < m_noCloseUntil) {
+        return;
+    }
     queue(jsonString({{"t", "goto"}, {"i", desktopIndex}}));
     m_pendingCurrent = desktopIndex;
     m_pendingUntil = now() + 600;
@@ -422,6 +487,7 @@ void OverviewEffect::goToDesktop(int index)
 
 void OverviewEffect::dropWindow(const QString &windowId, const QString &desktopId, int column, int tile)
 {
+    m_noCloseUntil = now() + 700;
     queue(jsonString({{"t", "drop"}, {"w", windowId}, {"d", desktopId}, {"c", column}, {"i", tile}}));
 }
 
@@ -443,6 +509,9 @@ void OverviewEffect::scrollView(const QString &desktopId, qreal delta)
 
 void OverviewEffect::requestClose()
 {
+    if (now() < m_noCloseUntil) {
+        return;
+    }
     close();
 }
 
