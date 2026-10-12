@@ -150,6 +150,12 @@ class World {
         if (layout !== null) {
             this.restoreLayout(layout);
         }
+        // the window that has the focus keeps it (KWin does not say it again), and Kiri has to know it as the focused
+        // one: closing it passes the focus on, and the view keeps it in sight
+        const active = Workspace.activeWindow;
+        if (active !== null && this.clientManager.hasClient(active)) {
+            this.clientManager.onClientFocused(active);
+        }
         this.currentDesktop = Workspace.currentDesktop;
         this.update();
     }
