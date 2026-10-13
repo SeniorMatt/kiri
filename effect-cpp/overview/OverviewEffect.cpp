@@ -13,7 +13,7 @@
 #include <QTimer>
 #include <QUrl>
 
-Q_LOGGING_CATEGORY(KIRI_OVERVIEW, "kiri.overview", QtWarningMsg)
+Q_LOGGING_CATEGORY(KIRI_OVERVIEW, "kiri.overview", QtInfoMsg)
 
 namespace KWin
 {
@@ -95,11 +95,16 @@ double OverviewEffect::seconds(qint64 start) const
 void OverviewEffect::logFrames()
 {
     if (m_frames > 0) {
-        qCDebug(KIRI_OVERVIEW) << "frames" << m_frames << "average ms" << double(m_frameSum) / m_frames << "max ms" << m_frameMax;
+        // one line per animation, so that a lag on the owner's machine can be read from the journal
+        qCInfo(KIRI_OVERVIEW).nospace() << (m_warm ? "warm-up" : "animation") << ": first frame " << m_firstFrameMs << " ms, "
+                                        << m_frames << " frames, average " << double(m_frameSum) / m_frames << " ms, max "
+                                        << m_frameMax << " ms, " << m_frameSlow << " over 25 ms";
     }
     m_frames = 0;
     m_frameSum = 0;
     m_frameMax = 0;
+    m_frameSlow = 0;
+    m_firstFrameMs = 0;
     m_lastFrame = 0;
 }
 
@@ -171,26 +176,40 @@ bool OverviewEffect::tick()
 void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
 {
     if (isRunning()) {
-        // frame times while the overview moves (logged with QT_LOGGING_RULES=kiri.overview=true)
+        // frame times while the overview moves, logged per animation (see logFrames); a hitch of up to 2 s counts
         const qint64 t = now();
-        if (m_lastFrame > 0 && t - m_lastFrame < 250) {
+        if (m_lastFrame > 0 && t - m_lastFrame < 2000) {
             m_frames++;
             m_frameSum += t - m_lastFrame;
             m_frameMax = std::max<qint64>(m_frameMax, t - m_lastFrame);
+            if (t - m_lastFrame > 25) {
+                m_frameSlow++;
+            }
         }
         // The springs run on their own clock that advances at most 100 ms per frame: building the scene
         // on the first frame, or any hitch, must not make the zoom skip ahead (it would look like a teleport).
         m_anim += (m_lastFrame > 0) ? std::min<qint64>(t - m_lastFrame, 100) : 0;
         if (m_lastFrame == 0 && m_openCall > 0) {
-            qCDebug(KIRI_OVERVIEW) << "first frame" << t - m_openCall << "ms after the scene was started";
+            m_firstFrameMs = t - m_openCall;
             m_openCall = 0;
         }
         m_lastFrame = t;
-        if (tick()) {
-            effects->addRepaintFull();
-        }
+        m_moving = tick();
+    } else {
+        m_moving = false;
     }
     QuickSceneEffect::prePaintScreen(data);
+}
+
+// The next frame is asked for once this one is painted. Asked for in prePaintScreen, the repaint belongs to the
+// frame being painted and is used up by it: KWin then draws the next frame only when something else on screen
+// changes (an app that redraws all the time, like OBS's preview), and the animation stutters.
+void OverviewEffect::postPaintScreen()
+{
+    if (m_moving && isRunning()) {
+        effects->addRepaintFull();
+    }
+    QuickSceneEffect::postPaintScreen();
 }
 
 // ---- layout ------------------------------------------------------------------------------------------------

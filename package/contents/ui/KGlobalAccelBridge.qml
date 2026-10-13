@@ -66,5 +66,9 @@ QtObject {
                 bridge.onRepeated(String(shortcut));
             }
         }
+
+        // not used; without a handler every key release logs "No signal handler"
+        function dbusglobalShortcutReleased(component, shortcut, timestamp) {
+        }
     }
 }

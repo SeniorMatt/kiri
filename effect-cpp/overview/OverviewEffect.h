@@ -52,6 +52,7 @@ public:
     void setSearchText(const QString &text);
 
     void prePaintScreen(ScreenPrePaintData &data) override;
+    void postPaintScreen() override;
     int requestedEffectChainPosition() const override { return 70; }
 
     // niri: overview { zoom 0.5 }
@@ -136,8 +137,11 @@ private:
     QVariantMap m_viewOffsets;
     QElapsedTimer m_clock;
     qint64 m_lastFrame = 0;
+    bool m_moving = false; // an animation runs: ask for the next frame (see postPaintScreen)
     bool m_warm = false;
     qint64 m_openCall = 0;
+    qint64 m_firstFrameMs = 0;
+    qint64 m_frameSlow = 0;
     qint64 m_noCloseUntil = 0; // after a drop, a click can not close the overview
     qint64 m_anim = 0; // animation clock (ms), see prePaintScreen
     qint64 m_frames = 0;
