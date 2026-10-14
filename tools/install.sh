@@ -97,6 +97,15 @@ if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key decor
     w Plugins kiri_decorationsEnabled true
     w Kiri-install decorations010 done
 fi
+# 0.10.3: Spectacle is not tiled by default; a saved list of window rules (changed in the settings) gets the rule once
+if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key spectacleRule)" != done ]; then
+    rules=$(kreadconfig6 --file kwinrc --group Script-kiri --key windowRules)
+    if [ -n "$rules" ] && ! printf '%s' "$rules" | grep -qi spectacle; then
+        rules=$(printf '%s' "$rules" | sed '0,/\[/s//[\n    {\n        "class": "(org\\\\.kde\\\\.)?spectacle",\n        "tile": false\n    },/')
+        w Script-kiri windowRules "$rules"
+    fi
+    w Kiri-install spectacleRule done
+fi
 if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key swipeEnabled)" != done ]; then
     # added in 0.9.1: turned on once, also for people who installed an older version
     w Plugins kiri_swipeEnabled true

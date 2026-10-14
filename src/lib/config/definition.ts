@@ -32,6 +32,10 @@ const defaultWindowRules = `[
         "tile": false
     },
     {
+        "class": "(org\\\\.kde\\\\.)?spectacle",
+        "tile": false
+    },
+    {
         "class": "wl-copy|wl-paste",
         "caption": "wl-clipboard",
         "tile": false
