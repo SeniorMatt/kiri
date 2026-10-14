@@ -94,6 +94,16 @@ FocusScope {
         });
     }
 
+    function applyStartRects() {
+        const r = effect.startRects;
+        for (let i = 0; i < tiles.count; i++) {
+            const t = tiles.itemAt(i);
+            if (t && r[t.wid] !== undefined) {
+                t.startFrom(r[t.wid]);
+            }
+        }
+    }
+
     function reload() {
         try {
             const l = JSON.parse(effect.layout);
@@ -108,10 +118,21 @@ FocusScope {
     Connections {
         target: root.effect
         function onLayoutChanged() { root.reload(); }
+        // the views are kept between runs: each open needs the keyboard focus again, and nothing of a drag may be left
+        // windows that were still animating when the overview opened start from where they were painted
+        function onStartRectsChanged() { Qt.callLater(root.applyStartRects); }
+        function onClosingChanged() {
+            if (!root.effect.closing) {
+                root.dragWid = "";
+                root.hint = null;
+                root.forceActiveFocus();
+            }
+        }
     }
     Component.onCompleted: {
         if (effect.layout !== "") {
             reload();
+            Qt.callLater(applyStartRects);
         }
         forceActiveFocus();
     }
@@ -281,6 +302,7 @@ FocusScope {
 
     // windows
     Repeater {
+        id: tiles
         model: winModel
         delegate: Item {
             id: tile
@@ -311,6 +333,22 @@ FocusScope {
             Behavior on ay { enabled: tile.ready; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
             Behavior on aw { enabled: tile.ready; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
             Behavior on ah { enabled: tile.ready; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+            // starts from a rect (screen coordinates) and animates to the layout's place
+            function startFrom(r) {
+                ready = false;
+                ax = r.x - root.lay.screen.x + lscroll;
+                ay = r.y - root.lay.screen.y;
+                aw = r.width;
+                ah = r.height;
+                Qt.callLater(() => {
+                    ready = true;
+                    ax = Qt.binding(() => tile.rx + tile.lscroll);
+                    ay = Qt.binding(() => tile.ry);
+                    aw = Qt.binding(() => tile.rw);
+                    ah = Qt.binding(() => tile.rh);
+                });
+            }
 
             readonly property bool dragging: root.dragWid === wid
             readonly property bool held: root.dropHold === wid

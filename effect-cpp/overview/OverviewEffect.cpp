@@ -35,6 +35,9 @@ QString jsonString(const QJsonObject &object)
 
 OverviewEffect::OverviewEffect()
 {
+    // keep the views (the QML scene, thumbnails, wallpapers) alive after the overview closes: opening it again right
+    // away reuses them instead of building everything again
+    setViewCachingEnabled(true);
     m_clock.start();
     QDBusConnection::sessionBus().registerObject(QStringLiteral("/KiriOverview"), this, QDBusConnection::ExportScriptableSlots);
     setSource(QUrl(QStringLiteral("qrc:/kiri/overview/qml/Main.qml")));
@@ -65,6 +68,18 @@ void OverviewEffect::setSearchText(const QString &text)
 }
 
 // ---- animation ---------------------------------------------------------------------------------------------
+
+// the speed of the zoom right now, so that a toggle during the animation turns it around smoothly (in progress
+// units per second of spring time, what the Spring takes)
+double OverviewEffect::progressVelocity() const
+{
+    if (!m_progressAnimating) {
+        return 0;
+    }
+    const double s = seconds(m_progressStart);
+    constexpr double dt = 0.002;
+    return (m_progressSpring.value(s + dt) - m_progressSpring.value(s)) / dt;
+}
 
 void OverviewEffect::startProgress(double to, double velocity)
 {
@@ -125,12 +140,9 @@ bool OverviewEffect::tick()
         }
         Q_EMIT progressChanged();
         if (!m_progressAnimating && !m_open && !m_gesture) {
-            // closed: hand the screen back
             m_progress = 0;
-            setRunning(false);
-            logFrames();
+            m_closedZoom = true;
             Q_EMIT progressChanged();
-            return false;
         }
     }
 
@@ -169,6 +181,14 @@ bool OverviewEffect::tick()
     }
     if (offsetsChanged) {
         Q_EMIT viewOffsetsChanged();
+    }
+    if (m_closedZoom && !more && !m_open && !m_gesture && !m_warm) {
+        // closed, and the desktops sit where they are on the real screen (the view offsets and the desktop spring have
+        // arrived: handing back earlier would show them jumping): hand the screen back
+        m_closedZoom = false;
+        setRunning(false);
+        logFrames();
+        return false;
     }
     return more;
 }
@@ -291,12 +311,31 @@ bool OverviewEffect::acquire()
     if (isRunning()) {
         return true;
     }
+    // The property change tells the effects that animate (kiri_motion, kiri_desktop_switch) to say where their
+    // pictures are right now (they listen for it, see their eventFilter); the zoom starts from there instead of from the end positions, so nothing jumps.
+    effects->setProperty("kiriOverviewOpening", true);
+    effects->setProperty("kiriOverviewOpening", QVariant());
     if (effects->hasActiveFullScreenEffect() && effects->activeFullScreenEffect() != this) {
         effects->setActiveFullScreenEffect(nullptr);
     }
+    const QVariantMap rects = effects->property("kiriMotionRects").toMap();
+    const QVariant visual = effects->property("kiriSwitchVisual");
+    effects->setProperty("kiriMotionRects", QVariant());
+    effects->setProperty("kiriSwitchVisual", QVariant());
     m_openCall = now();
+    m_closedZoom = false;
     setRunning(true);
-    return isRunning();
+    if (!isRunning()) {
+        return false;
+    }
+    if (visual.isValid()) {
+        m_wsIndex = visual.toDouble();
+        Q_EMIT wsIndexChanged();
+        startWorkspace(m_wsTarget);
+    }
+    m_startRects = rects;
+    Q_EMIT startRectsChanged();
+    return true;
 }
 
 void OverviewEffect::startOpen()
@@ -308,6 +347,7 @@ void OverviewEffect::startOpen()
     m_open = true;
     m_gesture = false;
     m_warm = false;
+    m_closedZoom = false;
     if (!wasRunning) {
         m_progress = 0;
         if (!acquire()) {
@@ -319,7 +359,7 @@ void OverviewEffect::startOpen()
     } else {
         Q_EMIT warmingChanged();
     }
-    startProgress(1.0, 0);
+    startProgress(1.0, progressVelocity());
     Q_EMIT closingChanged();
 }
 
@@ -372,7 +412,7 @@ QString OverviewEffect::close()
     if (isRunning() && (m_open || m_gesture)) {
         m_open = false;
         m_gesture = false;
-        startProgress(0.0, 0);
+        startProgress(0.0, progressVelocity());
         Q_EMIT closingChanged();
     } else if (!isRunning()) {
         m_open = false;

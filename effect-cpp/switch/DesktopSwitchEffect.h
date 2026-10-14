@@ -194,6 +194,7 @@ private Q_SLOTS:
 
 private:
     void finishedSwitching(bool releaseFullScreen = true);
+    bool eventFilter(QObject *watched, QEvent *event) override;
     DesktopSwitchScreen *getDesktopSwitchScreen(LogicalOutput *screen);
     void swipeFinish(std::chrono::microseconds time);
     void swipeApplyRelease();

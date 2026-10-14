@@ -20,6 +20,7 @@
 // KConfigSkeleton
 
 #include <QDBusConnection>
+#include <QDynamicPropertyChangeEvent>
 #include <QTimer>
 
 #include "input.h"
@@ -54,13 +55,7 @@ DesktopSwitchEffect::DesktopSwitchEffect()
             this, &DesktopSwitchEffect::windowAdded);
     connect(effects, &EffectsHandler::windowDeleted,
             this, &DesktopSwitchEffect::windowDeleted);
-    // another full-screen effect (the overview) takes over: the animation is cut short, like niri does
-    connect(effects, &EffectsHandler::activeFullScreenEffectChanged, this, [this]() {
-        if (isActive() && effects->activeFullScreenEffect() != this) {
-            finishedSwitching(false);
-            effects->addRepaintFull();
-        }
-    });
+    effects->installEventFilter(this);
     connect(effects, &EffectsHandler::desktopAdded,
             this, &DesktopSwitchEffect::finishedSwitching);
     connect(effects, &EffectsHandler::desktopRemoved,
@@ -462,6 +457,26 @@ void DesktopSwitchScreen::prepareSwitching()
             m_elevatedWindows << w;
         }
     }
+}
+
+// The overview opens: it zooms out from where the desktops are on screen at this moment, so that is published (as an
+// index into the desktop list), and the animation ends (cut short, like niri's workspace switch does when the overview
+// takes over).
+bool DesktopSwitchEffect::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == effects && event->type() == QEvent::DynamicPropertyChange
+        && static_cast<QDynamicPropertyChangeEvent *>(event)->propertyName() == "kiriOverviewOpening" && effects->property("kiriOverviewOpening").toBool() && isActive()) {
+        for (const DesktopSwitchScreen &screen : std::as_const(m_slideEffectScreens)) {
+            if (screen.isActive()) {
+                const QPointF p = screen.visualPosition();
+                effects->setProperty("kiriSwitchVisual", p.y() * effects->desktopGridWidth() + p.x());
+                break;
+            }
+        }
+        finishedSwitching(true);
+        effects->addRepaintFull();
+    }
+    return false;
 }
 
 void DesktopSwitchEffect::finishedSwitching(bool releaseFullScreen)

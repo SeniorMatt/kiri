@@ -284,9 +284,25 @@ class World {
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
     ) {
         if (Workspace.activeWindow === null) {
-            return;
+            // niri always has a focused window: when KWin left none, the actions work on the one that had it last
+            const window = this.getCurrentGridWindowToFocus();
+            if (window === null) {
+                return;
+            }
+            window.focus();
         }
-        this.doIfTiled(Workspace.activeWindow, f);
+        const active = Workspace.activeWindow;
+        if (active !== null) {
+            this.doIfTiled(active, f);
+        }
+    }
+
+    private getCurrentGridWindowToFocus() {
+        let window: Window|null = null;
+        this.do((clientManager, desktopManager) => {
+            window = desktopManager.getCurrentDesktop()?.grid.getLastFocusedWindow() ?? null;
+        });
+        return window as Window|null;
     }
 
     // niri's two layers: when a floating window has the focus, the focus keys act on the floating layer only (`floating`

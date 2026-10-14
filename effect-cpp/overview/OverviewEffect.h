@@ -36,6 +36,8 @@ class OverviewEffect : public QuickSceneEffect
     Q_PROPERTY(bool closing READ isClosing NOTIFY closingChanged)
     // the invisible first build of the scene (see warm())
     Q_PROPERTY(bool warming READ isWarming NOTIFY warmingChanged)
+    // window id -> rect where kiri_motion paints it at the moment the overview opens (see acquire())
+    Q_PROPERTY(QVariantMap startRects READ startRects NOTIFY startRectsChanged)
     Q_PROPERTY(QString searchText MEMBER m_searchText WRITE setSearchText NOTIFY searchTextChanged)
 
 public:
@@ -49,6 +51,7 @@ public:
     qreal zoom() const { return Zoom; }
     bool isClosing() const { return !m_open; }
     bool isWarming() const { return m_warm; }
+    QVariantMap startRects() const { return m_startRects; }
     void setSearchText(const QString &text);
 
     void prePaintScreen(ScreenPrePaintData &data) override;
@@ -87,6 +90,7 @@ Q_SIGNALS:
     void viewOffsetsChanged();
     void closingChanged();
     void warmingChanged();
+    void startRectsChanged();
     void searchTextChanged();
 
 private:
@@ -102,6 +106,7 @@ private:
 
     bool acquire();
     void startOpen();
+    double progressVelocity() const;
     void startProgress(double to, double velocity);
     void startWorkspace(double to);
     void applyLayout(const QString &layout);
@@ -139,6 +144,8 @@ private:
     qint64 m_lastFrame = 0;
     bool m_moving = false; // an animation runs: ask for the next frame (see postPaintScreen)
     bool m_warm = false;
+    bool m_closedZoom = false; // the zoom is back at 0, the hand-back waits for the desktops to settle
+    QVariantMap m_startRects;
     qint64 m_openCall = 0;
     qint64 m_firstFrameMs = 0;
     qint64 m_frameSlow = 0;

@@ -9,6 +9,7 @@
 #include <effect/effecthandler.h>
 #include <scene/windowitem.h>
 
+#include <QDynamicPropertyChangeEvent>
 #include <QLoggingCategory>
 
 Q_LOGGING_CATEGORY(KIRI_MOTION, "kiri.motion", QtWarningMsg)
@@ -33,6 +34,14 @@ constexpr double RemapHold = 0.3;
 constexpr double RemapRecent = 2.0;
 } // namespace
 
+// the Kiri overview is the full-screen effect that is running (not the desktop switch, which comes and goes with
+// every desktop change and moves nothing but its own picture)
+static bool overviewUp()
+{
+    const KWin::Effect *e = KWin::effects->activeFullScreenEffect();
+    return e && QByteArrayView(e->metaObject()->className()) == QByteArrayView("KWin::OverviewEffect");
+}
+
 Effect::Effect()
 {
     reconfigure(ReconfigureAll);
@@ -44,16 +53,10 @@ Effect::Effect()
             m_resizedWindow = nullptr;
         }
     });
-    // the overview (or any full-screen effect) cuts the window animations short, like niri: the windows are at their
-    // final places at once, the thumbnails show them there
-    connect(KWin::effects, &KWin::EffectsHandler::activeFullScreenEffectChanged, this, [this]() {
-        if (KWin::effects->hasActiveFullScreenEffect()) {
-            for (auto it = m_windows.begin(); it != m_windows.end(); ++it) {
-                stopWindow(it.key(), it.value());
-            }
-            KWin::effects->addRepaintFull();
-        }
-    });
+    // A full-screen effect (the overview) takes over: it zooms out from what is on screen at this moment, so it is told
+    // where each animated window is painted now. Changes of the windows while it is up are not animated here: it
+    // animates the thumbnails itself.
+    KWin::effects->installEventFilter(this);
     for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
         manage(w);
     }
@@ -154,6 +157,30 @@ void Effect::manage(KWin::EffectWindow *w)
             m_userResizeEnd = now();
         }
     });
+}
+
+bool Effect::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == KWin::effects && event->type() == QEvent::DynamicPropertyChange
+        && static_cast<QDynamicPropertyChangeEvent *>(event)->propertyName() == "kiriOverviewOpening" && KWin::effects->property("kiriOverviewOpening").toBool()) {
+        const double t = now();
+        QVariantMap rects;
+        for (auto it = m_windows.begin(); it != m_windows.end(); ++it) {
+            WindowState &s = it.value();
+            if (s.moving || s.resizing) {
+                const KWin::RectF frame = it.key()->frameGeometry();
+                const QPointF offset = moveOffset(s, t);
+                const QSizeF size = paintedSize(s, frame, t);
+                rects.insert(it.key()->internalId().toString(), QRectF(frame.x() + offset.x(), frame.y() + offset.y(), size.width(), size.height()));
+            }
+            stopWindow(it.key(), s);
+        }
+        if (!rects.isEmpty()) {
+            KWin::effects->setProperty("kiriMotionRects", rects);
+        }
+        KWin::effects->addRepaintFull();
+    }
+    return false;
 }
 
 void Effect::stopWindow(KWin::EffectWindow *w, WindowState &s)
@@ -333,7 +360,7 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
 
     if (m_speed <= 0 || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()
         || (!s.moving && !s.resizing && offScreen(old) && offScreen(frame)) // moving between two places nobody sees
-        || anyUserResize() // like niri's interactive resize (animate = false): the neighbours follow the mouse at once
+        || overviewUp() || anyUserResize() // like niri's interactive resize (animate = false): the neighbours follow the mouse at once
         || s.closeStart >= 0 || t - s.created < SettleAfterOpen || (s.streak >= StreamLength && t - s.streamStart >= StreamMinDuration) || old.isEmpty() || frame.isEmpty()) {
         stopWindow(w, s);
         return;

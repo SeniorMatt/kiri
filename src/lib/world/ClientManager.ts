@@ -26,6 +26,11 @@ class ClientManager {
     private readonly config: ClientManager.Config;
     private readonly clientMap: Map<KwinClient, ClientWrapper>;
     private lastFocusedClient: KwinClient|null;
+    // the window that had the focus before the current one, and when and how the current one got it: KWin picks the
+    // next window itself just before it reports a closed one, which must not pass for the user's choice
+    private focusedBefore: KwinClient|null = null;
+    private lastActivationTime = 0;
+    private lastActivationByKiri = false;
     private floatingFocusOrder: KwinClient[] = []; // most recently focused last
     private focusStamps = new Map<KwinClient, number>(); // for focus-window-previous
     private focusCounter = 0;
@@ -33,6 +38,7 @@ class ClientManager {
     private readonly windowRuleEnforcer: WindowRuleEnforcer;
     private closedSlot: ClosedSlot|null = null;
     private readonly remapTimer: Delayer;
+    private static readonly kwinPickMs = 150;
 
     constructor(
         config: Config,
@@ -263,7 +269,7 @@ class ClientManager {
     }
 
     // Remembers the place of a window that is being closed and that may come back. Returns false for any other window.
-    private rememberClosed(kwinClient: KwinClient, client: ClientWrapper) {
+    private rememberClosed(kwinClient: KwinClient, client: ClientWrapper, kwinPicked: boolean) {
         const window = this.findTiledWindow(kwinClient);
         const now = Date.now();
         if (window === null || !client.x11 || kwinClient.pid <= 0 || kwinClient.resourceClass === "" ||
@@ -278,7 +284,7 @@ class ClientManager {
         const grid = column.grid;
         const desktop = grid.desktop;
         const scrollBefore = grid.getScrollBeforeFocusLeft(column);
-        const focused = kwinClient === this.lastFocusedClient || scrollBefore !== null;
+        const focused = kwinClient === this.lastFocusedClient || kwinPicked || scrollBefore !== null;
         this.closedSlot = {
             pid: kwinClient.pid,
             resourceClass: kwinClient.resourceClass,
@@ -312,10 +318,20 @@ class ClientManager {
         // KWin may already have dropped the focus (e.g. a closing full-screen window with focus-follows-mouse
         // over empty space): then a neighbour must get it as well
         const focusLost = Workspace.activeWindow === null || Workspace.activeWindow === kwinClient;
-        if (kwinClient !== this.lastFocusedClient && !focusLost) {
+        // KWin's own pick of a window (a panel, the desktop, anything from its focus history) right before the close
+        // is reported does not count: niri's rule decides. Only a pick the user made (a click) stays.
+        const kwinPicked = this.focusedBefore === kwinClient && !this.lastActivationByKiri && Date.now() - this.lastActivationTime < ClientManager.kwinPickMs;
+        if (kwinClient !== this.lastFocusedClient && !focusLost && !kwinPicked) {
             passFocus = FocusPassing.Type.None;
         }
-        const held = mayReturn && this.rememberClosed(kwinClient, client);
+        if (kwinPicked) {
+            // the grid goes by the window that was focused when it closed, not by KWin's pick
+            const window = this.findTiledWindow(kwinClient);
+            if (window !== null) {
+                window.column.onWindowFocused(window);
+            }
+        }
+        const held = mayReturn && this.rememberClosed(kwinClient, client, kwinPicked);
         client.destroy(held ? FocusPassing.Type.None : passFocus);
         this.clientMap.delete(kwinClient);
         this.toggledManually.delete(kwinClient);
@@ -674,6 +690,11 @@ class ClientManager {
             Workspace.activeWindow = warped.client;
             return;
         }
+        if (kwinClient !== this.lastFocusedClient) {
+            this.focusedBefore = this.lastFocusedClient;
+        }
+        this.lastActivationTime = Date.now();
+        this.lastActivationByKiri = KiriFocus.peek(kwinClient);
         this.lastFocusedClient = kwinClient;
         this.focusStamps.set(kwinClient, ++this.focusCounter);
         // Like niri, only focus changes made by Kiri move the cursor, never pointer focus or an app activating

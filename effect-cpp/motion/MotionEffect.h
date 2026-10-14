@@ -85,6 +85,7 @@ private:
     void onAboutToChange(KWin::EffectWindow *w);
     void onClosed(KWin::EffectWindow *w);
     void onAdded(KWin::EffectWindow *w);
+    bool eventFilter(QObject *watched, QEvent *event) override;
     void stopWindow(KWin::EffectWindow *w, WindowState &s);
     void takeSnapshot(KWin::EffectWindow *w, WindowState &s);
     bool animatable(KWin::EffectWindow *w) const;
