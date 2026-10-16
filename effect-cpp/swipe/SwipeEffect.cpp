@@ -24,6 +24,14 @@ namespace KWin
 
 // niri: "Threshold copied from GNOME Shell."
 static constexpr double AxisLockDistance = 16.0;
+// kiri_decorations paints a parked full-screen X11 window (see its setParkedPositions) somewhere else than its real place and
+// publishes the offset as window data; the swipe moves the window from where it is painted
+static constexpr int ParkedOffsetRole = 0x4B495250;
+static double paintedX(const EffectWindow *w)
+{
+    const QVariant offset = w->data(ParkedOffsetRole);
+    return w->frameGeometry().x() + (offset.isValid() ? offset.toPointF().x() : 0.0);
+}
 // the release has to arrive from the script within this, or the picture is dropped
 static constexpr double HeldTimeout = 0.5;
 
@@ -174,14 +182,14 @@ void SwipeEffect::lockVisual()
     if (m_visual != Visual::Off) {
         for (auto it = m_g0.cbegin(); it != m_g0.cend(); ++it) {
             if (scrolls(it.key())) {
-                s0 = it.value() + shift() - it.key()->frameGeometry().x();
+                s0 = it.value() + shift() - paintedX(it.key());
                 break;
             }
         }
     }
     m_g0.clear();
     for (EffectWindow *w : effects->stackingOrder()) {
-        m_g0.insert(w, w->frameGeometry().x());
+        m_g0.insert(w, paintedX(w));
     }
     m_s0 = s0;
     m_d0 = -s0; // the script's view starts where the picture is
@@ -227,7 +235,7 @@ double SwipeEffect::windowOffset(EffectWindow *w) const
     if (it == m_g0.constEnd() || !scrolls(w)) {
         return 0.0;
     }
-    return it.value() + shift() - w->frameGeometry().x();
+    return it.value() + shift() - paintedX(w);
 }
 
 bool SwipeEffect::command(const QString &json)

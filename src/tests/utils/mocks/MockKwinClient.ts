@@ -84,11 +84,12 @@ class MockKwinClient {
             ),
         );
 
+        const area = Workspace.clientArea(ClientAreaOption.MaximizeArea, Workspace.activeScreen, Workspace.currentDesktop);
         this.frameGeometry = new MockQmlRect(
-            horizontally ? 0             : this.windowedFrameGeometry.x,
-            vertically   ? 0             : this.windowedFrameGeometry.y,
-            horizontally ? screen.width  : this.windowedFrameGeometry.width,
-            vertically   ? screen.height : this.windowedFrameGeometry.height,
+            horizontally ? area.x        : this.windowedFrameGeometry.x,
+            vertically   ? area.y        : this.windowedFrameGeometry.y,
+            horizontally ? area.width    : this.windowedFrameGeometry.width,
+            vertically   ? area.height   : this.windowedFrameGeometry.height,
         );
     }
 
@@ -197,7 +198,17 @@ class MockKwinClient {
     }
 
     // for assertions
+    // where the window is seen: a full-screen X11 window that Kiri has parked is painted elsewhere by the compiled effect
     public getActualFrameGeometry() {
+        const painted = parkedPositions.get(String(this.internalId));
+        if (painted !== undefined) {
+            return new MockQmlRect(painted[0], painted[1], this._frameGeometry.width, this._frameGeometry.height);
+        }
+        return this._frameGeometry;
+    }
+
+    // where KWin and the client think the window is
+    public getRealFrameGeometry() {
         return this._frameGeometry;
     }
 

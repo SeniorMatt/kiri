@@ -570,6 +570,7 @@ class ClientManager {
         if (client.stateManager.getState() instanceof ClientState.Floating) {
             return;
         }
+        client.unpark();
         client.stateManager.setState(() => new ClientState.Floating(this.world, client, this.config, !recoverTiling, false, recoverTiling), FocusPassing.Type.None);
     }
 

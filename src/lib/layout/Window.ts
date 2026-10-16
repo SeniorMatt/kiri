@@ -50,9 +50,6 @@ class Window {
             // window is maximized or full-screen outside of the grid, prevent fighting with the user
             return;
         }
-        if (this.client.escapesFullScreenMove && this.client.kwinClient.fullScreen && !this.isFocused()) {
-            return; // see ClientWrapper.escapesFullScreenMove
-        }
         if (this.client.isFightingLayout()) {
             return; // a game that answers every move with a new full-screen or maximize request stays where it is
         }
@@ -67,9 +64,15 @@ class Window {
         if (this.fillsWidth() || this.fillsHeight()) {
             const fillArea = this.getFillArea();
             if (this.fillsWidth()) {
-                const [overflowLeft, overflowRight] = this.getOverflow();
-                x -= overflowLeft;
-                width += overflowLeft + overflowRight;
+                if (this.isFocused() && this.isColumnInView(x, width) && !this.column.grid.desktop.isGestureScrolling() && !this.column.grid.isUserResizing()) {
+                    // the focused window sits exactly on its area, whatever the scroll is at the moment
+                    x = fillArea.x;
+                    width = fillArea.width;
+                } else {
+                    const [overflowLeft, overflowRight] = this.getOverflow();
+                    x -= overflowLeft;
+                    width += overflowLeft + overflowRight;
+                }
             }
             if (this.fillsHeight()) {
                 y = fillArea.y;
@@ -77,6 +80,11 @@ class Window {
             }
         }
         this.client.place(x, y, width, height, this.column.grid.isUserResizing());
+    }
+
+    private isColumnInView(x: number, width: number) {
+        const tilingArea = this.column.grid.desktop.tilingArea;
+        return x < rectRight(tilingArea) && x + width > tilingArea.x;
     }
 
     private shouldReMaximize() {

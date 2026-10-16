@@ -101,6 +101,9 @@ public Q_SLOTS:
     // where Kiri wants windows painted while KWin's interactive resize owns their real position:
     // {"{uuid}": [x, y], ...} (absolute frame position, so it stays right whatever KWin does meanwhile)
     Q_SCRIPTABLE void setVisualPositions(const QString &json);
+    // where Kiri wants full-screen X11 windows painted while their real place is parked in the bottom-right corner of the
+    // screen (see ClientWrapper.park): {"{uuid}": [x, y], ...}. The painted place is animated with niri's movement spring.
+    Q_SCRIPTABLE void setParkedPositions(const QString &json);
     // niri's insert hint while a window is dragged: {"r": [x, y, w, h] (screen coordinates), "w": "{uuid}" of the dragged window}, or "null"
     Q_SCRIPTABLE void setInsertHint(const QString &json);
     // the pointer buttons held right now (Qt::MouseButtons bits), for Kiri's focus-follows-mouse: niri ignores the pointer while it is grabbed
@@ -146,6 +149,20 @@ private:
         double start = -1; // -1: waiting for the real window to move (Kiri puts it in its place a moment after the release)
         double created = 0;
     };
+    // a parked window (see setParkedPositions) is painted at a place that moves from `from` to `to` (to the real place of
+    // the window when `toReal`: it is not parked any more)
+    struct ParkAnim
+    {
+        QPointF from;
+        QPointF to;
+        bool toReal = false;
+        double start = 0;
+    };
+    QHash<QUuid, ParkAnim> m_park;
+    QHash<QUuid, QPointF> m_parkPainted; // where each parked window was painted last (absolute top-left)
+    QPointF parkedPosition(KWin::EffectWindow *w, const ParkAnim &anim) const;
+    bool isParked(KWin::EffectWindow *w) const;
+    void clickOnParked(const QPointF &pos);
     QHash<QUuid, QPointF> m_lastVisualOffset;
     QHash<QUuid, VisualRelease> m_releasing;
     KWin::RectF m_insertHint; // empty = none

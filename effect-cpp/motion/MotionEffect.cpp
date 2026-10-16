@@ -225,6 +225,7 @@ void Effect::onAboutToChange(KWin::EffectWindow *w)
     s.requestStreak = fast ? s.requestStreak + 1 : 0;
     if (m_speed <= 0 || s.snapshot || s.closeStart >= 0 || s.requestStreak >= StreamLength || t - s.created < SettleAfterOpen
         || anyUserResize() || resizeSettling(t) // the other windows get their sizes at once while a resize goes on
+        || (w->isX11Client() && w->isFullScreen()) // Kiri parks these and kiri_decorations paints them (see setParkedPositions)
         || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()
         || (!s.moving && !s.resizing && offScreen(w->frameGeometry()))) {
         return;

@@ -94,6 +94,39 @@ function publishTabIndicators(owner: any, indicators: TabIndicator[], isCurrent 
 const visualPositions = new Map<string, [number, number]>();
 let lastVisualPositionsJson = "{}";
 
+// Where Kiri wants a full-screen X11 window painted while its real geometry is parked in the bottom-right corner of the
+// screen (id -> [x, y]); see ClientWrapper.place. A window that is full-screen is quite content with its place at
+// the screen's corner, but it is not with a place where its top-left corner is outside of the screen.
+const parkedPositions = new Map<string, [number, number]>();
+let lastParkedPositionsJson = "{}";
+
+// the compiled effect paints parked windows; without it they must stay where they are
+function canParkWindows() {
+    return typeof qmlBase === "undefined" || (qmlBase as any).decorationsEffect === true;
+}
+
+function setParkedPosition(id: string, position: [number, number] | null) {
+    const old = parkedPositions.get(id);
+    if (position === null ? old === undefined : (old !== undefined && old[0] === position[0] && old[1] === position[1])) {
+        return;
+    }
+    if (position === null) {
+        parkedPositions.delete(id);
+    } else {
+        parkedPositions.set(id, position);
+    }
+    if (typeof qmlBase === "undefined") {
+        return; // tests
+    }
+    const obj: Record<string, [number, number]> = {};
+    parkedPositions.forEach((v, k) => { obj[k] = v; });
+    const json = JSON.stringify(obj);
+    if (json !== lastParkedPositionsJson) {
+        lastParkedPositionsJson = json;
+        (qmlBase as any).parkedPositions = json;
+    }
+}
+
 function setVisualPosition(id: string, position: [number, number] | null) {
     const old = visualPositions.get(id);
     if (position === null ? old === undefined : (old !== undefined && old[0] === position[0] && old[1] === position[1])) {

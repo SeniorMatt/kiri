@@ -20,13 +20,7 @@ class ClientWrapper {
     private stateFlips: number[] = [];
     private fightingUntil = 0;
     private lastPlacementTime = 0;
-    // Stardew Valley (SDL2 on X11) leaves full-screen mode by itself a moment after its full-screen window has been
-    // moved away from the screen (an unfocused full-screen window sits in its column, partly off screen), then asks for
-    // full-screen again, and every move starts it over. Once a window has done that, Kiri does not move it while it is
-    // full-screen and unfocused: it stays covering the screen below the other windows, which keeps it still.
-    private lastFullScreenMoveTime = 0;
-    private static readonly fullScreenEscapeMs = 1500;
-    public escapesFullScreenMove = false;
+    private parked = false; // see park
     private awaitingCommit = false; // a size was requested and the client has not committed anything since
     private static readonly maxConfigureWaitMs = 100;
 
@@ -67,6 +61,7 @@ class ClientWrapper {
                 return;
             }
             setVisualPosition(String(this.kwinClient.internalId), null);
+            [x, y] = this.park(x, y);
             const current = this.kwinClient.frameGeometry;
             if (throttle && this.awaitingCommit && Date.now() - this.lastPlacementTime < ClientWrapper.maxConfigureWaitMs) {
                 return; // still waiting for the commit of the previous size
@@ -77,9 +72,6 @@ class ClientWrapper {
                 return;
             }
             this.lastPlacementTime = Date.now();
-            if (this.kwinClient.fullScreen && (current.x !== x || current.y !== y)) {
-                this.lastFullScreenMoveTime = this.lastPlacementTime;
-            }
             this.awaitingCommit = current.width !== width || current.height !== height;
             this.kwinClient.frameGeometry = this.lastPlacement; // a commit that happens at once clears awaitingCommit
             if (this.kwinClient.frameGeometry !== this.lastPlacement) {
@@ -88,6 +80,43 @@ class ClientWrapper {
                 this.kwinClient.frameGeometry.x = x; // This makes it unstuck.
                 this.kwinClient.frameGeometry = this.lastPlacement;
             }
+        });
+    }
+
+    // A full-screen X11 window (Stardew Valley, SDL2) drops full-screen mode when its top-left corner is moved out of the
+    // screen, and every move of niri's strip puts it there. Like xwayland-satellite, which never lets an X11 client see
+    // its position, Kiri keeps the window's real place in the bottom-right corner of the screen, where it is content
+    // and gets no input, and the compiled effect paints it at its place in the strip. Back at the origin of the
+    // screen (focused, scrolled into view) it is a normal window.
+    private park(x: number, y: number): [number, number] {
+        const kwinClient = this.kwinClient;
+        const id = String(kwinClient.internalId);
+        if (this.x11 && kwinClient.fullScreen && canParkWindows()) {
+            const area = Workspace.clientArea(ClientAreaOption.FullScreenArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
+            const originX = area.x.round();
+            const originY = area.y.round();
+            if (x !== originX || y !== originY) {
+                this.parked = true;
+                setParkedPosition(id, [x, y]);
+                return [originX + area.width.round() - 1, originY + area.height.round() - 1];
+            }
+        }
+        this.parked = false;
+        setParkedPosition(id, null);
+        return [x, y];
+    }
+
+    // the window leaves the layout (floating, closing): it goes back to where KWin thinks a full-screen window is
+    public unpark() {
+        if (!this.parked) {
+            return;
+        }
+        const kwinClient = this.kwinClient;
+        this.parked = false;
+        setParkedPosition(String(kwinClient.internalId), null);
+        const area = Workspace.clientArea(ClientAreaOption.FullScreenArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
+        this.manipulatingGeometry.do(() => {
+            kwinClient.frameGeometry = Qt.rect(area.x.round(), area.y.round(), kwinClient.frameGeometry.width.round(), kwinClient.frameGeometry.height.round());
         });
     }
 
@@ -266,6 +295,7 @@ class ClientWrapper {
     }
 
     public destroy(passFocus: FocusPassing.Type) {
+        setParkedPosition(String(this.kwinClient.internalId), null);
         this.stateManager.destroy(passFocus);
         this.signalManager.destroy();
         if (this.rulesSignalManager !== null) {
@@ -285,9 +315,6 @@ class ClientWrapper {
         manager.connect(client.kwinClient.fullScreenChanged, () => {
             if (client.kwinClient.fullScreen) {
                 client.fullScreenSeen = true;
-            }
-            if (!client.kwinClient.fullScreen && !client.isFocused() && Date.now() - client.lastFullScreenMoveTime < ClientWrapper.fullScreenEscapeMs) {
-                client.escapesFullScreenMove = true;
             }
             client.noteStateFlip();
         });

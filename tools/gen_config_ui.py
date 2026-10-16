@@ -245,7 +245,7 @@ behavior_tab = tab("behavior", "Behavior", [
         check("cursorFollowsFocus", "Cursor follows focus", "Move the mouse cursor to a window focused from the keyboard"),
         check("hideTitlebars", "Tiled windows have no title bar", "Like niri: tiled windows lose their title bar and frame (the focus ring is the outline). They get them back when they float or Kiri stops"),
         check("skipSwitcher", "Tiled windows skip Alt+Tab", "Hide tiled windows from the window switcher"),
-        check("dynamicDesktops", "Dynamic desktops", "Like niri's workspaces: there is always one empty desktop at the bottom, and empty desktops are removed when you leave them. Moving a window or column down from the last desktop opens a new one"),
+        check("dynamicDesktops", "Dynamic desktops (experimental)", "Experimental, off by default. Like niri's workspaces: there is always one empty desktop at the bottom, and empty desktops are removed when you leave them. Moving a window or column down from the last desktop opens a new one"),
         line("tiledDesktops", "Tiled desktops:", "Regex matched against virtual desktop names. Only matching desktops are tiled"),
     ]),
     group("Maximized and full-screen windows", [

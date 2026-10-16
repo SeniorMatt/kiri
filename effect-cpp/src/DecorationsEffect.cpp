@@ -42,6 +42,8 @@ namespace KiriDecorations
 namespace
 {
 constexpr int CaptureRole = 0x4B495249; // set by kiri_motion while it snapshots a window
+// set here on a parked window (see setParkedPositions): the QPointF from its real top-left corner to where it is painted
+constexpr int ParkedOffsetRole = 0x4B495250;
 QString shaderPath(const QString &name)
 {
     return QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("kwin/shaders/") + name);
@@ -132,6 +134,19 @@ void Effect::postPaintScreen()
         }
         ++it;
     }
+    for (auto it = m_park.begin(); it != m_park.end();) {
+        const bool done = factor <= 0 || NiriAnim::moveSpring().isDone((m_frameTime - it->start) * speed);
+        if (it->toReal && done) {
+            m_parkPainted.remove(it.key());
+            it = m_park.erase(it);
+            again = true; // one more frame at the real place
+            continue;
+        }
+        if (!done) {
+            again = true;
+        }
+        ++it;
+    }
     for (auto it = m_tabOpen.begin(); it != m_tabOpen.end();) {
         const double length = it->second ? NiriAnim::Defaults::openMs / 1000 : NiriAnim::moveSpring().duration();
         if (speed <= 0 || (m_frameTime - it->first) * speed >= length) {
@@ -192,6 +207,14 @@ Effect::Effect()
         }
     });
     auto watch = [this](KWin::EffectWindow *w) {
+        // the contents of a parked window are painted far from where KWin thinks they are: the damage must follow
+        connect(w, &KWin::EffectWindow::windowDamaged, this, [this](KWin::EffectWindow *w) {
+            if (!m_park.isEmpty()) {
+                if (const auto it = m_parkPainted.constFind(w->internalId()); it != m_parkPainted.constEnd()) {
+                    KWin::effects->addRepaint(KWin::RectF(*it, w->frameGeometry().size()));
+                }
+            }
+        });
         // The pointer was let go: Kiri puts the window in its place and clears the visual position by D-Bus, which can arrive
         // after the real geometry has changed (and kiri_motion has started to animate it). The offset between where the
         // window was painted and its real place is taken here, while that real place is still the one it was painted for.
@@ -208,6 +231,16 @@ Effect::Effect()
             if (auto release = m_releasing.find(w->internalId()); release != m_releasing.end() && release->start < 0 && old.topLeft() != w->frameGeometry().topLeft()) {
                 release->start = clock(); // the real window is where it belongs now: the offset to the old place runs out from here
             }
+            // Kiri has parked the window (moved it to the bottom-right corner): it stays painted where it was until the place
+            // Kiri wants for it arrives (by D-Bus, a moment later)
+            if (w->isX11Client() && w->isFullScreen() && !m_park.contains(w->internalId())) {
+                const QRectF screen = w->screen() ? QRectF(w->screen()->geometry()) : QRectF();
+                const QPointF parkPoint(screen.right() - 1, screen.bottom() - 1);
+                if (screen.isValid() && qFuzzyCompare(w->frameGeometry().x() + 1, parkPoint.x() + 1) && qFuzzyCompare(w->frameGeometry().y() + 1, parkPoint.y() + 1)) {
+                    const QPointF there = m_parkPainted.value(w->internalId(), old.topLeft());
+                    m_park.insert(w->internalId(), ParkAnim{there, there, false, clock()});
+                }
+            }
             // the ring is outside of what KWin repaints for the window itself
             const double reach = this->reach();
             KWin::effects->addRepaint(old.adjusted(-reach, -reach, reach, reach));
@@ -215,6 +248,11 @@ Effect::Effect()
             repaintAround(w);
         });
     };
+    connect(KWin::effects, &KWin::EffectsHandler::mouseChanged, this, [this](const QPointF &pos, const QPointF &, Qt::MouseButtons buttons, Qt::MouseButtons oldButtons, Qt::KeyboardModifiers, Qt::KeyboardModifiers) {
+        if ((buttons & Qt::LeftButton) && !(oldButtons & Qt::LeftButton) && !m_park.isEmpty()) {
+            clickOnParked(pos);
+        }
+    });
     connect(KWin::effects, &KWin::EffectsHandler::windowAdded, this, watch);
     for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
         watch(w);
@@ -226,6 +264,8 @@ Effect::Effect()
     });
     connect(KWin::effects, &KWin::EffectsHandler::windowDeleted, this, [this](KWin::EffectWindow *w) {
         repaintPainted(w);
+        m_park.remove(w->internalId());
+        m_parkPainted.remove(w->internalId());
         m_painted.remove(w);
         m_expanded.remove(w); // KWin frees the window right after this
     });
@@ -486,6 +526,76 @@ void Effect::setTabGroups(const QString &json)
     }
 }
 
+QPointF Effect::parkedPosition(KWin::EffectWindow *w, const ParkAnim &anim) const
+{
+    const QPointF target = anim.toReal ? w->frameGeometry().topLeft() : anim.to;
+    const double factor = KWin::effects->animationTimeFactor();
+    // niri's spring runs from 1 (at the start) to 0: the part of the way that is still to go
+    const double k = factor > 0 ? NiriAnim::moveSpring().value((m_frameTime - anim.start) / factor) : 0.0;
+    return target + (anim.from - target) * k;
+}
+
+bool Effect::isParked(KWin::EffectWindow *w) const
+{
+    const auto it = m_park.constFind(w->internalId());
+    return it != m_park.constEnd() && !it->toReal;
+}
+
+// A parked window has no place of its own on the screen, so a click on where it is painted goes to nothing: focus it
+// (Kiri scrolls it into view when it is activated), unless another window is above it there.
+void Effect::clickOnParked(const QPointF &pos)
+{
+    const auto windows = KWin::effects->stackingOrder();
+    for (auto it = windows.crbegin(); it != windows.crend(); ++it) {
+        KWin::EffectWindow *w = *it;
+        if (w->isDeleted() || w->isHidden() || w->isMinimized() || !w->isOnCurrentDesktop() || !w->isVisible() || !(w->isNormalWindow() || w->isDock())) {
+            continue;
+        }
+        if (isParked(w)) {
+            const auto painted = m_parkPainted.constFind(w->internalId());
+            if (painted != m_parkPainted.constEnd() && KWin::RectF(*painted, w->frameGeometry().size()).contains(pos)) {
+                KWin::effects->activateWindow(w);
+                return;
+            }
+        } else if (w->frameGeometry().contains(pos)) {
+            return;
+        }
+    }
+}
+
+void Effect::setParkedPositions(const QString &json)
+{
+    const QJsonObject object = QJsonDocument::fromJson(json.toUtf8()).object();
+    QSet<QUuid> wanted;
+    for (auto it = object.begin(); it != object.end(); ++it) {
+        const QJsonArray xy = it.value().toArray();
+        const QUuid uuid(it.key());
+        KWin::EffectWindow *w = uuid.isNull() ? nullptr : KWin::effects->findWindow(uuid);
+        if (!w || xy.size() != 2) {
+            continue;
+        }
+        wanted.insert(uuid);
+        const QPointF to(xy.at(0).toDouble(), xy.at(1).toDouble());
+        const auto old = m_park.constFind(uuid);
+        if (old != m_park.constEnd() && !old->toReal && old->to == to) {
+            continue;
+        }
+        // while kiri_swipe paints a touchpad swipe it compensates for every change of the real places at once: so must this
+        const bool instant = KWin::effects->property("kiriSwipeVisual").toBool();
+        const QPointF from = instant ? to : (m_parkPainted.contains(uuid) ? m_parkPainted.value(uuid) : w->frameGeometry().topLeft());
+        m_park.insert(uuid, ParkAnim{from, to, false, clock()});
+    }
+    for (auto it = m_park.begin(); it != m_park.end(); ++it) {
+        if (!wanted.contains(it.key()) && !it->toReal) {
+            if (KWin::EffectWindow *w = KWin::effects->findWindow(it.key())) {
+                const QPointF from = m_parkPainted.contains(it.key()) ? m_parkPainted.value(it.key()) : w->frameGeometry().topLeft();
+                *it = ParkAnim{from, from, true, clock()};
+            }
+        }
+    }
+    KWin::effects->addRepaintFull();
+}
+
 void Effect::setVisualPositions(const QString &json)
 {
     QHash<QUuid, QPointF> positions;
@@ -619,7 +729,7 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     if (radiusFor(w) > 0) {
         data.setTranslucent(); // the cut corners show what is behind the window
     }
-    if (m_visualPositions.contains(w->internalId()) || m_releasing.contains(w->internalId())) {
+    if (m_visualPositions.contains(w->internalId()) || m_releasing.contains(w->internalId()) || m_park.contains(w->internalId())) {
         data.setTransformed(); // painted somewhere else than where KWin thinks it is
     }
     OffscreenEffect::prePaintWindow(view, w, data);
@@ -644,6 +754,15 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
         unredirect(w);
     }
 
+    if (const auto parkIt = m_park.constFind(w->internalId()); parkIt != m_park.constEnd()) {
+        const QPointF at = parkedPosition(w, *parkIt);
+        data.setXTranslation(data.xTranslation() + at.x() - w->frameGeometry().x());
+        data.setYTranslation(data.yTranslation() + at.y() - w->frameGeometry().y());
+        m_parkPainted.insert(w->internalId(), at);
+        w->setData(ParkedOffsetRole, at - w->frameGeometry().topLeft());
+    } else if (w->data(ParkedOffsetRole).isValid()) {
+        w->setData(ParkedOffsetRole, QVariant());
+    }
     // Kiri moves the painted window instead of the real one while the user resizes it
     const auto visualIt = m_visualPositions.constFind(w->internalId());
     if (visualIt != m_visualPositions.constEnd()) {

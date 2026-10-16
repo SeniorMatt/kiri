@@ -6,7 +6,7 @@
         "EnabledByDefault": true,
         "License": "GPL-3.0",
         "Name": "Kiri overview",
-        "Version": "0.10.2",
+        "Version": "0.10.3",
         "Website": "https://github.com/SeniorMatt/kiri"
     }
 }

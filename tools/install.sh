@@ -106,6 +106,11 @@ if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key spectacleRule)" !=
     fi
     w Kiri-install spectacleRule done
 fi
+# 0.10.4: dynamic desktops are experimental and off by default; turned off once for those who had them on
+if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key dynamicDesktopsOff)" != done ]; then
+    w Script-kiri dynamicDesktops false
+    w Kiri-install dynamicDesktopsOff done
+fi
 if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key swipeEnabled)" != done ]; then
     # added in 0.9.1: turned on once, also for people who installed an older version
     w Plugins kiri_swipeEnabled true

@@ -160,11 +160,11 @@ tests.register("Unfocused window that keeps flipping full-screen is left alone",
     workspaceMock.activeWindow = a;
     a.fullScreen = true;
     workspaceMock.activeWindow = b;
-    const before = a.getActualFrameGeometry().x;
+    const before = a.getRealFrameGeometry().x;
     for (let i = 0; i < 8; i++) {
         a.fullScreen = i % 2 === 1; // the game drops full-screen, then asks for it again
     }
-    Assert.equalRects(a.getActualFrameGeometry(), screen, { message: "Kiri no longer scrolls it off screen (was at x=" + before + ")" });
+    Assert.equalRects(a.getRealFrameGeometry(), screen, { message: "Kiri no longer scrolls it off screen (was at x=" + before + ")" });
     Assert.equal(Workspace.activeWindow, b, { message: "the focused window keeps the focus" });
     workspaceMock.activeWindow = a;
     a.fullScreen = true;

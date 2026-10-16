@@ -27,7 +27,12 @@ class MockWorkspace {
     public readonly currentActivityChanged = new MockQSignal<[]>();
     public readonly virtualScreenSizeChanged = new MockQSignal<[]>();
 
+    public panelLeft = 0; // width of a panel reserved on the left screen edge
+
     public clientArea(option: ClientAreaOption, output: Output, kwinDesktop: KwinDesktop) {
+        if (this.panelLeft > 0 && option !== ClientAreaOption.FullScreenArea && option !== ClientAreaOption.ScreenArea && option !== ClientAreaOption.FullArea) {
+            return new MockQmlRect(screen.x + this.panelLeft, screen.y, screen.width - this.panelLeft, screen.height);
+        }
         return screen;
     }
 

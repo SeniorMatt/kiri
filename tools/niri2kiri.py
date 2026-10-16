@@ -547,7 +547,7 @@ def read_settings_inner(path, warn):
             warn("tab-indicator colours and place-within-column (Kiri has no such options)")
 
     out["hideTitlebars"] = bool(find(nodes, "prefer-no-csd"))
-    out["dynamicDesktops"] = True  # niri always has dynamic workspaces
+    # niri always has dynamic workspaces, but Kiri's are experimental: they stay as the user set them
     for blk in find(nodes, "input"):
         if child(blk, "warp-mouse-to-focus"):
             out["cursorFollowsFocus"] = True

@@ -146,6 +146,57 @@
         });
     }
 
+    // a panel on the left screen edge: a maximized window must fill the work area exactly, not run past the right edge
+    tests.register("Maximized in grid next to a left panel", 100, () => {
+        const config = getConfig(false);
+        const { qtMock, workspaceMock } = init(config, { width: 1920, height: 1080 });
+        const panel = 48;
+        workspaceMock.panelLeft = panel;
+        const workArea = new MockQmlRect(panel, 0, screen.width - panel, screen.height);
+
+        const clients = workspaceMock.createClientsWithWidths(500, 700, 900, 600, 800, 500);
+        for (let i = 0; i < clients.length; i++) {
+            workspaceMock.activeWindow = clients[i];
+            runOneOf(
+                () => { qtMock.fireShortcut("focus-right"); qtMock.fireShortcut("focus-left"); },
+                () => { qtMock.fireShortcut("focus-left"); qtMock.fireShortcut("focus-right"); },
+                () => {},
+            );
+            const window = Workspace.activeWindow as MockKwinClient;
+            runOneOf(
+                () => { window.setMaximize(true, true); },
+                () => { qtMock.fireShortcut("window-maximize-to-edges"); },
+            );
+            Assert.equalRects(window.getActualFrameGeometry(), workArea, { message: "right after maximize, i=" + i });
+            qtMock.fireShortcut(i > 0 ? "focus-left" : "focus-right");
+            qtMock.fireShortcut(i > 0 ? "focus-right" : "focus-left");
+            Assert.equalRects(window.getActualFrameGeometry(), workArea, { message: "after refocus, i=" + i });
+            window.setMaximize(false, false);
+        }
+    });
+
     registerTests("(tiled below)", false);
     registerTests("(floating above)", true);
 }
+
+tests.register("Maximized focused window stays at the work area when the scroll is off", 1, () => {
+    const config = getDefaultConfig();
+    config.tileMaximized = true;
+    const { workspaceMock, world } = init(config, { width: 1920, height: 1080 });
+    workspaceMock.panelLeft = 48;
+    const workArea = new MockQmlRect(48, 0, 1872, 1080);
+    const clients = workspaceMock.createClientsWithWidths(500, 700, 900, 600);
+    for (const offset of [37, -37, 5, 200]) {
+        for (const client of clients) {
+            workspaceMock.activeWindow = client;
+            client.setMaximize(true, true);
+            world.do((clientManager, desktopManager) => {
+                const desktop = desktopManager.getCurrentDesktop()!;
+                desktop.adjustScroll(offset, true);
+                desktop.forceArrange();
+            });
+            Assert.equalRects(client.getActualFrameGeometry(), workArea, { message: "scroll off by " + offset });
+            client.setMaximize(false, false);
+        }
+    }
+});

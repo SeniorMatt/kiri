@@ -448,7 +448,7 @@ namespace NiriImport {
         }
 
         out["hideTitlebars"] = Kdl.find(nodes, "prefer-no-csd").length > 0;
-        out["dynamicDesktops"] = true; // niri always has dynamic workspaces
+        // niri always has dynamic workspaces, but Kiri's are experimental: they stay as the user set them
         for (const block of Kdl.find(nodes, "input")) {
             if (Kdl.child(block, "warp-mouse-to-focus")) {
                 out["cursorFollowsFocus"] = true;

@@ -1,55 +1,50 @@
-// Stardew Valley (SDL2 on X11) leaves full-screen mode by itself a moment after Kiri has moved its unfocused
-// full-screen window out of the view, and asks for full-screen again a little later. Every new move started it over
-// (a window that "teleports around"). The first escape is the sign: from then on the unfocused full-screen window
-// stays on the screen, below the others, however the focus moves.
-tests.register("Full-screen window that escapes being moved stays put while unfocused", 10, () => {
-    const config = getDefaultConfig();
-    config.tileFullScreen = true;
-    const { qtMock, workspaceMock } = init(config);
-    const [game, left, right] = workspaceMock.createClientsWithWidths(300, 300, 300);
-    workspaceMock.activeWindow = game;
-    game.fullScreen = true;
-    let changes = 0;
-    game.fullScreenChanged.connect(() => changes++);
-
-    workspaceMock.activeWindow = left;
-    Assert.assert(game.getActualFrameGeometry().x !== screen.x, { message: "the first time the window is scrolled out of the view" });
-    game.fullScreen = false; // the game drops full-screen, because it was moved...
-    game.fullScreen = true; // ... and wants it back a moment later
-    Assert.equalRects(game.getActualFrameGeometry(), screen, { message: "full-screen again, Kiri leaves it on the screen" });
-    const flips = changes;
-
-    for (let i = 0; i < 4; i++) {
-        qtMock.fireShortcut("focus-right");
-        Assert.equalRects(game.getActualFrameGeometry(), screen, { message: "unfocused, not moved (round " + i + ")" });
-        Assert.assert(game.fullScreen);
-        qtMock.fireShortcut("focus-left");
-        workspaceMock.activeWindow = right;
-        workspaceMock.activeWindow = left;
+// Stardew Valley (SDL2 on X11) leaves full-screen mode by itself when the top-left corner of its window is moved out of
+// the screen, asks for full-screen again a moment later, and every move of the strip starts it over (it "teleports
+// around"). An X11 client must never see that: Kiri keeps the window of a full-screen X11 client in the bottom-right
+// corner of the screen, where its corner is still on the screen, and tells the compiled effect where to paint it.
+{
+    function topLeftOnScreen(window: MockKwinClient) {
+        const frame = window.getRealFrameGeometry();
+        return frame.x >= screen.x && frame.x < screen.x + screen.width && frame.y >= screen.y && frame.y < screen.y + screen.height;
     }
-    Assert.equal(changes, flips, { message: "Kiri does not make the window change its state again" });
 
-    workspaceMock.activeWindow = game;
-    Assert.equalRects(game.getActualFrameGeometry(), screen, { message: "focused, it is full-screen in the layout" });
-    Assert.equal(game.keepBelow, false);
-    workspaceMock.activeWindow = left;
-    Assert.assert(game.fullScreen);
-    Assert.equal(game.keepBelow, true, { message: "unfocused, it is kept below the others" });
-});
+    tests.register("Full-screen X11 window is painted in its column but its real place stays on the screen", 10, () => {
+        const config = getDefaultConfig();
+        config.tileFullScreen = true;
+        const { qtMock, workspaceMock } = init(config);
+        const [game, left, right] = workspaceMock.createClientsWithWidths(300, 300, 300);
+        const id = String(game.internalId);
+        workspaceMock.activeWindow = game;
+        game.fullScreen = true;
+        let changes = 0;
+        game.fullScreenChanged.connect(() => changes++);
+        Assert.equalRects(game.getActualFrameGeometry(), screen);
+        Assert.equal(parkedPositions.get(id), undefined, { message: "focused and in view: a normal window" });
 
-// A full-screen window that does not mind being moved still scrolls out of the view like niri's
-tests.register("Full-screen window that stays full-screen is still scrolled out of the view", 10, () => {
-    const config = getDefaultConfig();
-    config.tileFullScreen = true;
-    const { workspaceMock } = init(config);
-    const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
-    workspaceMock.activeWindow = a;
-    a.fullScreen = true;
-    workspaceMock.activeWindow = b;
-    Assert.assert(a.getActualFrameGeometry().x !== screen.x, { message: "moved away" });
-    Assert.assert(a.fullScreen);
-    workspaceMock.activeWindow = a;
-    Assert.equalRects(a.getActualFrameGeometry(), screen);
-    workspaceMock.activeWindow = b;
-    Assert.assert(a.getActualFrameGeometry().x !== screen.x, { message: "moved away again" });
-});
+        for (let i = 0; i < 3; i++) {
+            runOneOf(
+                () => { workspaceMock.activeWindow = left; },
+                () => { qtMock.fireShortcut("focus-right"); },
+                () => { workspaceMock.activeWindow = right; },
+            );
+            Assert.assert(game.fullScreen, { message: "stays full-screen in its column" });
+            Assert.assert(topLeftOnScreen(game), { message: "the corner of the window is on the screen (round " + i + ")" });
+            Assert.rect(game.getRealFrameGeometry(), screen.width - 1, screen.height - 1, screen.width, screen.height);
+            const painted = parkedPositions.get(id);
+            Assert.assert(painted !== undefined && painted[0] < screen.x, { message: "painted left of the screen, in its column" });
+            Assert.equal(painted![1], screen.y);
+
+            workspaceMock.activeWindow = game;
+            Assert.equalRects(game.getActualFrameGeometry(), screen);
+            Assert.equal(parkedPositions.get(id), undefined, { message: "focused again: back at the origin, painted as is" });
+        }
+        Assert.equal(changes, 0, { message: "the window never had a reason to change its state" });
+
+        workspaceMock.activeWindow = left;
+        Assert.assert(parkedPositions.get(id) !== undefined);
+        workspaceMock.activeWindow = game;
+        qtMock.fireShortcut("window-toggle-floating");
+        Assert.equal(parkedPositions.get(id), undefined, { message: "a floating window is not painted anywhere else" });
+        Assert.assert(topLeftOnScreen(game));
+    });
+}

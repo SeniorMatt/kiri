@@ -367,7 +367,7 @@ const configDef = [
     {
         name: "dynamicDesktops",
         type: "Bool",
-        default: true,
+        default: false, // experimental
     },
     {
         name: "tiledDesktops",
