@@ -71,6 +71,12 @@ double Effect::expandedProgress(KWin::EffectWindow *w) const
             const KWin::RectF screen = output->geometry();
             const KWin::RectF frame = w->frameGeometry();
             expanded = frame.width() >= screen.width() - 0.5 && frame.height() >= screen.height() - 0.5;
+            if (!expanded && w->isNormalWindow()) {
+                // maximized next to a panel: the frame fills the work area, not the screen
+                const auto area = KWin::effects->clientArea(KWin::MaximizeArea, w);
+                expanded = area.width() > 0 && frame.width() >= area.width() - 0.5 && frame.height() >= area.height() - 0.5
+                    && frame.left() <= area.left() + 0.5 && frame.top() <= area.top() + 0.5;
+            }
         }
     }
     ExpandedState &s = m_expanded[w];

@@ -25,7 +25,12 @@ QtWin.Window {
             return false;
         }
         const g = t.frameGeometry, o = t.output.geometry;
-        return g.width >= o.width - 0.5 && g.height >= o.height - 0.5;
+        if (g.width >= o.width - 0.5 && g.height >= o.height - 0.5) {
+            return true;
+        }
+        // maximized next to a panel: the frame fills the work area, not the screen
+        const a = Workspace.clientArea(Workspace.MaximizeArea, t);
+        return a.width > 0 && g.width >= a.width - 0.5 && g.height >= a.height - 0.5 && g.x <= a.x + 0.5 && g.y <= a.y + 0.5;
     }
 
     readonly property bool shown: {
