@@ -107,3 +107,64 @@ tests.register("Columns that fit stay put while resizing, unless the grid is cen
         }
     }
 });
+
+tests.register("Lone column re-centers when its neighbour closes", 6, () => {
+    for (const alwaysCenter of [true, false]) {
+        for (const closeFirst of [false, true]) {
+            const config = getDefaultConfig();
+            config.alwaysCenterSingleColumn = alwaysCenter;
+            config.centerGridWhenFits = false;
+            const { qtMock, workspaceMock, world } = init(config);
+            const [a] = workspaceMock.createClientsWithWidths(300);
+            const [b] = workspaceMock.createClientsWithWidths(300);
+            const message = `always=${alwaysCenter} closeFirst=${closeFirst}`;
+            if (closeFirst) {
+                workspaceMock.activeWindow = a;
+                workspaceMock.removeWindow(a);
+                if (alwaysCenter) {
+                    Assert.centered(config, tilingArea, b, { message });
+                }
+            } else {
+                workspaceMock.removeWindow(b);
+                if (alwaysCenter) {
+                    Assert.centered(config, tilingArea, a, { message });
+                }
+            }
+            workspaceMock.removeWindow(closeFirst ? b : a);
+        }
+    }
+});
+
+tests.register("Lone column re-centers when a manually focused neighbour closes", 6, () => {
+    const config = getDefaultConfig();
+    config.alwaysCenterSingleColumn = true;
+    const { qtMock, workspaceMock, world } = init(config);
+    const [a] = workspaceMock.createClientsWithWidths(300);
+    const [b] = workspaceMock.createClientsWithWidths(300);
+    qtMock.fireShortcut("focus-left");
+    qtMock.fireShortcut("focus-right");
+    workspaceMock.removeWindow(b);
+    Assert.centered(config, tilingArea, a);
+    const [c] = workspaceMock.createClientsWithWidths(300);
+    qtMock.fireShortcut("focus-left");
+    workspaceMock.removeWindow(a);
+    Assert.centered(config, tilingArea, c);
+});
+
+tests.register("Lone column stays centered through consume, expel and width changes", 6, () => {
+    const config = getDefaultConfig();
+    config.alwaysCenterSingleColumn = true;
+    const { qtMock, workspaceMock, world } = init(config);
+    const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
+    qtMock.fireShortcut("window-consume-or-expel-left"); // b joins a: one column
+    Assert.equal(Math.round(a.getActualFrameGeometry().x + a.getActualFrameGeometry().width / 2), Math.round(tilingArea.x + tilingArea.width / 2), { message: "consume" });
+    qtMock.fireShortcut("window-consume-or-expel-right"); // b leaves again: two columns
+    qtMock.fireShortcut("window-consume-or-expel-left");
+    Assert.equal(Math.round(a.getActualFrameGeometry().x + a.getActualFrameGeometry().width / 2), Math.round(tilingArea.x + tilingArea.width / 2), { message: "consume again" });
+    qtMock.fireShortcut("column-width-fit-increase");
+    Assert.equal(Math.round(a.getActualFrameGeometry().x + a.getActualFrameGeometry().width / 2), Math.round(tilingArea.x + tilingArea.width / 2), { message: "wider" });
+    qtMock.fireShortcut("column-width-fit-decrease");
+    Assert.equal(Math.round(a.getActualFrameGeometry().x + a.getActualFrameGeometry().width / 2), Math.round(tilingArea.x + tilingArea.width / 2), { message: "narrower" });
+    workspaceMock.removeWindow(b);
+    Assert.equal(Math.round(a.getActualFrameGeometry().x + a.getActualFrameGeometry().width / 2), Math.round(tilingArea.x + tilingArea.width / 2), { message: "one window of the column closed" });
+});

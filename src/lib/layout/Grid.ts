@@ -292,6 +292,7 @@ class Grid {
         if (returnTo !== null) {
             this.desktop.setScroll(returnTo.scrollX, false); // the view goes back to where it was before the window opened
         }
+        this.desktop.recenterLoneColumn(); // the focus passing below may leave the view where it is
         if (columnToFocus !== null) {
             switch (passFocus) {
             case FocusPassing.Type.Immediate:

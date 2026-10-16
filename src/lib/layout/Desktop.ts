@@ -134,6 +134,14 @@ class Desktop {
         }
 
         this.scrollToColumn(focusedColumn, false);
+        this.recenterLoneColumn();
+    }
+
+    // niri: a lone column stays centered whatever happened to the view before (a closed neighbour, a held scroll)
+    public recenterLoneColumn() {
+        if (this.config.alwaysCenterSingleColumn && this.grid.getFirstColumn() !== null && this.grid.getFirstColumn() === this.grid.getLastColumn()) {
+            this.setScroll(this.scrollX, false);
+        }
     }
 
     // While the user resizes a column (and when they let go): like niri, the view only keeps the resized column centered
