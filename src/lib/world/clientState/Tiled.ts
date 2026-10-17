@@ -4,6 +4,8 @@ namespace ClientState {
         private readonly defaultState: Tiled.WindowState;
         private readonly signalManager: SignalManager;
         private readonly relayoutDelayer: Delayer;
+        private readonly maximizedDelayer: Delayer;
+        private pendingMaximized: MaximizedMode | null = null;
         private static readonly maxExternalFrameGeometryChangedIntervalMs = 1000;
 
         // `placement` puts the window where a window that was just closed and mapped again was
@@ -37,12 +39,22 @@ namespace ClientState {
             this.relayoutDelayer = new Delayer(Tiled.maxExternalFrameGeometryChangedIntervalMs, () => {
                 world.do(() => window.column.grid.desktop.onLayoutChanged());
             });
-            this.signalManager = Tiled.initSignalManager(world, window, grid.config, this.relayoutDelayer);
+            // KWin does not take a geometry for a window that is in the middle of being maximized or restored (an X11
+            // window ends up with the wrong size): the layout reacts when KWin is done
+            this.maximizedDelayer = new Delayer(0, () => {
+                const mode = this.pendingMaximized;
+                this.pendingMaximized = null;
+                if (mode !== null) {
+                    world.do(() => { window.onMaximizedChanged(mode); });
+                }
+            });
+            this.signalManager = Tiled.initSignalManager(world, window, grid.config, this.relayoutDelayer, this.maximizedDelayer, mode => { this.pendingMaximized = mode; });
         }
 
         public destroy(passFocus: FocusPassing.Type) {
             this.signalManager.destroy();
             this.relayoutDelayer.destroy();
+            this.maximizedDelayer.destroy();
 
             const window = this.window;
             const grid = window.column.grid;
@@ -52,7 +64,7 @@ namespace ClientState {
             Tiled.restoreClientAfterTiling(client, grid.config, this.defaultState, grid.desktop.clientArea);
         }
 
-        private static initSignalManager(world: World, window: Window, config: LayoutConfig, relayoutDelayer: Delayer) {
+        private static initSignalManager(world: World, window: Window, config: LayoutConfig, relayoutDelayer: Delayer, maximizedDelayer: Delayer, setPendingMaximized: (mode: MaximizedMode) => void) {
             const client = window.client;
             const kwinClient = client.kwinClient;
             const manager = new SignalManager();
@@ -90,9 +102,8 @@ namespace ClientState {
             });
 
             manager.connect(kwinClient.maximizedAboutToChange, (maximizedMode: MaximizedMode) => {
-                world.do(() => {
-                    window.onMaximizedChanged(maximizedMode);
-                });
+                setPendingMaximized(maximizedMode);
+                maximizedDelayer.run();
             });
 
             let moving = false;
