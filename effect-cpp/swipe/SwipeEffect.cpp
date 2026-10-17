@@ -65,9 +65,7 @@ void SwipeEffect::swipeGestureBegin(PointerSwipeGestureBeginEvent *event)
     m_queue.clear();
     m_ended = false;
     m_cumulative = QPointF();
-    m_unaccel.reset();
     const TouchpadConfig config = TouchpadConfig::read();
-    m_unaccel.setProfile(config.flat, config.speed);
     m_natural = config.natural;
     if (event->fingerCount == 3 || event->fingerCount == 4) {
         m_fingers = event->fingerCount;
@@ -80,12 +78,12 @@ void SwipeEffect::swipeGestureBegin(PointerSwipeGestureBeginEvent *event)
 
 void SwipeEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event)
 {
-    // niri reads dx_unaccelerated(); KWin only passes on libinput's accelerated delta, so undo it
-    double ux = event->delta.x();
-    double uy = event->delta.y();
-    if (m_phase != Phase::Idle) {
-        m_unaccel.apply(event->delta.x(), event->delta.y(), event->time.count() / 1000.0, ux, uy);
-    }
+    // niri reads dx_unaccelerated(). KWin passes exactly that on since Plasma 6.2 (backends/libinput GestureEvent::delta
+    // uses libinput_event_gesture_get_dx_unaccelerated, "don't apply pointer acceleration to touchpad gestures"), and this
+    // effect needs KWin 6.7.90 or newer: the delta is niri's own, whatever the pointer speed and profile are. Undoing an
+    // acceleration that was never applied made the view run at 0.4x to 4x the speed of niri's depending on the speed setting.
+    const double ux = event->delta.x();
+    const double uy = event->delta.y();
     if (m_phase == Phase::Pending) {
         m_cumulative += QPointF(ux, uy);
         if (m_cumulative.x() * m_cumulative.x() + m_cumulative.y() * m_cumulative.y() >= AxisLockDistance * AxisLockDistance) {
@@ -116,6 +114,7 @@ void SwipeEffect::finish(std::chrono::microseconds time)
     if (m_phase == Phase::Idle) {
         return;
     }
+    qCDebug(KIRI_SWIPE) << "end" << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     // niri ends the view gesture on cancel as well
     m_queue.append({time.count() / 1000.0, 0.0});
     m_ended = true;
@@ -243,7 +242,8 @@ bool SwipeEffect::command(const QString &json)
     const QJsonObject o = QJsonDocument::fromJson(json.toUtf8()).object();
     const QString m = o.value(QStringLiteral("m")).toString();
     if (m == QLatin1String("begin")) {
-        if (m_visual != Visual::Drag) {
+        // a flick can end before this call arrives: the picture is then held and still has to follow the release
+        if (m_visual != Visual::Drag && !(m_visual == Visual::Held && !m_began)) {
             return false;
         }
         m_scale = o.value(QStringLiteral("scale")).toDouble();
@@ -263,6 +263,7 @@ bool SwipeEffect::command(const QString &json)
         if (m_visual == Visual::Drag) {
             m_sEnd = shift();
         }
+        qCDebug(KIRI_SWIPE) << "release" << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
         m_spring = NiriAnim::Spring(from, to, o.value(QStringLiteral("v")).toDouble(), 1.0, 800.0, 0.0001);
         m_springFrom = from;
         m_since = m_frameTime = nowSeconds();

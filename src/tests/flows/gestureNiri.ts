@@ -198,3 +198,109 @@ tests.register("Gesture swipe: the focus moves when the fingers are lifted", 1, 
         Date.now = realNow;
     }
 });
+
+// niri: a lone column with always-center-single-column swipes like any other, and the view comes back to the center
+for (const visual of [false, true]) {
+    for (const sign of [1, -1]) {
+        for (const how of ["always-center-single-column", "center-grid-when-fits"]) {
+            tests.register(`Gesture swipe: a lone centered column springs back to the center (${how}, ${visual ? "effect paints" : "script settles"}, ${sign > 0 ? "right" : "left"})`, 1, () => {
+                const config = getDefaultConfig();
+                config.gestureScroll = true;
+                config.alwaysCenterSingleColumn = how === "always-center-single-column";
+                config.centerGridWhenFits = how === "center-grid-when-fits";
+                const { workspaceMock, world } = init(config, { width: 1600, height: 900 });
+                const clients = workspaceMock.createClientsWithWidths(800);
+                workspaceMock.activeWindow = clients[0];
+                const desktop = (world as any).desktopManager.getCurrentDesktop() as Desktop;
+                const timer = (world as any).gestureAnimationTimer;
+                const centered = desktop.getScrollX(); 
+                const realNow = Date.now;
+                setSwipeVisualForTests(visual);
+                try {
+                    let t = 3000;
+                    for (let i = 0; i < 12; i++) {
+                        Date.now = () => t;
+                        world.gestureRaw(JSON.stringify({ id: 1, phase: "h", end: false, ev: [[t, sign * 40]] }));
+                        t += 8;
+                    }
+                    Assert.assert(Math.abs(desktop.getScrollX() - centered) > 100, { message: "the view follows the fingers" });
+                    Date.now = () => t;
+                    world.gestureRaw(JSON.stringify({ id: 1, phase: "h", end: true, ev: [[t, 0]] }));
+                    for (let i = 0; i < 100 && (world as any).gestureAnimation !== null; i++) {
+                        t += 16;
+                        Date.now = () => t;
+                        timer.triggered.fire();
+                    }
+                    Assert.equal(desktop.getScrollX(), centered, { message: "back at the center" });
+                } finally {
+                    Date.now = realNow;
+                    setSwipeVisualForTests(true);
+                }
+            });
+        }
+    }
+}
+
+// niri: after the fingers lift the view settles once, and nothing moves afterwards, whatever the focus does. The focus
+// passing to the column the swipe landed on must not scroll the view again (no scrollToColumn, no re-centering).
+for (const visual of [false, true]) {
+    for (const scroller of ["lazy", "overflow", "centered"]) {
+        for (const start of [0, 2]) {
+            tests.register(`Gesture swipe: nothing moves after the release (${scroller}, ${visual ? "effect paints" : "script settles"}, from column ${start})`, 1, () => {
+                const config = getDefaultConfig();
+                config.gestureScroll = true;
+                config.scrollingLazy = scroller === "lazy";
+                config.scrollingOnOverflow = scroller === "overflow";
+                config.scrollingCentered = scroller === "centered";
+                const { workspaceMock, world } = init(config, { width: 1600, height: 900 });
+                const clients = workspaceMock.createClientsWithWidths(700, 900, 780, 650, 800);
+                workspaceMock.activeWindow = clients[start];
+                const desktop = (world as any).desktopManager.getCurrentDesktop() as Desktop;
+                const timer = (world as any).gestureAnimationTimer;
+                const realNow = Date.now;
+                setSwipeVisualForTests(visual);
+                try {
+                    let t = 5000;
+                    for (let i = 0; i < 10; i++) {
+                        Date.now = () => t;
+                        world.gestureRaw(JSON.stringify({ id: 1, phase: "h", end: false, ev: [[t, start === 0 ? -35 : 35]] }));
+                        t += 8;
+                    }
+                    Date.now = () => t;
+                    world.gestureRaw(JSON.stringify({ id: 1, phase: "h", end: true, ev: [[t, 0]] }));
+                    const anim = (world as any).gestureAnimation;
+                    Assert.assert(anim !== null, { message: "the view settles" });
+                    const to = anim.to;
+                    const seen: number[] = [desktop.getScrollX()];
+                    for (let i = 0; i < 100 && (world as any).gestureAnimation !== null; i++) {
+                        t += 16;
+                        Date.now = () => t;
+                        timer.triggered.fire();
+                        seen.push(desktop.getScrollX());
+                    }
+                    if (visual) {
+                        // the layout is at the end of the settle from the release on and never moves again
+                        for (const x of seen) {
+                            Assert.equal(x, to, { message: "the layout moved after the release: " + seen.join(",") });
+                        }
+                    } else {
+                        // the script paints the settle: one spring towards `to` (it may first carry on with the fingers' velocity and
+                        // turn once, never wobble), and it ends there
+                        let turns = 0;
+                        for (let i = 2; i < seen.length; i++) {
+                            if ((seen[i] - seen[i - 1]) * (seen[i - 1] - seen[i - 2]) < 0 && Math.abs(seen[i - 1] - to) > 1) {
+                                turns++;
+                            }
+                        }
+                        Assert.assert(turns <= 1, { message: "the view wobbled: " + seen.join(",") });
+                        Assert.equal(seen[seen.length - 1], to, { message: "the view ends at the snap point: " + seen.join(",") });
+                    }
+                    Assert.equal(desktop.getScrollX(), to, { message: "the view stays at the snap point after the settle" });
+                } finally {
+                    Date.now = realNow;
+                    setSwipeVisualForTests(true);
+                }
+            });
+        }
+    }
+}

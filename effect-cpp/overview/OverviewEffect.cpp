@@ -247,6 +247,7 @@ void OverviewEffect::applyLayout(const QString &layout)
     const QJsonArray desktops = obj.value(QStringLiteral("desktops")).toArray();
     m_desktopCount = desktops.size();
 
+    const bool idle = !isRunning() || (m_warm && !m_open && !m_gesture);
     QStringList seen;
     for (const QJsonValue &v : desktops) {
         const QJsonObject d = v.toObject();
@@ -258,6 +259,13 @@ void OverviewEffect::applyLayout(const QString &layout)
             Scroll sc;
             sc.shown = sc.target = scroll;
             it = m_scrolls.insert(id, sc);
+            m_viewOffsets.insert(id, scroll);
+        } else if (idle) {
+            // nothing of the overview is on screen: the windows are where the script put them, so the first frame
+            // must show the strip there too (the offset of the last run is stale once the script scrolled meanwhile)
+            it->target = it->shown = scroll;
+            it->animating = false;
+            it->localUntil = 0;
             m_viewOffsets.insert(id, scroll);
         } else if (std::abs(scroll - it->target) > 0.5) {
             it->target = scroll;

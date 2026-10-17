@@ -91,7 +91,6 @@ private:
     Phase m_phase = Phase::Idle;
     int m_fingers = 3;
     QPointF m_cumulative;
-    NiriSwipe::Unaccelerate m_unaccel;
     bool m_natural = false;
     int m_id = 0;
     bool m_ended = false;

@@ -185,6 +185,9 @@ bool Effect::eventFilter(QObject *watched, QEvent *event)
 
 void Effect::stopWindow(KWin::EffectWindow *w, WindowState &s)
 {
+    if (s.moving || s.resizing) {
+        qCDebug(KIRI_MOTION) << "stop" << w->caption() << "moving" << s.moving << "resizing" << s.resizing << "swipe" << KWin::effects->property("kiriSwipeVisual").toBool();
+    }
     s.moving = false;
     s.resizing = false;
     if (s.snapshot) {
@@ -346,7 +349,11 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
     const double t = now();
     const KWin::RectF frame = w->frameGeometry();
     if (KWin::effects->property("kiriSwipeVisual").toBool()) {
-        stopWindow(w, s);
+        // kiri_swipe paints the scrolling view. A window that only moves with the view keeps the animation it has (niri: the
+        // view offset gesture never touches the tiles' move and resize animations; they run on under the moving view)
+        if (frame.size() != old.size() || !(s.moving || s.resizing)) {
+            stopWindow(w, s);
+        }
         s.lastChange = t;
         s.lastSize = frame.size();
         return;
@@ -360,6 +367,7 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
     }
 
     if (m_speed <= 0 || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()
+        || (w->isX11Client() && w->isFullScreen()) // parked by Kiri and painted by kiri_decorations
         || (!s.moving && !s.resizing && offScreen(old) && offScreen(frame)) // moving between two places nobody sees
         || overviewUp() || anyUserResize() // like niri's interactive resize (animate = false): the neighbours follow the mouse at once
         || s.closeStart >= 0 || t - s.created < SettleAfterOpen || (s.streak >= StreamLength && t - s.streamStart >= StreamMinDuration) || old.isEmpty() || frame.isEmpty()) {

@@ -293,7 +293,17 @@ class Desktop {
             return { from: this.scrollX, to: this.scrollX, velocity: 0 };
         }
         this.gestureTargetColumn = columns[result.column];
-        return { from: this.scrollX, to: result.view + marginLeft, velocity: result.retargeted ? 0 : viewVelocity };
+        let to = result.view + marginLeft;
+        if (this.centersGridWhenFits()) {
+            // Kiri's own option (not niri's): a grid that fits the screen stays centered, a swipe does not park it at an edge
+            to = this.clampScrollX(to);
+        }
+        return { from: this.scrollX, to: to, velocity: to !== result.view + marginLeft || result.retargeted ? 0 : viewVelocity };
+    }
+
+    private centersGridWhenFits() {
+        const clamper = this.config.clamper;
+        return clamper instanceof EdgeClamper && clamper.centerWhenFits && this.grid.getWidth() <= this.tilingArea.width;
     }
 
     public isRawGesture() {

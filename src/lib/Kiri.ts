@@ -213,8 +213,23 @@ function overviewActive() {
 // the pointer under the overview's own tiles
 function warpCursorToFocus() {
     if (!overviewActive()) {
+        lastWarpTime = Date.now();
         moveCursorToFocus.call();
     }
+}
+
+let lastWarpTime = 0;
+
+// true when a pointer move at `pos` is (most likely) the echo of our own warp: shortly after one, and onto the
+// focused window. niri's warp-mouse-to-focus does not run focus-follows-mouse, so such a move must not pick the
+// window under the pointer (a floating window above the focus would take the focus away again)
+function recentlyWarped(pos: Readonly<QmlPoint>) {
+    const active = Workspace.activeWindow;
+    if (Date.now() - lastWarpTime > 200 || active === null) {
+        return false;
+    }
+    const g = active.frameGeometry;
+    return pos.x >= g.x && pos.x < g.x + g.width && pos.y >= g.y && pos.y < g.y + g.height;
 }
 
 function overviewCall(member: string, arg: string) {

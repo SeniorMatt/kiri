@@ -44,18 +44,25 @@ LAYOUTS = {
     "L2fit": dict(cols=[600, 700], start=0),
     "L3wide": dict(cols=[900, 1568, 900, 700], start=1),
     "L1": dict(cols=[1000], start=0),
+    # the owner's laptop: 1872 px working width, gaps 8, mixed widths and 50% columns
+    "O1": dict(cols=[920, 1050, 936, 936, 920], start=1, width=1872, gaps=8),
+    "O2": dict(cols=[936, 936, 936, 936], start=0, width=1872, gaps=8),
+    "O3": dict(cols=[936, 936, 936, 936], start=2, width=1872, gaps=8),
+    "O4": dict(cols=[936], start=0, width=1872, gaps=8),
 }
 
 def write(name, layout, ev, end_gap, natural=0, center="never", extra=None, desks=None):
     L = LAYOUTS[layout] if layout else None
     last = ev[-1][0] if ev else 0
     with open(os.path.join(OUT, name + ".trace"), "w") as f:
-        f.write(f"name {name}\nwidth 1600\ngaps 16\n")
+        W = L.get("width", 1600) if L else 1600
+        G = L.get("gaps", 16) if L else 16
+        f.write(f"name {name}\nwidth {W}\ngaps {G}\n")
         if L:
             f.write("cols " + " ".join(map(str, L["cols"])) + f"\nstart_col {L['start']}\n")
-            cx = lambda i: sum(w + 16 for w in L["cols"][:i])
-            rightmost = cx(len(L["cols"]) - 1) + L["cols"][-1] + 16 - 1600
-            f.write(f"start_view_pos {max(-16, min(cx(L['start']) - 16, max(rightmost, -16)))}\n")
+            cx = lambda i: sum(w + G for w in L["cols"][:i])
+            rightmost = cx(len(L["cols"]) - 1) + L["cols"][-1] + G - W
+            f.write(f"start_view_pos {max(-G, min(cx(L['start']) - G, max(rightmost, -G)))}\n")
         if desks:
             f.write(f"desks {desks[0]} {desks[1]}\n")
         f.write(f"natural {natural}\ncenter {center}\n")
@@ -102,6 +109,18 @@ add("center_always_L5", "L5", [seg(350, 300)], 11, 1, noise=0.2, center="always"
 add("center_overflow_L5", "L5", [seg(350, 300)], 11, 1, noise=0.2, center="on-overflow")
 add("center_always_flick_L8", "L8", [seg(500, 200, "faststart")], 9, 1, noise=0.2, center="always")
 add("center_overflow_flick_L8", "L8", [seg(500, 200, "faststart")], 9, -1, noise=0.2, center="on-overflow")
+for L in ["O1", "O2", "O3"]:
+    for d, sg in (("r", 1), ("l", -1)):
+        add(f"own_slow_short_{L}_{d}", L, [seg(140, 700), hold(120)], 130, sg, noise=0.15, dt=11)
+        add(f"own_slow_long_{L}_{d}", L, [seg(650, 1500, "linear"), hold(80)], 90, sg, noise=0.25)
+        add(f"own_flick_{L}_{d}", L, [seg(260, 130, "faststart")], 8, sg, noise=0.3, dt=7.5)
+        add(f"own_medium_{L}_{d}", L, [seg(420, 380)], 12, sg, dy_frac=0.08, noise=0.2)
+        add(f"own_between_{L}_{d}", L, [seg(300, 420), hold(60)], 70, sg, noise=0.2)
+        add(f"own_fling_{L}_{d}", L, [seg(900, 240, "faststart")], 10, sg, noise=0.4, dt=7.5)
+        add(f"own_hesitate_{L}_{d}", L, [seg(180, 300), hold(320), seg(240, 260)], 14, sg, noise=0.2)
+for d, sg in (("r", 1), ("l", -1)):
+    add(f"own_single_O4_{d}", "O4", [seg(300, 300)], 11, sg, noise=0.2, center="always")
+    add(f"own_single_flick_O4_{d}", "O4", [seg(260, 130, "faststart")], 8, sg, noise=0.3, center="always")
 # slow dt (touchpads at ~100Hz with scheduling hiccups)
 add("hiccup_L5", "L5", [seg(300, 400)], 20, 1, noise=0.2, dt=14)
 # vertical (workspace) traces: 4 desks, start on desk 1 and edge desks

@@ -121,6 +121,52 @@ tests.register("Overview: drop into a column, out of a column, and reorder", 1, 
     Assert.assert(b.getActualFrameGeometry().x < a.getActualFrameGeometry().x, { message: "b is first" });
 });
 
+tests.register("Overview: a focused window alone in its column can be dropped to the end, the front or another desktop", 1, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock, world } = init(config);
+    overviewCalls.length = 0;
+
+    const [a, b, c] = workspaceMock.createClientsWithWidths(200, 200, 200);
+    const desktop0 = workspaceMock.desktops[0];
+    const desktop1 = workspaceMock.desktops[1];
+    const clientManager = getClientManager(world);
+    function check(order: any[], message: string) {
+        const layout = overviewLastLayout();
+        Assert.equal(layout.desktops[0].cols.length, order.length, { message: message + ": no empty column" });
+        Assert.equalArrays(layout.desktops[0].cols.map((col: any) => col.wins.length), order.map(() => 1), { message: message });
+        Assert.equalArrays(layout.desktops[0].cols.map((col: any) => col.wins[0].id), order.map(client => String(client.internalId)), { message: message });
+        for (const client of order) {
+            Assert.tiledClient(clientManager, client);
+        }
+    }
+    workspaceMock.activeWindow = c;
+    qtMock.fireShortcut("overview");
+
+    // c is focused and the last column: dropped past the end it stays the last column (this used to lose the window)
+    overviewPoll(world, [{ t: "drop", w: String(c.internalId), d: desktop0.id, c: 2, i: -1 }]);
+    check([a, b, c], "c dropped past the end");
+
+    // the focused first column goes to the middle and to the end
+    workspaceMock.activeWindow = a;
+    overviewPoll(world, [{ t: "drop", w: String(a.internalId), d: desktop0.id, c: 1, i: -1 }]);
+    check([b, a, c], "a dropped between b and c");
+    overviewPoll(world, [{ t: "drop", w: String(a.internalId), d: desktop0.id, c: 2, i: -1 }]);
+    check([b, c, a], "a dropped past the end");
+
+    // the focused last column goes to the front
+    overviewPoll(world, [{ t: "drop", w: String(a.internalId), d: desktop0.id, c: 0, i: -1 }]);
+    check([a, b, c], "a dropped at the front");
+
+    // the focused window goes to another desktop and leaves no empty column behind
+    overviewPoll(world, [{ t: "drop", w: String(a.internalId), d: desktop1.id, c: 0, i: -1 }]);
+    Assert.equalArrays(a.desktops, [desktop1]);
+    const layout = overviewLastLayout();
+    Assert.equal(layout.desktops[0].cols.length, 2);
+    Assert.equal(layout.desktops[1].cols.length, 1);
+    Assert.tiledClient(clientManager, a);
+});
+
 tests.register("Overview: click activates, goto and scroll", 1, () => {
     const config = getDefaultConfig();
     const { qtMock, workspaceMock, world } = init(config);

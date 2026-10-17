@@ -104,7 +104,22 @@ FocusScope {
         }
     }
 
+    function tileOf(wid) {
+        for (let i = 0; i < tiles.count; i++) {
+            const t = tiles.itemAt(i);
+            if (t && t.wid === wid) {
+                return t;
+            }
+        }
+        return null;
+    }
+
     function reload() {
+        // the dropped window is still where the pointer let go; the new layout moves its place (maybe to another
+        // desktop), so the offset that keeps it where it is now is worked out first and then eased away together
+        // with the layout's own animation: it glides to its new place instead of jumping back to the old one first
+        const held = dropHold !== "" ? tileOf(dropHold) : null;
+        const hx = held ? held.x : 0, hy = held ? held.y : 0;
         try {
             const l = JSON.parse(effect.layout);
             lay = l;
@@ -112,7 +127,17 @@ FocusScope {
         } catch (e) {
             console.warn("kiri overview: bad layout", e);
         }
-        dropHold = "";
+        if (held && dropPending) {
+            held.settleAnim = false;
+            held.offX = hx - (held.x - held.offX);
+            held.offY = hy - (held.y - held.offY);
+            held.settleAnim = true;
+            held.offX = 0;
+            held.offY = 0;
+            dropPending = false;
+            holdTimer.interval = 350;
+            holdTimer.restart();
+        }
     }
 
     Connections {
@@ -222,6 +247,22 @@ FocusScope {
     // ---- dragging ----
     property string dragWid: ""
     property string dropHold: ""
+    property bool dropPending: false // dropped, the script's new layout has not arrived yet
+    Timer {
+        id: holdTimer
+        interval: 700
+        onTriggered: {
+            // no new layout came (dropped back in place, or the drop was refused): the window glides back
+            const t = root.dropHold !== "" ? root.tileOf(root.dropHold) : null;
+            root.dropPending = false;
+            root.dropHold = "";
+            if (t) {
+                t.settleAnim = true;
+                t.offX = 0;
+                t.offY = 0;
+            }
+        }
+    }
     property real dragX: 0 // pointer position, root coordinates
     property real dragY: 0
     property var hint: null // { di, rect }
@@ -354,16 +395,19 @@ FocusScope {
             readonly property bool held: root.dropHold === wid
             property real offX: 0
             property real offY: 0
+            property bool settleAnim: false
+            Behavior on offX { enabled: tile.settleAnim; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on offY { enabled: tile.settleAnim; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
             // when a column leaves (a window is dragged out of a single-window column) the columns to its right close up
             property real closeUp: {
-                if (root.dragWid === "" || tile.floating) {
+                if ((root.dragWid === "" && !root.dropPending) || tile.floating) {
                     return 0;
                 }
                 const d = root.lay.desktops[tile.di];
                 let s = 0;
                 for (let i = 0; i < d.cols.length; i++) {
                     const c = d.cols[i];
-                    if (c.wins.length === 1 && c.wins[0].id === root.dragWid) {
+                    if (c.wins.length === 1 && c.wins[0].id === (root.dragWid !== "" ? root.dragWid : root.dropHold)) {
                         return i < tile.col ? -(c.w + d.gapH) : 0;
                     }
                 }
@@ -411,6 +455,7 @@ FocusScope {
                     }
                     const dist = Math.hypot(translation.x, translation.y);
                     const thr = root.moveThreshold * root.effect.zoom;
+                    tile.settleAnim = false;
                     if (root.dragWid === "" && dist >= thr) {
                         root.dragWid = tile.wid;
                     }
@@ -430,35 +475,21 @@ FocusScope {
                     }
                     if (root.dragWid === tile.wid) {
                         const h = root.hint;
+                        root.dragWid = "";
+                        root.hint = null;
                         if (h !== null) {
                             root.dropHold = tile.wid;
+                            root.dropPending = true;
                             root.effect.dropWindow(tile.wid, h.did, h.col, h.tile);
+                            holdTimer.interval = 700;
                             holdTimer.restart();
                         } else {
+                            // not a place to drop: back where it was
+                            tile.settleAnim = true;
                             tile.offX = 0;
                             tile.offY = 0;
                         }
-                        root.dragWid = "";
-                        root.hint = null;
                     } else {
-                        tile.offX = 0;
-                        tile.offY = 0;
-                    }
-                }
-            }
-            Timer {
-                id: holdTimer
-                interval: 600
-                onTriggered: {
-                    if (root.dropHold === tile.wid) {
-                        root.dropHold = "";
-                    }
-                }
-            }
-            Connections {
-                target: root
-                function onDropHoldChanged() {
-                    if (root.dropHold !== tile.wid && !tile.dragging) {
                         tile.offX = 0;
                         tile.offY = 0;
                     }

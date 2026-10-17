@@ -3,12 +3,17 @@
 // as it loses focus, and not while a pointer button is held (niri skips the grab). Like niri, only a change of the window under the pointer activates, and layout animations that
 // slide a window under a still pointer do not (cursorPosChanged only fires when the pointer moves).
 class FocusFollowsMouse {
-    private hover: KwinClient | null = null;
+    // where the pointer was at the previous event; like niri, the window "left" is looked up here with the layout as it
+    // is NOW (handle_focus_follows_mouse recomputes it), not remembered, so a window that slid under a still pointer
+    // does not count as entered when the pointer then moves inside it
+    private prevPos: { x: number, y: number } | null = null;
     private readonly signalManager = new SignalManager();
 
     // `busy` says that the layout is in a swipe or settling after one; `maxScroll` is niri's max-scroll-amount in
     // percent of the screen width (100 or more = no limit)
     constructor(private readonly busy: () => boolean, private readonly maxScroll: number) {
+        const pos = Workspace.cursorPos;
+        this.prevPos = { x: pos.x, y: pos.y };
         this.signalManager.connect(Workspace.cursorPosChanged, () => this.onPointerMoved());
     }
 
@@ -17,20 +22,25 @@ class FocusFollowsMouse {
     }
 
     private onPointerMoved() {
+        const pos = Workspace.cursorPos;
+        const prev = this.prevPos;
+        this.prevPos = { x: pos.x, y: pos.y };
         if (overviewActive()) {
             // the pointer is over the overview's tiles, not over the windows below them
-            this.hover = null;
             return;
         }
-        const window = FocusFollowsMouse.topWindowAt(Workspace.cursorPos);
-        if (window === this.hover) {
+        if (recentlyWarped(pos)) {
+            // niri's warp-mouse-to-focus moves the pointer without focus-follows-mouse looking at it
             return;
         }
-        this.hover = window;
+        const window = FocusFollowsMouse.topWindowAt(pos);
         if (window === null || !(window.normalWindow || window.dialog) || window === Workspace.activeWindow) {
             return;
         }
-        if (FocusFollowsMouse.popupOpen() || this.busy() || isOverTabIndicator(Workspace.cursorPos.x, Workspace.cursorPos.y)) {
+        if (prev !== null && FocusFollowsMouse.topWindowAt(prev) === window) {
+            return;
+        }
+        if (FocusFollowsMouse.popupOpen() || this.busy() || isOverTabIndicator(pos.x, pos.y)) {
             return;
         }
         if (this.maxScroll < 100 && FocusFollowsMouse.scrollAmount(window) > this.maxScroll) {
@@ -39,7 +49,9 @@ class FocusFollowsMouse {
         // niri does nothing while the pointer is grabbed (handle_focus_follows_mouse): a held button means a
         // drag or drag and drop, which must not move the focus and scroll the view
         queryPointerButtons(buttons => {
-            if (buttons === 0 && this.hover === window && window !== Workspace.activeWindow) {
+            // the answer comes later: the pointer may have moved on, or a warp / the overview may have taken over
+            if (buttons === 0 && !overviewActive() && window !== Workspace.activeWindow &&
+                FocusFollowsMouse.topWindowAt(Workspace.cursorPos) === window) {
                 Workspace.activeWindow = window;
             }
         });
@@ -63,7 +75,7 @@ class FocusFollowsMouse {
         return false;
     }
 
-    private static topWindowAt(point: Readonly<QmlPoint>) {
+    private static topWindowAt(point: { x: number, y: number }) {
         // runs for every pointer event: the cheap geometry test comes first, so that only the windows under the
         // pointer pay for the desktops list
         const stack = Workspace.stackingOrder;

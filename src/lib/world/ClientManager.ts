@@ -979,8 +979,13 @@ class ClientManager {
             }
         } else {
             const left = columnIndex <= 0 || others.length === 0 ? null : others[Math.min(columnIndex, others.length) - 1];
-            const newColumn = new Column(grid, left);
-            window.moveToColumn(newColumn, true, pass);
+            if (oldColumn.getWindowCount() === 1) {
+                // the column itself moves: an empty new column next to it would be the one to take the focus when the
+                // old one is removed, and the window would end up in no column at all
+                oldColumn.moveToGrid(grid, left);
+            } else {
+                window.moveToColumn(new Column(grid, left), true, FocusPassing.Type.None);
+            }
         }
         if (kwinClient.desktops.length !== 1 || kwinClient.desktops[0] !== kwinDesktop) {
             kwinClient.desktops = [kwinDesktop];
