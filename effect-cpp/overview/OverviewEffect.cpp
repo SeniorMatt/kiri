@@ -193,6 +193,13 @@ bool OverviewEffect::tick()
     return more;
 }
 
+// the invisible warm-up must not take the screen out of direct scan-out: switching the output to composition and back
+// is what can blink a real display
+bool OverviewEffect::blocksDirectScanout() const
+{
+    return m_warm && !m_open && !m_gesture ? false : QuickSceneEffect::blocksDirectScanout();
+}
+
 void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
 {
     if (isRunning()) {
@@ -392,10 +399,10 @@ QString OverviewEffect::warm(const QString &layout)
     effects->addRepaintFull();
     QTimer::singleShot(500, this, [this]() {
         if (m_warm && isRunning() && !m_open && !m_gesture) {
+            logFrames(); // while m_warm is still set: the line says "warm-up", not "animation"
             m_warm = false;
             m_progressAnimating = false;
             setRunning(false);
-            logFrames();
             Q_EMIT warmingChanged();
         }
     });
@@ -556,6 +563,13 @@ void OverviewEffect::dropWindow(const QString &windowId, const QString &desktopI
 {
     m_noCloseUntil = now() + 700;
     queue(jsonString({{"t", "drop"}, {"w", windowId}, {"d", desktopId}, {"c", column}, {"i", tile}}));
+}
+
+// a floating window let go in the overview: it stays floating, on the desktop under the pointer, at x/y (screen space)
+void OverviewEffect::dropFloating(const QString &windowId, const QString &desktopId, qreal x, qreal y)
+{
+    m_noCloseUntil = now() + 700;
+    queue(jsonString({{"t", "dropf"}, {"w", windowId}, {"d", desktopId}, {"x", x}, {"y", y}}));
 }
 
 void OverviewEffect::scrollView(const QString &desktopId, qreal delta)

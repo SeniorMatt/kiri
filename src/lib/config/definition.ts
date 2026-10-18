@@ -385,3 +385,8 @@ const configDef = [
         default: "",
     },
 ];
+
+// a function, so that code in files that come before this one can ask for the list without a use-before-declaration
+function getConfigDef() {
+    return configDef;
+}

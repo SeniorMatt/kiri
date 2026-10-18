@@ -200,6 +200,15 @@ class Overview {
             this.world.do(clientManager => clientManager.overviewDrop(kwinClient, kwinDesktop, event.c, event.i));
             return true;
         }
+        case "dropf": {
+            const kwinClient = this.clientManager.findClientById(event.w);
+            const kwinDesktop = Workspace.desktops.find(d => d.id === event.d);
+            if (kwinClient === undefined || kwinDesktop === undefined) {
+                return false;
+            }
+            this.world.do(clientManager => clientManager.overviewDropFloating(kwinClient, kwinDesktop, event.x, event.y));
+            return true;
+        }
         }
         return false;
     }

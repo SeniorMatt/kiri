@@ -167,6 +167,55 @@ tests.register("Overview: a focused window alone in its column can be dropped to
     Assert.tiledClient(clientManager, a);
 });
 
+tests.register("Overview: a floating window dropped stays floating, where it was let go and on the desktop under the pointer", 1, () => {
+    const config = getDefaultConfig();
+    const { qtMock, workspaceMock, world } = init(config);
+    overviewCalls.length = 0;
+
+    const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
+    const desktop0 = workspaceMock.desktops[0];
+    const desktop1 = workspaceMock.desktops[1];
+    const clientManager = getClientManager(world);
+    workspaceMock.activeWindow = b;
+    qtMock.fireShortcut("window-move-to-floating");
+    Assert.assert(!clientManager.findTiledWindow(b), { message: "b floats" });
+    qtMock.fireShortcut("overview");
+    const before = overviewLastLayout();
+    Assert.equal(before.desktops[0].floats.length, 1);
+    Assert.equal(before.desktops[0].floats[0].id, String(b.internalId));
+
+    // dropped inside the same desktop: moved, still floating, focused
+    const frame = b.getActualFrameGeometry();
+    overviewPoll(world, [{ t: "dropf", w: String(b.internalId), d: desktop0.id, x: 40, y: 50 }]);
+    Assert.assert(!clientManager.findTiledWindow(b), { message: "still floating" });
+    const moved = b.getActualFrameGeometry();
+    Assert.equal(moved.x, 40);
+    Assert.equal(moved.y, 50);
+    Assert.assert(Math.abs(moved.width - frame.width) < 1 && Math.abs(moved.height - frame.height) < 1, { message: "same size" });
+    Assert.equal(workspaceMock.activeWindow, b);
+    Assert.equal(overviewLastLayout().desktops[0].floats[0].x, 40);
+
+    // dropped below the screen: kept on the screen
+    overviewPoll(world, [{ t: "dropf", w: String(b.internalId), d: desktop0.id, x: 99999, y: 99999 }]);
+    const clamped = b.getActualFrameGeometry();
+    Assert.assert(clamped.x + clamped.width <= screen.width + 1 && clamped.y + clamped.height <= screen.height + 1, { message: "inside the screen " + clamped.x + "," + clamped.y + " " + clamped.width + "x" + clamped.height });
+
+    // dropped on another desktop's row: it moves there and floats on
+    overviewPoll(world, [{ t: "dropf", w: String(b.internalId), d: desktop1.id, x: 100, y: 120 }]);
+    Assert.equalArrays(b.desktops, [desktop1]);
+    Assert.assert(!clientManager.findTiledWindow(b), { message: "floats on desktop 1" });
+    const layout = overviewLastLayout();
+    Assert.equal(layout.desktops[1].floats.length, 1);
+    Assert.equal(layout.desktops[0].floats.length, 0);
+    Assert.equal(layout.desktops[0].cols.length, 1);
+    Assert.equalArrays(a.desktops, [desktop0]);
+
+    // a tiled window is not moved by a floating drop
+    const x = a.getActualFrameGeometry().x;
+    overviewPoll(world, [{ t: "dropf", w: String(a.internalId), d: desktop0.id, x: 10, y: 10 }]);
+    Assert.equal(a.getActualFrameGeometry().x, x);
+});
+
 tests.register("Overview: click activates, goto and scroll", 1, () => {
     const config = getDefaultConfig();
     const { qtMock, workspaceMock, world } = init(config);

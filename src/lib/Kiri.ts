@@ -1,6 +1,10 @@
+// declared before the functions that use them: QML warns about a variable used above its declaration
+const tabIndicatorsByDesktop = new Map<any, TabIndicator[]>();
+let lastWarpTime = 0;
+
 function loadConfig(): Config {
     const config: any = {};
-    for (const entry of configDef) {
+    for (const entry of getConfigDef()) {
         config[entry.name] = KWin.readConfig(entry.name, entry.default);
     }
     config.shortcutKeys = readShortcutKeys(name => KWin.readConfig(name, ""));
@@ -56,7 +60,6 @@ function isOverTabIndicator(x: number, y: number) {
 }
 
 let lastTabGroupsJson = "[]";
-const tabIndicatorsByDesktop = new Map<any, TabIndicator[]>();
 
 // `tabIndicators` (this desktop's, for the script's own fallback windows) and `tabGroups` (every desktop's, as
 // JSON, for the compiled effect, which paints them with the windows and so also while desktops switch)
@@ -217,8 +220,6 @@ function warpCursorToFocus() {
         moveCursorToFocus.call();
     }
 }
-
-let lastWarpTime = 0;
 
 // true when a pointer move at `pos` is (most likely) the echo of our own warp: shortly after one, and onto the
 // focused window. niri's warp-mouse-to-focus does not run focus-follows-mouse, so such a move must not pick the

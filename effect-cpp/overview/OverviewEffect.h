@@ -55,6 +55,7 @@ public:
     void setSearchText(const QString &text);
 
     void prePaintScreen(ScreenPrePaintData &data) override;
+    bool blocksDirectScanout() const override;
     void postPaintScreen() override;
     int requestedEffectChainPosition() const override { return 70; }
 
@@ -79,6 +80,7 @@ public Q_SLOTS:
     void activateWindow(const QString &windowId, const QString &desktopId, int desktopIndex);
     void activateDesktop(int desktopIndex);
     void dropWindow(const QString &windowId, const QString &desktopId, int column, int tile);
+    void dropFloating(const QString &windowId, const QString &desktopId, qreal x, qreal y);
     void goToDesktop(int index);
     void scrollView(const QString &desktopId, qreal delta);
     void requestClose();

@@ -140,10 +140,11 @@ Item {
             (error) => { /* a busy compositor times out: keep what is known, or Meta+O would fall back to Plasma's overview */ },
         );
     }
-    // a moment after the effect has loaded, when the session is quiet: it builds its scene once, invisibly
+    // a good while after the effect has loaded, when the session is quiet: it builds its scene once, invisibly.
+    // Not at login: the compositor is busy with the splash, the panel and the hand-over from the login screen then
     Timer {
         id: overviewWarmTimer
-        interval: 4000
+        interval: 45000
         onTriggered: if (qmlBase.overviewEffect && !qmlBase.overviewPolling) qmlBase.karouselInstance.overviewWarm()
     }
     property int overviewPollErrors: 0

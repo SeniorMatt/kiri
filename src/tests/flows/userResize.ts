@@ -256,3 +256,43 @@ tests.register("Resize from the left edge: the right edge stays and the window b
     Assert.equal(rectRight(top.getActualFrameGeometry()), rectRight(topStart), { message: "the right edge stayed" });
     Assert.equal(rectRight(bottom.getActualFrameGeometry()), rectRight(topStart), { message: "the right edge of the window below stayed too" });
 });
+
+// niri's Mod+right-drag in the top third of the lower window takes its top edge: the window gets taller, the one
+// above gives up the height, and the top edge of the first window of a column does nothing
+tests.register("Resize by the top edge of the lower window of a column", 7, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock } = init(config);
+    const [, top, bottom] = workspaceMock.createClientsWithWidths(300, 300, 200);
+    qtMock.fireShortcut("window-move-left");
+    workspaceMock.activeWindow = bottom;
+    const topStart = top.getFrameGeometryCopy();
+    const bottomStart = bottom.getFrameGeometryCopy();
+
+    workspaceMock.cursorPos = new MockQmlPoint(bottomStart.x + bottomStart.width / 2, bottomStart.y + 10);
+    bottom.resize = true;
+    bottom.interactiveMoveResizeStarted.fire();
+    const requested = new MockQmlRect(bottomStart.x, bottomStart.y - 40, bottomStart.width, bottomStart.height + 40);
+    bottom.interactiveMoveResizeStepped.fire(requested);
+    bottom.frameGeometry = requested;
+    bottom.resize = false;
+    bottom.interactiveMoveResizeFinished.fire();
+    const t = top.getActualFrameGeometry();
+    const b = bottom.getActualFrameGeometry();
+    Assert.equal(b.height, bottomStart.height + 40, { message: "the dragged window is taller" });
+    Assert.equal(t.height, topStart.height - 40, { message: "the window above gave up the height" });
+    Assert.equal(b.y, t.y + t.height + gapV);
+    Assert.equal(rectBottom(b), tilingArea.y + tilingArea.height);
+
+    // the top edge of the first window of the column does nothing
+    top.resize = true;
+    top.interactiveMoveResizeStarted.fire();
+    const grab = new MockQmlRect(t.x, t.y - 30, t.width, t.height + 30);
+    top.interactiveMoveResizeStepped.fire(grab);
+    top.frameGeometry = grab;
+    top.resize = false;
+    top.interactiveMoveResizeFinished.fire();
+    Assert.equal(top.getActualFrameGeometry().height, t.height);
+    Assert.equal(bottom.getActualFrameGeometry().height, b.height);
+    Assert.equal(top.getActualFrameGeometry().y, t.y);
+});

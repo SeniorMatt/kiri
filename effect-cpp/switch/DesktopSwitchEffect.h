@@ -203,7 +203,6 @@ private:
     enum class SwipePhase { Idle, Pending, Vertical, Other };
     SwipePhase m_swipePhase = SwipePhase::Idle;
     QPointF m_swipeCumulative;
-    NiriSwipe::Unaccelerate m_swipeUnaccel;
     NiriSwipe::WorkspaceGesture m_swipeGesture;
     int m_swipeCenter = 0;
     bool m_swipeNatural = false;

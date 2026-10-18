@@ -993,6 +993,24 @@ class ClientManager {
         window.focus();
     }
 
+    // A floating window dropped in the overview (niri: InsertPosition::Floating): it stays floating, on the desktop
+    // under the pointer, where it was let go (x/y are its top left corner in screen space) and takes the focus.
+    public overviewDropFloating(kwinClient: KwinClient, kwinDesktop: KwinDesktop, x: number, y: number) {
+        const client = this.clientMap.get(kwinClient);
+        if (client === undefined || !this.isFloating(kwinClient) || !Number.isFinite(x) || !Number.isFinite(y)) {
+            return;
+        }
+        const area = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, kwinDesktop);
+        const g = kwinClient.frameGeometry;
+        const nx = Math.max(area.x, Math.min(x, area.x + area.width - g.width));
+        const ny = Math.max(area.y, Math.min(y, area.y + area.height - g.height));
+        if (kwinClient.desktops.length !== 1 || kwinClient.desktops[0] !== kwinDesktop) {
+            kwinClient.desktops = [kwinDesktop];
+        }
+        client.place(Math.round(nx), Math.round(ny), g.width, g.height);
+        Workspace.activeWindow = kwinClient;
+    }
+
     public findTiledWindow(kwinClient: KwinClient) {
         const client = this.clientMap.get(kwinClient);
         if (client === undefined) {

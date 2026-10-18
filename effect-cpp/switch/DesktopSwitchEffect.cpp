@@ -27,7 +27,11 @@
 #include "input_event.h"
 #include "../common/TouchpadConfig.h"
 
+#include <QLoggingCategory>
+#include <chrono>
 #include <cmath>
+
+Q_LOGGING_CATEGORY(KIRI_SWITCH, "kiri.switch", QtWarningMsg)
 
 namespace KWin
 {
@@ -833,9 +837,7 @@ void DesktopSwitchEffect::swipeGestureBegin(PointerSwipeGestureBeginEvent *event
         swipeApplyRelease(); // the previous swipe was released a moment ago
     }
     m_swipeCumulative = QPointF();
-    m_swipeUnaccel.reset();
     const TouchpadConfig config = TouchpadConfig::read();
-    m_swipeUnaccel.setProfile(config.flat, config.speed);
     m_swipeNatural = config.natural;
     const bool column = effects->desktopGridWidth() == 1 && effects->desktopGridHeight() > 1;
     m_swipePhase = (event->fingerCount == 3 && column) ? SwipePhase::Pending : SwipePhase::Idle;
@@ -847,8 +849,9 @@ void DesktopSwitchEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *eve
         return;
     }
     const double ms = event->time.count() / 1000.0;
-    double ux, uy;
-    m_swipeUnaccel.apply(event->delta.x(), event->delta.y(), ms, ux, uy);
+    // niri reads dx_unaccelerated(); KWin passes exactly that on since Plasma 6.2 (see kiri_swipe), nothing to undo
+    const double ux = event->delta.x();
+    const double uy = event->delta.y();
     if (m_swipePhase == SwipePhase::Pending) {
         m_swipeCumulative += QPointF(ux, uy);
         if (m_swipeCumulative.x() * m_swipeCumulative.x() + m_swipeCumulative.y() * m_swipeCumulative.y() < AxisLockDistance * AxisLockDistance) {
@@ -913,6 +916,7 @@ void DesktopSwitchEffect::swipeFinish(std::chrono::microseconds time)
         return;
     }
     m_swipeRelease = m_swipeGesture.end(time.count() / 1000.0);
+    qCDebug(KIRI_SWITCH) << "swipe end: niri picks row" << m_swipeRelease.target << "from" << m_swipeRelease.from << "current desktop" << effects->desktopGridCoords(effects->currentDesktop(effects->activeScreen())).y();
     m_swipeReleasePending = true;
     // KWin's own release handling runs after the spies and may switch to another desktop (its own threshold,
     // always one step) or cancel; whichever it does is announced by desktopChanged or desktopChangingCancelled,
@@ -931,6 +935,7 @@ void DesktopSwitchEffect::swipeApplyRelease()
     const auto release = m_swipeRelease;
     LogicalOutput *output = effects->activeScreen();
     VirtualDesktop *target = effects->desktopAtCoords(QPoint(0, release.target));
+    qCDebug(KIRI_SWITCH) << "apply release: target row" << release.target << "current row" << effects->desktopGridCoords(effects->currentDesktop(output)).y();
     if (target && effects->currentDesktop(output) != target) {
         effects->setCurrentDesktop(target);
     }

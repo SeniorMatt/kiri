@@ -276,8 +276,8 @@ FocusScope {
         return -1;
     }
     function updateHint() {
-        if (dragWid === "") {
-            hint = null;
+        if (dragWid === "" || (tileOf(dragWid) && tileOf(dragWid).floating)) {
+            hint = null; // a floating window has no insert position
             return;
         }
         const di = desktopAt(dragY);
@@ -366,7 +366,9 @@ FocusScope {
             // layout-driven changes (reflow, resize) animate; zoom and scrolling do not. ax is in content space (the
             // position without the view scroll), so a scroll change (focus moving) never goes through the Behavior: the
             // effect's offset spring moves every tile smoothly instead of the tile jumping and then animating back.
-            property real ax: rx + lscroll
+            // a floating window stays where it is when the strip scrolls
+            readonly property real lsc: floating ? 0 : lscroll
+            property real ax: rx + lsc
             property real ay: ry
             property real aw: rw
             property real ah: rh
@@ -378,13 +380,13 @@ FocusScope {
             // starts from a rect (screen coordinates) and animates to the layout's place
             function startFrom(r) {
                 ready = false;
-                ax = r.x - root.lay.screen.x + lscroll;
+                ax = r.x - root.lay.screen.x + lsc;
                 ay = r.y - root.lay.screen.y;
                 aw = r.width;
                 ah = r.height;
                 Qt.callLater(() => {
                     ready = true;
-                    ax = Qt.binding(() => tile.rx + tile.lscroll);
+                    ax = Qt.binding(() => tile.rx + tile.lsc);
                     ay = Qt.binding(() => tile.ry);
                     aw = Qt.binding(() => tile.rw);
                     ah = Qt.binding(() => tile.rh);
@@ -415,13 +417,13 @@ FocusScope {
             }
             Behavior on closeUp { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
-            readonly property real shift: -root.offsetOf(did, lscroll)
+            readonly property real shift: floating ? 0 : -root.offsetOf(did, lscroll)
             x: root.x0 + (ax + shift + closeUp) * root.zm + offX
             y: root.wsY(di) + ay * root.zm + offY
             width: aw * root.zm
             height: ah * root.zm
             z: dragging || held ? 100 : (floating ? 10 : 0)
-            opacity: (dragging || held ? root.moveAlpha : 1)
+            opacity: ((dragging || held) && !floating ? root.moveAlpha : 1)
                 * (root.query === "" || title.toLowerCase().indexOf(root.query) !== -1 || cls.toLowerCase().indexOf(root.query) !== -1 ? 1 : 0.2)
             visible: root.mine && x < root.width && x + width > 0 && y < root.height && y + height > 0
 
@@ -447,20 +449,20 @@ FocusScope {
             DragHandler {
                 id: dh
                 target: null
-                enabled: !tile.floating
                 acceptedButtons: Qt.LeftButton
                 onTranslationChanged: {
                     if (!active) {
                         return;
                     }
                     const dist = Math.hypot(translation.x, translation.y);
-                    const thr = root.moveThreshold * root.effect.zoom;
+                    // niri: a floating window follows the pointer at once, a tiled one after a threshold
+                    const thr = tile.floating ? 0 : root.moveThreshold * root.effect.zoom;
                     tile.settleAnim = false;
                     if (root.dragWid === "" && dist >= thr) {
                         root.dragWid = tile.wid;
                     }
                     // rubber band before the window leaves the grid (niri), then it follows the pointer
-                    const f = 0.5 + 0.5 * Math.min(1, dist / thr);
+                    const f = thr === 0 ? 1 : 0.5 + 0.5 * Math.min(1, dist / thr);
                     tile.offX = translation.x * f;
                     tile.offY = translation.y * f;
                     if (root.dragWid === tile.wid) {
@@ -475,9 +477,26 @@ FocusScope {
                     }
                     if (root.dragWid === tile.wid) {
                         const h = root.hint;
+                        const fdi = tile.floating ? root.desktopAt(root.dragY) : -1;
                         root.dragWid = "";
                         root.hint = null;
-                        if (h !== null) {
+                        if (tile.floating) {
+                            // niri: stays floating, on the desktop under the pointer, where it was let go
+                            if (fdi >= 0) {
+                                const fd = root.lay.desktops[fdi];
+                                root.dropHold = tile.wid;
+                                root.dropPending = true;
+                                root.effect.dropFloating(tile.wid, fd.id,
+                                    (tile.x - root.x0) / root.zm + root.lay.screen.x,
+                                    (tile.y - root.wsY(fdi)) / root.zm + root.lay.screen.y);
+                                holdTimer.interval = 700;
+                                holdTimer.restart();
+                            } else {
+                                tile.settleAnim = true;
+                                tile.offX = 0;
+                                tile.offY = 0;
+                            }
+                        } else if (h !== null) {
                             root.dropHold = tile.wid;
                             root.dropPending = true;
                             root.effect.dropWindow(tile.wid, h.did, h.col, h.tile);

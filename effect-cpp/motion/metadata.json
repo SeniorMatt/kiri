@@ -8,7 +8,7 @@
         "EnabledByDefault": true,
         "License": "GPL-3.0",
         "Name": "Kiri motion",
-        "Version": "0.10.3",
+        "Version": "0.10.4",
         "Website": "https://github.com/SeniorMatt/kiri"
     }
 }

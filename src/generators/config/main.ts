@@ -3,7 +3,7 @@ console.log(`<?xml version="1.0" encoding="UTF-8"?>
     <kcfgfile name="kwinrc" />
     <group name="">`);
 
-for (const entry of [...configDef, ...getShortcutConfigDef()]) {
+for (const entry of [...getConfigDef(), ...getShortcutConfigDef()]) {
     const entryChoices: string[] | undefined = (entry as any).choices;
     const choices = entryChoices !== undefined
         ? `\n            <choices>\n${entryChoices.map(choice => `                <choice name="${choice}"/>`).join("\n")}\n            </choices>`
