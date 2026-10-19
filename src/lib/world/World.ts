@@ -8,6 +8,7 @@ class World {
     private readonly screenResizedDelayer: Delayer;
     private readonly gestureEndDelayer: Delayer;
     private readonly gestureAnimationTimer: QmlTimer;
+    private readonly minSizeTimer: QmlTimer;
     // the desktop a swipe started on: it keeps the swipe if the current desktop changes while the fingers are down
     private gestureDesktop: Desktop|null = null;
     private gestureRawId: number|undefined = undefined;
@@ -94,6 +95,17 @@ class World {
         this.gestureAnimationTimer.interval = 16;
         this.gestureAnimationTimer.repeat = true;
         this.gestureAnimationTimer.triggered.connect(() => this.gestureAnimationStep());
+
+        // KWin has no signal for a client that changes its minimum size: look twice a second, lay out only on a change
+        this.minSizeTimer = initQmlTimer();
+        this.minSizeTimer.interval = 500;
+        this.minSizeTimer.repeat = true;
+        this.minSizeTimer.triggered.connect(() => {
+            if (this.desktopManager.getCurrentDesktop()?.grid.minHeightsChanged()) {
+                this.update();
+            }
+        });
+        this.minSizeTimer.start();
 
         this.closeRelayoutDelay = config.closeRelayoutDelay;
         this.closeRelayoutDelayer = new Delayer(config.closeRelayoutDelay, () => {
@@ -624,6 +636,7 @@ class World {
         this.overview.close();
         this.gestureEndDelayer.destroy();
         this.gestureAnimationTimer.destroy();
+        this.minSizeTimer.destroy();
         this.closeRelayoutDelayer.destroy();
         this.screenResizedDelayer.destroy();
         this.workspaceSignalManager.destroy();

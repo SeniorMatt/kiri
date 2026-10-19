@@ -216,6 +216,49 @@ tests.register("Overview: a floating window dropped stays floating, where it was
     Assert.equal(a.getActualFrameGeometry().x, x);
 });
 
+tests.register("Overview: the drop index counts the column without the dragged window (the hint's index)", 1, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock, world } = init(config);
+    overviewCalls.length = 0;
+
+    const [a, b, c, d] = workspaceMock.createClientsWithWidths(200, 200, 200, 200);
+    const desktop0 = workspaceMock.desktops[0];
+    // one column with a, b, c from top to bottom (d stays alone to its right)
+    const names = new Map<string, string>([[String(a.internalId), "a"], [String(b.internalId), "b"], [String(c.internalId), "c"], [String(d.internalId), "d"]]);
+    qtMock.fireShortcut("overview");
+    function order(): string {
+        const col = overviewLastLayout().desktops[0].cols.find((cl: any) => cl.wins.length > 1);
+        return col.wins.map((w: any) => names.get(w.id)).join("");
+    }
+    function drop(client: any, column: number, tile: number) {
+        overviewPoll(world, [{ t: "drop", w: String(client.internalId), d: desktop0.id, c: column, i: tile }]);
+    }
+    drop(b, 0, 1); // below a
+    drop(c, 0, 2); // below b
+    const start = order();
+    Assert.equal(start, "abc");
+    // the top window dropped below the window that is now first (index 1 of the two that are left): top goes to the middle
+    const [top, middle, bottom] = start.split("");
+    const byName = (name: string) => [a, b, c, d].find(client => names.get(String(client.internalId)) === name)!;
+    drop(byName(top), 0, 1);
+    Assert.equal(order(), middle + top + bottom);
+    // the same window to the very bottom (index 2 of the two others) and back to the very top (index 0)
+    drop(byName(top), 0, 2);
+    Assert.equal(order(), middle + bottom + top);
+    drop(byName(top), 0, 0);
+    Assert.equal(order(), top + middle + bottom);
+    // the bottom window to the middle (index 1)
+    drop(byName(bottom), 0, 1);
+    Assert.equal(order(), top + bottom + middle);
+    // a window of another column into the column, between the first two (index 1 of the three there)
+    drop(d, 0, 1);
+    const col = overviewLastLayout().desktops[0].cols[0].wins.map((w: any) => w.id);
+    Assert.equal(col.length, 4);
+    Assert.equal(col[1], String(d.internalId));
+    Assert.equal(overviewLastLayout().desktops[0].cols.length, 1);
+});
+
 tests.register("Overview: click activates, goto and scroll", 1, () => {
     const config = getDefaultConfig();
     const { qtMock, workspaceMock, world } = init(config);

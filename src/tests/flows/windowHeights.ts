@@ -58,3 +58,26 @@ tests.register("A single window can have a preset height (niri)", 5, () => {
     qtMock.fireShortcut("window-height-reset");
     Assert.equal(a.getActualFrameGeometry().height, tilingArea.height);
 });
+
+// niri updates the tile sizes when a window commits new limits: a minimum height that grows after the window joined
+// the column (Chromium, Konsole) takes space from the other windows
+tests.register("Window heights follow a minimum that changes", 10, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [a, b, c] = workspaceMock.createClientsWithWidths(300, 300, 300);
+    workspaceMock.activeWindow = b;
+    qtMock.fireShortcut("window-consume-or-expel-left");
+    workspaceMock.activeWindow = c;
+    qtMock.fireShortcut("window-consume-or-expel-left"); // a b c in one column
+    const total = tilingArea.height - 2 * gapV;
+
+    a.minSize = new MockQmlSize(50, Math.floor(total / 2));
+    workspaceMock.activeWindow = b; // any event: the layout looks at the limits again
+    Assert.equal(a.getActualFrameGeometry().height, Math.floor(total / 2), { message: "grown minimum honoured" });
+    Assert.between(b.getActualFrameGeometry().height, Math.floor(total / 4), Math.ceil(total / 4));
+    Assert.between(c.getActualFrameGeometry().height, Math.floor(total / 4), Math.ceil(total / 4));
+    Assert.equal(a.getActualFrameGeometry().height + b.getActualFrameGeometry().height + c.getActualFrameGeometry().height + 2 * gapV, tilingArea.height);
+
+    a.minSize = new MockQmlSize(50, 100);
+    workspaceMock.activeWindow = c;
+    Assert.between(a.getActualFrameGeometry().height, Math.floor(total / 3), Math.ceil(total / 3));
+});

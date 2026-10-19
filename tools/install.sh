@@ -141,6 +141,11 @@ fi
 # Plasma's "Geometry change" effect also animates every frame change and fights kiri_animations (windows
 # jump back and forth), so it goes off
 w Plugins kwin4_effect_geometry_changeEnabled false
+# niri's workspaces do not wrap around: KWin's "navigation wraps around" would take the last desktop to the first one
+if [ -z "$(kreadconfig6 --file kwinrc --group Kiri-install --key rollOverBefore)" ]; then
+    w Kiri-install rollOverBefore "$(kreadconfig6 --file kwinrc --group Windows --key RollOverDesktops --default true)"
+    w Windows RollOverDesktops false
+fi
 # desktops one above the other, like niri's workspaces. Plasma writes Rows=1 (one horizontal row), which
 # makes KWin's own 3/4-finger left/right swipe switch desktops and fight Kiri's horizontal swipe
 number=$(kreadconfig6 --file kwinrc --group Desktops --key Number --default 1)

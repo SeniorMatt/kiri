@@ -58,7 +58,9 @@ class Window {
             return;
         }
 
-        if (this.fillsWidth() || this.fillsHeight()) {
+        if (!this.fillsWidth() && !this.fillsHeight()) {
+            this.client.hadSlot = true;
+        } else {
             const fillArea = this.getFillArea();
             if (this.fillsWidth()) {
                 if (this.isFocused() && this.isColumnInView(x, width) && !this.column.grid.desktop.isGestureScrolling() && !this.column.grid.isUserResizing()) {
@@ -238,13 +240,26 @@ class Window {
     }
 
     public onFrameGeometryChanged() {
+        this.adoptFrameWidth();
+        this.column.grid.desktop.onLayoutChanged();
+    }
+
+    private adoptFrameWidth() {
         const newGeometry = this.client.kwinClient.frameGeometry;
         // while outputs come and go KWin squeezes windows into whatever screen is left; their widths are not wanted and
         // must not replace the column's proportion, which brings the width back with the screen
         if (!Clients.isFrameFullScreenSize(this.client.kwinClient) && !this.column.grid.desktop.isScreenSettling()) {
             this.column.setWidth(newGeometry.width.round(), true, true); // the preset stays: clients may snap to a slightly different size
         }
-        this.column.grid.desktop.onLayoutChanged();
+    }
+
+    // KWin has put the frame of a window that leaves full-screen mode back and the layout is about to place it. A column
+    // that has had its slot keeps its width (niri: the window is back exactly as it was); one whose window arrived
+    // full-screen has none yet and takes the size KWin restores.
+    public onLeftFullScreenFrame() {
+        if (!this.client.hadSlot) {
+            this.adoptFrameWidth();
+        }
     }
 
     public destroy(passFocus: FocusPassing.Type) {

@@ -67,6 +67,12 @@ if [ -n "$policy" ]; then
     w Windows FocusPolicy "$policy"
     d Kiri-install focusPolicyBefore
 fi
+# navigation wraps around, as it was
+rollover=$(kreadconfig6 --file kwinrc --group Kiri-install --key rollOverBefore)
+if [ -n "$rollover" ]; then
+    w Windows RollOverDesktops "$rollover"
+    d Kiri-install rollOverBefore
+fi
 d Kiri-install effectsEnabled
 d Kiri-install motionEnabled
 d Kiri-install swipeEnabled

@@ -230,6 +230,21 @@ class Grid {
         }
     }
 
+    public minHeightsChanged() {
+        for (const column of this.columns.iterator()) {
+            if (column.minHeightsChanged()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public refreshMinHeights() {
+        for (const column of this.columns.iterator()) {
+            column.refreshMinHeights();
+        }
+    }
+
     public arrange(x: number, visibleRange: Range) {
         for (const column of this.columns.iterator()) {
             column.arrange(x + column.gridX, visibleRange, this.userResize);

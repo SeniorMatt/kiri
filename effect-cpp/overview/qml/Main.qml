@@ -162,6 +162,24 @@ FocusScope {
         forceActiveFocus();
     }
 
+    // The windows of column `c` without the dragged one, the gap closed like niri does while a tile is out of its
+    // column: the rest share the column's height in proportion to what they had. The hint is worked out from these
+    // rects and the tiles are drawn at them, so what the hint shows is where the drop goes.
+    function filled(d, c, dragWid) {
+        const rest = c.wins.filter(w => w.id !== dragWid);
+        if (rest.length === c.wins.length || rest.length === 0 || c.tab) {
+            return rest;
+        }
+        const total = rest.reduce((sum, w) => sum + w.h, 0);
+        const k = total > 0 ? (d.area[3] - d.gapV * (rest.length - 1)) / total : 1;
+        let y = d.area[1];
+        return rest.map(w => {
+            const r = { id: w.id, x: w.x, y: y, w: w.w, h: w.h * k };
+            y += r.h + d.gapV;
+            return r;
+        });
+    }
+
     // ---- niri's insert position (the same as the script's ClientManager.insertTarget), in layout space ----
     // `cur` is the pointer in the desktop's unzoomed space relative to the screen; the dragged window is out of the grid
     function insertTarget(d, cur, dragWid) {
@@ -170,7 +188,7 @@ FocusScope {
         const cols = [];
         let shift = 0;
         d.cols.forEach(c => {
-            const wins = c.wins.filter(w => w.id !== dragWid);
+            const wins = filled(d, c, dragWid);
             if (wins.length === 0) {
                 shift += c.w + gapH;
             } else {
@@ -369,9 +387,27 @@ FocusScope {
             // a floating window stays where it is when the strip scrolls
             readonly property real lsc: floating ? 0 : lscroll
             property real ax: rx + lsc
-            property real ay: ry
+            // while another tile of its column is dragged out, this one grows into the gap (see filled())
+            readonly property var fillRect: {
+                const wid = root.dragWid !== "" ? root.dragWid : (root.dropPending ? root.dropHold : "");
+                if (wid === "" || wid === tile.wid || tile.floating) {
+                    return null;
+                }
+                const d = root.lay.desktops[tile.di];
+                for (let i = 0; i < d.cols.length; i++) {
+                    const c = d.cols[i];
+                    if (c.wins.some(w => w.id === wid) && c.wins.some(w => w.id === tile.wid)) {
+                        const f = root.filled(d, c, wid).find(w => w.id === tile.wid);
+                        return f ? f : null;
+                    }
+                }
+                return null;
+            }
+            readonly property real eRy: fillRect ? fillRect.y - root.lay.screen.y : ry
+            readonly property real eRh: fillRect ? fillRect.h : rh
+            property real ay: eRy
             property real aw: rw
-            property real ah: rh
+            property real ah: eRh
             Behavior on ax { enabled: tile.ready; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
             Behavior on ay { enabled: tile.ready; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
             Behavior on aw { enabled: tile.ready; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
@@ -387,9 +423,9 @@ FocusScope {
                 Qt.callLater(() => {
                     ready = true;
                     ax = Qt.binding(() => tile.rx + tile.lsc);
-                    ay = Qt.binding(() => tile.ry);
+                    ay = Qt.binding(() => tile.eRy);
                     aw = Qt.binding(() => tile.rw);
-                    ah = Qt.binding(() => tile.rh);
+                    ah = Qt.binding(() => tile.eRh);
                 });
             }
 

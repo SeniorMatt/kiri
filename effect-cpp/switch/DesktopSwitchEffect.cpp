@@ -33,6 +33,14 @@
 
 Q_LOGGING_CATEGORY(KIRI_SWITCH, "kiri.switch", QtWarningMsg)
 
+// niri never wraps around: the last workspace is the last one, pulling past it shows nothing there. KWin's
+// "navigation wraps around" setting (RollOverDesktops, on by default) would draw the first desktop below the last
+// one while the rubber band pulls past the end, and slide 3 -> 1 directly.
+static bool rollOverDesktops()
+{
+    return false;
+}
+
 namespace KWin
 {
 
@@ -122,7 +130,7 @@ inline Region buildClipRegion(const QPoint &pos, int w, int h)
 {
     const QSize screenSize = effects->virtualScreenSize();
     Region r = Rect(pos, screenSize);
-    if (effects->optionRollOverDesktops()) {
+    if (rollOverDesktops()) {
         r += (r & Rect(-w, 0, w, h)).translated(w, 0); // W
         r += (r & Rect(w, 0, w, h)).translated(-w, 0); // E
 
@@ -216,7 +224,7 @@ bool DesktopSwitchEffect::paintScreen(const RenderTarget &renderTarget, const Re
 
 void DesktopSwitchScreen::paintScreen()
 {
-    m_paintCtx.wrap = effects->optionRollOverDesktops();
+    m_paintCtx.wrap = rollOverDesktops();
 }
 
 QPoint DesktopSwitchScreen::getDrawCoords(QPointF pos, LogicalOutput *screen)
@@ -406,7 +414,7 @@ void DesktopSwitchScreen::startAnimation(const QPointF &oldPos, VirtualDesktop *
 
     m_startPos = oldPos;
     m_endPos = effects->desktopGridCoords(current);
-    if (effects->optionRollOverDesktops()) {
+    if (rollOverDesktops()) {
         optimizePath();
     }
 
@@ -602,7 +610,7 @@ void DesktopSwitchScreen::desktopChanging(VirtualDesktop *old, QPointF desktopOf
     m_gesturePos.setX(gridPos.x() + desktopOffset.x() + m_gestureBase.x());
     m_gesturePos.setY(gridPos.y() + desktopOffset.y() + m_gestureBase.y());
 
-    if (effects->optionRollOverDesktops()) {
+    if (rollOverDesktops()) {
         m_gesturePos = forcePositivePosition(m_gesturePos);
     } else {
         m_gesturePos = moveInsideDesktopGrid(m_gesturePos);

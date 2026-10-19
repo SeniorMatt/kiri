@@ -738,6 +738,13 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     if (m_visualPositions.contains(w->internalId()) || m_releasing.contains(w->internalId()) || m_park.contains(w->internalId())) {
         data.setTransformed(); // painted somewhere else than where KWin thinks it is
     }
+    // kiri_swipe (which paints before this effect) reads where a parked window is painted: it has to be this frame's place, not
+    // the last frame's, or the window jumps for one frame when it gets parked or unparked or its place changes
+    if (const auto parkIt = m_park.constFind(w->internalId()); parkIt != m_park.constEnd()) {
+        w->setData(ParkedOffsetRole, parkedPosition(w, *parkIt) - w->frameGeometry().topLeft());
+    } else if (w->data(ParkedOffsetRole).isValid()) {
+        w->setData(ParkedOffsetRole, QVariant());
+    }
     OffscreenEffect::prePaintWindow(view, w, data);
 }
 

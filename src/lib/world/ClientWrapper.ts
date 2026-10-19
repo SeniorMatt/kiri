@@ -12,6 +12,7 @@ class ClientWrapper {
     public x11 = false; // an Xwayland window (known a moment after it is created, see ClientManager.addClient)
     public fullScreenSeen: boolean; // has been full-screen at some point (or is)
     public maximizedSeen = false; // has been maximized at some point (or is)
+    public hadSlot = false; // the layout has placed it at a slot of its column (not full-screen or maximized)
     private lastPlacementTime = 0;
     private parked = false; // see park
     private awaitingCommit = false; // a size was requested and the client has not committed anything since

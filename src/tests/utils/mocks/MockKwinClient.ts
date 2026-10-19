@@ -137,6 +137,8 @@ class MockKwinClient {
         return !this._fullScreen && !this.fixedSize;
     }
 
+    public frameFirst = false; // the frame of a window that enters or leaves full-screen mode changes before the flag does
+
     public get fullScreen() {
         return this._fullScreen;
     }
@@ -154,7 +156,9 @@ class MockKwinClient {
         // On Wayland KWin sets the full-screen flag when the client acknowledges the request, before the frame of the
         // new size arrives: without a title bar (where a screen-sized frame looks like full-screen geometry) the
         // flag comes first when a window enters full-screen mode
-        const run = fullScreen && this._noBorder ? (...fs: (() => void)[]) => fs.forEach(f => f()) : runReorder;
+        // (KWin on Wayland changes the frame first: `frameFirst`)
+        const run = this.frameFirst ? (...fs: (() => void)[]) => { fs[2](); fs[0](); } :
+            fullScreen && this._noBorder ? (...fs: (() => void)[]) => fs.forEach(f => f()) : runReorder;
         run(
             () => {
                 this._fullScreen = fullScreen;
@@ -171,20 +175,20 @@ class MockKwinClient {
                     }
                     runOneOf(
                         () => {
-                            this.frameGeometry = new MockQmlRect(
+                            this.setFrameByKwin(new MockQmlRect(
                                 0,
                                 0,
                                 screen.width + 2 * MockKwinClient.borderThickness,
                                 screen.height + 2 * MockKwinClient.borderThickness,
-                            );
+                            ));
                         },
                         () => {
-                            this.frameGeometry = new MockQmlRect(
+                            this.setFrameByKwin(new MockQmlRect(
                                 -MockKwinClient.borderThickness,
                                 -MockKwinClient.borderThickness,
                                 screen.width + 2 * MockKwinClient.borderThickness,
                                 screen.height + 2 * MockKwinClient.borderThickness,
-                            );
+                            ));
                         },
                         () => {},
                     );
@@ -192,7 +196,7 @@ class MockKwinClient {
             },
             () => {
                 this.windowed = !fullScreen;
-                this.frameGeometry = targetFrameGeometry;
+                this.setFrameByKwin(targetFrameGeometry);
             },
         );
     }
@@ -227,6 +231,10 @@ class MockKwinClient {
 
     private committing = false;
 
+    // every geometry the script assigned (KWin's own changes are not in it)
+    public assignedGeometries: MockQmlRect[] = [];
+    private kwinChange = false;
+
     // for Karousel
     public get frameGeometry() {
         return new MockQmlRect(
@@ -239,6 +247,11 @@ class MockKwinClient {
     }
 
     public set frameGeometry(frameGeometry: MockQmlRect) {
+        const byKwin = this.kwinChange;
+        this.kwinChange = false; // what the change makes the script assign is the script's
+        if (!byKwin && !this.committing) {
+            this.assignedGeometries.push(new MockQmlRect(frameGeometry.x, frameGeometry.y, frameGeometry.width, frameGeometry.height));
+        }
         const commit = this.committing;
         this.committing = false; // only this assignment is the commit, whatever the signal makes Kiri ask for next waits again
         if (this.slowClient && !commit && (Math.round(frameGeometry.width) !== Math.round(this._frameGeometry.width) || Math.round(frameGeometry.height) !== Math.round(this._frameGeometry.height))) {
@@ -262,6 +275,11 @@ class MockKwinClient {
         if (!rectEquals(frameGeometry, oldFrameGeometry)) {
             this.frameGeometryChanged.fire(oldFrameGeometry);
         }
+    }
+
+    private setFrameByKwin(frameGeometry: MockQmlRect) {
+        this.kwinChange = true;
+        this.frameGeometry = frameGeometry;
     }
 
     public get minimized() {

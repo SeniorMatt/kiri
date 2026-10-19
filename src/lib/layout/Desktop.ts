@@ -372,6 +372,7 @@ class Desktop {
     public arrange() {
         // TODO (optimization): only arrange visible windows
         this.updateArea();
+        this.grid.refreshMinHeights();
         if (this.dirty) {
             this.tabIndicators = [];
             this.grid.arrange(this.tilingArea.x - this.scrollX, this.getCurrentVisibleRange());

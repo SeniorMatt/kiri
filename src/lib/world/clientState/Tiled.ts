@@ -5,7 +5,9 @@ namespace ClientState {
         private readonly signalManager: SignalManager;
         private readonly relayoutDelayer: Delayer;
         private readonly maximizedDelayer: Delayer;
+        private readonly fullScreenDelayer: Delayer;
         private pendingMaximized: MaximizedMode | null = null;
+        private readonly fullScreenFrame = { pending: false }; // the frame of a window entering or leaving full-screen mode changed before its flag did
         private static readonly maxExternalFrameGeometryChangedIntervalMs = 1000;
 
         // `placement` puts the window where a window that was just closed and mapped again was
@@ -48,13 +50,21 @@ namespace ClientState {
                     world.do(() => { window.onMaximizedChanged(mode); });
                 }
             });
-            this.signalManager = Tiled.initSignalManager(world, window, grid.config, this.relayoutDelayer, this.maximizedDelayer, mode => { this.pendingMaximized = mode; });
+            // KWin changes the frame of a window that enters or leaves full-screen mode a moment before it sets the flag. A
+            // layout pass in between would give the client the old size again, and a client that is slow to commit would
+            // show it, one more size on the way: the layout waits for the flag
+            this.fullScreenDelayer = new Delayer(0, () => {
+                this.fullScreenFrame.pending = false;
+                world.do(() => window.onFrameGeometryChanged());
+            });
+            this.signalManager = Tiled.initSignalManager(world, window, grid.config, this.relayoutDelayer, this.maximizedDelayer, this.fullScreenDelayer, this.fullScreenFrame, mode => { this.pendingMaximized = mode; });
         }
 
         public destroy(passFocus: FocusPassing.Type) {
             this.signalManager.destroy();
             this.relayoutDelayer.destroy();
             this.maximizedDelayer.destroy();
+            this.fullScreenDelayer.destroy();
 
             const window = this.window;
             const grid = window.column.grid;
@@ -64,7 +74,7 @@ namespace ClientState {
             Tiled.restoreClientAfterTiling(client, grid.config, this.defaultState, grid.desktop.clientArea);
         }
 
-        private static initSignalManager(world: World, window: Window, config: LayoutConfig, relayoutDelayer: Delayer, maximizedDelayer: Delayer, setPendingMaximized: (mode: MaximizedMode) => void) {
+        private static initSignalManager(world: World, window: Window, config: LayoutConfig, relayoutDelayer: Delayer, maximizedDelayer: Delayer, fullScreenDelayer: Delayer, fullScreenFrame: { pending: boolean }, setPendingMaximized: (mode: MaximizedMode) => void) {
             const client = window.client;
             const kwinClient = client.kwinClient;
             const manager = new SignalManager();
@@ -253,6 +263,11 @@ namespace ClientState {
                     // frame then); KWin sets the full-screen flag before the frame of a window that enters it.
                     (!Clients.isFullScreenGeometry(kwinClient) || (config.hideTitlebars && !kwinClient.fullScreen)) // not using `kwinClient.fullScreen` because it may not be set yet at this point
                 ) {
+                    if (kwinClient.fullScreenable && Clients.isFrameFullScreenSize(kwinClient) !== kwinClient.fullScreen) {
+                        fullScreenFrame.pending = true;
+                        fullScreenDelayer.run(); // the full-screen flag follows
+                        return;
+                    }
                     const placed = kwinClient.move ? null : client.getMovedByKwinFrom(newGeometry);
                     if (placed !== null) {
                         // only the position changed, to a place that is not Kiri's: put the window back, the rest of the
@@ -272,6 +287,13 @@ namespace ClientState {
             });
 
             manager.connect(kwinClient.fullScreenChanged, () => {
+                if (fullScreenFrame.pending) {
+                    fullScreenFrame.pending = false;
+                    fullScreenDelayer.stop();
+                    if (!kwinClient.fullScreen) {
+                        world.do(() => window.onLeftFullScreenFrame());
+                    }
+                }
                 world.do((clientManager, desktopManager) => {
                     // some clients only turn out to be untileable after exiting full-screen mode
                     if (!Clients.canTileEver(kwinClient)) {

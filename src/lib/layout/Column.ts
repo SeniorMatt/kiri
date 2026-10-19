@@ -9,6 +9,7 @@ class Column {
     private tabbed: boolean;
     private normalSizing = true; // niri's sizing_mode is normal: no window is full-screen or maximized in the grid
     private focusTaker: Window|null;
+    private minHeightsSeen: number[] = []; // the minimum heights the last height distribution was made with
     // while the user resizes one of the windows: the geometry the pointer asks for, before the client has committed
     // it. The other windows of the column are sent there at once (niri sends all the configures of a resize together)
     private userResizeTarget: { window: Window, x: number, width: number } | null = null;
@@ -364,6 +365,25 @@ class Column {
         this.grid.desktop.onLayoutChanged();
     }
 
+    // niri runs update_tile_sizes again whenever a window commits new size limits; KWin has no signal for that, so the
+    // layout asks: a window whose minimum height changed (Chromium and Konsole report theirs late) gets a new distribution
+    public minHeightsChanged() {
+        const seen = this.minHeightsSeen;
+        let i = 0;
+        for (const window of this.windows.iterator()) {
+            if (seen[i++] !== this.getMinWindowHeight(window)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public refreshMinHeights() {
+        if (this.minHeightsChanged()) {
+            this.resizeWindows();
+        }
+    }
+
     // Gives the windows their heights like niri's update_tile_sizes: fixed windows first, the rest of the column
     // is shared by the weights of the auto windows (windows that need more than their share keep their minimum)
     public resizeWindows() {
@@ -374,6 +394,7 @@ class Column {
         }
         const totalHeight = this.grid.desktop.tilingArea.height - (nWindows-1) * this.grid.config.gapsInnerVertical;
         const minHeights = windows.map(window => this.getMinWindowHeight(window));
+        this.minHeightsSeen = minHeights;
 
         const heights: (number|null)[] = windows.map(() => null);
         let heightLeft = totalHeight;

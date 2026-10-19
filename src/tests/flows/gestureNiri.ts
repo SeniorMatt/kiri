@@ -304,3 +304,56 @@ for (const visual of [false, true]) {
         }
     }
 }
+
+// niri: an empty workspace is a normal place to be. Reaching one by a swipe (the focus goes to nobody) must not make any
+// focus logic activate a window of the desktop that was left: KWin would switch straight back to it.
+tests.register("Gesture swipe: nothing pulls the user back from an empty desktop", 1, () => {
+    const config = getDefaultConfig();
+    config.gestureScroll = true;
+    const { qtMock, workspaceMock, world } = init(config, { width: 1600, height: 900 });
+    const clients = workspaceMock.createClientsWithWidths(800, 800, 800, 800);
+    workspaceMock.activeWindow = clients[3];
+    const realNow = Date.now;
+    try {
+        // a horizontal swipe settles, and its focus change is done
+        let t = 8000;
+        for (let i = 0; i < 8; i++) {
+            Date.now = () => t;
+            world.gestureRaw(JSON.stringify({ id: 1, phase: "h", end: false, ev: [[t, 40]] }));
+            t += 8;
+        }
+        Date.now = () => t;
+        world.gestureRaw(JSON.stringify({ id: 1, phase: "h", end: true, ev: [[t, 0]] }));
+        const first = workspaceMock.currentDesktop;
+        // the effect (or a key) switches to the empty desktop; KWin leaves nobody focused
+        workspaceMock.currentDesktop = workspaceMock.desktops[1];
+        workspaceMock.activeWindow = null;
+        // everything that may be pending runs: the settle timer, the focus passing retries
+        for (let i = 0; i < 40; i++) {
+            t += 16;
+            Date.now = () => t;
+            (world as any).gestureAnimationTimer.triggered.fire();
+        }
+        Assert.equal(workspaceMock.currentDesktop, workspaceMock.desktops[1], { message: "still on the empty desktop" });
+        Assert.equal(workspaceMock.activeWindow, null, { message: "nothing was activated" });
+        Assert.assert(first !== workspaceMock.currentDesktop);
+    } finally {
+        Date.now = realNow;
+    }
+});
+
+// niri never wraps around: the last workspace is the last one, however KWin's "navigation wraps around" is set
+tests.register("Gesture: switching desktops never wraps around", 1, () => {
+    const config = getDefaultConfig();
+    config.gestureScroll = true;
+    config.gestureDesktopSwitch = true;
+    const { workspaceMock, world } = init(config, { width: 1600, height: 900 });
+    workspaceMock.createClientsWithWidths(800);
+    const last = workspaceMock.desktops[workspaceMock.desktops.length - 1];
+    workspaceMock.currentDesktop = last;
+    world.gestureSwitchDesktop(1);
+    Assert.equal(workspaceMock.currentDesktop, last, { message: "next at the last desktop stays" });
+    workspaceMock.currentDesktop = workspaceMock.desktops[0];
+    world.gestureSwitchDesktop(-1);
+    Assert.equal(workspaceMock.currentDesktop, workspaceMock.desktops[0], { message: "previous at the first desktop stays" });
+});
