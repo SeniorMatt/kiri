@@ -271,6 +271,13 @@ class World {
         if (currentDesktop !== undefined) {
             currentDesktop.arrange();
         }
+        // like niri, every workspace stays laid out: a window opened, closed or resized on another desktop, a
+        // screen or panel change, a config reload show up there before it is visited (arrange does nothing when clean)
+        for (const desktop of this.desktopManager.getAllDesktops()) {
+            if (desktop !== currentDesktop) {
+                desktop.arrange();
+            }
+        }
     }
 
     public do(f: (clientManager: ClientManager, desktopManager: DesktopManager) => void) {
@@ -622,7 +629,7 @@ class World {
         }
         const index = Workspace.desktops.indexOf(Workspace.currentDesktop) + offset;
         if (index >= 0 && index < Workspace.desktops.length) {
-            Workspace.currentDesktop = Workspace.desktops[index];
+            gotoDesktop(Workspace.desktops[index], "swipe");
         }
     }
 

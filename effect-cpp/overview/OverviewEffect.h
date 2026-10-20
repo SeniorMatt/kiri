@@ -11,10 +11,13 @@
 #pragma once
 
 #include "NiriAnim.h"
+#include "effect/effectwindow.h"
 #include "effect/quickeffect.h"
 
 #include <QElapsedTimer>
 #include <QHash>
+#include <memory>
+#include <unordered_map>
 #include <QStringList>
 #include <QVariantMap>
 
@@ -106,6 +109,10 @@ private:
         qint64 localUntil = 0; // the user is scrolling it: the layout does not move it
     };
 
+    void run(bool on);
+    void holdWindow(EffectWindow *w);
+    std::unordered_map<EffectWindow *, std::unique_ptr<EffectWindowVisibleRef>> m_visibleRefs;
+
     bool acquire();
     void startOpen();
     double progressVelocity() const;
@@ -144,6 +151,8 @@ private:
     QVariantMap m_viewOffsets;
     QElapsedTimer m_clock;
     qint64 m_lastFrame = 0;
+    qint64 m_prePaint = 0; // when the frame being painted began (0: none)
+    qint64 m_costMax = 0;  // the longest prePaint-to-postPaint time of this animation
     bool m_moving = false; // an animation runs: ask for the next frame (see postPaintScreen)
     bool m_warm = false;
     bool m_closedZoom = false; // the zoom is back at 0, the hand-back waits for the desktops to settle

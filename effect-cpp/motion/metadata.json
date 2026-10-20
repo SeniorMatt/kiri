@@ -5,10 +5,10 @@
         ],
         "Category": "Window Management",
         "Description": "niri's window animations for Kiri: movement and resize springs, open and close, cross-faded resizes",
-        "EnabledByDefault": true,
+        "EnabledByDefault": false,
         "License": "GPL-3.0",
         "Name": "Kiri motion",
-        "Version": "0.10.4",
+        "Version": "0.10.6",
         "Website": "https://github.com/SeniorMatt/kiri"
     }
 }

@@ -5,10 +5,10 @@
         ],
         "Category": "Window Management",
         "Description": "Rounds window corners and draws Kiri's focus ring and borders as part of the window, so they follow its animations",
-        "EnabledByDefault": true,
+        "EnabledByDefault": false,
         "License": "GPL-3.0",
         "Name": "Kiri decorations",
-        "Version": "0.10.4",
+        "Version": "0.10.6",
         "Website": "https://github.com/SeniorMatt/kiri"
     }
 }

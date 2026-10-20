@@ -4,6 +4,7 @@
 #include "OverviewEffect.h"
 
 #include "effect/effecthandler.h"
+#include "effect/effectwindow.h"
 
 #include <QDBusConnection>
 #include <QJsonArray>
@@ -41,17 +42,47 @@ OverviewEffect::OverviewEffect()
     m_clock.start();
     QDBusConnection::sessionBus().registerObject(QStringLiteral("/KiriOverview"), this, QDBusConnection::ExportScriptableSlots);
     setSource(QUrl(QStringLiteral("qrc:/kiri/overview/qml/Main.qml")));
+    connect(effects, &EffectsHandler::windowAdded, this, [this](EffectWindow *w) {
+        if (isRunning()) {
+            holdWindow(w);
+        }
+    });
+    connect(effects, &EffectsHandler::windowDeleted, this, [this](EffectWindow *w) {
+        m_visibleRefs.erase(w);
+    });
     connect(effects, &EffectsHandler::screenAboutToLock, this, [this]() {
         if (isRunning()) {
             m_open = false;
             m_gesture = false;
             m_progress = 0;
             m_progressAnimating = false;
-            setRunning(false);
+            run(false);
             Q_EMIT progressChanged();
             Q_EMIT closingChanged();
         }
     });
+}
+
+// KWin hides the windows of the other desktops: no frame callbacks, so a video or terminal there freezes. While the
+// overview runs every window stays visible to KWin (it is not painted by KWin itself, the scene draws thumbnails of
+// them), so the clients keep committing frames from the first frame the overview paints them (niri: live workspaces).
+void OverviewEffect::run(bool on)
+{
+    setRunning(on);
+    if (!on) {
+        m_visibleRefs.clear();
+        return;
+    }
+    for (EffectWindow *w : effects->stackingOrder()) {
+        holdWindow(w);
+    }
+}
+
+void OverviewEffect::holdWindow(EffectWindow *w)
+{
+    if (!m_visibleRefs.contains(w)) {
+        m_visibleRefs.emplace(w, std::make_unique<EffectWindowVisibleRef>(w, EffectWindow::PAINT_DISABLED_BY_DESKTOP));
+    }
 }
 
 OverviewEffect::~OverviewEffect()
@@ -113,12 +144,14 @@ void OverviewEffect::logFrames()
         // one line per animation, so that a lag on the owner's machine can be read from the journal
         qCInfo(KIRI_OVERVIEW).nospace() << (m_warm ? "warm-up" : "animation") << ": first frame " << m_firstFrameMs << " ms, "
                                         << m_frames << " frames, average " << double(m_frameSum) / m_frames << " ms, max "
-                                        << m_frameMax << " ms, " << m_frameSlow << " over 25 ms";
+                                        << m_frameMax << " ms, " << m_frameSlow << " over 25 ms, slowest frame took " << m_costMax << " ms";
     }
     m_frames = 0;
     m_frameSum = 0;
     m_frameMax = 0;
     m_frameSlow = 0;
+    m_costMax = 0;
+    m_prePaint = 0;
     m_firstFrameMs = 0;
     m_lastFrame = 0;
 }
@@ -186,7 +219,7 @@ bool OverviewEffect::tick()
         // closed, and the desktops sit where they are on the real screen (the view offsets and the desktop spring have
         // arrived: handing back earlier would show them jumping): hand the screen back
         m_closedZoom = false;
-        setRunning(false);
+        run(false);
         logFrames();
         return false;
     }
@@ -205,7 +238,10 @@ void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
     if (isRunning()) {
         // frame times while the overview moves, logged per animation (see logFrames); a hitch of up to 2 s counts
         const qint64 t = now();
-        if (m_lastFrame > 0 && t - m_lastFrame < 2000) {
+        // Only frames the animation asked for count: while the overview sits open nothing is repainted, and the next
+        // repaint (a key, the pointer) arrives whenever it arrives. That idle gap used to show up as "max" (166 to
+        // 223 ms in the journal) although no frame was late.
+        if (m_lastFrame > 0 && m_moving && t - m_lastFrame < 2000) {
             m_frames++;
             m_frameSum += t - m_lastFrame;
             m_frameMax = std::max<qint64>(m_frameMax, t - m_lastFrame);
@@ -216,6 +252,7 @@ void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
         // The springs run on their own clock that advances at most 100 ms per frame: building the scene
         // on the first frame, or any hitch, must not make the zoom skip ahead (it would look like a teleport).
         m_anim += (m_lastFrame > 0) ? std::min<qint64>(t - m_lastFrame, 100) : 0;
+        m_prePaint = t;
         if (m_lastFrame == 0 && m_openCall > 0) {
             m_firstFrameMs = t - m_openCall;
             m_openCall = 0;
@@ -233,6 +270,12 @@ void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
 // changes (an app that redraws all the time, like OBS's preview), and the animation stutters.
 void OverviewEffect::postPaintScreen()
 {
+    if (isRunning() && m_prePaint > 0) {
+        // what this frame cost the compositor (the QML scene is rendered inside it): a real stall, unlike the interval
+        const qint64 cost = now() - m_prePaint;
+        m_costMax = std::max(m_costMax, cost);
+        m_prePaint = 0;
+    }
     if (m_moving && isRunning()) {
         effects->addRepaintFull();
     }
@@ -339,7 +382,7 @@ bool OverviewEffect::acquire()
     effects->setProperty("kiriSwitchVisual", QVariant());
     m_openCall = now();
     m_closedZoom = false;
-    setRunning(true);
+    run(true);
     if (!isRunning()) {
         return false;
     }
@@ -402,7 +445,7 @@ QString OverviewEffect::warm(const QString &layout)
             logFrames(); // while m_warm is still set: the line says "warm-up", not "animation"
             m_warm = false;
             m_progressAnimating = false;
-            setRunning(false);
+            run(false);
             Q_EMIT warmingChanged();
         }
     });

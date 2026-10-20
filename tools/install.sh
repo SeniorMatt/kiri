@@ -2,9 +2,9 @@
 # Installs or updates Kiri on this machine. Run it from the extracted release (kiri_X.tar.gz) or a git checkout:
 #   ./install.sh
 # It builds the compiled KWin effects against the KWin you have installed (so run it again after a KWin
-# update), installs the Kiri script for your user (and the kiri_animations effect if the build fails), turns everything on and does
-# the one-time setup (Plasma's Slide, Fade, Scale, Glide and Maximize effects off, desktops in one column). If the build fails, Kiri still works:
-# it draws its rings itself and the old Slide stays.
+# update), installs the Kiri script for your user (and the kiri_animations effect if the build fails) and the
+# kiri-mode switch (Meta+Ctrl+Shift+K), and starts in Kiri mode. Plasma's own settings stay as they are in kwinrc.
+# If the build fails, Kiri still works: it draws its rings itself.
 #   ./install.sh --no-build    skip the compiled effects
 set -e
 
@@ -60,16 +60,10 @@ fi
 
 # kwinrc writer (defined before first use: /usr/bin/w exists, so a late definition fails silently)
 w() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" "$3"; }
+d() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" --delete; }
 
 # ---- the script and the animation effect ---------------------------------------------------------------
 kpackagetool6 --type=KWin/Script --upgrade "$root/package" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Script --install "$root/package"
-if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key overviewEnabled)" != done ]; then
-    # added with the overview: niri's overview (Meta+O, 4-finger swipe up). Plasma's own Overview has the same 4-finger
-    # swipe and would open on top of it, so it is switched off once; uninstall.sh switches it back on
-    w Plugins kiri_overviewEnabled true
-    w Plugins overviewEnabled false
-    w Kiri-install overviewEnabled done
-fi
 if $compiled; then
     # kiri_motion replaces the kiri_animations script effect; with both on every window animates twice, so the
     # fallback is not installed at all and doesn't show up in Desktop Effects
@@ -79,24 +73,6 @@ else
     kpackagetool6 --type=KWin/Effect --upgrade "$effect" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Effect --install "$effect"
 fi
 
-# ---- turn things on ------------------------------------------------------------------------------------
-w Plugins kiriEnabled true
-if ! $compiled && [ "$(kreadconfig6 --file kwinrc --group Plugins --key kiri_animationsEnabled)" != false ]; then
-    w Plugins kiri_animationsEnabled true
-fi
-if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key effectsEnabled)" != done ]; then
-    # the first install turns them on; after that the user's choice stays
-    w Plugins kiri_decorationsEnabled true
-    w Plugins kiri_desktop_switchEnabled true
-    w Plugins slideEnabled false
-    w Kiri-install effectsEnabled done
-fi
-if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key decorations010)" != done ]; then
-    # 0.10: titlebar hiding, the drag outline, focus follows mouse and the full-screen fix all need kiri_decorations,
-    # so it is turned on once again for people who had it off
-    w Plugins kiri_decorationsEnabled true
-    w Kiri-install decorations010 done
-fi
 # 0.10.3: Spectacle is not tiled by default; a saved list of window rules (changed in the settings) gets the rule once
 if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key spectacleRule)" != done ]; then
     rules=$(kreadconfig6 --file kwinrc --group Script-kiri --key windowRules)
@@ -111,74 +87,75 @@ if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key dynamicDesktopsOff
     w Script-kiri dynamicDesktops false
     w Kiri-install dynamicDesktopsOff done
 fi
-if $compiled && [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key swipeEnabled)" != done ]; then
-    # added in 0.9.1: turned on once, also for people who installed an older version
-    w Plugins kiri_swipeEnabled true
-    w Kiri-install swipeEnabled done
-fi
-if $compiled; then
-    # kiri_motion does what the kiri_animations script effect does, with niri's springs, open/close and cross-faded
-    # resizes; kiri_animations is only installed as the fallback where the compiled effects can't be built.
-    if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key motionEnabled)" != done ]; then
-        w Plugins kiri_motionEnabled true
-        # Plasma's own window open/close and maximize animations would play on top of niri's: Fade, Scale,
-        # Glide (the choices for "Window open/close animation") and Maximize
-        for e in fade scale glide maximize; do
-            w Plugins "${e}Enabled" false
-        done
-        w Kiri-install motionEnabled done
+# ---- 0.10.6: the mode switch -----------------------------------------------------------------------------
+# Up to 0.10.5 install.sh wrote Kiri's choices into kwinrc: Plasma's effects off, the kiri_* effects on, the focus
+# policy, wrap-around and rows. Now kwinrc keeps the user's settings and Kiri mode applies its own at runtime
+# (kiri-mode), so those entries go: Plasma's effects are back at their defaults (we can't know which ones the user
+# had off before Kiri) and the kiri_* effects are no longer switched on in kwinrc, the script loads them.
+old_install=false
+for k in effectsEnabled motionEnabled swipeEnabled overviewEnabled decorations010 focusPolicyBefore rollOverBefore; do
+    [ -n "$(kreadconfig6 --file kwinrc --group Kiri-install --key $k)" ] && old_install=true
+done
+if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key modeSwitch)" != done ]; then
+    if $old_install; then for e in slide overview kwin4_effect_geometry_change fade scale glide maximize kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
+        d Plugins ${e}Enabled
+    done; fi
+    # the values saved by older versions are the user's, now kept in [Kiri-mode]
+    policy=$(kreadconfig6 --file kwinrc --group Kiri-install --key focusPolicyBefore)
+    if [ -n "$policy" ]; then
+        w Kiri-mode focusPolicy "$policy"
+        w Kiri-mode focusPolicyApplied ClickToFocus
     fi
-fi
-# focus follows the mouse like in niri: Kiri does it itself (it pauses while a Plasma popup such as the launcher is
-# open, which KWin's own focus-follows-mouse can't), so KWin goes to "Click to focus". The old policy is kept once
-# and uninstall.sh puts it back.
-if [ "$(kreadconfig6 --file kwinrc --group Script-kiri --key focusFollowsMouse --default true)" = true ]; then
-    if [ -z "$(kreadconfig6 --file kwinrc --group Kiri-install --key focusPolicyBefore)" ]; then
-        w Kiri-install focusPolicyBefore "$(kreadconfig6 --file kwinrc --group Windows --key FocusPolicy --default ClickToFocus)"
+    rollover=$(kreadconfig6 --file kwinrc --group Kiri-install --key rollOverBefore)
+    if [ -n "$rollover" ]; then
+        w Kiri-mode rollOver "$rollover"
+        w Kiri-mode rollOverApplied false
     fi
-    w Windows FocusPolicy ClickToFocus
-fi
-# Plasma's "Geometry change" effect also animates every frame change and fights kiri_animations (windows
-# jump back and forth), so it goes off
-w Plugins kwin4_effect_geometry_changeEnabled false
-# niri's workspaces do not wrap around: KWin's "navigation wraps around" would take the last desktop to the first one
-if [ -z "$(kreadconfig6 --file kwinrc --group Kiri-install --key rollOverBefore)" ]; then
-    w Kiri-install rollOverBefore "$(kreadconfig6 --file kwinrc --group Windows --key RollOverDesktops --default true)"
-    w Windows RollOverDesktops false
-fi
-# desktops one above the other, like niri's workspaces. Plasma writes Rows=1 (one horizontal row), which
-# makes KWin's own 3/4-finger left/right swipe switch desktops and fight Kiri's horizontal swipe
-number=$(kreadconfig6 --file kwinrc --group Desktops --key Number --default 1)
-rows=$(kreadconfig6 --file kwinrc --group Desktops --key Rows --default 1)
-if [ "$number" -gt 1 ] && [ "$rows" -lt "$number" ]; then
-    echo "Setting the desktops to $number rows (one above the other), was $rows."
-    w Desktops Rows "$number"
+    d Kiri-install focusPolicyBefore
+    d Kiri-install rollOverBefore
+    for k in effectsEnabled motionEnabled swipeEnabled overviewEnabled decorations010; do
+        d Kiri-install $k
+    done
+    w Kiri-install modeSwitch done
 fi
 
-# ---- apply without logging out where KWin allows it ----------------------------------------------------
+# ---- the switch: kiri-mode and its shortcut ------------------------------------------------------------------
+bin=$HOME/.local/bin
+apps=${XDG_DATA_HOME:-$HOME/.local/share}/applications
+mkdir -p "$bin" "$apps"
+install -m 755 "$here/kiri-mode" "$bin/kiri-mode" 2>/dev/null || install -m 755 "$root/tools/kiri-mode" "$bin/kiri-mode"
+# Meta+Ctrl+Shift+K, unless something else already has it (kglobalacceld takes the shortcut from a .desktop file with X-KDE-Shortcuts)
+shortcut=Meta+Ctrl+Shift+K
+if [ ! -f "$apps/kiri-mode.desktop" ] && grep -rqs -- "$shortcut" "${XDG_CONFIG_HOME:-$HOME/.config}/kglobalshortcutsrc"; then
+    shortcut=
+fi
+cat >"$apps/kiri-mode.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Switch Kiri / Plasma
+Comment=Switch between Kiri mode and Plasma mode
+Icon=kiri
+Exec=$bin/kiri-mode toggle
+Terminal=false
+StartupNotify=false
+Categories=Utility;
+X-KDE-GlobalAccel-CommandShortcut=true
+${shortcut:+X-KDE-Shortcuts=$shortcut}
+DESKTOP
+command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+
+# ---- start in Kiri mode (settings and effects switch at runtime where KWin allows it) ----------------------------
 applied=false
 if qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1; then
     applied=true
-    rows=$(kreadconfig6 --file kwinrc --group Desktops --key Rows --default 0)
-    qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect kwin4_effect_geometry_change >/dev/null 2>&1 || true
-    [ "$rows" -gt 0 ] && dbus-send --session --type=method_call --dest=org.kde.KWin /VirtualDesktopManager org.freedesktop.DBus.Properties.Set string:org.kde.KWin.VirtualDesktopManager string:rows variant:uint32:"$rows" >/dev/null 2>&1 || true
-    if $compiled; then
-        for e in slide fade scale glide maximize; do
-            [ "$(kreadconfig6 --file kwinrc --group Plugins --key ${e}Enabled)" = false ] &&
-                qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
-        done
-    fi
-    [ "$(kreadconfig6 --file kwinrc --group Plugins --key overviewEnabled)" = false ] &&
-        qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect overview >/dev/null 2>&1 || true
     for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
         qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
-        # only the ones that are switched on (the script effect is the fallback and stays off beside kiri_motion)
-        [ "$(kreadconfig6 --file kwinrc --group Plugins --key ${e}Enabled)" = false ] && continue
-        qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect $e >/dev/null 2>&1 || true
     done
-    # a new version of the script: stop the running one, reconfigure starts it again
+    # a new version of the script: stop the running one, kiri-mode starts it again
     qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript kiri >/dev/null 2>&1 || true
-    qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
+    "$bin/kiri-mode" kiri || true
+else
+    w Plugins kiriEnabled true
 fi
 
 # the Shortcuts page looks up an icon named after the shortcut group, "kiri"
@@ -199,7 +176,8 @@ if [ ! -e "$icons/scalable/apps/kiri.svg" ]; then
 fi
 
 if $applied; then
-    echo "Kiri installed and running."
+    echo "Kiri installed and running. Switch between Kiri and Plasma with Meta+Ctrl+Shift+K or: kiri-mode toggle"
+    exit 0
 fi
 echo "Done. Log out and log back in to finish."
 if [ -r /dev/tty ]; then

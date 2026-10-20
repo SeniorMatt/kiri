@@ -378,7 +378,7 @@ class Desktop {
             this.grid.arrange(this.tilingArea.x - this.scrollX, this.getCurrentVisibleRange());
             this.dirty = false;
         }
-        publishTabIndicators(this, this.tabIndicators);
+        publishTabIndicators(this, this.tabIndicators, this.kwinDesktop === Workspace.currentDesktop);
     }
 
     public addTabIndicator(indicator: TabIndicator) {

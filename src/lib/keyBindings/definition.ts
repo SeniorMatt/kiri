@@ -520,7 +520,7 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
 function switchToPreviousDesktop(world: World) {
     const previous = world.previousDesktop;
     if (previous !== null && Workspace.desktops.includes(previous)) {
-        Workspace.currentDesktop = previous;
+        gotoDesktop(previous, "previous-desktop");
     }
 }
 
@@ -531,7 +531,7 @@ function currentDesktopIndex() {
 function switchToDesktop(index: number) {
     const desktop = Workspace.desktops[index];
     if (desktop !== undefined) {
-        Workspace.currentDesktop = desktop;
+        gotoDesktop(desktop, "focus-desktop");
     }
 }
 

@@ -3,10 +3,10 @@
         "Authors": [ { "Name": "Senior Matthew" } ],
         "Category": "Window Management",
         "Description": "niri's overview: every desktop zoomed out and stacked, with its windows where Kiri placed them",
-        "EnabledByDefault": true,
+        "EnabledByDefault": false,
         "License": "GPL-3.0",
         "Name": "Kiri overview",
-        "Version": "0.10.4",
+        "Version": "0.10.6",
         "Website": "https://github.com/SeniorMatt/kiri"
     }
 }

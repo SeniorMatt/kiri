@@ -18,13 +18,29 @@ mouse wheel binds, the animation effect): download `kiri_*.tar.gz` from [Release
 
 It builds the compiled effects against your KWin, so run it again after KWin updates. Arch-based systems only for now.
 
-To remove it, run `./uninstall.sh` from the same folder. It asks before removing anything, then asks whether to
+To remove it, run `./uninstall.sh` from the same folder (it switches to Plasma mode first). It asks before removing anything, then asks whether to
 also delete your Kiri settings and shortcuts; keep them if you only want Kiri gone for a while.
 
 Script only: download `kiri_*.kwinscript`, then in System Settings > Window Management > KWin Scripts use
 "Install from File…", tick Kiri and log in again.
 
 Run it again to update. Then log out and back in, and enable Kiri in System Settings > Window Management > KWin Scripts if it isn't already.
+
+## Switching between Kiri and Plasma
+`install.sh` installs `kiri-mode` (in `~/.local/bin`) and a "Switch Kiri / Plasma" entry with the shortcut
+Meta+Ctrl+Shift+K (not set if that key is taken). No log out, no uninstall:
+
+    kiri-mode toggle | kiri | plasma | status
+
+Your Plasma settings stay as they are in System Settings (kwinrc). Kiri mode only overrides them while it runs: the Kiri
+script unloads Plasma's Slide, Overview, Geometry change, Fade, Scale, Glide and Maximize effects and loads the kiri_*
+effects, and `kiri-mode` sets the three settings that have no runtime switch (focus policy "Click to focus", desktop
+wrap-around off, desktops in one column) while keeping your values in the `[Kiri-mode]` group of kwinrc. Plasma mode puts
+it all back; a message on screen says which mode you are in. The mode is remembered for the next login. If the session
+ends in Kiri mode, the saved values survive. A setting you change in System Settings while in Kiri mode is not overwritten
+when you go back to Plasma mode. Enabling or disabling only the script in KWin Scripts switches the effects but not these
+three settings; use `kiri-mode` for that. Upgrading from 0.10.5 or older: Plasma's effects are back at their defaults
+(Kiri could not know which ones you had turned off before it).
 
 ## Shortcuts
 They're in System Settings > Shortcuts > Kiri, and the defaults follow niri's, except moving uses Meta+Shift instead of Meta+Ctrl:

@@ -47,44 +47,44 @@ delete_group() {
     awk -v g="[$2]" '/^\[/ { skip = ($0 == g) } !skip' "$1" >"$1.kiri-tmp" && mv "$1.kiri-tmp" "$1"
 }
 
-# ---- stop everything (the script gives Plasma's borrowed shortcuts back when it stops) ------------------
-w Plugins kiriEnabled false
+# ---- Plasma mode first: the script and the kiri_* effects stop, Plasma's effects and your focus policy, wrap-around
+# and rows come back (the script gives Plasma's borrowed shortcuts back when it stops) ----------------------------
+kiri_mode=$(command -v kiri-mode || echo "$HOME/.local/bin/kiri-mode")
+if [ -x "$kiri_mode" ]; then
+    "$kiri_mode" plasma --no-osd || true
+else
+    w Plugins kiriEnabled false
+    q org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript kiri
+fi
 for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
     d Plugins ${e}Enabled
     q org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e
 done
-q org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript kiri
-
-# ---- Plasma's own effects back (their default is on) ---------------------------------------------------
-d Plugins slideEnabled
-d Plugins kwin4_effect_geometry_changeEnabled
-for e in fade scale glide maximize; do
-    d Plugins ${e}Enabled
+# what versions up to 0.10.5 left in kwinrc
+old_install=false
+for k in effectsEnabled motionEnabled swipeEnabled overviewEnabled decorations010; do
+    [ -n "$(kreadconfig6 --file kwinrc --group Kiri-install --key $k)" ] && old_install=true
 done
-# the focus policy Kiri replaced with "Click to focus"
+if $old_install; then
+    for e in slide overview kwin4_effect_geometry_change fade scale glide maximize; do
+        d Plugins ${e}Enabled
+    done
+    for k in effectsEnabled motionEnabled swipeEnabled overviewEnabled decorations010; do
+        d Kiri-install $k
+    done
+fi
 policy=$(kreadconfig6 --file kwinrc --group Kiri-install --key focusPolicyBefore)
-if [ -n "$policy" ]; then
-    w Windows FocusPolicy "$policy"
-    d Kiri-install focusPolicyBefore
-fi
-# navigation wraps around, as it was
+[ -n "$policy" ] && w Windows FocusPolicy "$policy"
 rollover=$(kreadconfig6 --file kwinrc --group Kiri-install --key rollOverBefore)
-if [ -n "$rollover" ]; then
-    w Windows RollOverDesktops "$rollover"
-    d Kiri-install rollOverBefore
-fi
-d Kiri-install effectsEnabled
-d Kiri-install motionEnabled
-d Kiri-install swipeEnabled
-d Kiri-install overviewEnabled
-d Plugins overviewEnabled # Plasma's own Overview is on by default again
+[ -n "$rollover" ] && w Windows RollOverDesktops "$rollover"
+delete_group "$config/kwinrc" Kiri-mode
+d Kiri-install focusPolicyBefore
+d Kiri-install rollOverBefore
+d Plugins kiriEnabled
 q org.kde.KWin /KWin org.kde.KWin.reconfigure
-q org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect slide
-q org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect kwin4_effect_geometry_change
-q org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect overview
-for e in scale maximize; do # the ones Plasma has on by default (Fade and Glide are off unless chosen)
-    q org.kde.KWin /Effects org.kde.kwin.Effects.loadEffect $e
-done
+rm -f "$HOME/.local/bin/kiri-mode" "$data/applications/kiri-mode.desktop"
+$purge && delete_group "$config/kglobalshortcutsrc" "services][kiri-mode.desktop"
+command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
 
 # ---- files -----------------------------------------------------------------------------------------------
 kpackagetool6 --type=KWin/Script --remove kiri >/dev/null 2>&1 || true
@@ -120,7 +120,6 @@ if $purge; then
     q org.kde.kglobalaccel /component/kiri org.kde.kglobalaccel.Component.cleanUp
     delete_group "$config/kglobalshortcutsrc" kiri
     delete_group "$config/kwinrc" Script-kiri
-    delete_group "$config/kwinrc" Kiri-install
     d Plugins kiriEnabled
     q org.kde.KWin /KWin org.kde.KWin.reconfigure
     echo "Deleted Kiri's settings and shortcuts."
@@ -130,4 +129,4 @@ fi
 
 rows=$(kreadconfig6 --file kwinrc --group Desktops --key Rows --default 1)
 [ "$rows" -gt 1 ] && echo "Your desktops stay one above the other ($rows rows); change it in System Settings > Virtual Desktops."
-echo "Kiri removed. Log out and log back in to finish."
+echo "Kiri removed."

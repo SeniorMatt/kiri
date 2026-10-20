@@ -140,11 +140,11 @@ Item {
             (error) => { /* a busy compositor times out: keep what is known, or Meta+O would fall back to Plasma's overview */ },
         );
     }
-    // a good while after the effect has loaded, when the session is quiet: it builds its scene once, invisibly.
+    // a while (15 s) after the effect has loaded, when the first frames are long shown: it builds its scene once, invisibly.
     // Not at login: the compositor is busy with the splash, the panel and the hand-over from the login screen then
     Timer {
         id: overviewWarmTimer
-        interval: 45000
+        interval: 15000
         onTriggered: if (qmlBase.overviewEffect && !qmlBase.overviewPolling) qmlBase.karouselInstance.overviewWarm()
     }
     property int overviewPollErrors: 0
@@ -474,12 +474,68 @@ Item {
         }
     }
 
+    // Kiri mode: while the script runs, Plasma's own animation effects are unloaded and the kiri_* effects are loaded
+    // (at runtime only; kwinrc keeps the user's Plasma settings). Stopping the script reverses it. `kiri-mode`
+    // (tools/kiri-mode) does the same from outside and covers a script that was stopped without getting to do it.
+    property var unloadedPlasmaEffects: []
+    readonly property var plasmaEffects: ["slide", "overview", "kwin4_effect_geometry_change", "fade", "scale", "glide", "maximize"]
+    readonly property var kiriEffects: ["kiri_decorations", "kiri_desktop_switch", "kiri_motion", "kiri_swipe", "kiri_overview"]
+
+    function effectCall(member, name, callback) {
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/Effects",
+                iface: "org.kde.kwin.Effects",
+                member: member,
+                arguments: [new DBus.string(name)],
+                signature: "(s)",
+            },
+            (reply) => {
+                const value = reply && reply.value !== undefined && reply.value !== null && typeof reply.value === "object" && "value" in reply.value ? reply.value.value : reply.value;
+                if (callback) { callback(value === true); }
+            },
+            (error) => { if (callback) { callback(false); } },
+        );
+    }
+
+    function enterKiriMode() {
+        for (const name of plasmaEffects) {
+            effectCall("isEffectLoaded", name, (loaded) => {
+                if (loaded) {
+                    qmlBase.unloadedPlasmaEffects.push(name);
+                    qmlBase.effectCall("unloadEffect", name, null);
+                }
+            });
+        }
+        for (const name of kiriEffects) {
+            effectCall("loadEffect", name, (ok) => {
+                // the script effect is only the fallback where the compiled one is not installed
+                if (!ok && name === "kiri_motion") {
+                    qmlBase.effectCall("loadEffect", "kiri_animations", null);
+                }
+            });
+        }
+    }
+
+    function leaveKiriMode() {
+        for (const name of kiriEffects.concat(["kiri_animations"])) {
+            effectCall("unloadEffect", name, null);
+        }
+        for (const name of unloadedPlasmaEffects) {
+            effectCall("loadEffect", name, null);
+        }
+        unloadedPlasmaEffects = [];
+    }
+
     Component.onCompleted: {
         qmlBase.karouselInstance = Karousel.init();
+        qmlBase.enterKiriMode();
     }
 
     Component.onDestruction: {
         qmlBase.karouselInstance.destroy();
+        qmlBase.leaveKiriMode();
     }
 
     // Applying settings without restarting: when kwinrc changes, KWin is asked to re-read it

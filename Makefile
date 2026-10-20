@@ -31,7 +31,7 @@ package: build
 	rm -rf ./kiri-pkg-tmp
 	mkdir -p ./kiri-pkg-tmp/kiri_${subst .,_,${VERSION}}
 	cp -r ./package ./effect ./effect-cpp ./kiri-pkg-tmp/kiri_${subst .,_,${VERSION}}/
-	cp ./tools/install.sh ./tools/uninstall.sh ./LICENSE ./README.md ./kiri-pkg-tmp/kiri_${subst .,_,${VERSION}}/
+	cp ./tools/install.sh ./tools/uninstall.sh ./tools/kiri-mode ./LICENSE ./README.md ./kiri-pkg-tmp/kiri_${subst .,_,${VERSION}}/
 	rm -rf ./kiri-pkg-tmp/kiri_${subst .,_,${VERSION}}/effect-cpp/build
 	tar -czf ./kiri_${subst .,_,${VERSION}}.tar.gz -C ./kiri-pkg-tmp kiri_${subst .,_,${VERSION}}
 	rm -rf ./kiri-pkg-tmp

@@ -28,7 +28,9 @@ function initWorkspaceSignalHandlers(world: World, focusPasser: FocusPassing.Pas
         }
     });
 
+    initDesktopLog();
     manager.connect(Workspace.currentDesktopChanged, () => {
+        logDesktopChange();
         focusPasser.clear(); // a focus request from before the switch belongs to the old desktop
         world.onDesktopChanged();
         world.do(() => {}); // re-arrange desktop

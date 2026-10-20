@@ -3,10 +3,10 @@
         "Authors": [ { "Name": "Senior Matthew" } ],
         "Category": "Tests",
         "Description": "Hands the raw 3-finger touchpad swipe (uncapped deltas) to the Kiri script, which scrolls like niri's view gesture",
-        "EnabledByDefault": true,
+        "EnabledByDefault": false,
         "License": "GPL-3.0",
         "Name": "Kiri touchpad swipe",
-        "Version": "0.10.4",
+        "Version": "0.10.6",
         "Website": "https://github.com/SeniorMatt/kiri"
     }
 }

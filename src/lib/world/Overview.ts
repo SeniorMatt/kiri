@@ -169,7 +169,7 @@ class Overview {
             }
             this.world.do(() => {
                 if (kwinClient.desktops.length === 1 && kwinClient.desktops[0] !== Workspace.currentDesktop) {
-                    Workspace.currentDesktop = kwinClient.desktops[0];
+                    gotoDesktop(kwinClient.desktops[0], "overview-window");
                 }
                 Workspace.activeWindow = kwinClient;
             });
@@ -178,7 +178,7 @@ class Overview {
         case "goto": {
             const kwinDesktop = Workspace.desktops[event.i];
             if (kwinDesktop !== undefined && kwinDesktop !== Workspace.currentDesktop) {
-                Workspace.currentDesktop = kwinDesktop;
+                gotoDesktop(kwinDesktop, "overview-desktop");
             }
             return true;
         }

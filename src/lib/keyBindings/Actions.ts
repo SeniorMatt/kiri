@@ -161,7 +161,7 @@ class Actions {
     public static switchDesktop(step: number) {
         const target = Workspace.desktops[Workspace.desktops.indexOf(Workspace.currentDesktop) + step];
         if (target !== undefined) {
-            Workspace.currentDesktop = target;
+            gotoDesktop(target, "switch-desktop");
         }
     }
 
@@ -837,7 +837,7 @@ class Actions {
         const wasFocused = window.isFocused();
         column.moveToGrid(newGrid, newGrid.getLastFocusedColumn() ?? newGrid.getLastColumn());
         if (wasFocused) {
-            Workspace.currentDesktop = newGrid.desktop.kwinDesktop;
+            gotoDesktop(newGrid.desktop.kwinDesktop, "move-window-follow");
             window.focus();
         }
     };
@@ -857,7 +857,7 @@ class Actions {
         window.moveToColumn(newColumn, true, wasFocused ? FocusPassing.Type.Immediate : FocusPassing.Type.None);
         window.client.kwinClient.desktops = [newGrid.desktop.kwinDesktop];
         if (wasFocused) {
-            Workspace.currentDesktop = newGrid.desktop.kwinDesktop;
+            gotoDesktop(newGrid.desktop.kwinDesktop, "move-window-follow");
             window.focus();
         }
     };

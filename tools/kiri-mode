@@ -1,0 +1,144 @@
+#!/bin/sh
+# Switches between Kiri mode and Plasma mode without logging out:
+#   kiri-mode kiri | plasma | toggle | status
+# Your Plasma settings stay the truth in kwinrc. Kiri mode loads the Kiri script and the kiri_* effects at runtime,
+# unloads Plasma's Slide, Overview, Geometry change, Fade, Scale, Glide and Maximize, and sets the few settings that have
+# no runtime switch (focus policy, desktop wrap-around, desktop rows), keeping your values in [Kiri-mode] of kwinrc.
+# Plasma mode undoes all of that. The mode is "Plasma Plugins kiriEnabled" in kwinrc, so the next login starts in the
+# same mode. Options: --no-osd (no on-screen message).
+set -e
+
+osd=true
+cmd=
+for arg in "$@"; do
+    case $arg in
+        --no-osd) osd=false ;;
+        *) cmd=$arg ;;
+    esac
+done
+
+KWIN="qdbus6 org.kde.KWin"
+KIRI_EFFECTS="kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview kiri_animations"
+# Plasma effects Kiri replaces, with whether Plasma has them on by default
+PLASMA_EFFECTS="slide:true overview:true kwin4_effect_geometry_change:true fade:false scale:true glide:false maximize:true"
+
+r() { kreadconfig6 --file kwinrc --group "$1" --key "$2" ${3:+--default "$3"}; }
+w() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" "$3"; }
+d() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" --delete; }
+fx() { $KWIN /Effects "org.kde.kwin.Effects.$1" "$2" 2>/dev/null || true; }
+reconfigure() { $KWIN /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true; }
+
+current() { [ "$(r Plugins kiriEnabled)" = true ] && echo kiri || echo plasma; }
+script_loaded() { [ "$($KWIN /Scripting org.kde.kwin.Scripting.isScriptLoaded kiri 2>/dev/null)" = true ]; }
+effect_loaded() { [ "$(fx isEffectLoaded "$1")" = true ]; }
+
+# Settings without a runtime switch: "name group key kiri-value". The user's value is kept in [Kiri-mode] under
+# "name". A saved value is replaced when the current one is neither Kiri's nor the saved one: the user changed the
+# setting in System Settings while in Kiri mode.
+keep_user_value() { # name group key kiriValue
+    cur=$(r "$2" "$3")
+    saved=$(r Kiri-mode "$1")
+    if [ "$cur" != "$4" ]; then
+        w Kiri-mode "$1" "$cur"
+    elif [ -z "$saved" ]; then
+        w Kiri-mode "$1" "$cur"
+    fi
+    w Kiri-mode "${1}Applied" "$4"
+    w "$2" "$3" "$4"
+}
+give_back() { # name group key
+    saved=$(r Kiri-mode "$1")
+    applied=$(r Kiri-mode "${1}Applied")
+    cur=$(r "$2" "$3")
+    # only when Kiri's value is still there: otherwise the user changed it in System Settings and that stays
+    if [ -n "$saved" ] && [ "$cur" = "$applied" ]; then
+        w "$2" "$3" "$saved"
+    fi
+    d Kiri-mode "$1"
+    d Kiri-mode "${1}Applied"
+}
+
+apply_settings() {
+    if [ "$(r Script-kiri focusFollowsMouse true)" = true ]; then
+        keep_user_value focusPolicy Windows FocusPolicy ClickToFocus
+    fi
+    keep_user_value rollOver Windows RollOverDesktops false
+    number=$(r Desktops Number 1)
+    rows=$(r Desktops Rows 1)
+    if [ "$number" -gt 1 ] && [ "$rows" -lt "$number" ]; then
+        keep_user_value rows Desktops Rows "$number"
+    fi
+}
+restore_settings() {
+    give_back focusPolicy Windows FocusPolicy
+    give_back rollOver Windows RollOverDesktops
+    give_back rows Desktops Rows
+}
+apply_rows() {
+    rows=$(r Desktops Rows 0)
+    [ "$rows" -gt 0 ] && dbus-send --session --type=method_call --dest=org.kde.KWin /VirtualDesktopManager \
+        org.freedesktop.DBus.Properties.Set string:org.kde.KWin.VirtualDesktopManager string:rows variant:uint32:"$rows" >/dev/null 2>&1 || true
+}
+
+# the effects: the script does this itself when it starts and stops; this makes sure of it (and covers a script
+# that was stopped without getting to do it)
+effects_kiri() {
+    for pair in $PLASMA_EFFECTS; do fx unloadEffect "${pair%%:*}" >/dev/null; done
+    for e in kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
+        effect_loaded $e || fx loadEffect $e >/dev/null
+    done
+    effect_loaded kiri_motion || effect_loaded kiri_animations || fx loadEffect kiri_animations >/dev/null
+}
+effects_plasma() {
+    for e in $KIRI_EFFECTS; do fx unloadEffect $e >/dev/null; done
+    for pair in $PLASMA_EFFECTS; do
+        e=${pair%%:*}
+        on=$(r Plugins "${e}Enabled" "${pair##*:}")
+        [ "$on" = true ] && ! effect_loaded "$e" && fx loadEffect "$e" >/dev/null
+    done
+    return 0
+}
+
+show() { # text
+    $osd || return 0
+    qdbus6 org.kde.plasmashell /org/kde/osdService org.kde.osdService.showText kiri "$1" >/dev/null 2>&1 ||
+        notify-send -i kiri -t 2000 "$1" >/dev/null 2>&1 || true
+}
+
+go_kiri() {
+    w Plugins kiriEnabled true
+    apply_settings
+    reconfigure
+    apply_rows
+    script_loaded || { sleep 0.3; reconfigure; }
+    for _ in 1 2 3 4 5 6 7 8 9 10; do script_loaded && break; sleep 0.3; done
+    sleep 0.5
+    effects_kiri
+    show "Kiri mode"
+}
+go_plasma() {
+    w Plugins kiriEnabled false
+    $KWIN /Scripting org.kde.kwin.Scripting.unloadScript kiri >/dev/null 2>&1 || true
+    sleep 0.3
+    restore_settings
+    reconfigure
+    apply_rows
+    effects_plasma
+    show "Plasma mode"
+}
+
+case $cmd in
+    kiri) go_kiri ;;
+    plasma) go_plasma ;;
+    toggle) if [ "$(current)" = kiri ]; then go_plasma; else go_kiri; fi ;;
+    status)
+        echo "$(current) mode"
+        if script_loaded; then echo "script: loaded"; else echo "script: not loaded"; fi
+        loaded=
+        for e in $KIRI_EFFECTS slide overview kwin4_effect_geometry_change fade scale glide maximize; do
+            effect_loaded "$e" && loaded="$loaded $e"
+        done
+        echo "effects:${loaded:- none}"
+        ;;
+    *) echo "usage: kiri-mode kiri|plasma|toggle|status [--no-osd]" >&2; exit 2 ;;
+esac
