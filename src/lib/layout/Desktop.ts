@@ -115,6 +115,26 @@ class Desktop {
             (this.config.alwaysCenterSingleColumn && this.grid.getFirstColumn() === this.grid.getLastColumn());
     }
 
+    // niri leaves the view offset alone unless the focused column is centered; the scroll clamping to the grid's ends
+    // and the centering of a grid that fits are not niri's
+    public keepsViewOffset() {
+        const clamper = this.config.clamper;
+        return !this.isCenteringFocusedColumn() && clamper instanceof EdgeClamper && !clamper.centerWhenFits;
+    }
+
+    // niri's compute_new_view_offset: a column wider than the view is left aligned, a visible one leaves the view alone,
+    // otherwise the view moves the shorter way
+    public fitColumnInView(column: Column) {
+        const view = this.getCurrentVisibleRange();
+        if (this.tilingArea.width <= column.getWidth()) {
+            this.setScroll(column.getLeft(), true);
+        } else if (column.getLeft() < view.getLeft() || column.getRight() > view.getRight()) {
+            const toLeft = Math.abs(view.getLeft() - column.getLeft());
+            const toRight = Math.abs(view.getRight() - column.getRight());
+            this.setScroll(toLeft <= toRight ? column.getLeft() : column.getRight() - this.tilingArea.width, true);
+        }
+    }
+
     public scrollCenterRange(range: Range) {
         const scrollAmount = Range.minus(range, this.getCurrentVisibleRange());
         this.adjustScroll(scrollAmount, true);

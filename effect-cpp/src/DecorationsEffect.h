@@ -176,6 +176,9 @@ private:
     QHash<QUuid, std::pair<double, bool>> m_tabOpen;
     std::chrono::steady_clock::time_point m_clockStart = std::chrono::steady_clock::now();
     double m_frameTime = 0;
+    // the shaders get their first real draw (the driver's final compile) a few seconds after load, into a tiny texture
+    bool m_warmed = false;
+    void warmShaders();
     std::vector<std::unique_ptr<QAction>> m_wheelActions;
 };
 

@@ -461,7 +461,6 @@ class Actions {
         const full = desktop.tilingArea.width + grid.config.gapsInnerHorizontal;
         column.widthBeforeMaximize = undefined;
         column.setWidth(column.getWidth() + Math.round(full * percent / 100), true);
-        desktop.autoAdjustScroll();
     };
 
     // the same keys on a floating window (niri's floating layer): sizes relative to the work area

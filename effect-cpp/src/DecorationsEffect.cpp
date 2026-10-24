@@ -125,8 +125,65 @@ void Effect::prePaintScreen(KWin::ScreenPrePaintData &data)
     KWin::OffscreenEffect::prePaintScreen(data);
 }
 
+// The first draw with a shader makes the driver finish compiling it for the render target in use, which costs
+// 10-30 ms in the middle of the first window's paint. Done once, a few seconds after load (the first frames at login are
+// not touched), into a 64x64 texture that is thrown away. The GL context is current in postPaintScreen.
+void Effect::warmShaders()
+{
+    m_warmed = true;
+    if (!m_cornerShader || !m_ringShader || !KWin::effects->isOpenGLCompositing()) {
+        return;
+    }
+    const auto texture = KWin::GLTexture::allocate(GL_RGBA8, QSize(64, 64));
+    if (!texture) {
+        return;
+    }
+    KWin::GLFramebuffer fbo(texture.get());
+    if (!fbo.valid()) {
+        return;
+    }
+    GLint viewportBefore[4];
+    glGetIntegerv(GL_VIEWPORT, viewportBefore);
+    KWin::GLFramebuffer::pushFramebuffer(&fbo);
+    glViewport(0, 0, 64, 64);
+    QMatrix4x4 projection;
+    projection.ortho(0, 64, 64, 0, -1, 1);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    KWin::ShaderManager::instance()->pushShader(m_cornerShader.get());
+    m_cornerShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, projection);
+    m_cornerShader->setUniform("radius", 8.0f);
+    m_cornerShader->setUniform("windowSize", QVector2D(64, 64));
+    m_cornerShader->setUniform("windowExpandedSize", QVector2D(64, 64));
+    m_cornerShader->setUniform("windowTopLeft", QVector2D(0, 0));
+    texture->render(QSizeF(64, 64));
+    KWin::ShaderManager::instance()->popShader();
+    KWin::ShaderManager::instance()->pushShader(m_ringShader.get());
+    m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, projection);
+    m_ringShader->setUniform("rect", QVector4D(8, 8, 48, 48));
+    m_ringShader->setUniform("radius", 8.0f);
+    m_ringShader->setUniform("borderWidth", 2.0f);
+    m_ringShader->setUniform("ringWidth", 2.0f);
+    m_ringShader->setUniform("borderColor", QVector4D(0, 0, 0, 0));
+    m_ringShader->setUniform("ringColor", QVector4D(0, 0, 0, 0));
+    m_ringShader->setUniform("fillColor", QVector4D(0, 0, 0, 0));
+    m_ringShader->setUniform("pixel", 1.0f);
+    const std::vector<QVector2D> vertices{{0, 0}, {64, 0}, {0, 64}, {0, 64}, {64, 0}, {64, 64}};
+    KWin::GLVertexBuffer *vbo = KWin::GLVertexBuffer::streamingBuffer();
+    vbo->reset();
+    vbo->setVertices(vertices);
+    vbo->render(GL_TRIANGLES);
+    KWin::ShaderManager::instance()->popShader();
+    glDisable(GL_BLEND);
+    KWin::GLFramebuffer::popFramebuffer();
+    glViewport(viewportBefore[0], viewportBefore[1], viewportBefore[2], viewportBefore[3]);
+}
+
 void Effect::postPaintScreen()
 {
+    if (!m_warmed && std::chrono::steady_clock::now() - m_clockStart > std::chrono::seconds(6)) {
+        warmShaders();
+    }
     const double factor = KWin::effects->animationTimeFactor();
     const double speed = factor > 0 ? 1.0 / factor : 0;
     bool again = false;

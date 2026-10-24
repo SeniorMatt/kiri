@@ -323,9 +323,16 @@ class Grid {
     }
 
     public onColumnWidthChanged(column: Column) {
+        // niri: the view offset is relative to the active column, so its left edge stays where it is on the screen and
+        // the columns to its right slide; the view only moves when the column no longer fits
+        const keepOffset = !this.userResize && column === this.lastFocusedColumn && this.desktop.keepsViewOffset();
+        const offset = keepOffset ? this.desktop.getScrollX() - column.getLeft() : 0;
         this.columnsSetX(column); // starting at `column`, because its overflow may have changed too
         this.desktop.onLayoutChanged();
-        if (!this.userResize) {
+        if (keepOffset) {
+            this.desktop.setScroll(column.getLeft() + offset, true);
+            this.desktop.fitColumnInView(column);
+        } else if (!this.userResize) {
             this.desktop.autoAdjustScroll();
         }
     }
