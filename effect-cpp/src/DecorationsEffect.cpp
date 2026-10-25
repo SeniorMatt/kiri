@@ -144,6 +144,9 @@ void Effect::warmShaders()
     }
     GLint viewportBefore[4];
     glGetIntegerv(GL_VIEWPORT, viewportBefore);
+    GLint drawFboBefore = 0, readFboBefore = 0;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFboBefore);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &readFboBefore);
     KWin::GLFramebuffer::pushFramebuffer(&fbo);
     glViewport(0, 0, 64, 64);
     QMatrix4x4 projection;
@@ -177,6 +180,19 @@ void Effect::warmShaders()
     glDisable(GL_BLEND);
     KWin::GLFramebuffer::popFramebuffer();
     glViewport(viewportBefore[0], viewportBefore[1], viewportBefore[2], viewportBefore[3]);
+    // leave the framebuffer bindings exactly as they were (popFramebuffer has nothing to go back to when KWin has none
+    // pushed between frames), and say so in the journal if anything was off
+    GLint drawFboAfter = 0, readFboAfter = 0;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFboAfter);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &readFboAfter);
+    if (drawFboAfter != drawFboBefore || readFboAfter != readFboBefore) {
+        qCWarning(KIRI_DECO) << "shader warm-up changed the framebuffer binding" << drawFboBefore << readFboBefore << "->" << drawFboAfter << readFboAfter << "(restored)";
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, drawFboBefore);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, readFboBefore);
+    }
+    if (const GLenum error = glGetError(); error != GL_NO_ERROR) {
+        qCWarning(KIRI_DECO) << "shader warm-up left GL error" << Qt::hex << error;
+    }
 }
 
 void Effect::postPaintScreen()
