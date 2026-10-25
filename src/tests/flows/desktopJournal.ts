@@ -25,5 +25,5 @@ tests.register("Journal: every desktop change is logged with its cause", 1, () =
     Assert.equalArrays(lines, ["Kiri: desktop 2 -> 1 (KWin)"]);
 
     lines = captureLog(() => { workspaceMock.currentDesktop = workspaceMock.desktops[0]; });
-    Assert.equalArrays(lines, [], { message: "no change, no line" });
+    Assert.equalArrays(lines, ["Kiri: desktop 1 -> 1 (KWin, unchanged, of 2 desktops)"], { message: "a signal without a change is logged too: a switch undone inside the cascade" });
 });

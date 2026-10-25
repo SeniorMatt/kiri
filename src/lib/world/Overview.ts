@@ -171,7 +171,7 @@ class Overview {
                 if (kwinClient.desktops.length === 1 && kwinClient.desktops[0] !== Workspace.currentDesktop) {
                     gotoDesktop(kwinClient.desktops[0], "overview-window");
                 }
-                Workspace.activeWindow = kwinClient;
+                activateWindow(kwinClient, "overview");
             });
             return true;
         }

@@ -173,10 +173,15 @@ class KeyBindings {
         for (const shortcut of shortcuts) {
             this.actions.set(shortcut.name, catchWrap(shortcut.action));
         }
-        kglobalaccel.onPressed = (name: string) => this.actions.get(name)?.();
+        kglobalaccel.onPressed = (name: string) => runShortcutEvent(name, "press", () => this.actions.get(name)?.());
         kglobalaccel.onRepeated = (name: string) => {
             if (!NO_REPEAT.has(name)) {
-                this.actions.get(name)?.();
+                runShortcutEvent(name, "repeat", () => this.actions.get(name)?.());
+            }
+        };
+        kglobalaccel.onReleased = (name: string) => {
+            if (name.startsWith("desktop-")) {
+                log("shortcut", name, "release");
             }
         };
         return shortcuts;
@@ -222,6 +227,7 @@ class KeyBindings {
         this.priorityDelayer.destroy();
         kglobalaccel.onPressed = null;
         kglobalaccel.onRepeated = null;
+        kglobalaccel.onReleased = null;
         for (const name of this.actions.keys()) {
             KGlobalAccel.call("setInactive", ["as"], [[KGlobalAccel.component, name, "", ""]]);
         }

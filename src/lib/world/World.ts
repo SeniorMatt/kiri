@@ -91,13 +91,13 @@ class World {
         this.gestureDesktopSwitch = config.gestureDesktopSwitch;
         // a gesture that is cancelled by KWin because the swipe changed direction continues right after
         this.gestureEndDelayer = new Delayer(40, () => this.gestureRelease());
-        this.gestureAnimationTimer = initQmlTimer();
+        this.gestureAnimationTimer = initQmlTimer()!;
         this.gestureAnimationTimer.interval = 16;
         this.gestureAnimationTimer.repeat = true;
         this.gestureAnimationTimer.triggered.connect(() => this.gestureAnimationStep());
 
         // KWin has no signal for a client that changes its minimum size: look twice a second, lay out only on a change
-        this.minSizeTimer = initQmlTimer();
+        this.minSizeTimer = initQmlTimer()!;
         this.minSizeTimer.interval = 500;
         this.minSizeTimer.repeat = true;
         this.minSizeTimer.triggered.connect(() => {
@@ -158,6 +158,9 @@ class World {
         this.clientManager = new ClientManager(config, this, this.desktopManager, this.pinManager);
         this.dynamicDesktops = new DynamicDesktops(config.dynamicDesktops, desktop => this.clientManager.isDesktopOccupied(desktop));
         this.overview = new Overview(this, this.clientManager, this.desktopManager);
+        if (layout !== null) {
+            this.clientManager.prepareRestore(layout.floating, layout.manual, layout.floatingFrames);
+        }
         this.addExistingClients(layout);
         if (layout !== null) {
             this.restoreLayout(layout);
@@ -167,6 +170,9 @@ class World {
         const active = Workspace.activeWindow;
         if (active !== null && this.clientManager.hasClient(active)) {
             this.clientManager.onClientFocused(active);
+        }
+        if (layout !== null) {
+            this.restoreViews(layout);
         }
         this.currentDesktop = Workspace.currentDesktop;
         this.update();
@@ -190,48 +196,68 @@ class World {
     private addExistingClients(layout: World.Layout | null) {
         let kwinClients = Workspace.windows;
         if (layout !== null) {
-            const order = new Map<KwinClient, number>();
+            const order = new Map<string, number>();
             for (const column of layout.columns) {
                 for (const window of column.windows) {
-                    order.set(window.client, order.size);
+                    order.set(window.id, order.size);
                 }
             }
-            kwinClients = kwinClients.slice().sort((a, b) => (order.get(a) ?? Infinity) - (order.get(b) ?? Infinity));
+            kwinClients = kwinClients.slice().sort((a, b) => (order.get(String(a.internalId)) ?? Infinity) - (order.get(String(b.internalId)) ?? Infinity));
         }
         for (const kwinClient of kwinClients) {
             this.clientManager.addClient(kwinClient, true);
         }
     }
 
-    // remembers which windows are in which columns, in which order, to rebuild the world with the same layout
+    // remembers the whole state that is not in the windows themselves (columns and their order, heights, floating
+    // windows, the focus and the view of every desktop), to rebuild the world as it was. Windows are named by their
+    // internal id, so it survives a reload of the script too (see Kiri.saveState)
     public captureLayout(): World.Layout {
         const columns: World.Layout["columns"] = [];
-        for (const desktop of this.desktopManager.getAllDesktops()) {
+        const views: World.Layout["views"] = [];
+        for (const [key, desktop] of this.desktopManager.getKeyedDesktops()) {
             for (const column of desktop.grid.getColumns()) {
                 columns.push({
                     windows: column.getWindows().map(window => ({
-                        client: window.client.kwinClient,
+                        id: String(window.client.kwinClient.internalId),
                         fullScreen: window.client.kwinClient.fullScreen,
                         maximizedMode: window.client.getMaximizedMode() ?? MaximizedMode.Unmaximized,
+                        fixedHeight: window.fixedHeight,
+                        presetHeightIndex: window.presetHeightIndex,
+                        heightWeight: window.heightWeight,
                     })),
                     heightRatios: column.getHeightRatios(),
                     tabbed: column.isTabbed(),
                 });
             }
+            const focused = desktop.grid.getLastFocusedWindow();
+            views.push({
+                desktop: key,
+                scrollX: desktop.getScrollX(),
+                focused: focused === null ? null : String(focused.client.kwinClient.internalId),
+            });
         }
-        return { columns };
+        const floating = this.clientManager.captureFloating();
+        return { columns, views, floating: floating.floating, manual: floating.manual, floatingFrames: floating.floatingFrames };
     }
 
     private restoreLayout(layout: World.Layout) {
+        const byId = new Map<string, KwinClient>();
+        for (const kwinClient of Workspace.windows) {
+            byId.set(String(kwinClient.internalId), kwinClient);
+        }
         const lastColumns = new Map<Grid, Column | null>();
         for (const savedColumn of layout.columns) {
             const windows: Window[] = [];
+            const savedWindows: typeof savedColumn.windows = [];
             for (const saved of savedColumn.windows) {
-                const window = this.clientManager.findTiledWindow(saved.client);
-                if (window === null || window.client.kwinClient !== saved.client) {
+                const kwinClient = byId.get(saved.id);
+                const window = kwinClient === undefined ? null : this.clientManager.findTiledWindow(kwinClient);
+                if (window === null || window.client.kwinClient !== kwinClient) {
                     continue; // the window is no longer tiled
                 }
                 windows.push(window);
+                savedWindows.push(saved);
                 if (saved.fullScreen) {
                     window.client.setFullScreen(true);
                 } else if (saved.maximizedMode !== MaximizedMode.Unmaximized) {
@@ -258,7 +284,38 @@ class World {
             if (column.getWindowCount() === savedColumn.heightRatios.length) {
                 column.setHeightRatios(savedColumn.heightRatios);
             }
+            if (column.getWindowCount() === savedWindows.length) {
+                // the heights as they were set: fixed ones (resized by hand or by a preset) and the weights of the auto ones
+                savedWindows.forEach((saved, i) => {
+                    if (saved.fixedHeight !== undefined) {
+                        windows[i].heightWeight = saved.heightWeight ?? 1;
+                        windows[i].fixedHeight = saved.fixedHeight ?? null;
+                        windows[i].presetHeightIndex = saved.presetHeightIndex ?? null;
+                    }
+                });
+                column.resizeWindows();
+            }
             column.setTabbed(savedColumn.tabbed);
+        }
+    }
+
+    // the focused window and the scroll position of every desktop
+    private restoreViews(layout: World.Layout) {
+        const byId = new Map<string, KwinClient>();
+        for (const kwinClient of Workspace.windows) {
+            byId.set(String(kwinClient.internalId), kwinClient);
+        }
+        for (const view of layout.views) {
+            const desktop = this.desktopManager.getDesktopByKey(view.desktop);
+            if (desktop === undefined) {
+                continue;
+            }
+            const kwinClient = view.focused === null ? undefined : byId.get(view.focused);
+            const window = kwinClient === undefined ? null : this.clientManager.findTiledWindow(kwinClient);
+            if (window !== null && window.column.grid === desktop.grid) {
+                window.column.onWindowFocused(window);
+            }
+            desktop.setScroll(view.scrollX, true);
         }
     }
 
@@ -672,11 +729,23 @@ class World {
 }
 
 namespace World {
+    // plain data (windows are named by their internal id), so it can be stored as JSON
     export interface Layout {
         columns: {
-            windows: { client: KwinClient, fullScreen: boolean, maximizedMode: MaximizedMode }[];
+            windows: {
+                id: string;
+                fullScreen: boolean;
+                maximizedMode: MaximizedMode;
+                fixedHeight?: number | null;
+                presetHeightIndex?: number | null;
+                heightWeight?: number;
+            }[];
             heightRatios: number[];
             tabbed: boolean;
         }[];
+        floating: string[]; // windows the user floated that are floating now
+        manual: string[]; // windows the user floated or tiled by hand (rules leave them alone)
+        floatingFrames: { id: string, x: number, y: number, width: number, height: number }[];
+        views: { desktop: string, scrollX: number, focused: string | null }[];
     }
 }

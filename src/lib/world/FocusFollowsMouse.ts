@@ -52,7 +52,7 @@ class FocusFollowsMouse {
             // the answer comes later: the pointer may have moved on, or a warp / the overview may have taken over
             if (buttons === 0 && !overviewActive() && window !== Workspace.activeWindow &&
                 FocusFollowsMouse.topWindowAt(Workspace.cursorPos) === window) {
-                Workspace.activeWindow = window;
+                activateWindow(window, "focus-follows-mouse");
             }
         });
     }

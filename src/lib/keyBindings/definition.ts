@@ -531,7 +531,7 @@ function currentDesktopIndex() {
 function switchToDesktop(index: number) {
     const desktop = Workspace.desktops[index];
     if (desktop !== undefined) {
-        gotoDesktop(desktop, "focus-desktop");
+        gotoDesktop(desktop, shortcutEvent === null ? "focus-desktop" : "focus-desktop " + shortcutEvent);
     }
 }
 

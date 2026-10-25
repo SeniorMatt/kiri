@@ -2,6 +2,7 @@ import QtQuick 6.0
 import QtQml 6.0
 import org.kde.kwin 3.0
 import org.kde.notification 1.0
+import QtCore as QC
 import org.kde.plasma.workspace.dbus as DBus
 import "../code/main.js" as Karousel
 
@@ -528,12 +529,42 @@ Item {
         unloadedPlasmaEffects = [];
     }
 
+    // What Kiri keeps of its layout between two runs of the script (Kiri mode off and on again): floating
+    // windows, column heights, the focus and the scroll of every desktop. Windows are named by internal id.
+    QC.Settings {
+        id: stateStore
+        category: "KiriState"
+        location: QC.StandardPaths.writableLocation(QC.StandardPaths.GenericCacheLocation) + "/kiri-state.conf"
+        property string state: ""
+    }
+
+    function saveState() {
+        try {
+            const json = qmlBase.karouselInstance.saveState();
+            if (json !== stateStore.state) {
+                stateStore.state = json;
+                stateStore.sync();
+            }
+        } catch (error) {
+            console.log("Kiri: could not save the state:", error);
+        }
+    }
+
+    // in case the script is stopped without a chance to save
+    Timer {
+        interval: 20000
+        repeat: true
+        running: true
+        onTriggered: qmlBase.saveState()
+    }
+
     Component.onCompleted: {
-        qmlBase.karouselInstance = Karousel.init();
+        qmlBase.karouselInstance = Karousel.init(stateStore.state);
         qmlBase.enterKiriMode();
     }
 
     Component.onDestruction: {
+        qmlBase.saveState();
         qmlBase.karouselInstance.destroy();
         qmlBase.leaveKiriMode();
     }

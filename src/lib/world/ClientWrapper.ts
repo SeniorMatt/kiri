@@ -138,9 +138,18 @@ class ClientWrapper {
         }
     }
 
+    // A window that was closed a moment ago may still be in the layout until KWin reports the removal; raising or
+    // activating it only makes KWin complain ("closed window cannot be restacked") and can leave nothing focused.
+    public isGone() {
+        return !Workspace.windows.includes(this.kwinClient);
+    }
+
     public focus() {
+        if (this.isGone()) {
+            return;
+        }
         KiriFocus.mark(this.kwinClient);
-        Workspace.activeWindow = this.kwinClient;
+        activateWindow(this.kwinClient, "focus");
     }
 
     public isFocused() {
@@ -148,6 +157,9 @@ class ClientWrapper {
     }
 
     public raise() {
+        if (this.isGone()) {
+            return;
+        }
         Workspace.raiseWindow(this.kwinClient);
     }
 

@@ -94,6 +94,9 @@ class ClientManager {
         let desktop: Desktop | undefined;
         if (kwinClient.dock) {
             constructState = () => new ClientState.Docked(this.world, kwinClient);
+        } else if (existing && this.restoredFloating.has(String(kwinClient.internalId))) {
+            // the user floated it before the script was reloaded
+            constructState = (client: ClientWrapper) => new ClientState.Floating(this.world, client, this.config, false);
         } else if (
             Clients.canTileEver(kwinClient) &&
             this.windowRuleEnforcer.shouldTile(kwinClient) &&
@@ -138,6 +141,16 @@ class ClientManager {
             this.windowRuleEnforcer.initClientSignalManager(this.world, kwinClient),
         );
         this.clientMap.set(kwinClient, client);
+        if (existing) {
+            const id = String(kwinClient.internalId);
+            if (this.restoredManual.has(id)) {
+                this.toggledManually.add(kwinClient);
+            }
+            const frame = this.restoredFrames.get(id);
+            if (frame !== undefined) {
+                this.floatingFrames.set(kwinClient, frame);
+            }
+        }
         if (slot !== null) {
             client.x11 = true; // the same X11 window again
         } else {
@@ -637,6 +650,33 @@ class ClientManager {
     }
 
     private readonly toggledManually = new Set<KwinClient>();
+    // from a saved layout (the script was reloaded): windows to put back on the floating layer when they are added
+    private restoredFloating = new Set<string>();
+    private restoredManual = new Set<string>();
+    private restoredFrames = new Map<string, { x: number, y: number, width: number, height: number }>();
+
+    public prepareRestore(floating: string[], manual: string[], frames: { id: string, x: number, y: number, width: number, height: number }[]) {
+        this.restoredFloating = new Set(floating);
+        this.restoredManual = new Set(manual);
+        this.restoredFrames = new Map(frames.map(f => [f.id, { x: f.x, y: f.y, width: f.width, height: f.height }]));
+    }
+
+    public captureFloating() {
+        const floating: string[] = [];
+        const manual: string[] = [];
+        const floatingFrames: { id: string, x: number, y: number, width: number, height: number }[] = [];
+        this.toggledManually.forEach(kwinClient => {
+            const id = String(kwinClient.internalId);
+            manual.push(id);
+            if (this.isFloating(kwinClient)) {
+                floating.push(id);
+            }
+        });
+        this.floatingFrames.forEach((frame, kwinClient) => {
+            floatingFrames.push({ id: String(kwinClient.internalId), x: frame.x, y: frame.y, width: frame.width, height: frame.height });
+        });
+        return { floating, manual, floatingFrames };
+    }
 
     // the user floated or tiled this window with the toggle: caption rules leave it alone
     public wasToggledManually(kwinClient: KwinClient) {
@@ -688,7 +728,7 @@ class ClientManager {
         if (warped !== null && warped.client !== kwinClient && Date.now() - warped.time < 800 &&
             this.isFloating(kwinClient) && !KiriFocus.peek(kwinClient) && this.clientMap.has(warped.client)) {
             KiriFocus.mark(warped.client);
-            Workspace.activeWindow = warped.client;
+            activateWindow(warped.client, "client-manager");
             return;
         }
         if (kwinClient !== this.lastFocusedClient) {
@@ -802,7 +842,7 @@ class ClientManager {
         }
         if (best !== null) {
             KiriFocus.mark(best);
-            Workspace.activeWindow = best;
+            activateWindow(best, "client-manager");
         }
         return best !== null;
     }
@@ -824,7 +864,7 @@ class ClientManager {
         }
         if (best !== null && best !== active) {
             KiriFocus.mark(best);
-            Workspace.activeWindow = best;
+            activateWindow(best, "client-manager");
         }
     }
 
@@ -1008,7 +1048,7 @@ class ClientManager {
             kwinClient.desktops = [kwinDesktop];
         }
         client.place(Math.round(nx), Math.round(ny), g.width, g.height);
-        Workspace.activeWindow = kwinClient;
+        activateWindow(kwinClient, "client-manager");
     }
 
     public findTiledWindow(kwinClient: KwinClient) {

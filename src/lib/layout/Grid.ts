@@ -286,7 +286,12 @@ class Grid {
         // like niri: the column that takes the place of the closed one (the right neighbour) gets the focus,
         // or the left one when the closed one was the last, or the one it was opened from
         const returnTo = this.returnTo !== null && column === this.lastFocusedColumn && this.returnTo.column === leftColumn ? this.returnTo : null;
-        const columnToFocus = isLastColumn ? null : returnTo !== null ? leftColumn : rightColumn ?? leftColumn;
+        let columnToFocus = isLastColumn ? null : returnTo !== null ? leftColumn : rightColumn ?? leftColumn;
+        // when several windows close at once the neighbour may already be empty: take the next column that still has a window
+        if (columnToFocus !== null && columnToFocus.isEmpty()) {
+            const goRight = columnToFocus === rightColumn;
+            columnToFocus = this.findNonEmptyColumn(columnToFocus, goRight, column) ?? this.findNonEmptyColumn(columnToFocus, !goRight, column);
+        }
         if (this.opened !== null && this.opened.column === column) {
             this.opened = null;
         }
@@ -313,13 +318,33 @@ class Grid {
             case FocusPassing.Type.Immediate:
                 columnToFocus.getWindowToFocus().focus();
                 this.focusPasser.request(columnToFocus.getWindowToFocus().client.kwinClient); // KWin may still drop the focus while closing
+                this.ensureInView(columnToFocus);
                 return;
             case FocusPassing.Type.OnUnfocus:
                 this.focusPasser.request(columnToFocus.getWindowToFocus().client.kwinClient);
+                this.ensureInView(columnToFocus);
                 return;
             }
         }
         this.desktop.autoAdjustScroll();
+    }
+
+    private findNonEmptyColumn(start: Column, goRight: boolean, removed: Column) {
+        for (let c: Column | null = start; c !== null; c = goRight ? this.getRightColumn(c) : this.getLeftColumn(c)) {
+            if (c !== removed && !c.isEmpty()) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    // The focus passing above scrolls the view when the focus really moves. When KWin had already focused the column
+    // (it picks the neighbour of a closing window before the close is reported) no focus change follows, and a view
+    // left where the closed window was (a maximized one, say) would show nothing but an empty desktop.
+    private ensureInView(column: Column) {
+        if (this.columns.length() > 0 && !Range.contains(this.desktop.getCurrentVisibleRange(), column)) {
+            this.desktop.autoAdjustScroll();
+        }
     }
 
     public onColumnWidthChanged(column: Column) {

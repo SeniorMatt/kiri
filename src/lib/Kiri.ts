@@ -355,6 +355,36 @@ class Kiri {
         return true;
     }
 
+    // The layout and the view as JSON, for the next run of the script (the script is unloaded when Kiri mode is left
+    // and loaded again when it is back): the columns with their heights, the floating windows, the focus and the
+    // scroll of every desktop. Windows are named by their internal id.
+    public saveState(): string {
+        return JSON.stringify(this.world.captureLayout());
+    }
+
+    // the saved state back, or null when there is none or it is not valid
+    public static parseState(json: string): World.Layout | null {
+        if (typeof json !== "string" || json === "") {
+            return null;
+        }
+        try {
+            const data = JSON.parse(json);
+            if (data === null || typeof data !== "object" || !Array.isArray(data.columns)) {
+                return null;
+            }
+            return {
+                columns: data.columns,
+                floating: Array.isArray(data.floating) ? data.floating : [],
+                manual: Array.isArray(data.manual) ? data.manual : [],
+                floatingFrames: Array.isArray(data.floatingFrames) ? data.floatingFrames : [],
+                views: Array.isArray(data.views) ? data.views : [],
+            };
+        } catch (error: any) {
+            log("the saved state is not valid:", error);
+            return null;
+        }
+    }
+
     public destroy() {
         this.world.destroy();
     }

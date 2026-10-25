@@ -59,3 +59,17 @@ tests.register("Close the new window returns the view to where it was", 10, () =
     Assert.equal(clients[2].getActualFrameGeometry().x, before[2]);
     Assert.equal(clients[4].getActualFrameGeometry().x, before[4]);
 });
+
+tests.register("Closing many windows in a row keeps a focused window", 10, () => {
+    const config = getDefaultConfig();
+    const { qtMock, workspaceMock, world } = init(config);
+
+    const clients = workspaceMock.createClients(7);
+    workspaceMock.activeWindow = clients[1];
+    for (let i = 1; i < 6; i++) {
+        workspaceMock.removeWindow(clients[i]);
+    }
+    Assert.equal(workspaceMock.activeWindow, clients[6], { message: "each close goes to the right neighbour" });
+    workspaceMock.removeWindow(clients[6]);
+    Assert.equal(workspaceMock.activeWindow, clients[0]);
+});

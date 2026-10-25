@@ -236,7 +236,7 @@ class Actions {
         const previous = cm.findPreviousFocused();
         if (previous !== null) {
             KiriFocus.mark(previous);
-            Workspace.activeWindow = previous;
+            activateWindow(previous, "actions");
         }
     };
 
@@ -245,7 +245,7 @@ class Actions {
         const floating = cm.findLastFocusedFloating();
         if (floating !== null) {
             KiriFocus.mark(floating);
-            Workspace.activeWindow = floating;
+            activateWindow(floating, "actions");
         }
     };
 

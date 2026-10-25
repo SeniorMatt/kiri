@@ -9,6 +9,7 @@ QtObject {
     property var onPressed: null
     // key auto-repeat of a held shortcut: KWin (6.5+) sends it to kglobalacceld, which emits globalShortcutRepeated
     property var onRepeated: null
+    property var onReleased: null
 
     function wrap(type, value) {
         switch (type) {
@@ -67,8 +68,11 @@ QtObject {
             }
         }
 
-        // not used; without a handler every key release logs "No signal handler"
+        // only logged for the desktop shortcuts; without a handler every key release logs "No signal handler"
         function dbusglobalShortcutReleased(component, shortcut, timestamp) {
+            if (bridge.onReleased !== null) {
+                bridge.onReleased(String(shortcut));
+            }
         }
     }
 }

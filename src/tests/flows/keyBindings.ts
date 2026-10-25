@@ -10,6 +10,28 @@
         Assert.equal(parseKeySequence("Meta+Nope"), undefined);
     });
 
+    tests.register("The journal says which shortcut event switched the desktop", 1, () => {
+        const { workspaceMock } = init(getDefaultConfig());
+        const accel = kglobalaccel as MockKGlobalAccel;
+        const lines: string[] = [];
+        const original = console.log;
+        console.log = (...args: any[]) => { lines.push(args.join(" ")); };
+        try {
+            accel.press("desktop-next");
+            accel.repeat("desktop-next");
+            accel.release("desktop-next");
+            accel.press("desktop-previous");
+        } finally {
+            console.log = original;
+        }
+        const text = lines.join("\n");
+        Assert.assert(text.includes("desktop 1 -> 2 (focus-desktop desktop-next press)"), { message: text });
+        Assert.assert(text.includes("shortcut desktop-next repeat"), { message: text });
+        Assert.assert(text.includes("shortcut desktop-next release"), { message: text });
+        Assert.assert(text.includes("desktop 2 -> 1 (focus-desktop desktop-previous press)"), { message: text });
+        Assert.equal(workspaceMock.desktops.indexOf(workspaceMock.currentDesktop), 0);
+    });
+
     tests.register("Niri default keys", 1, () => {
         init(getDefaultConfig());
         const registered = (kglobalaccel as MockKGlobalAccel).registered;

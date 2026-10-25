@@ -133,6 +133,16 @@ class DesktopManager {
         }
     }
 
+    public *getKeyedDesktops(): Generator<[string, Desktop]> {
+        for (const entry of this.desktops) {
+            yield entry;
+        }
+    }
+
+    public getDesktopByKey(key: string) {
+        return this.desktops.get(key);
+    }
+
     public *getAllDesktops() {
         for (const desktop of this.desktops.values()) {
             yield desktop;
