@@ -42,6 +42,11 @@ namespace FocusPassing {
             }
         }
 
+        public destroy() {
+            this.clear();
+            this.retryTimer.destroy();
+        }
+
         public clearIfDifferent(kwinClient: KwinClient) {
             if (this.currentRequest !== null && this.currentRequest.target !== kwinClient) {
                 this.clear();

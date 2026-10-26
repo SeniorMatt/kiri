@@ -29,3 +29,22 @@ tests.register("Destroy", 5, () => {
     Assert.equalRects(client1.getActualFrameGeometry(), expectedFrame1);
     Assert.equalRects(client2.getActualFrameGeometry(), expectedFrame2);
 });
+
+tests.register("A destroyed focus passer does not touch the focus", 5, () => {
+    const config = getDefaultConfig();
+    const { qtMock, workspaceMock, world } = init(config);
+
+    const [a, b] = workspaceMock.createClients(2);
+    workspaceMock.activeWindow = a;
+    MockQmlTimer.deferred = true;
+    try {
+        const passer = new FocusPassing.Passer();
+        passer.request(b); // KWin may still drop the focus: the passer looks again on a timer
+        passer.destroy();
+        workspaceMock.activeWindow = null;
+        MockQmlTimer.flush();
+        Assert.equal(workspaceMock.activeWindow, null, { message: "a destroyed passer must not activate anything" });
+    } finally {
+        MockQmlTimer.deferred = false;
+    }
+});

@@ -246,7 +246,9 @@ class ClientWrapper {
 
     private removeTransient(transient: ClientWrapper) {
         const i = this.transients.indexOf(transient);
-        this.transients.splice(i, 1);
+        if (i >= 0) {
+            this.transients.splice(i, 1);
+        }
     }
 
     public ensureTransientsVisible(screenSize: QmlRect) {

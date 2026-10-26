@@ -7,6 +7,7 @@ namespace ClientState {
         private readonly maximizedDelayer: Delayer;
         private readonly fullScreenDelayer: Delayer;
         private pendingMaximized: MaximizedMode | null = null;
+        private readonly userResize: { grid: Grid | null } = { grid: null }; // the grid that this window's user resize holds
         private readonly fullScreenFrame = { pending: false }; // the frame of a window entering or leaving full-screen mode changed before its flag did
         private static readonly maxExternalFrameGeometryChangedIntervalMs = 1000;
 
@@ -57,7 +58,7 @@ namespace ClientState {
                 this.fullScreenFrame.pending = false;
                 world.do(() => window.onFrameGeometryChanged());
             });
-            this.signalManager = Tiled.initSignalManager(world, window, grid.config, this.relayoutDelayer, this.maximizedDelayer, this.fullScreenDelayer, this.fullScreenFrame, mode => { this.pendingMaximized = mode; });
+            this.signalManager = Tiled.initSignalManager(world, window, grid.config, this.relayoutDelayer, this.maximizedDelayer, this.fullScreenDelayer, this.fullScreenFrame, this.userResize, mode => { this.pendingMaximized = mode; });
         }
 
         public destroy(passFocus: FocusPassing.Type) {
@@ -65,6 +66,11 @@ namespace ClientState {
             this.relayoutDelayer.destroy();
             this.maximizedDelayer.destroy();
             this.fullScreenDelayer.destroy();
+            if (this.userResize.grid !== null) {
+                // closed or floated in the middle of a resize: KWin's finished signal will not come
+                this.userResize.grid.onUserResizeFinished();
+                this.userResize.grid = null;
+            }
 
             const window = this.window;
             const grid = window.column.grid;
@@ -74,7 +80,7 @@ namespace ClientState {
             Tiled.restoreClientAfterTiling(client, grid.config, this.defaultState, grid.desktop.clientArea);
         }
 
-        private static initSignalManager(world: World, window: Window, config: LayoutConfig, relayoutDelayer: Delayer, maximizedDelayer: Delayer, fullScreenDelayer: Delayer, fullScreenFrame: { pending: boolean }, setPendingMaximized: (mode: MaximizedMode) => void) {
+        private static initSignalManager(world: World, window: Window, config: LayoutConfig, relayoutDelayer: Delayer, maximizedDelayer: Delayer, fullScreenDelayer: Delayer, fullScreenFrame: { pending: boolean }, userResize: { grid: Grid | null }, setPendingMaximized: (mode: MaximizedMode) => void) {
             const client = window.client;
             const kwinClient = client.kwinClient;
             const manager = new SignalManager();
@@ -151,7 +157,8 @@ namespace ClientState {
                             };
                         }
                     }
-                    window.column.grid.onUserResizeStarted();
+                    userResize.grid = window.column.grid;
+                    userResize.grid.onUserResizeStarted();
                 }
             });
 
@@ -180,7 +187,8 @@ namespace ClientState {
                     resizing = false;
                     resizeRequest = null;
                     resizeNeighbor = undefined;
-                    window.column.grid.onUserResizeFinished();
+                    (userResize.grid ?? window.column.grid).onUserResizeFinished();
+                    userResize.grid = null;
                 }
             });
 

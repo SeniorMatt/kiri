@@ -296,3 +296,22 @@ tests.register("Resize by the top edge of the lower window of a column", 7, () =
     Assert.equal(bottom.getActualFrameGeometry().height, b.height);
     Assert.equal(top.getActualFrameGeometry().y, t.y);
 });
+
+tests.register("Closing a window in the middle of a resize ends the resize", 10, () => {
+    const config = getDefaultConfig();
+    const { qtMock, workspaceMock, world } = init(config);
+    const [a, b] = workspaceMock.createClients(2);
+    const resizing = () => {
+        let result = false;
+        world.do((clientManager, desktopManager) => {
+            result = desktopManager.getCurrentDesktop()!.grid.isUserResizing();
+        });
+        return result;
+    };
+    workspaceMock.cursorPos = new MockQmlPoint(rectRight(b.frameGeometry), rectBottom(b.frameGeometry));
+    b.resize = true;
+    b.interactiveMoveResizeStarted.fire();
+    Assert.assert(resizing(), { message: "the resize holds the grid" });
+    workspaceMock.removeWindow(b);
+    Assert.assert(!resizing(), { message: "the window is gone, so is its resize" });
+});

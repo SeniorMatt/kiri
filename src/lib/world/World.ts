@@ -3,6 +3,7 @@ class World {
     private readonly clientManager: ClientManager;
     private readonly pinManager: PinManager;
     private readonly workspaceSignalManager: SignalManager;
+    private readonly focusPasser: FocusPassing.Passer;
     private readonly keyBindings: KeyBindings;
     private keyBindingsReleased = false;
     private readonly screenResizedDelayer: Delayer;
@@ -28,6 +29,7 @@ class World {
     // and the windows are put back into the columns they were in.
     constructor(config: Config, keyBindings: KeyBindings | null = null, layout: World.Layout | null = null) {
         const focusPasser = new FocusPassing.Passer();
+        this.focusPasser = focusPasser;
         this.workspaceSignalManager = initWorkspaceSignalHandlers(this, focusPasser);
 
         let presetWidths = {
@@ -701,6 +703,7 @@ class World {
         this.gestureEndDelayer.destroy();
         this.gestureAnimationTimer.destroy();
         this.minSizeTimer.destroy();
+        this.focusPasser.destroy();
         this.closeRelayoutDelayer.destroy();
         this.screenResizedDelayer.destroy();
         this.workspaceSignalManager.destroy();

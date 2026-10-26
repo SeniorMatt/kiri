@@ -141,7 +141,6 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         {
             name: "window-move-right",
             description: "Move window right",
-            defaultKeys: ["Meta+]"],
             action: () => world.doIfTiledFocusedOrMoveFloating(actions.windowMoveRight, 50, 0),
         },
         {

@@ -32,6 +32,17 @@
         Assert.equal(workspaceMock.desktops.indexOf(workspaceMock.currentDesktop), 0);
     });
 
+    tests.register("No default key belongs to two actions", 1, () => {
+        init(getDefaultConfig());
+        const owners = new Map<number, string>();
+        (kglobalaccel as MockKGlobalAccel).registered.forEach((keys, name) => {
+            for (const key of keys) {
+                Assert.assert(!owners.has(key), { message: `${name} and ${owners.get(key)} both use the key ${key.toString(16)}` });
+                owners.set(key, name);
+            }
+        });
+    });
+
     tests.register("Niri default keys", 1, () => {
         init(getDefaultConfig());
         const registered = (kglobalaccel as MockKGlobalAccel).registered;
