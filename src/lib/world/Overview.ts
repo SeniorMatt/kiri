@@ -130,8 +130,11 @@ class Overview {
         } catch (error: any) {
             return;
         }
+        if (answer === null || typeof answer !== "object") {
+            return;
+        }
         let changed = false;
-        for (const event of answer.events) {
+        for (const event of Array.isArray(answer.events) ? answer.events : []) {
             changed = this.apply(event) || changed;
         }
         const wasOpen = this.open;
