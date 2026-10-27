@@ -55,7 +55,11 @@ class ClientManager {
 
         let parsedWindowRules: WindowRule[] = [];
         try {
-            parsedWindowRules = JSON.parse(config.windowRules);
+            const parsed = JSON.parse(config.windowRules);
+            if (!Array.isArray(parsed)) {
+                throw new Error("the rules are not a list");
+            }
+            parsedWindowRules = parsed;
         } catch (error: any) {
             notificationInvalidWindowRules.sendEvent();
             log("failed to parse windowRules:", error);

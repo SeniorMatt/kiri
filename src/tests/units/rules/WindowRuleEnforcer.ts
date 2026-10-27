@@ -91,3 +91,28 @@ tests.register("window rule matchers: is-floating, is-active, is-focused and exc
     client.resourceClass = "none";
     Assert.equal(sizes.getFloatingSize(client, area), null);
 });
+
+tests.register("A window rule with a broken regex does not stop the others", 1, () => {
+    screen = new MockQmlRect(0, 0, 800, 600);
+    Workspace = new MockWorkspace();
+    const enforcer = new WindowRuleEnforcer([
+        { class: "(unclosed", caption: undefined, tile: false },
+        { class: "fine", caption: undefined, tile: false, exclude: [{ class: "[" }] },
+        { class: "ok", caption: undefined, tile: false },
+    ], false);
+    const client = (resourceClass: string): any => ({
+        normalWindow: true, transient: false, modal: false, managed: true, pid: 100, fullScreen: false,
+        resourceClass: resourceClass, resourceName: resourceClass, caption: "c",
+    });
+    Assert.equal(enforcer.shouldTile(client("ok")), false);
+    Assert.equal(enforcer.shouldTile(client("other")), true);
+});
+
+tests.register("Window rules that are not a list are ignored", 1, () => {
+    notificationInvalidWindowRules = { sendEvent: () => {} } as any;
+    const config = getDefaultConfig();
+    config.windowRules = '{ "class": "x", "tile": false }';
+    const { workspaceMock, world } = init(config);
+    const [client] = workspaceMock.createClients(1);
+    world.do((clientManager) => Assert.tiledClient(clientManager, client));
+});

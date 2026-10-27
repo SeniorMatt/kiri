@@ -593,6 +593,9 @@ class Actions {
         }
         const visibleRange = desktop.getCurrentVisibleRange();
         const visibleColumns = Array.from(desktop.grid.getVisibleColumns(visibleRange));
+        if (visibleColumns.length === 0) {
+            return; // an empty desktop, or no column is fully on screen
+        }
 
         const availableSpace = desktop.tilingArea.width;
         const gapsWidth = desktop.grid.config.gapsInnerHorizontal * (visibleColumns.length-1);

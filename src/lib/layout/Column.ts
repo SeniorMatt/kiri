@@ -275,6 +275,13 @@ class Column {
             return;
         }
 
+        // neither window gets smaller than its minimum
+        heightDelta = Math.min(heightDelta, otherWindow.height - this.getMinWindowHeight(otherWindow));
+        heightDelta = Math.max(heightDelta, this.getMinWindowHeight(window) - window.height);
+        if (heightDelta === 0) {
+            return;
+        }
+
         window.height += heightDelta;
         otherWindow.height -= heightDelta;
         for (const other of this.windows.iterator()) {

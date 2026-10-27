@@ -55,7 +55,15 @@ class WindowRuleEnforcer {
         context: WindowRuleContext = noWindowRuleContext,
         private readonly gapsInnerVertical = 0,
     ) {
-        this.entries = windowRules.map(rule => ({ matcher: new RuleMatcher(rule, rule.exclude ?? [], context), rule }));
+        // a rule with a broken regex (or no rule at all, like a null in the JSON) is dropped, the others still work
+        this.entries = [];
+        for (const rule of windowRules) {
+            try {
+                this.entries.push({ matcher: new RuleMatcher(rule, rule.exclude ?? [], context), rule });
+            } catch (error: any) {
+                log("invalid window rule:", JSON.stringify(rule), error);
+            }
+        }
         this.widthRules = [];
         for (const entry of this.entries) {
             if (entry.rule.width === undefined) {
@@ -75,7 +83,7 @@ class WindowRuleEnforcer {
                 log("invalid defaultColumnWidth:", defaultColumnWidth, error);
             }
         }
-        this.followCaption = WindowRuleEnforcer.createFollowCaptionRegex(windowRules);
+        this.followCaption = WindowRuleEnforcer.createFollowCaptionRegex(this.entries.map(entry => entry.rule));
     }
 
     private preferTiling(kwinClient: KwinClient) {
