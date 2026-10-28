@@ -343,6 +343,9 @@ Effect::Effect()
     });
     connect(KWin::effects, &KWin::EffectsHandler::windowDeleted, this, [this](KWin::EffectWindow *w) {
         repaintPainted(w);
+        if (m_active == w) {
+            m_active = nullptr;
+        }
         m_park.remove(w->internalId());
         m_parkPainted.remove(w->internalId());
         m_painted.remove(w);
