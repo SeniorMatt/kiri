@@ -164,6 +164,9 @@ class Overview {
     }
 
     private apply(event: { t: string, [key: string]: any }) {
+        if (event === null || typeof event !== "object") {
+            return false;
+        }
         switch (event.t) {
         case "activate": {
             const kwinClient = this.clientManager.findClientById(event.w);

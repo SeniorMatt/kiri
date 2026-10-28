@@ -192,8 +192,8 @@ void DesktopSwitchScreen::prePaintScreen(ScreenPrePaintData &data)
     // Clipping
     m_paintCtx.visibleDesktops.clear();
     m_paintCtx.visibleDesktops.reserve(4); // 4 - maximum number of visible desktops
-    bool includedX = false, includedY = false;
     for (VirtualDesktop *desktop : desktops) {
+        bool includedX = false, includedY = false;
         const QPoint coords = effects->desktopGridCoords(desktop);
         if (coords.x() % w == (int)(m_paintCtx.position.x()) % w) {
             includedX = true;
@@ -502,7 +502,8 @@ void DesktopSwitchEffect::finishedSwitching(bool releaseFullScreen)
         w->setData(WindowForceBackgroundContrastRole, QVariant());
         w->setData(WindowForceBlurRole, QVariant());
     }
-    if (releaseFullScreen) {
+    // only let go of the full-screen slot if it is ours: the overview may hold it (a desktop was added, a screen removed)
+    if (releaseFullScreen && effects->activeFullScreenEffect() == this) {
         effects->setActiveFullScreenEffect(nullptr);
     }
 }

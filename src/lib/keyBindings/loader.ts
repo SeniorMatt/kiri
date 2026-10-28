@@ -144,6 +144,9 @@ class KeyBindings {
             const userKeys = parseKeys(shortcutKeys[shortcut.name] ?? []);
             const flags = userKeys.length > 0 ? KGlobalAccel.setPresent | KGlobalAccel.noAutoloading : KGlobalAccel.setPresent;
             KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, userKeys.length > 0 ? userKeys : defaultKeys, flags], (keys: number[]|undefined) => {
+                if (this.destroyed) {
+                    return; // the script stopped before kglobalaccel answered
+                }
                 if (userKeys.length === 0 && defaultKeys.length > 0 && (keys ?? []).length === 0 && GAINED_DEFAULT_KEYS.has(shortcut.name)) {
                     // kglobalacceld keeps what it stored, and older versions stored "no key" for these actions
                     // (their default keys came later), so the default never took effect: set it once more

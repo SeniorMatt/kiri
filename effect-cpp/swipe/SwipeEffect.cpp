@@ -46,6 +46,10 @@ SwipeEffect::SwipeEffect()
 {
     QDBusConnection::sessionBus().registerObject(QStringLiteral("/KiriSwipe"), this, QDBusConnection::ExportScriptableSlots);
     input()->installInputEventSpy(this);
+    // m_g0 is keyed by window pointer and lockVisual() calls scrolls() on its keys: a deleted window must go
+    connect(effects, &EffectsHandler::windowDeleted, this, [this](EffectWindow *w) {
+        m_g0.remove(w);
+    });
 }
 
 SwipeEffect::~SwipeEffect()
