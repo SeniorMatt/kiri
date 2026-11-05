@@ -592,6 +592,7 @@ class Column {
     }
 
     public onWindowAdded(window: Window, bottom: boolean, after?: Window|null) {
+        const widthBefore = this.getWidth();
         if (after !== undefined && after !== null) {
             this.windows.insertAfter(window, after);
         } else if (after === null || !bottom) {
@@ -609,6 +610,9 @@ class Column {
 
         this.resizeWindows();
         this.normalSizing = this.isNormalSizing(); // a window that arrives full-screen has no view offset to restore
+        if (widthBefore > 0 && this.getWidth() !== widthBefore) {
+            this.grid.onColumnWidthChanged(this); // a maximized window makes the column as wide as the screen
+        }
 
         if (window.isFocused()) {
             this.onWindowFocused(window);
@@ -621,6 +625,7 @@ class Column {
         const lastWindow = this.windows.length() === 1;
         // like niri: the window below takes the place of the removed one, the one above if it was the bottom one
         const windowToFocus = this.getBelowWindow(window) ?? this.getAboveWindow(window);
+        const widthBefore = this.getWidth();
 
         this.windows.remove(window);
         if (!lastWindow) {
@@ -647,6 +652,9 @@ class Column {
                 }
             }
             this.resizeWindows();
+            if (this.getWidth() !== widthBefore) {
+                this.grid.onColumnWidthChanged(this); // the maximized window that filled the screen left
+            }
             if (windowToFocus !== null) {
                 switch (passFocus) {
                 case FocusPassing.Type.Immediate:

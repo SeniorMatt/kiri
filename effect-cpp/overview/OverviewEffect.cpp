@@ -423,8 +423,16 @@ void OverviewEffect::startOpen()
 
 // Builds the scene once, invisibly, shortly after login: the first real open otherwise pays for the QML and shader
 // compilation, the wallpapers and the window textures while the zoom is running.
+//
+// This blanks the screen: while the scene is up the windows are not painted by KWin and the (invisible, opacity 0.003)
+// scene draws nothing at progress 0, so the whole output is black for the length of the warm-up plus the stall of
+// building the scene (0.4 to 1.5 s measured in the test session, longer on a slower GPU). The script asks 15 s after
+// every load of the effect, so it showed as a random black screen. It is off unless KIRI_OVERVIEW_WARM is set.
 QString OverviewEffect::warm(const QString &layout)
 {
+    if (!qEnvironmentVariableIsSet("KIRI_OVERVIEW_WARM")) {
+        return QStringLiteral("disabled");
+    }
     if (isRunning() || effects->isScreenLocked() || effects->hasActiveFullScreenEffect()) {
         return QStringLiteral("busy");
     }

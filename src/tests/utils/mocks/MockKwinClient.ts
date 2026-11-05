@@ -145,6 +145,9 @@ class MockKwinClient {
 
     public set fullScreen(fullScreen: boolean) {
         const oldFullScreen = this._fullScreen;
+        if (fullScreen === oldFullScreen) {
+            return; // like KWin: nothing changes, the window keeps its frame
+        }
         this.hasBorder = !fullScreen;
         const targetFrameGeometry = fullScreen ? screen : this.windowedFrameGeometry;
         if (fullScreen) {

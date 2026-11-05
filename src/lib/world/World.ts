@@ -314,10 +314,16 @@ class World {
             }
             const kwinClient = view.focused === null ? undefined : byId.get(view.focused);
             const window = kwinClient === undefined ? null : this.clientManager.findTiledWindow(kwinClient);
-            if (window !== null && window.column.grid === desktop.grid) {
-                window.column.onWindowFocused(window);
+            const active = Workspace.activeWindow === null ? null : this.clientManager.findTiledWindow(Workspace.activeWindow);
+            if (window !== null && window.column.grid === desktop.grid && (active === null || active.column.grid !== desktop.grid)) {
+                window.column.onWindowFocused(window); // the window that has the focus now keeps it
             }
             desktop.setScroll(view.scrollX, true);
+            // the focused window may be a tiled one that was not in the saved layout (it was floating, minimized): keep it in view
+            const focusedColumn = desktop.grid.getLastFocusedColumn();
+            if (focusedColumn !== null && focusedColumn.getWidth() < desktop.tilingArea.width && !Range.contains(desktop.getCurrentVisibleRange(), focusedColumn)) {
+                desktop.fitColumnInView(focusedColumn);
+            }
         }
     }
 
