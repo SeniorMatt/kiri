@@ -321,7 +321,7 @@ class World {
             desktop.setScroll(view.scrollX, true);
             // the focused window may be a tiled one that was not in the saved layout (it was floating, minimized): keep it in view
             const focusedColumn = desktop.grid.getLastFocusedColumn();
-            if (focusedColumn !== null && focusedColumn.getWidth() < desktop.tilingArea.width && !Range.contains(desktop.getCurrentVisibleRange(), focusedColumn)) {
+            if (focusedColumn !== null && focusedColumn.getWidth() <= desktop.tilingArea.width && !Range.contains(desktop.getCurrentVisibleRange(), focusedColumn)) {
                 desktop.fitColumnInView(focusedColumn);
             }
         }

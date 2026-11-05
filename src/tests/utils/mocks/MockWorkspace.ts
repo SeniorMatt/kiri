@@ -90,7 +90,9 @@ class MockWorkspace {
     }
 
     public removeWindow(window: MockKwinClient) {
-        this.activeWindow = null;
+        if (this.activeWindow === window) {
+            this.activeWindow = null; // like KWin: closing another window leaves the focus where it is
+        }
         runReorder(
             () => this.windows.splice(this.windows.indexOf(window), 1),
             () => this.windowRemoved.fire(window),

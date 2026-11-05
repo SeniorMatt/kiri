@@ -40,4 +40,41 @@
         assertFocusedColumnInView(reloaded, workspaceMock);
         reloaded.destroy();
     });
+
+    tests.register("A script reload keeps a column with a full-screen window in view", 1, () => {
+        const config = getDefaultConfig();
+        const { qtMock, workspaceMock, world } = init(config, { width: 503, height: 600 });
+        const [a, b, c] = workspaceMock.createClientsWithWidths(471, 300, 200);
+        b.fullScreen = true;
+        workspaceMock.activeWindow = a;
+        qtMock.fireShortcut("window-consume-into-column"); // b joins the column of a: the column overflows to the left
+        Assert.assert(workspaceMock.activeWindow === a);
+        const json = JSON.stringify(world.captureLayout());
+        world.destroy();
+        const reloaded = new World(config, null, Kiri.parseState(json));
+        assertFocusedColumnInView(reloaded, workspaceMock);
+        reloaded.destroy();
+    });
+
+    tests.register("Trading height with the neighbour never gives a window a negative height", 1, () => {
+        const config = getDefaultConfig();
+        const { qtMock, workspaceMock } = init(config);
+        const [a, b, c] = workspaceMock.createClientsWithWidths(300, 300, 300);
+        workspaceMock.activeWindow = a;
+        qtMock.fireShortcut("window-consume-into-column");
+        qtMock.fireShortcut("window-consume-into-column"); // a b c in one column
+        workspaceMock.activeWindow = c;
+        for (let i = 0; i < 100; i++) {
+            qtMock.fireShortcut("window-height-increase-up");
+        }
+        workspaceMock.activeWindow = a;
+        for (let i = 0; i < 100; i++) {
+            qtMock.fireShortcut("window-height-increase-down");
+        }
+        for (const client of [a, b, c]) {
+            Assert.assert(client.getActualFrameGeometry().height >= 1, { message: `the height is ${client.getActualFrameGeometry().height}` });
+        }
+        const [first, second, third] = [a, b, c].map(client => client.getActualFrameGeometry());
+        Assert.assert(second.y >= first.y + first.height && third.y >= second.y + second.height, { message: "the windows stay in order" });
+    });
 }
