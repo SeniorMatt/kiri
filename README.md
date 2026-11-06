@@ -57,6 +57,7 @@ They're in System Settings > Shortcuts > Kiri, and the defaults follow niri's, e
     Meta+R                         cycle column widths
     Meta+F                         maximize column
     Meta+Shift+F                   full-screen
+    Meta+Ctrl+Shift+F              windowed (fake) full-screen: the app hides its UI, the window stays a tile
     Meta+- / Meta+=                narrower/wider column
     Meta+C                         center column
     Meta+W                         toggle tabbed column

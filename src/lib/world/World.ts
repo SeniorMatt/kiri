@@ -223,6 +223,7 @@ class World {
                     windows: column.getWindows().map(window => ({
                         id: String(window.client.kwinClient.internalId),
                         fullScreen: window.client.kwinClient.fullScreen,
+                        windowedFullScreen: window.client.windowedFullScreen,
                         maximizedMode: window.client.getMaximizedMode() ?? MaximizedMode.Unmaximized,
                         fixedHeight: window.fixedHeight,
                         presetHeightIndex: window.presetHeightIndex,
@@ -261,7 +262,11 @@ class World {
                 windows.push(window);
                 savedWindows.push(saved);
                 if (saved.fullScreen) {
+                    window.client.windowedFullScreen = saved.windowedFullScreen === true;
                     window.client.setFullScreen(true);
+                    if (window.client.windowedFullScreen) {
+                        window.onFullScreenChanged(true); // the window was added as a real full-screen one
+                    }
                 } else if (saved.maximizedMode !== MaximizedMode.Unmaximized) {
                     window.client.setMaximize(
                         saved.maximizedMode === MaximizedMode.Horizontally || saved.maximizedMode === MaximizedMode.Maximized,
@@ -744,6 +749,7 @@ namespace World {
             windows: {
                 id: string;
                 fullScreen: boolean;
+                windowedFullScreen?: boolean;
                 maximizedMode: MaximizedMode;
                 fixedHeight?: number | null;
                 presetHeightIndex?: number | null;

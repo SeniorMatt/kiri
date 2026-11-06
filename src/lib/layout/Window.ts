@@ -141,7 +141,9 @@ class Window {
         const config = this.column.grid.config;
         const wasOutsideGrid = this.isMaximizedOutsideGrid();
         if (!config.tileFullScreen) {
-            this.client.setFullScreen(false);
+            if (!this.client.windowedFullScreen) {
+                this.client.setFullScreen(false);
+            }
         }
         if (!config.tileMaximized) {
             this.client.setMaximize(false, false);
@@ -158,6 +160,34 @@ class Window {
             this.focusedState.maximizedMode = maximizedMode;
         }
         this.onMaximizedOrFullScreenChanged();
+    }
+
+    // niri's toggle-windowed-fullscreen: the client is told it is full-screen, the window stays a tile of its column
+    public toggleWindowedFullScreen() {
+        const client = this.client;
+        const kwinClient = client.kwinClient;
+        if (!kwinClient.fullScreenable) {
+            return;
+        }
+        if (client.windowedFullScreen && kwinClient.fullScreen) {
+            client.windowedFullScreen = false;
+            kwinClient.fullScreen = false; // the signal brings the layout pass
+        } else {
+            client.windowedFullScreen = true;
+            if (kwinClient.fullScreen) {
+                this.onFullScreenChanged(true); // it was full-screen for real
+            } else {
+                kwinClient.fullScreen = true;
+            }
+        }
+    }
+
+    // niri's fullscreen-window on a windowed full-screen window: it becomes full-screen for real
+    public makeFullScreenReal() {
+        if (this.client.windowedFullScreen) {
+            this.client.windowedFullScreen = false;
+            this.onFullScreenChanged(this.client.kwinClient.fullScreen);
+        }
     }
 
     public onFullScreenChanged(fullScreen: boolean) {
@@ -201,7 +231,7 @@ class Window {
     }
 
     private isFullScreenInGrid() {
-        return this.column.grid.config.tileFullScreen && this.client.kwinClient.fullScreen;
+        return this.column.grid.config.tileFullScreen && this.client.kwinClient.fullScreen && !this.client.windowedFullScreen;
     }
 
     private getMaximizedModeInGrid() {
@@ -211,7 +241,7 @@ class Window {
     // maximized or full-screen windows that are not kept in the grid are left to KWin
     private isMaximizedOutsideGrid() {
         const config = this.column.grid.config;
-        return (!config.tileFullScreen && this.client.kwinClient.fullScreen) ||
+        return (!config.tileFullScreen && this.client.kwinClient.fullScreen && !this.client.windowedFullScreen) ||
             (!config.tileMaximized && this.getMaximizedMode() !== MaximizedMode.Unmaximized);
     }
 

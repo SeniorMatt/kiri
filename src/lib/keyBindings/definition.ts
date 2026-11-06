@@ -503,9 +503,25 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => {
                 const window = Workspace.activeWindow;
                 if (window !== null && window.fullScreenable) {
-                    window.fullScreen = !window.fullScreen;
+                    // a windowed full-screen window (niri's toggle-windowed-fullscreen) becomes full-screen for real
+                    let wasWindowed = false;
+                    world.doIfTiled(window, (cm, dm, tiled) => {
+                        wasWindowed = tiled.client.windowedFullScreen && window.fullScreen;
+                        if (wasWindowed) {
+                            tiled.makeFullScreenReal();
+                        }
+                    });
+                    if (!wasWindowed) {
+                        window.fullScreen = !window.fullScreen;
+                    }
                 }
             },
+        },
+        {
+            name: "window-toggle-windowed-fullscreen",
+            description: "Toggle windowed (fake) full-screen",
+            defaultKeys: ["Meta+Ctrl+Shift+F"],
+            action: () => world.doIfTiledFocused(actions.windowToggleWindowedFullScreen),
         },
         {
             name: "overview",

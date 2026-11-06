@@ -142,17 +142,20 @@ class MockWorkspace {
         window.interactiveMoveResizeStarted.fire();
 
         for (const delta of deltas) {
+            // like KWin, an interactive resize stops at the window's minimum size (and never goes below 1 px)
             if (delta.width !== 0) {
-                frame.width += delta.width;
+                const width = Math.max(frame.width + delta.width, window.minSize.width, 1);
                 if (leftEdge) {
-                    frame.x -= delta.width;
+                    frame.x -= width - frame.width;
                 }
+                frame.width = width;
             }
             if (delta.height !== 0) {
-                frame.height += delta.height;
+                const height = Math.max(frame.height + delta.height, window.minSize.height, 1);
                 if (topEdge) {
-                    frame.y -= delta.height;
+                    frame.y -= height - frame.height;
                 }
+                frame.height = height;
             }
             window.interactiveMoveResizeStepped.fire(frame.clone()); // KWin tells the geometry the pointer asks for, before the client commits it
             runOneOf(

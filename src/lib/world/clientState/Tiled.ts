@@ -262,6 +262,10 @@ namespace ClientState {
                 } else if (window.column.grid.isUserResizing() && !client.isManipulatingGeometry(newGeometry)) {
                     // this window has committed a size it was sent while another one is being resized: it may have a newer one waiting
                     world.do(() => window.column.grid.desktop.onLayoutChanged());
+                } else if (client.windowedFullScreen && kwinClient.fullScreen && !window.column.grid.isUserResizing() &&
+                    Clients.isFrameFullScreenSize(kwinClient)) {
+                    // KWin gave the window the screen when the client was told it is full-screen: it is a tile, put it back
+                    world.do(() => window.column.grid.desktop.onLayoutChanged());
                 } else if (
                     !window.column.grid.isUserResizing() &&
                     !client.isManipulatingGeometry(newGeometry) &&
@@ -271,7 +275,7 @@ namespace ClientState {
                     // frame then); KWin sets the full-screen flag before the frame of a window that enters it.
                     (!Clients.isFullScreenGeometry(kwinClient) || (config.hideTitlebars && !kwinClient.fullScreen)) // not using `kwinClient.fullScreen` because it may not be set yet at this point
                 ) {
-                    if (kwinClient.fullScreenable && Clients.isFrameFullScreenSize(kwinClient) !== kwinClient.fullScreen) {
+                    if (kwinClient.fullScreenable && !client.windowedFullScreen && Clients.isFrameFullScreenSize(kwinClient) !== kwinClient.fullScreen) {
                         fullScreenFrame.pending = true;
                         fullScreenDelayer.run(); // the full-screen flag follows
                         return;

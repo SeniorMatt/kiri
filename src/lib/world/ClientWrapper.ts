@@ -10,6 +10,8 @@ class ClientWrapper {
     public keepTitlebarHidden = false; // set while a dragged window passes through the floating state
     public readonly createdAt = Date.now();
     public x11 = false; // an Xwayland window (known a moment after it is created, see ClientManager.addClient)
+    // niri's toggle-windowed-fullscreen: the client is told it is full-screen but stays a tile of its column
+    public windowedFullScreen = false;
     public fullScreenSeen: boolean; // has been full-screen at some point (or is)
     public maximizedSeen = false; // has been maximized at some point (or is)
     public hadSlot = false; // the layout has placed it at a slot of its column (not full-screen or maximized)
@@ -85,7 +87,7 @@ class ClientWrapper {
     private park(x: number, y: number): [number, number] {
         const kwinClient = this.kwinClient;
         const id = String(kwinClient.internalId);
-        if (this.x11 && kwinClient.fullScreen && canParkWindows()) {
+        if (this.x11 && kwinClient.fullScreen && !this.windowedFullScreen && canParkWindows()) {
             const area = Workspace.clientArea(ClientAreaOption.FullScreenArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
             const originX = area.x.round();
             const originY = area.y.round();
@@ -293,6 +295,8 @@ class ClientWrapper {
         manager.connect(client.kwinClient.fullScreenChanged, () => {
             if (client.kwinClient.fullScreen) {
                 client.fullScreenSeen = true;
+            } else {
+                client.windowedFullScreen = false; // the client left full-screen mode (niri: unset-fullscreen ends the windowed one too)
             }
         });
 

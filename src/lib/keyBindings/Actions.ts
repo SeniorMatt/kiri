@@ -427,6 +427,10 @@ class Actions {
         cm.toggleFloatingClient(Workspace.activeWindow);
     };
 
+    public readonly windowToggleWindowedFullScreen = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        window.toggleWindowedFullScreen();
+    };
+
     public readonly columnMoveLeft = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         grid.moveColumnLeft(column);
     };

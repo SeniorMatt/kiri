@@ -112,6 +112,13 @@ bool Effect::blocksDirectScanout() const
 
 // A window that is entirely off every screen cannot be seen, so neither a snapshot of it nor an animation is needed.
 // Kiri parks most of the columns off screen and moves them with every scroll.
+// a window that is told it is full-screen but stays a tile (niri's toggle-windowed-fullscreen) is not one of the parked ones
+static bool coversScreen(const KWin::EffectWindow *w)
+{
+    const auto *output = w->screen();
+    return !output || (w->frameGeometry().width() >= output->geometry().width() - 0.5 && w->frameGeometry().height() >= output->geometry().height() - 0.5);
+}
+
 static bool offScreen(const KWin::RectF &frame)
 {
     const KWin::Rect screens = KWin::effects->virtualScreenGeometry();
@@ -228,7 +235,7 @@ void Effect::onAboutToChange(KWin::EffectWindow *w)
     s.requestStreak = fast ? s.requestStreak + 1 : 0;
     if (m_speed <= 0 || s.snapshot || s.closeStart >= 0 || s.requestStreak >= StreamLength || t - s.created < SettleAfterOpen
         || anyUserResize() || resizeSettling(t) // the other windows get their sizes at once while a resize goes on
-        || (w->isX11Client() && w->isFullScreen()) // Kiri parks these and kiri_decorations paints them (see setParkedPositions)
+        || (w->isX11Client() && w->isFullScreen() && coversScreen(w)) // Kiri parks these and kiri_decorations paints them (see setParkedPositions)
         || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()
         || (!s.moving && !s.resizing && offScreen(w->frameGeometry()))) {
         return;
@@ -367,7 +374,7 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
     }
 
     if (m_speed <= 0 || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()
-        || (w->isX11Client() && w->isFullScreen()) // parked by Kiri and painted by kiri_decorations
+        || (w->isX11Client() && w->isFullScreen() && coversScreen(w)) // parked by Kiri and painted by kiri_decorations
         || (!s.moving && !s.resizing && offScreen(old) && offScreen(frame)) // moving between two places nobody sees
         || overviewUp() || anyUserResize() // like niri's interactive resize (animate = false): the neighbours follow the mouse at once
         || s.closeStart >= 0 || t - s.created < SettleAfterOpen || (s.streak >= StreamLength && t - s.streamStart >= StreamMinDuration) || old.isEmpty() || frame.isEmpty()) {

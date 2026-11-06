@@ -65,7 +65,8 @@ double Effect::clock() const
 // reaches the screen edges, from 1 to 0 when it stops being so
 double Effect::expandedProgress(KWin::EffectWindow *w) const
 {
-    bool expanded = w->isFullScreen();
+    // a window that is only told it is full-screen (niri's toggle-windowed-fullscreen) stays a tile: expanded needs the frame to cover the screen
+    bool expanded = w->isFullScreen() && !w->screen();
     if (!expanded) {
         if (const auto *output = w->screen()) {
             const KWin::RectF screen = output->geometry();

@@ -14,6 +14,7 @@ interface ClosedSlot {
     placement: ClientState.Tiled.Placement;
     preferredWidth: number;
     fullScreen: boolean;
+    windowedFullScreen: boolean;
     maximizedMode: MaximizedMode;
     viewRestoreOffset: number|null;
     focused: boolean; // had the focus, or lost it to KWin's pick a moment before the close was reported
@@ -230,6 +231,7 @@ class ClientManager {
             return;
         }
         if (slot.fullScreen) {
+            client.windowedFullScreen = slot.windowedFullScreen;
             client.setFullScreen(true);
         } else if (slot.maximizedMode !== MaximizedMode.Unmaximized) {
             client.setMaximize(
@@ -313,6 +315,7 @@ class ClientManager {
             },
             preferredWidth: client.preferredWidth,
             fullScreen: kwinClient.fullScreen,
+            windowedFullScreen: client.windowedFullScreen,
             maximizedMode: client.getMaximizedMode() ?? MaximizedMode.Unmaximized,
             viewRestoreOffset: grid.getViewRestoreOffset(column),
             focused: focused,

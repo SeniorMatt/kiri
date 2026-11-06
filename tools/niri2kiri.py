@@ -53,6 +53,7 @@ ACTIONS = {
     "maximize-column": "column-width-maximize",
     "maximize-window-to-edges": "window-maximize-to-edges",
     "fullscreen-window": "window-toggle-fullscreen",
+    "toggle-windowed-fullscreen": "window-toggle-windowed-fullscreen",
     "center-column": "grid-scroll-focused",
     "toggle-window-floating": "window-toggle-floating",
     "toggle-column-tabbed-display": "column-toggle-tabbed",

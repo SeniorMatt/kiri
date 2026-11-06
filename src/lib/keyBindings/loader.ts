@@ -56,7 +56,7 @@ function getShortcuts(world: World, actions: Actions): Shortcut[] {
 // Holding a key repeats its action like in niri (binds repeat by default there). Close, overview and the toggles
 // do not repeat (niri's default config has repeat=false for close-window), a held key would flip them back and forth.
 const NO_REPEAT = new Set([
-    "window-close", "overview", "window-toggle-floating", "window-toggle-fullscreen", "window-move-to-floating",
+    "window-close", "overview", "window-toggle-floating", "window-toggle-fullscreen", "window-toggle-windowed-fullscreen", "window-move-to-floating",
     "window-move-to-tiling", "column-toggle-tabbed", "column-display-normal", "column-display-tabbed",
     "column-width-maximize", "column-width-expand", "window-maximize-to-edges", "window-switch-focus-floating-tiling",
     "desktop-previous-used", "screen-switch",

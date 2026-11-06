@@ -54,7 +54,7 @@ focus-column-left/right/first/last and focus-window-up/down (no wrapping); focus
 
 - Per-monitor workspaces and focus-monitor-*, move-*-to-monitor-*, move-workspace-to-monitor-*: desktops are shared by all monitors; the grid sits on one screen.
 - move-workspace-up/down, set-workspace-name, empty-workspace-above-first: scripts can create and remove desktops but not reorder or rename them (could be emulated by moving the windows; not done).
-- toggle-windowed-fullscreen, spawn, screenshot, power-off-monitors, change-vt, quit, hotkey overlay: not window management or no KWin script API.
+- spawn, screenshot, power-off-monitors, change-vt, quit, hotkey overlay: not window management or no KWin script API.
 - Shortcut on the bare `Mod` key release (overview): Plasma owns it.
 
 ## Visual checks in a nested KWin (container ksr-kdelinux, own dirs /parity)
