@@ -460,7 +460,7 @@ class Actions {
         const desktop = grid.desktop;
         const full = desktop.tilingArea.width + grid.config.gapsInnerHorizontal;
         column.widthBeforeMaximize = undefined;
-        column.setWidth(column.getWidth() + Math.round(full * percent / 100), true);
+        column.setWidth(column.getWidth() + Math.round(full * percent / 100), true, false, true); // may exceed the view, like niri
     };
 
     // the same keys on a floating window (niri's floating layer): sizes relative to the work area
@@ -489,7 +489,7 @@ class Actions {
         if (column.getWidth() === fullWidth && column.widthBeforeMaximize !== undefined) {
             const restoreWidth = column.widthBeforeMaximize;
             column.widthBeforeMaximize = undefined;
-            column.setWidth(restoreWidth, true);
+            column.setWidth(restoreWidth, true, false, true);
         } else if (column.getWidth() !== fullWidth) {
             column.widthBeforeMaximize = column.getWidth();
             column.setWidth(fullWidth, true);

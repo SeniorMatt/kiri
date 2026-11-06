@@ -13,7 +13,9 @@ class Column {
     // while the user resizes one of the windows: the geometry the pointer asks for, before the client has committed
     // it. The other windows of the column are sent there at once (niri sends all the configures of a resize together)
     private userResizeTarget: { window: Window, x: number, width: number } | null = null;
+    private beyondView = false; // a width step made the column wider than the view (niri allows it)
     private static readonly minWidth = 40;
+    private static readonly maxWidthBeyondView = 4; // times the view width: keeps the window under the GPU's texture size
     private static readonly minHeight = 40;
 
     constructor(grid: Grid, leftColumn: Column|null) {
@@ -145,8 +147,9 @@ class Column {
         return Math.min(maxMinWidth, this.grid.desktop.tilingArea.width); // min width mustn't exceed tilingArea width
     }
 
-    public getMaxWidth() {
-        let minMaxWidth = this.grid.desktop.tilingArea.width;
+    // `beyondView`: the limit for niri's width steps (Meta+=), which may make a column wider than the screen
+    public getMaxWidth(beyondView = false) {
+        let minMaxWidth = this.grid.desktop.tilingArea.width * (beyondView ? Column.maxWidthBeyondView : 1);
         for (const window of this.windows.iterator()) {
             const maxWidth = window.client.kwinClient.maxSize.width.floor();
             if (maxWidth < minMaxWidth) {
@@ -156,8 +159,17 @@ class Column {
         return Math.max(minMaxWidth, this.getMinWidth()); // max width mustn't be lower than min width
     }
 
-    public setWidth(width: number, setPreferred: boolean, keepPreset = false) {
-        width = clamp(width, this.getMinWidth(), this.getMaxWidth());
+    // `beyondView`: the width was asked for by a width step and may exceed the screen; once a column is that
+    // wide, later updates (the client's own frame) may keep it so until it is narrowed back into the view
+    public setWidth(width: number, setPreferred: boolean, keepPreset = false, beyondView = false) {
+        const viewMax = this.getMaxWidth();
+        if (beyondView) {
+            this.beyondView = width > viewMax;
+        }
+        width = clamp(width, this.getMinWidth(), this.beyondView ? this.getMaxWidth(true) : viewMax);
+        if (width <= viewMax) {
+            this.beyondView = false;
+        }
         if (!keepPreset) {
             this.presetIndex = undefined;
             this.presetWidth = undefined;
@@ -276,13 +288,6 @@ class Column {
         }
 
         // neither window gets smaller than its minimum
-        heightDelta = Math.min(heightDelta, otherWindow.height - this.getMinWindowHeight(otherWindow));
-        heightDelta = Math.max(heightDelta, this.getMinWindowHeight(window) - window.height);
-        if (heightDelta === 0) {
-            return;
-        }
-
-        // neither window gets less than its minimum (or a height below 1)
         heightDelta = Math.min(heightDelta, otherWindow.height - this.getMinWindowHeight(otherWindow));
         heightDelta = Math.max(heightDelta, this.getMinWindowHeight(window) - window.height);
         if (heightDelta === 0) {

@@ -77,4 +77,36 @@
         const [first, second, third] = [a, b, c].map(client => client.getActualFrameGeometry());
         Assert.assert(second.y >= first.y + first.height && third.y >= second.y + second.height, { message: "the windows stay in order" });
     });
+
+    tests.register("The focus KWin gives to a floating window on the next desktop is not taken back by the warp check", 5, () => {
+        const config = getDefaultConfig();
+        config.cursorFollowsFocus = true;
+        const { qtMock, workspaceMock } = init(config);
+        const [a, b] = workspaceMock.createClients(2);
+        workspaceMock.currentDesktop = workspaceMock.desktops[1];
+        const [floating] = workspaceMock.createClients(1);
+        qtMock.fireShortcut("window-toggle-floating");
+        workspaceMock.currentDesktop = workspaceMock.desktops[0];
+        workspaceMock.activeWindow = b;
+        qtMock.fireShortcut("focus-1"); // the cursor warps to the tiled window
+        qtMock.fireShortcut("desktop-2");
+        workspaceMock.activeWindow = floating; // KWin picks the window of the desktop the user went to
+        Assert.assert(workspaceMock.activeWindow === floating, { message: "the focus stays on the new desktop" });
+        Assert.assert(floating.desktops.includes(workspaceMock.currentDesktop));
+    });
+
+    tests.register("The warp check does not give the focus back to a window that was minimized", 5, () => {
+        const config = getDefaultConfig();
+        config.cursorFollowsFocus = true;
+        const { qtMock, workspaceMock } = init(config);
+        const [floating, a] = workspaceMock.createClients(2);
+        workspaceMock.activeWindow = floating;
+        qtMock.fireShortcut("window-toggle-floating");
+        workspaceMock.activeWindow = null;
+        qtMock.fireShortcut("focus-1"); // the cursor warps to the tiled window
+        Assert.assert(workspaceMock.activeWindow === a, { message: "invalid test setup" });
+        a.minimized = true;
+        workspaceMock.activeWindow = floating; // KWin's pick after the minimize
+        Assert.assert(workspaceMock.activeWindow === floating && a.minimized, { message: "the minimized window is not activated again" });
+    });
 }

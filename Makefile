@@ -19,6 +19,10 @@ lint-fix: npm-install
 test:
 	./run-ts.sh ./src/tests "${PATTERN}"
 
+# a long seeded stress run: make fuzz FUZZ_SEEDS=2000 (FUZZ_STEPS=300; FUZZ_ONLY=<seed> replays one seed)
+fuzz:
+	FUZZ_SEEDS=$${FUZZ_SEEDS:-2000} ./run-ts.sh ./src/tests "^Fuzz"
+
 install: build
 	kpackagetool6 --type=KWin/Script --install=./package || kpackagetool6 --type=KWin/Script --upgrade=./package
 	kpackagetool6 --type=KWin/Effect --install=./effect || kpackagetool6 --type=KWin/Effect --upgrade=./effect

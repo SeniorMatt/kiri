@@ -139,6 +139,7 @@ class Window {
             return;
         }
         const config = this.column.grid.config;
+        const wasOutsideGrid = this.isMaximizedOutsideGrid();
         if (!config.tileFullScreen) {
             this.client.setFullScreen(false);
         }
@@ -146,6 +147,10 @@ class Window {
             this.client.setMaximize(false, false);
         }
         this.updateLayering();
+        if (wasOutsideGrid) {
+            // KWin may put the window back to its old frame after the flag changed and the layout ran: place it again
+            this.column.grid.desktop.onLayoutChanged();
+        }
     }
 
     public onMaximizedChanged(maximizedMode: MaximizedMode) {

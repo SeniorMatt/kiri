@@ -730,6 +730,8 @@ class ClientManager {
         const warped = this.warpedToTiled;
         this.warpedToTiled = null;
         if (warped !== null && warped.client !== kwinClient && Date.now() - warped.time < 800 &&
+            Clients.isOnVirtualDesktop(warped.client, Workspace.currentDesktop) && !warped.client.minimized && // not after a switch to another desktop or a minimize, where KWin's pick is the user's
+
             this.isFloating(kwinClient) && !KiriFocus.peek(kwinClient) && this.clientMap.has(warped.client)) {
             KiriFocus.mark(warped.client);
             activateWindow(warped.client, "client-manager");

@@ -71,6 +71,38 @@ tests.register("A column that grows past the screen is left aligned, one that ov
         workspaceMock.resizeWindow(b, true, false, false, new MockQmlSize(500, 0));
         qtMock.fireShortcut("column-width-increase");
         const fb = b.getActualFrameGeometry();
-        Assert.assert(fb.x >= tilingArea.x && rectRight(fb) <= tilingArea.x + tilingArea.width, { message: "B is fully visible" });
+        if (fb.width > tilingArea.width) {
+            Assert.equal(fb.x, tilingArea.x, { message: "B grew past the screen (like niri) and shows its left edge" });
+        } else {
+            Assert.assert(fb.x >= tilingArea.x && rectRight(fb) <= tilingArea.x + tilingArea.width, { message: "B is fully visible" });
+        }
     }
+});
+
+tests.register("Column width steps go past the screen width like niri and come back", 3, () => {
+    const { qtMock, workspaceMock, b } = widthViewSetup();
+    workspaceMock.resizeWindow(b, true, false, false, new MockQmlSize(tilingArea.width - 300, 0));
+    for (let i = 0; i < 4; i++) {
+        qtMock.fireShortcut("column-width-increase");
+    }
+    const wide = b.getActualFrameGeometry();
+    Assert.assert(wide.width > tilingArea.width, { message: `wider than the screen: ${wide.width}` });
+    Assert.equal(wide.x, tilingArea.x, { message: "a column wider than the view shows its left edge" });
+
+    // the client's own frame update keeps the wide width
+    b.frameGeometry = new MockQmlRect(wide.x, wide.y, wide.width, wide.height);
+    Assert.equal(b.getActualFrameGeometry().width, wide.width, { message: "stays wide after the client commits" });
+
+    for (let i = 0; i < 8; i++) {
+        qtMock.fireShortcut("column-width-decrease");
+    }
+    Assert.assert(b.getActualFrameGeometry().width < tilingArea.width, { message: "back inside the view" });
+});
+
+tests.register("Column width steps stop at four screen widths", 1, () => {
+    const { qtMock, b } = widthViewSetup();
+    for (let i = 0; i < 60; i++) {
+        qtMock.fireShortcut("column-width-increase");
+    }
+    Assert.equal(b.getActualFrameGeometry().width, tilingArea.width * 4, { message: "capped" });
 });
