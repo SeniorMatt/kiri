@@ -259,7 +259,7 @@ class Actions {
 
     public readonly switchFocusFloatingTiling = (cm: ClientManager, dm: DesktopManager) => {
         const active = Workspace.activeWindow;
-        if (active !== null && cm.isFloating(active)) {
+        if (active !== null && cm.isUserFloating(active)) {
             this.focusTiling(cm, dm);
         } else {
             this.focusFloating(cm, dm);
@@ -274,7 +274,7 @@ class Actions {
     };
 
     public readonly windowMoveToTiling = (cm: ClientManager, dm: DesktopManager) => {
-        if (Workspace.activeWindow !== null && cm.isFloating(Workspace.activeWindow)) {
+        if (Workspace.activeWindow !== null && cm.isUserFloating(Workspace.activeWindow)) {
             cm.toggleFloatingClient(Workspace.activeWindow);
         }
     };

@@ -33,12 +33,14 @@ script_loaded() { [ "$($KWIN /Scripting org.kde.kwin.Scripting.isScriptLoaded ki
 effect_loaded() { [ "$(fx isEffectLoaded "$1")" = true ]; }
 
 # Settings without a runtime switch: "name group key kiri-value". The user's value is kept in [Kiri-mode] under
-# "name". A saved value is replaced when the current one is neither Kiri's nor the saved one: the user changed the
-# setting in System Settings while in Kiri mode.
+# "name". Coming from Plasma mode the current value is always the user's (even when it equals Kiri's, e.g. click to
+# focus), so it is saved. Already in Kiri mode (login), a saved value is replaced only when the current one is
+# not Kiri's: the user changed the setting in System Settings while in Kiri mode.
+from_plasma=false
 keep_user_value() { # name group key kiriValue
     cur=$(r "$2" "$3")
     saved=$(r Kiri-mode "$1")
-    if [ "$cur" != "$4" ]; then
+    if $from_plasma || [ "$cur" != "$4" ]; then
         w Kiri-mode "$1" "$cur"
     elif [ -z "$saved" ]; then
         w Kiri-mode "$1" "$cur"
@@ -106,6 +108,7 @@ show() { # text
 }
 
 go_kiri() {
+    [ "$(current)" = plasma ] && from_plasma=true
     w Plugins kiriEnabled true
     apply_settings
     reconfigure

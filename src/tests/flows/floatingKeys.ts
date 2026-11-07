@@ -341,3 +341,21 @@ tests.register("Floating window returns with its old size and position", 1, () =
     qtMock.fireShortcut("window-toggle-floating"); // float again
     Assert.equalArrays(frame(), before);
 });
+
+tests.register("Floating-window keys leave the desktop (wallpaper) alone and act on the last focused tile", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [a] = workspaceMock.createClientsWithWidths(300);
+    const desktop = new MockKwinClient(new MockQmlRect(0, 0, screen.width, screen.height));
+    Object.assign(desktop, { normalWindow: false, desktopWindow: true, caption: "Desktop" });
+    workspaceMock.createWindows(desktop);
+    workspaceMock.activeWindow = a;
+    workspaceMock.activeWindow = desktop;
+    const desktopFrame = desktop.getFrameGeometryCopy();
+    const width = a.getActualFrameGeometry().width;
+    for (const key of ["cycle-preset-widths", "column-width-increase", "window-height-increase", "window-move-left", "grid-scroll-focused", "window-move-to-tiling", "window-height-cycle-presets"]) {
+        qtMock.fireShortcut(key);
+        const frame = desktop.getActualFrameGeometry();
+        Assert.assert(frame.x === desktopFrame.x && frame.y === desktopFrame.y && frame.width === desktopFrame.width && frame.height === desktopFrame.height, { message: `the desktop stays put: ${key}` });
+    }
+    Assert.assert(a.getActualFrameGeometry().width !== width, { message: "the width keys went to the tiled window" });
+});

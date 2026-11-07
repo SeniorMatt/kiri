@@ -802,6 +802,12 @@ class ClientManager {
         return client !== undefined && client.stateManager.getState() instanceof ClientState.Floating;
     }
 
+    // a floating window the user's keys may move, resize and focus: niri's floating layer holds only app windows, never
+    // the desktop (wallpaper), panels or Plasma's popups, which Kiri also keeps as floating clients
+    public isUserFloating(kwinClient: KwinClient) {
+        return this.isFloating(kwinClient) && !Clients.placesItself(kwinClient);
+    }
+
     // The floating window that was focused last on the current desktop and screen; like niri's floating layer,
     // which always has an active window when it isn't empty, any floating window there if none was focused yet
     public findLastFocusedFloating(): KwinClient|null {
@@ -818,7 +824,7 @@ class ClientManager {
     }
 
     private isFloatingOnCurrentDesktop(kwinClient: KwinClient) {
-        return this.isFloating(kwinClient) &&
+        return this.isUserFloating(kwinClient) &&
             !kwinClient.minimized &&
             kwinClient.desktops.includes(Workspace.currentDesktop) &&
             (kwinClient.activities.length === 0 || kwinClient.activities.includes(Workspace.currentActivity)) &&
@@ -891,7 +897,7 @@ class ClientManager {
     // niri moves floating windows by a fixed step (move-window-* on the floating layer)
     public moveFloatingClient(kwinClient: KwinClient, dx: number, dy: number) {
         const client = this.clientMap.get(kwinClient);
-        if (client === undefined || !this.isFloating(kwinClient)) {
+        if (client === undefined || !this.isUserFloating(kwinClient)) {
             return false;
         }
         const area = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));

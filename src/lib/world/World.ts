@@ -372,8 +372,9 @@ class World {
     public doIfTiledFocused(
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
     ) {
-        if (Workspace.activeWindow === null) {
-            // niri always has a focused window: when KWin left none, the actions work on the one that had it last
+        if (Workspace.activeWindow === null || Workspace.activeWindow.desktopWindow) {
+            // niri always has a focused window: when KWin left none (or gave it to the desktop), the actions work on the
+            // one that had it last
             const window = this.getCurrentGridWindowToFocus();
             if (window === null) {
                 return;
@@ -403,7 +404,7 @@ class World {
     ) {
         const active = Workspace.activeWindow;
         // a full-screen window that is only floating because it could not be tiled (a game) can still be left
-        if (active !== null && this.clientManager.isFloating(active) && !active.fullScreen) {
+        if (active !== null && this.clientManager.isUserFloating(active) && !active.fullScreen) {
             this.do(clientManager => floating(clientManager, active));
             return;
         }
@@ -444,7 +445,7 @@ class World {
         floating: (clientManager: ClientManager, active: KwinClient) => void,
     ) {
         const active = Workspace.activeWindow;
-        if (active !== null && this.clientManager.isFloating(active)) {
+        if (active !== null && this.clientManager.isUserFloating(active)) {
             this.do(clientManager => floating(clientManager, active));
             return;
         }
