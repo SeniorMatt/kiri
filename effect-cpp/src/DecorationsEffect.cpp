@@ -210,7 +210,7 @@ void Effect::postPaintScreen()
             it = m_expanded.erase(it);
             continue;
         }
-        if (it->from != it->to && !NiriAnim::resizeSpring().isDone((m_frameTime - it->start) * speed)) {
+        if (it->from != it->to && speed > 0 && !NiriAnim::resizeSpring().isDone((m_frameTime - it->start) * speed)) {
             again = true;
         }
         ++it;
@@ -232,6 +232,7 @@ void Effect::postPaintScreen()
         const double length = it->second ? NiriAnim::Defaults::openMs / 1000 : NiriAnim::moveSpring().duration();
         if (speed <= 0 || (m_frameTime - it->first) * speed >= length) {
             it = m_tabOpen.erase(it);
+            again = true; // one more frame with the finished indicator
         } else {
             again = true;
             ++it;
@@ -243,6 +244,7 @@ void Effect::postPaintScreen()
         }
         if (it->start >= 0 && (speed <= 0 || NiriAnim::moveSpring().isDone((m_frameTime - it->start) * speed))) {
             it = m_releasing.erase(it);
+            again = true; // one more frame at the real place
         } else {
             again = true;
             ++it;
@@ -307,6 +309,18 @@ Effect::Effect()
                 m_lastVisualOffset.remove(id);
                 KWin::effects->addRepaintFull();
             }
+        });
+        // the ring is outside of the window: when the window stops being painted (minimized, hidden, on another desktop)
+        // KWin repaints the window's own area only, and the ring stays on the screen
+        auto stateChanged = [this](KWin::EffectWindow *w) {
+            repaintAround(w);
+        };
+        connect(w, &KWin::EffectWindow::minimizedChanged, this, stateChanged);
+        connect(w, &KWin::EffectWindow::windowDesktopsChanged, this, stateChanged);
+        connect(w, &KWin::EffectWindow::windowHiddenChanged, this, stateChanged);
+        connect(w, &KWin::EffectWindow::windowFullScreenChanged, this, stateChanged);
+        connect(w, &KWin::EffectWindow::windowMaximizedStateChanged, this, [this](KWin::EffectWindow *w) {
+            repaintAround(w);
         });
         connect(w, &KWin::EffectWindow::windowFrameGeometryChanged, this, [this](KWin::EffectWindow *w, const KWin::RectF &old) {
             if (auto release = m_releasing.find(w->internalId()); release != m_releasing.end() && release->start < 0 && old.topLeft() != w->frameGeometry().topLeft()) {
@@ -818,6 +832,7 @@ void Effect::repaintAround(KWin::EffectWindow *w)
     if (!w->isDeleted()) {
         KWin::effects->addRepaint(outerBounds(w));
     }
+    repaintPainted(w); // where the ring was drawn last may be somewhere else (an animation moves the window)
 }
 
 void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data)

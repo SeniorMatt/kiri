@@ -34,6 +34,8 @@ static double paintedX(const EffectWindow *w)
 }
 // the release has to arrive from the script within this, or the picture is dropped
 static constexpr double HeldTimeout = 0.5;
+// a new swipe paints the previous picture's windows this long, waiting for the script's begin
+static constexpr double BridgeTimeout = 0.25;
 
 static QString plainId(const QString &id)
 {
@@ -54,7 +56,10 @@ SwipeEffect::SwipeEffect()
 
 SwipeEffect::~SwipeEffect()
 {
-    effects->setProperty("kiriSwipeVisual", false);
+    if (m_visual != Visual::Off) {
+        effects->setProperty("kiriSwipeVisual", false);
+        effects->addRepaintFull();
+    }
     input()->uninstallInputEventSpy(this);
     QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/KiriSwipe"));
 }
@@ -197,7 +202,11 @@ void SwipeEffect::lockVisual()
     m_s0 = s0;
     m_d0 = -s0; // the script's view starts where the picture is
     m_pos = 0.0;
-    m_began = false;
+    // a swipe that lands on a picture that is still held or settling goes on painting it with the scroll and windows
+    // of that one until the script's new begin arrives; without them the windows would jump to their real places for
+    // the frames in between
+    m_began = m_began && m_visual != Visual::Off;
+    m_bridgeSince = m_began ? nowSeconds() : 0.0;
     m_visual = Visual::Drag;
     effects->setProperty("kiriSwipeVisual", true);
 }
@@ -250,6 +259,7 @@ bool SwipeEffect::command(const QString &json)
         if (m_visual != Visual::Drag && !(m_visual == Visual::Held && !m_began)) {
             return false;
         }
+        m_bridgeSince = 0.0;
         m_scale = o.value(QStringLiteral("scale")).toDouble();
         m_ids.clear();
         for (const QJsonValue &v : o.value(QStringLiteral("ids")).toArray()) {
@@ -285,6 +295,12 @@ bool SwipeEffect::command(const QString &json)
 void SwipeEffect::prePaintScreen(ScreenPrePaintData &data)
 {
     m_frameTime = nowSeconds();
+    if (m_bridgeSince > 0.0 && m_frameTime - m_bridgeSince > BridgeTimeout) {
+        // the script did not take this swipe over: the old picture is not painted any more
+        m_bridgeSince = 0.0;
+        m_began = false;
+        effects->addRepaintFull();
+    }
     if (m_visual == Visual::Held && m_frameTime - m_since > HeldTimeout) {
         stopVisual();
     }

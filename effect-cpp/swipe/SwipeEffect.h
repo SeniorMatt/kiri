@@ -78,6 +78,7 @@ private:
     QHash<EffectWindow *, double> m_g0; // frame x of every window when the swipe locked
     QSet<QString> m_ids;
     bool m_began = false; // the script's begin arrived
+    double m_bridgeSince = 0.0; // a new swipe locked on a painted picture and waits for the script's begin since then
     double m_scale = 0.0;
     double m_pos = 0.0; // travel since the lock
     double m_s0 = 0.0;  // the shift when the swipe locked (a swipe that lands on a settling view)
