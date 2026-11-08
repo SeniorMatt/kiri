@@ -155,7 +155,7 @@ tests.register("Switch focus to floating moves the cursor", 1, () => {
     const [tiled, floating] = workspaceMock.createClients(2);
     workspaceMock.activeWindow = floating;
     qtMock.fireShortcut("window-toggle-floating");
-    floating.frameGeometry = new MockQmlRect(1200, 600, 300, 200);
+    floating.frameGeometry = new MockQmlRect(500, 300, 250, 200);
     qtMock.fireShortcut("focus-1");
     Assert.assert(rectContainsPoint(tiled.getActualFrameGeometry(), Workspace.cursorPos), { message: "invalid test setup" });
     Assert.assert(!rectContainsPoint(floating.getActualFrameGeometry(), Workspace.cursorPos), { message: "invalid test setup" });
@@ -358,4 +358,57 @@ tests.register("Floating-window keys leave the desktop (wallpaper) alone and act
         Assert.assert(frame.x === desktopFrame.x && frame.y === desktopFrame.y && frame.width === desktopFrame.width && frame.height === desktopFrame.height, { message: `the desktop stays put: ${key}` });
     }
     Assert.assert(a.getActualFrameGeometry().width !== width, { message: "the width keys went to the tiled window" });
+});
+
+// niri (layout/workspace.rs remove_tile, floating.rs remove_tile_by_idx): the focused floating window closes: the
+// topmost floating window left gets the focus, without one the tiling layer's active window; never the window under
+// the pointer (what KWin picks with NextFocusPrefersMouse)
+tests.register("Closing a floating window gives the focus back to the tiling layer's active window, not the one under the pointer", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [left, right, floating] = workspaceMock.createClients(3);
+    workspaceMock.activeWindow = floating;
+    qtMock.fireShortcut("window-toggle-floating");
+    workspaceMock.activeWindow = right;
+    workspaceMock.activeWindow = floating;
+    // the pointer rests on `left`: KWin hands it the focus when `floating` closes
+    workspaceMock.activeWindow = left;
+    workspaceMock.removeWindow(floating);
+    Assert.equal(workspaceMock.activeWindow, right, { message: "the window that was focused before the floating one gets the focus back" });
+});
+
+tests.register("Closing a floating window: nothing picked by KWin, the tiling layer's active window gets the focus", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [left, right, floating] = workspaceMock.createClients(3);
+    workspaceMock.activeWindow = floating;
+    qtMock.fireShortcut("window-toggle-floating");
+    workspaceMock.activeWindow = right;
+    workspaceMock.activeWindow = floating;
+    workspaceMock.removeWindow(floating);
+    Assert.equal(workspaceMock.activeWindow, right);
+});
+
+tests.register("Closing a floating window passes the focus to the topmost floating window left", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [tiled, f1, f2, f3] = workspaceMock.createClients(4);
+    for (const f of [f1, f2, f3]) {
+        workspaceMock.activeWindow = f;
+        qtMock.fireShortcut("window-toggle-floating");
+    }
+    workspaceMock.stackingOrder.push(tiled, f1, f3, f2); // f2 is the topmost of those that stay
+    workspaceMock.activeWindow = f3;
+    workspaceMock.activeWindow = tiled; // KWin's pick
+    workspaceMock.removeWindow(f3);
+    Assert.equal(workspaceMock.activeWindow, f2, { message: "the topmost floating window" });
+});
+
+tests.register("Closing an unfocused floating window does not move the focus", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const [left, right, floating] = workspaceMock.createClients(3);
+    workspaceMock.activeWindow = floating;
+    qtMock.fireShortcut("window-toggle-floating");
+    qtMock.fireShortcut("window-switch-focus-floating-tiling"); // Kiri moves the focus to the tiling layer
+    const focused = workspaceMock.activeWindow;
+    Assert.assert(focused !== floating, { message: "invalid test setup" });
+    workspaceMock.removeWindow(floating);
+    Assert.equal(workspaceMock.activeWindow, focused);
 });

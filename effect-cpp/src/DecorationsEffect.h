@@ -108,6 +108,9 @@ public Q_SLOTS:
     Q_SCRIPTABLE void setInsertHint(const QString &json);
     // the pointer buttons held right now (Qt::MouseButtons bits), for Kiri's focus-follows-mouse: niri ignores the pointer while it is grabbed
     Q_SCRIPTABLE int pointerButtons();
+    // niri's warp-mouse-to-focus: moves the pointer to "x,y" in global logical coordinates, like a warp by the
+    // compositor (no motion is sent from a device)
+    Q_SCRIPTABLE void warpPointer(const QString &xy);
     // whether the window "{uuid}" is an X11 (Xwayland) window: scripts cannot tell
     Q_SCRIPTABLE bool isX11Window(const QString &id);
     // KWin shrinks its desktop grid's row count when desktops are removed and never grows it back, so

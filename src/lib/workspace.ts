@@ -13,6 +13,10 @@ function initWorkspaceSignalHandlers(world: World, focusPasser: FocusPassing.Pas
             clientManager.removeClient(kwinClient, FocusPassing.Type.Immediate, true);
             if (wasTiled && !clientManager.hasClosedSlot()) {
                 world.holdArrangeForClose();
+                // niri warps to where the window that gets the focus ends up: the layout settles after the hold
+                if (focusPasser.isPassing()) {
+                    requestCursorWarp();
+                }
             }
         });
     });

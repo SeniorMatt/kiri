@@ -48,9 +48,12 @@ class FocusFollowsMouse {
         }
         // niri does nothing while the pointer is grabbed (handle_focus_follows_mouse): a held button means a
         // drag or drag and drop, which must not move the focus and scroll the view
+        const activeAtEvent = Workspace.activeWindow;
         queryPointerButtons(buttons => {
-            // the answer comes later: the pointer may have moved on, or a warp / the overview may have taken over
-            if (buttons === 0 && !overviewActive() && window !== Workspace.activeWindow &&
+            // the answer comes later: the pointer may have moved on, a warp / the overview may have taken over, or
+            // something else has been given the focus since the pointer event (a window that opened, a key): niri
+            // decides at the event, so a late answer must not take that focus away again
+            if (buttons === 0 && !overviewActive() && window !== Workspace.activeWindow && Workspace.activeWindow === activeAtEvent &&
                 FocusFollowsMouse.topWindowAt(Workspace.cursorPos) === window) {
                 activateWindow(window, "focus-follows-mouse");
             }

@@ -157,10 +157,18 @@ class Desktop {
         this.recenterLoneColumn();
     }
 
-    // niri: a lone column stays centered whatever happened to the view before (a closed neighbour, a held scroll)
+    // niri: a lone column stays centered whatever happened to the view before (a closed neighbour, a held scroll).
+    // Columns that all fit on the screen stay centered as a group the same way with "center when everything fits" (and
+    // the centering scrollers), so a closed window doesn't leave them off-center until the focus moves.
     public recenterLoneColumn() {
         if (this.config.alwaysCenterSingleColumn && this.grid.getFirstColumn() !== null && this.grid.getFirstColumn() === this.grid.getLastColumn()) {
             this.setScroll(this.scrollX, false);
+            return;
+        }
+        const clamper = this.config.clamper;
+        if ((clamper instanceof CenterClamper || (clamper instanceof EdgeClamper && clamper.centerWhenFits)) &&
+            this.grid.getFirstColumn() !== null && this.grid.getWidth() <= this.tilingArea.width) {
+            this.setScroll(Math.round((this.grid.getWidth() - this.tilingArea.width) / 2), false);
         }
     }
 

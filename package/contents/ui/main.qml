@@ -389,6 +389,28 @@ Item {
         );
     }
 
+    // Moves the pointer to (x, y) (niri's warp-mouse-to-focus puts it at an exact place), by the compiled effect: KWin's
+    // script API has no way to. Without the effect, or when it does not know the call, the pointer goes to the centre
+    // of the focused window (KWin's own MoveMouseToFocus shortcut).
+    function warpPointer(x, y) {
+        if (!decorationsEffect) {
+            moveCursorToFocus.call();
+            return;
+        }
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriDecorations",
+                iface: "org.kde.kiri.Decorations",
+                member: "warpPointer",
+                arguments: [new DBus.string(x + "," + y)],
+                signature: "(s)",
+            },
+            (reply) => {},
+            (error) => moveCursorToFocus.call(),
+        );
+    }
+
     function sendVisualPositions() {
         DBus.SessionBus.asyncCall(
             {

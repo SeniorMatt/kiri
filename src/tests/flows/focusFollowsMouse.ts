@@ -111,3 +111,85 @@ tests.register("Focus follows mouse: the pointer leaving before the button check
         ffm.destroy();
     }
 });
+
+tests.register("Focus follows mouse: a late answer does not take away a focus given after the pointer event", 1, () => {
+    const { workspaceMock } = init(getDefaultConfig());
+    const [client1, client2, client3] = workspaceMock.createClients(3);
+    workspaceMock.stackingOrder.push(client1, client2, client3);
+    const ffm = new FocusFollowsMouse(() => false, 100);
+    const originalQmlBase = qmlBase;
+    const pending: ((buttons: number) => void)[] = [];
+    qmlBase = { queryPointerButtons: (callback: (buttons: number) => void) => pending.push(callback) } as any;
+    try {
+        workspaceMock.activeWindow = client1;
+        const f2 = client2.getActualFrameGeometry();
+        ffmTestHover(workspaceMock, f2.x + 5, f2.y + 5);
+        workspaceMock.activeWindow = client3; // a new window opens and takes the focus (or a key moves it)
+        pending.forEach(callback => callback(0));
+        Assert.assert(workspaceMock.activeWindow === client3, { message: "niri decides at the pointer event; a late answer must not undo later focus" });
+    } finally {
+        qmlBase = originalQmlBase;
+        ffm.destroy();
+    }
+});
+
+tests.register("Focus follows mouse: a still pointer never changes the focus when the layout moves, with or without a warp", 1, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    const clients = workspaceMock.createClients(4);
+    workspaceMock.stackingOrder.push(...clients);
+    const ffm = new FocusFollowsMouse(() => false, 100);
+    try {
+        const f = clients[3].getActualFrameGeometry();
+        ffmTestHover(workspaceMock, f.x + 5, f.y + 5);
+        for (const key of ["focus-1", "focus-2", "focus-3", "focus-4", "column-move-left", "focus-left"]) {
+            qtMock.fireShortcut(key);
+            const expected = workspaceMock.activeWindow;
+            workspaceMock.cursorPosChanged.fire(); // a notification without movement
+            Assert.assert(workspaceMock.activeWindow === expected, { message: "no change after " + key });
+        }
+    } finally {
+        ffm.destroy();
+    }
+});
+
+tests.register("Focus follows mouse: max-scroll-amount stops hovering a window that needs a big scroll", 1, () => {
+    const { workspaceMock } = init(getDefaultConfig());
+    const [client1, client2] = workspaceMock.createClientsWithWidths(500, 500);
+    workspaceMock.stackingOrder.push(client1, client2);
+    const ffm = new FocusFollowsMouse(() => false, 0);
+    try {
+        workspaceMock.activeWindow = client1;
+        client2.frameGeometry = new MockQmlRect(700, 0, 300, 300); // 200 px of it is off screen
+        const f = client2.getActualFrameGeometry();
+        ffmTestHover(workspaceMock, f.x + 5, f.y + 5);
+        Assert.assert(workspaceMock.activeWindow === client1, { message: "0% only allows windows that are fully visible" });
+    } finally {
+        ffm.destroy();
+    }
+});
+
+tests.register("Focus follows mouse stops when Kiri is destroyed (the script is unloaded)", 1, () => {
+    const config = getDefaultConfig();
+    config.focusFollowsMouse = true;
+    const { workspaceMock, world } = init(config);
+    const [client1, client2] = workspaceMock.createClientsWithWidths(600, 600);
+    workspaceMock.stackingOrder.push(client1, client2);
+    const originalQmlBase = qmlBase;
+    qmlBase = { queryPointerButtons: (callback: (buttons: number) => void) => callback(0) } as any;
+    try {
+        const kiri = new Kiri(config, world);
+        workspaceMock.activeWindow = client1;
+        const f2 = client2.getActualFrameGeometry();
+        ffmTestHover(workspaceMock, f2.x + 50, f2.y + 50);
+        Assert.assert(workspaceMock.activeWindow === client2, { message: "hover focuses while Kiri runs" });
+
+        kiri.destroy();
+        workspaceMock.activeWindow = client1;
+        const f1 = client1.getActualFrameGeometry();
+        ffmTestHover(workspaceMock, f1.x + 50, f1.y + 50);
+        ffmTestHover(workspaceMock, f2.x + 50, f2.y + 50);
+        Assert.assert(workspaceMock.activeWindow === client1, { message: "hover does not focus after Kiri is gone" });
+    } finally {
+        qmlBase = originalQmlBase;
+    }
+});

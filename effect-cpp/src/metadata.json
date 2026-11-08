@@ -8,7 +8,7 @@
         "EnabledByDefault": false,
         "License": "GPL-3.0",
         "Name": "Kiri decorations",
-        "Version": "0.10.8",
+        "Version": "0.10.9",
         "Website": "https://github.com/SeniorMatt/kiri"
     }
 }

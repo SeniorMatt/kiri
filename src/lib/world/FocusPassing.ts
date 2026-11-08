@@ -47,6 +47,11 @@ namespace FocusPassing {
             this.retryTimer.destroy();
         }
 
+        // the focus is being passed on (the closed window had it)
+        public isPassing() {
+            return this.currentRequest !== null;
+        }
+
         public clearIfDifferent(kwinClient: KwinClient) {
             if (this.currentRequest !== null && this.currentRequest.target !== kwinClient) {
                 this.clear();

@@ -102,12 +102,12 @@
         Assert.equalArrays(xs(clients), second);
     });
 
-    tests.register("View offset restore keeps the cursor warp of leaving full-screen", 10, () => {
+    tests.register("Leaving full-screen does not warp the cursor (niri)", 10, () => {
         const { qtMock, workspaceMock, clients } = setup(config => { config.scrollingLazy = true; config.scrollingOnOverflow = false; config.scrollingCentered = false; config.cursorFollowsFocus = true; });
         clients[5].fullScreen = true;
         workspaceMock.cursorPos = new MockQmlPoint(5, 5);
         clients[5].fullScreen = false;
-        const frame = clients[5].getActualFrameGeometry();
-        Assert.assert(rectContainsPoint(frame, workspaceMock.cursorPos), { message: "the pointer follows the window out of full-screen" });
+        // niri has no warp in set-window-fullscreen / fullscreen-window (input/mod.rs): only focus changes and moves warp
+        Assert.assert(pointEquals(workspaceMock.cursorPos, new MockQmlPoint(5, 5)), { message: "the pointer stays when a window leaves full-screen" });
     });
 }

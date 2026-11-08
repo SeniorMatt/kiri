@@ -28,6 +28,7 @@ class World {
     // `keyBindings` and `layout` are given when Kiri reloads its settings: the shortcuts stay registered
     // and the windows are put back into the columns they were in.
     constructor(config: Config, keyBindings: KeyBindings | null = null, layout: World.Layout | null = null) {
+        setCursorWarpConfig(config);
         const focusPasser = new FocusPassing.Passer();
         this.focusPasser = focusPasser;
         this.workspaceSignalManager = initWorkspaceSignalHandlers(this, focusPasser);
@@ -158,6 +159,7 @@ class World {
             new DesktopFilter(config.tiledDesktops),
         );
         this.clientManager = new ClientManager(config, this, this.desktopManager, this.pinManager);
+        warpFrame.provider = kwinClient => this.clientManager.getWarpFrame(kwinClient);
         this.dynamicDesktops = new DynamicDesktops(config.dynamicDesktops, desktop => this.clientManager.isDesktopOccupied(desktop));
         this.overview = new Overview(this, this.clientManager, this.desktopManager);
         if (layout !== null) {
@@ -348,6 +350,7 @@ class World {
                 desktop.arrange();
             }
         }
+        flushCursorWarp();
     }
 
     public do(f: (clientManager: ClientManager, desktopManager: DesktopManager) => void) {

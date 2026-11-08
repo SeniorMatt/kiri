@@ -38,6 +38,14 @@ class MockWorkspace {
 
     public raiseWindow(kwinClient: KwinClient) {}
 
+    // the compiled effect's pointer warp (see warpPointerTo); like KWin, the move is announced
+    public readonly warps: { x: number, y: number }[] = [];
+    public warpPointerTo(x: number, y: number) {
+        this.warps.push({ x, y });
+        this.cursorPos = new MockQmlPoint(x, y);
+        this.cursorPosChanged.fire();
+    }
+
     private desktopCounter = 100;
 
     public createDesktop(position: number, name: string) {
@@ -72,6 +80,23 @@ class MockWorkspace {
             this.windowAdded.fire(kwinClient);
             this.activeWindow = kwinClient;
         }
+    }
+
+    // like KWin: the new window is activated before the script hears that it was added
+    public createWindowActivatedFirst(frame: MockQmlRect) {
+        const client = new MockKwinClient(frame);
+        this.windows.push(client);
+        this.activeWindow = client;
+        this.windowAdded.fire(client);
+        return client;
+    }
+
+    // a window that does not take the focus
+    public createWindowInBackground(frame: MockQmlRect) {
+        const client = new MockKwinClient(frame);
+        this.windows.push(client);
+        this.windowAdded.fire(client);
+        return client;
     }
 
     public createClients(n: number) {

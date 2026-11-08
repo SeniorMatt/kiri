@@ -212,13 +212,104 @@ function overviewActive() {
     return typeof qmlBase === "undefined" ? overviewPollingFlag : (qmlBase as any).overviewPolling === true;
 }
 
-// moves the pointer to the focused window (KWin's MoveMouseToFocus), except while the overview is up: it would move
-// the pointer under the overview's own tiles
-function warpCursorToFocus() {
-    if (!overviewActive()) {
-        lastWarpTime = Date.now();
-        moveCursorToFocus.call();
+let cursorFollowsFocusOn = false;
+let warpPending = false;
+let warpBoth = false;
+let warpRequestedAt = 0;
+const warpFrame: { provider: (kwinClient: KwinClient) => QmlRect|null|undefined } = { provider: () => undefined };
+
+function setCursorWarpConfig(config: Config) {
+    cursorFollowsFocusOn = config.cursorFollowsFocus;
+    if (!cursorFollowsFocusOn) {
+        warpPending = false;
     }
+}
+
+// niri's maybe_warp_cursor_to_focus: asks for a warp of the pointer to the focused window; it is done by
+// flushCursorWarp once the layout has settled (niri warps to where the window ends up, not to where it is now).
+// `both` is niri's maybe_warp_cursor_to_focus_centered (after a move to another screen): the pointer goes to the
+// window's centre when it is outside the window, instead of only fixing the coordinate that is outside.
+function requestCursorWarp(both = false) {
+    if (cursorFollowsFocusOn) {
+        warpPending = true;
+        warpRequestedAt = Date.now();
+        warpBoth = warpBoth || both;
+    }
+}
+
+// niri's move_cursor_to_rect with the default mode (center-xy off): the visible part of the focused window is the
+// target; the pointer stays where it is when it is inside, and only the coordinate that is outside is moved to the
+// middle of that part. Returns null when the pointer does not move.
+function cursorWarpTarget(cursor: { x: number, y: number }, rect: { x: number, y: number, width: number, height: number }, both: boolean) {
+    const xIn = cursor.x >= rect.x && cursor.x <= rect.x + rect.width;
+    const yIn = cursor.y >= rect.y && cursor.y <= rect.y + rect.height;
+    if (xIn && yIn) {
+        return null;
+    }
+    const centerX = rect.x + rect.width / 2;
+    const centerY = rect.y + rect.height / 2;
+    if (!both && yIn) {
+        return { x: centerX, y: cursor.y };
+    }
+    if (!both && xIn) {
+        return { x: cursor.x, y: centerY };
+    }
+    return { x: centerX, y: centerY };
+}
+
+// the warp asked for by requestCursorWarp, if it is still needed with the layout as it is now
+function flushCursorWarp() {
+    if (!warpPending) {
+        return;
+    }
+    const both = warpBoth;
+    const active = Workspace.activeWindow;
+    if (Date.now() - warpRequestedAt > 1000) { // nothing arranged the layout after the request
+        warpPending = false;
+        warpBoth = false;
+        return;
+    }
+    if (active !== null && active.desktops.length > 0 && !active.desktops.includes(Workspace.currentDesktop)) {
+        return; // a desktop switch is still handing the focus over: the window that has it is on the desktop that is left
+    }
+    // niri does not warp while the overview is up (it has no focused window rectangle then), nor without a window
+    if (overviewActive() || active === null || active.desktopWindow || active.dock || active.minimized) {
+        warpPending = false;
+        warpBoth = false;
+        return;
+    }
+    // niri warps to the place the window ends up in: where Kiri put a tiled window, which KWin's frame shows only after
+    // the client has committed (a new window is still at KWin's own placement then)
+    const placed = warpFrame.provider(active);
+    if (placed === null) {
+        return; // not placed yet: wait for the next layout pass
+    }
+    warpPending = false;
+    warpBoth = false;
+    const frame = placed ?? active.frameGeometry;
+    const view = Workspace.clientArea(ClientAreaOption.ScreenArea, active.output, Workspace.currentDesktop);
+    const x1 = Math.max(frame.x, view.x);
+    const y1 = Math.max(frame.y, view.y);
+    const x2 = Math.min(frame.x + frame.width, view.x + view.width);
+    const y2 = Math.min(frame.y + frame.height, view.y + view.height);
+    if (x2 <= x1 || y2 <= y1) {
+        return;
+    }
+    const target = cursorWarpTarget(Workspace.cursorPos, { x: x1, y: y1, width: x2 - x1, height: y2 - y1 }, both);
+    if (target !== null) {
+        warpPointerTo(target.x, target.y);
+    }
+}
+
+// moves the pointer, without a click or a hover; the compiled effect does it (KWin's script API cannot), and without
+// it the pointer goes to the centre of the focused window (KWin's MoveMouseToFocus)
+function warpPointerTo(x: number, y: number) {
+    lastWarpTime = Date.now();
+    if (typeof qmlBase === "undefined") {
+        (Workspace as any).warpPointerTo(x, y); // tests
+        return;
+    }
+    (qmlBase as any).warpPointer(x, y);
 }
 
 // true when a pointer move at `pos` is (most likely) the echo of our own warp: shortly after one, and onto the
@@ -386,6 +477,8 @@ class Kiri {
     }
 
     public destroy() {
+        this.focusFollowsMouse?.destroy();
+        this.focusFollowsMouse = null;
         this.world.destroy();
     }
 }

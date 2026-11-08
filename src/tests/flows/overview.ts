@@ -353,7 +353,7 @@ tests.register("Overview: no cursor warps and no focus follows mouse while it is
     workspaceMock.stackingOrder.push(a, b, c);
     const ffm = new FocusFollowsMouse(() => false, 100);
     const originalQmlBase = qmlBase;
-    const base: any = { overviewEffect: true, overviewPolling: false, overviewCall: "", queryPointerButtons: (callback: (buttons: number) => void) => callback(0) };
+    const base: any = { overviewEffect: true, overviewPolling: false, overviewCall: "", queryPointerButtons: (callback: (buttons: number) => void) => callback(0), warpPointer: (x: number, y: number) => workspaceMock.warpPointerTo(x, y) };
     qmlBase = base;
     try {
         const hover = (client: MockKwinClient) => {

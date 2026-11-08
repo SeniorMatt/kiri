@@ -7,6 +7,7 @@
 
 #include <core/output.h>
 #include <input.h>
+#include <pointer_input.h>
 #include <virtualdesktops.h>
 #include <core/pixelgrid.h>
 #include <core/renderviewport.h>
@@ -460,6 +461,18 @@ void Effect::reloadSettings(const QString &)
 int Effect::pointerButtons()
 {
     return KWin::input() ? int(KWin::input()->qtButtonStates()) : 0;
+}
+
+void Effect::warpPointer(const QString &xy)
+{
+    const QStringList parts = xy.split(QLatin1Char(','));
+    bool okX = false;
+    bool okY = false;
+    const double x = parts.value(0).toDouble(&okX);
+    const double y = parts.value(1).toDouble(&okY);
+    if (okX && okY && KWin::input() && KWin::input()->pointer()) {
+        KWin::input()->pointer()->warp(QPointF(x, y));
+    }
 }
 
 void Effect::setDesktopRows(const QString &rows)

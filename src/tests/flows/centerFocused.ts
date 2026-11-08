@@ -37,3 +37,18 @@ tests.register("Center visible columns (niri)", 5, () => {
     Assert.assert(Math.abs((left - tilingArea.x) - (rectRight(tilingArea) - right)) <= 1, { message: "the visible columns are centered as a group" });
     Assert.assert(client1.getActualFrameGeometry().x !== before[0] || before[0] === left);
 });
+
+tests.register("Columns that fit are centered again right after a window closes", 5, () => {
+    for (const closeFocused of [true, false]) {
+        const config = getDefaultConfig();
+        config.centerGridWhenFits = true;
+        const { workspaceMock } = init(config);
+        const [a, b, c] = workspaceMock.createClientsWithWidths(200, 200, 200);
+        workspaceMock.activeWindow = closeFocused ? c : b;
+        workspaceMock.removeWindow(c);
+        const left = a.getActualFrameGeometry().x;
+        const right = rectRight(b.getActualFrameGeometry());
+        Assert.assert(Math.abs((left - tilingArea.x) - (rectRight(tilingArea) - right)) <= 1,
+            { message: `the two columns left are centered at once (closed the ${closeFocused ? "focused" : "unfocused"} one): ${left}..${right}` });
+    }
+});

@@ -30,12 +30,56 @@ function catchWrap(f: () => void) {
     };
 }
 
+// The actions after which niri calls maybe_warp_cursor_to_focus (input/mod.rs, every `Action::` arm that does), by the name
+// of Kiri's shortcut. The others never move the pointer: width and height changes, centring, full-screen and
+// maximize, floating toggles, consume-into-column, the overview. Closing a window and opening one warp too, through
+// the focus they hand out (see ClientManager).
+const WARPING_SHORTCUTS = new Set([
+    "focus-left", "focus-right", "focus-up", "focus-down", "focus-next", "focus-previous", "focus-start", "focus-end",
+    "focus-column-right-or-first", "focus-column-left-or-last", "focus-window-down-or-column-left",
+    "focus-window-down-or-column-right", "focus-window-up-or-column-left", "focus-window-up-or-column-right",
+    "focus-window-top", "focus-window-bottom", "focus-window-down-or-top", "focus-window-up-or-bottom",
+    "focus-window-or-desktop-down", "focus-window-or-desktop-up", "focus-window-previous", "focus-floating", "focus-tiling",
+    "window-switch-focus-floating-tiling", "window-move-left", "window-move-right", "window-consume-or-expel-left",
+    "window-consume-or-expel-right", "window-expel-from-column", "window-move-up", "window-move-down",
+    "window-move-down-or-to-desktop-down", "window-move-up-or-to-desktop-up", "window-swap-left", "window-swap-right",
+    "column-display-normal", "column-display-tabbed", "column-toggle-tabbed", "column-move-left", "column-move-right",
+    "column-move-start", "column-move-end", "column-move-to-next-desktop", "column-move-to-previous-desktop",
+    "window-move-to-next-desktop", "window-move-to-previous-desktop", "desktop-previous-used", "desktop-next",
+    "desktop-previous",
+]);
+const WARPING_PREFIXES = ["desktop-", "focus-", "focus-window-in-column-", "window-move-to-column-", "column-move-to-column-", "column-move-to-desktop-", "window-move-to-desktop-"];
+// niri's maybe_warp_cursor_to_focus_centered: after a move to another screen
+const WARPING_BOTH = new Set(["screen-switch"]);
+
+function warpsCursor(name: string) {
+    return WARPING_SHORTCUTS.has(name) || WARPING_BOTH.has(name) ||
+        (/-\d+$/.test(name) && WARPING_PREFIXES.some(prefix => name.startsWith(prefix)));
+}
+
+function warpAfter(name: string, action: () => void) {
+    if (!warpsCursor(name)) {
+        return action;
+    }
+    return () => {
+        // asked for before the action, so that the action's own arrange does it (niri warps to where the window ends up)
+        requestCursorWarp(WARPING_BOTH.has(name));
+        try {
+            action();
+        } finally {
+            // actions that do not arrange anything still warp; one that handed the focus to another desktop is waited
+            // for (flushCursorWarp keeps the request until the focused window is on the desktop shown)
+            flushCursorWarp();
+        }
+    };
+}
+
 function getShortcuts(world: World, actions: Actions): Shortcut[] {
     const shortcuts: Shortcut[] = getKeyBindings(world, actions).map(keyBinding => ({
         name: keyBinding.name,
         description: keyBinding.description,
         defaultKeys: keyBinding.defaultKeys ?? [],
-        action: keyBinding.action,
+        action: warpAfter(keyBinding.name, keyBinding.action),
     }));
 
     for (const numKeyBinding of getNumKeyBindings(world, actions)) {
@@ -45,7 +89,7 @@ function getShortcuts(world: World, actions: Actions): Shortcut[] {
                 name: applyMacro(numKeyBinding.name, numKey),
                 description: applyMacro(numKeyBinding.description, numKey),
                 defaultKeys: numKeyBinding.defaultModifiers !== undefined && i < 9 ? [`${numKeyBinding.defaultModifiers}+${numKey}`] : [],
-                action: () => numKeyBinding.action(i),
+                action: warpAfter(applyMacro(numKeyBinding.name, numKey), () => numKeyBinding.action(i)),
             });
         }
     }

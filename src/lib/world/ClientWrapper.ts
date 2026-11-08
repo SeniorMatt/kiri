@@ -41,6 +41,11 @@ class ClientWrapper {
         this.stateManager = new ClientState.Manager(constructInitialState(this));
     }
 
+    // where Kiri last put the window (its frame, before the client has committed the size), null before the first placement
+    public getPlacement() {
+        return this.lastPlacement;
+    }
+
     // `throttle`: like niri's configure throttling while a window is resized by the user, a client that has not yet
     // committed the size it was last given is not sent another one; it gets the latest when it has committed
     // (otherwise a slow client builds up a queue of sizes and keeps changing size long after the pointer stopped)

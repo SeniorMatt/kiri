@@ -167,6 +167,12 @@ class ClientManager {
             if (!kwinClient.dock) {
                 // niri warps the cursor to a newly opened window that it activates (warp-mouse-to-focus)
                 KiriFocus.mark(kwinClient);
+                if (Workspace.activeWindow === kwinClient) {
+                    // KWin activates a new window before it tells the script about it, so onClientFocused has
+                    // already run without knowing it was Kiri's focus; the pointer goes to the window now
+                    KiriFocus.take(kwinClient);
+                    requestCursorWarp();
+                }
             }
         }
         if (slot !== null) {
@@ -351,6 +357,12 @@ class ClientManager {
                 window.column.onWindowFocused(window);
             }
         }
+        // niri (workspace.rs remove_tile, floating.rs remove_tile_by_idx): when the focused floating window closes, the
+        // topmost floating window that is left gets the focus, and without one the tiling layer's active window; never
+        // the window under the pointer, which is what KWin's own pick can be
+        const floatingFocusLost = this.isUserFloating(kwinClient) && (kwinClient === this.lastFocusedClient || kwinPicked);
+        const closedStamp = this.focusStamps.get(kwinClient) ?? Infinity;
+        const floatingDesktop = floatingFocusLost ? this.desktopManager.getDesktopForClient(kwinClient) : undefined;
         const held = mayReturn && this.rememberClosed(kwinClient, client, kwinPicked);
         client.destroy(held ? FocusPassing.Type.None : passFocus);
         this.clientMap.delete(kwinClient);
@@ -359,6 +371,9 @@ class ClientManager {
         this.floatingFrames.delete(kwinClient);
         this.floatingFocusOrder = this.floatingFocusOrder.filter(c => c !== kwinClient);
         setVisualPosition(String(kwinClient.internalId), null); // a window that closes in the middle of a resize
+        if (floatingFocusLost) {
+            this.focusAfterFloatingClose(kwinClient, floatingDesktop, kwinPicked, closedStamp);
+        }
         if (held) {
             const slot = this.closedSlot!;
             // like the window being still there: the focus stays, the view stays and nothing moves
@@ -366,6 +381,51 @@ class ClientManager {
             this.world.holdArrange();
             this.remapTimer.run();
         }
+    }
+
+    private focusAfterFloatingClose(kwinClient: KwinClient, desktop: Desktop|undefined, kwinPicked: boolean, closedStamp: number) {
+        // a dialog opens from the window that had the focus, so that one is also what niri's rule gives it back to
+        const parent = kwinClient.transientFor;
+        if (parent !== null && this.clientMap.has(parent) && !parent.minimized) {
+            KiriFocus.mark(parent);
+            activateWindow(parent, "client-manager");
+            requestCursorWarp();
+            return;
+        }
+        const stack = Workspace.stackingOrder;
+        let topmost: KwinClient|null = null;
+        let topIndex = -1;
+        for (const other of this.clientMap.keys()) {
+            const index = stack.indexOf(other);
+            if (index > topIndex && this.isFloatingOnCurrentDesktop(other)) {
+                topmost = other;
+                topIndex = index;
+            }
+        }
+        if (topmost !== null) {
+            KiriFocus.mark(topmost);
+            activateWindow(topmost, "client-manager");
+        } else {
+            let window = desktop === undefined ? null : desktop.grid.getLastFocusedWindow();
+            if (kwinPicked && desktop !== undefined) {
+                // KWin's pick already moved the grid's focus: the tiled window that was focused before the floating
+                // one got the focus is the one that goes back
+                let bestStamp = -1;
+                for (const [other, stamp] of this.focusStamps) {
+                    const candidate = this.findTiledWindow(other);
+                    if (candidate !== null && candidate.column.grid === desktop.grid && stamp < closedStamp && stamp > bestStamp) {
+                        window = candidate;
+                        bestStamp = stamp;
+                    }
+                }
+            }
+            if (window === null) {
+                return;
+            }
+            window.client.focus();
+        }
+        // niri warps after the focused window closed (cursor-follows-focus); a no-op when the pointer is inside already
+        requestCursorWarp();
     }
 
     private findTransientFor(kwinClient: KwinClient) {
@@ -723,6 +783,13 @@ class ClientManager {
         return this.clientMap.has(kwinClient);
     }
 
+    // where a tiled window ends up (niri warps to the final place of the window), null while Kiri has not placed it yet;
+    // undefined for a window that is not tiled
+    public getWarpFrame(kwinClient: KwinClient) {
+        const window = this.findTiledWindow(kwinClient);
+        return window === null ? undefined : window.client.getPlacement();
+    }
+
     // Kiri warped the cursor to this tiled window just now (see onClientFocused)
     private warpedToTiled: { client: KwinClient, time: number }|null = null;
 
@@ -748,11 +815,11 @@ class ClientManager {
         this.lastFocusedClient = kwinClient;
         this.focusStamps.set(kwinClient, ++this.focusCounter);
         // Like niri, only focus changes made by Kiri move the cursor, never pointer focus or an app activating
-        // itself; the cursor position is checked before onFocused scrolls the window away from it. Floating
-        // windows too: with focus follows mouse, a cursor left on the tiled window would take the focus back.
-        const cursorWasOnWindow = rectContainsPoint(roundQtRect(kwinClient.frameGeometry), Workspace.cursorPos);
+        // itself. Floating windows too: with focus follows mouse, a cursor left on the tiled window would take the
+        // focus back. Whether the cursor is already on the window is decided once the layout has settled (niri
+        // compares with the place the window ends up in), see flushCursorWarp.
         const focusedByKiri = KiriFocus.take(kwinClient);
-        const warp = this.config.cursorFollowsFocus && focusedByKiri && !cursorWasOnWindow;
+        const warp = this.config.cursorFollowsFocus && focusedByKiri;
         if (this.isFloating(kwinClient)) {
             this.floatingFocusOrder = this.floatingFocusOrder.filter(c => c !== kwinClient);
             this.floatingFocusOrder.push(kwinClient);
@@ -770,7 +837,7 @@ class ClientManager {
             if (window !== null) {
                 this.warpedToTiled = { client: kwinClient, time: Date.now() };
             }
-            warpCursorToFocus();
+            requestCursorWarp();
         }
     }
 

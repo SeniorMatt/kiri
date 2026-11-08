@@ -68,3 +68,108 @@ tests.register("Cursor follows focus: a newly opened window gets the cursor", 5,
     second.workspaceMock.createClients(1);
     Assert.assert(pointEquals(Workspace.cursorPos, new MockQmlPoint(5, 5)));
 });
+
+// niri's move_cursor_to_rect (default mode): only the coordinate that is outside the window is fixed
+tests.register("Cursor follows focus: only the coordinate outside the window moves (niri's default mode)", 1, () => {
+    const config = getDefaultConfig();
+    config.cursorFollowsFocus = true;
+    const { qtMock, workspaceMock } = init(config);
+    const [client1, client2] = workspaceMock.createClients(2);
+    qtMock.fireShortcut("focus-1");
+    const f1 = client1.getActualFrameGeometry();
+    workspaceMock.cursorPos = new MockQmlPoint(f1.x + 10, f1.y + 30);
+    qtMock.fireShortcut("focus-2");
+    let f2 = client2.getActualFrameGeometry(); // after the shortcut: the layout has moved
+    Assert.assert(Math.abs(Workspace.cursorPos.y - (f1.y + 30)) < 1, { message: "y is inside the window, so it stays" });
+    Assert.assert(Math.abs(Workspace.cursorPos.x - (f2.x + f2.width / 2)) < 1);
+    // outside on both axes: the centre
+    workspaceMock.cursorPos = new MockQmlPoint(f1.x + 10, f2.y + f2.height + 50);
+    qtMock.fireShortcut("focus-2");
+    f2 = client2.getActualFrameGeometry();
+    Assert.assert(Math.abs(Workspace.cursorPos.x - (f2.x + f2.width / 2)) < 1);
+    Assert.assert(Math.abs(Workspace.cursorPos.y - (f2.y + f2.height / 2)) < 1);
+    // pressing the key again with the pointer inside does nothing
+    const warps = (workspaceMock as any).warps.length;
+    qtMock.fireShortcut("focus-2");
+    Assert.equal((workspaceMock as any).warps.length, warps);
+});
+
+tests.register("Cursor follows focus: a key that does not change the focus still brings the pointer back (niri)", 1, () => {
+    const config = getDefaultConfig();
+    config.cursorFollowsFocus = true;
+    const { qtMock, workspaceMock } = init(config);
+    const [client1, client2] = workspaceMock.createClients(2);
+    qtMock.fireShortcut("focus-1");
+    workspaceMock.cursorPos = new MockQmlPoint(700, 500); // away from client1
+    qtMock.fireShortcut("focus-left");
+    Assert.assert(workspaceMock.activeWindow === client1);
+    Assert.assert(rectContainsPoint(client1.getActualFrameGeometry(), Workspace.cursorPos), { message: "focus-left at the first column still warps" });
+});
+
+tests.register("Cursor follows focus: moving a column warps, resizing and toggling do not", 1, () => {
+    const config = getDefaultConfig();
+    config.cursorFollowsFocus = true;
+    const { qtMock, workspaceMock } = init(config);
+    const [client1, client2, client3] = workspaceMock.createClients(3);
+    qtMock.fireShortcut("focus-2");
+    const park = new MockQmlPoint(790, 590);
+    workspaceMock.cursorPos = park.clone();
+    qtMock.fireShortcut("column-move-left");
+    Assert.assert(rectContainsPoint(client2.getActualFrameGeometry(), Workspace.cursorPos), { message: "move-column warps to the moved window" });
+    workspaceMock.cursorPos = park.clone();
+    qtMock.fireShortcut("cycle-preset-widths");
+    Assert.assert(pointEquals(Workspace.cursorPos, park), { message: "a width change does not warp" });
+    qtMock.fireShortcut("window-toggle-fullscreen");
+    qtMock.fireShortcut("window-toggle-fullscreen");
+    Assert.assert(pointEquals(Workspace.cursorPos, park), { message: "full-screen toggles do not warp" });
+    qtMock.fireShortcut("column-center-visible");
+    Assert.assert(pointEquals(Workspace.cursorPos, park), { message: "centring does not warp" });
+});
+
+tests.register("Cursor follows focus: a window that opens and takes the focus gets the pointer, one in the background does not", 1, () => {
+    const config = getDefaultConfig();
+    config.cursorFollowsFocus = true;
+    const { workspaceMock } = init(config);
+    workspaceMock.createClients(2);
+    workspaceMock.cursorPos = new MockQmlPoint(5, 5);
+    const opened = workspaceMock.createWindowActivatedFirst(new MockQmlRect(300, 300, 100, 300));
+    Assert.assert(workspaceMock.activeWindow === opened);
+    Assert.assert(rectContainsPoint(opened.getActualFrameGeometry(), Workspace.cursorPos), { message: "the pointer goes to the window KWin activated before telling the script" });
+    workspaceMock.cursorPos = new MockQmlPoint(5, 5);
+    workspaceMock.createWindowInBackground(new MockQmlRect(300, 300, 100, 300));
+    Assert.assert(pointEquals(Workspace.cursorPos, new MockQmlPoint(5, 5)), { message: "a window that opens in the background does not move the pointer" });
+});
+
+tests.register("Cursor follows focus: the window that gets the focus when one closes gets the pointer", 1, () => {
+    const config = getDefaultConfig();
+    config.cursorFollowsFocus = true;
+    const { qtMock, workspaceMock } = init(config);
+    const [client1, client2, client3] = workspaceMock.createClients(3);
+    qtMock.fireShortcut("focus-2");
+    workspaceMock.cursorPos = new MockQmlPoint(790, 590);
+    workspaceMock.removeWindow(client2);
+    const active = workspaceMock.activeWindow as MockKwinClient;
+    Assert.assert(active !== null && active !== client2, { message: "focus passed on" });
+    // (the mock settles the frames a few pixels apart from where Kiri put them)
+    const f = active.getActualFrameGeometry();
+    Assert.assert(Math.abs(Workspace.cursorPos.x - (f.x + f.width / 2)) < 60 && Math.abs(Workspace.cursorPos.y - (f.y + f.height / 2)) < 60, { message: "the pointer goes to the window that got the focus" });
+});
+
+tests.register("Cursor follows focus: the warp goes to the visible part of a window that is partly off screen", 1, () => {
+    const config = getDefaultConfig();
+    config.cursorFollowsFocus = true;
+    const { workspaceMock } = init(config);
+    const [client] = workspaceMock.createClientsWithFrames(new MockQmlRect(700, 100, 300, 200));
+    workspaceMock.cursorPos = new MockQmlPoint(10, 500);
+    (client as any).frameGeometry = new MockQmlRect(700, 100, 300, 200);
+    workspaceMock.activeWindow = null;
+    const visible = new MockQmlPoint(750, 200);
+    Assert.assert(visible.x < 800);
+    // the pure rule
+    const target = cursorWarpTarget({ x: 10, y: 500 }, { x: 700, y: 100, width: 100, height: 200 }, false);
+    Assert.equal(target!.x, 750);
+    Assert.equal(target!.y, 200);
+    Assert.assert(cursorWarpTarget({ x: 750, y: 150 }, { x: 700, y: 100, width: 100, height: 200 }, false) === null);
+    Assert.equal(cursorWarpTarget({ x: 10, y: 150 }, { x: 700, y: 100, width: 100, height: 200 }, false)!.y, 150);
+    Assert.equal(cursorWarpTarget({ x: 10, y: 150 }, { x: 700, y: 100, width: 100, height: 200 }, true)!.y, 200);
+});

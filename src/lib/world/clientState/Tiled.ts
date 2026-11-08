@@ -319,13 +319,6 @@ namespace ClientState {
                         client.setNoBorder(true);
                     }
                 });
-                // The pass above has placed the window at its slot. Leaving full-screen mode can leave the pointer
-                // over a neighbour or in a gap, where focus-follows-mouse takes the focus away at the next pointer
-                // movement; the pointer goes with the window.
-                if (!kwinClient.fullScreen && Workspace.activeWindow === kwinClient &&
-                    !rectContainsPoint(roundQtRect(kwinClient.frameGeometry), Workspace.cursorPos)) {
-                    warpCursorToFocus();
-                }
             });
 
             manager.connect(kwinClient.tileChanged, () => {

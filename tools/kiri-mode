@@ -63,6 +63,9 @@ give_back() { # name group key
 apply_settings() {
     if [ "$(r Script-kiri focusFollowsMouse true)" = true ]; then
         keep_user_value focusPolicy Windows FocusPolicy ClickToFocus
+        # KWin's "mouse precedence": after a close it focuses the window under the still pointer, even with click to
+        # focus (activateNextWindow); niri gives the focus back to the window that had it before
+        keep_user_value nextFocusPrefersMouse Windows NextFocusPrefersMouse false
     fi
     keep_user_value rollOver Windows RollOverDesktops false
     number=$(r Desktops Number 1)
@@ -73,6 +76,7 @@ apply_settings() {
 }
 restore_settings() {
     give_back focusPolicy Windows FocusPolicy
+    give_back nextFocusPrefersMouse Windows NextFocusPrefersMouse
     give_back rollOver Windows RollOverDesktops
     give_back rows Desktops Rows
 }

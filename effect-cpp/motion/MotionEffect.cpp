@@ -195,6 +195,10 @@ void Effect::stopWindow(KWin::EffectWindow *w, WindowState &s)
     if (s.moving || s.resizing) {
         qCDebug(KIRI_MOTION) << "stop" << w->caption() << "moving" << s.moving << "resizing" << s.resizing << "swipe" << KWin::effects->property("kiriSwipeVisual").toBool();
     }
+    if (s.moving || s.resizing) {
+        // the window was painted somewhere else than its real place: KWin only knows the real place, so the painted one is cleared here
+        KWin::effects->addRepaintFull();
+    }
     s.moving = false;
     s.resizing = false;
     if (s.snapshot) {
@@ -262,6 +266,7 @@ void Effect::onAdded(KWin::EffectWindow *w)
         o.itemEffect.reset();
         old->setData(KWin::WindowClosedGrabRole, QVariant());
         o.deletedRef.reset(); // windowDeleted erases the state
+        KWin::effects->addRepaintFull(); // the old picture goes at once
         return;
     }
     if (m_speed <= 0 || !animatable(w) || !w->isVisible() || KWin::effects->activeFullScreenEffect()) {
@@ -284,18 +289,17 @@ void Effect::onClosed(KWin::EffectWindow *w)
         return;
     }
     WindowState &s = *it;
-    // a window that was opening is just closed; a snapshot or movement is dropped
-    s.moving = s.resizing = false;
-    if (s.snapshot) {
-        unredirect(w);
-        s.snapshot = false;
-    }
+    // a window that was opening is just closed
     s.openStart = -1;
     if (m_speed <= 0 || !animatable(w) || !w->isVisible() || w->skipsCloseAnimation() || KWin::effects->activeFullScreenEffect()
         || w->data(KWin::WindowClosedGrabRole).value<void *>()) {
+        stopWindow(w, s);
         s.itemEffect.reset();
+        KWin::effects->addRepaintFull();
         return;
     }
+    // a movement or resize that is running goes on under the closing animation, so the window does not jump to its
+    // real place for the first frame of the close
     s.deletedRef.emplace(w);
     s.closeStart = now();
     s.pid = w->pid();
@@ -505,9 +509,11 @@ void Effect::postPaintScreen()
         KWin::EffectWindow *w = it.key();
         if (s.moving && (t - s.moveStart) * m_speed >= NiriAnim::moveSpring().duration()) {
             s.moving = false;
+            again = true; // one more frame with the window exactly in place
         }
         if (s.resizing && (t - s.resizeStart) * m_speed >= NiriAnim::resizeSpring().duration()) {
             s.resizing = false;
+            again = true;
             if (s.snapshot) {
                 unredirect(w);
                 s.snapshot = false;
@@ -518,6 +524,7 @@ void Effect::postPaintScreen()
         if (!s.resizing && s.snapshot && t - s.snapshotSince > 4.0) {
             unredirect(w);
             s.snapshot = false;
+            again = true;
         }
         if (s.openStart >= 0 && (t - s.openStart) * m_speed >= NiriAnim::Defaults::openMs / 1000) {
             s.openStart = -1;
@@ -525,6 +532,7 @@ void Effect::postPaintScreen()
                 s.itemEffect.reset();
             }
             w->setData(KWin::WindowAddedGrabRole, QVariant());
+            again = true;
         }
         if (s.closeStart >= 0 && (t - s.closeStart) * m_speed >= NiriAnim::Defaults::closeMs / 1000) {
             s.closeStart = -1;
