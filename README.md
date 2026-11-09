@@ -26,8 +26,6 @@ Run it again after KWin updates.
 
 - Desktops are shared by all monitors, so there are no per-monitor workspaces.
 - Binds on a bare modifier or on key release (e.g. tapping Mod for the overview) are not possible.
-- The niri importer doesn't follow `include`.
-- Window rules: `block-out-from`, `tiled-state`, `background-effect` and `popups` have no KWin equivalent.
 
 ## Build
 
