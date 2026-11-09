@@ -149,6 +149,11 @@ const configDef = [
         default: false,
     },
     {
+        name: "hotCorner",
+        type: "Bool",
+        default: true,
+    },
+    {
         name: "tabbedColumnsByDefault",
         type: "Bool",
         default: false,

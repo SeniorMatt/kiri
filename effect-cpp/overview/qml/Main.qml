@@ -624,7 +624,7 @@ FocusScope {
             while (Math.abs(root.wheelY) >= step) {
                 const dir = root.wheelY > 0 ? 1 : -1;
                 root.wheelY -= dir * step;
-                root.effect.goToDesktop(Math.round(root.effect.wsIndex) + dir);
+                root.effect.stepDesktop(dir);
             }
         }
     }
@@ -660,10 +660,10 @@ FocusScope {
             root.effect.requestClose();
             event.accepted = true;
         } else if (event.key === Qt.Key_Up) {
-            root.effect.goToDesktop(Math.round(root.effect.wsIndex) - 1);
+            root.effect.stepDesktop(-1);
             event.accepted = true;
         } else if (event.key === Qt.Key_Down) {
-            root.effect.goToDesktop(Math.round(root.effect.wsIndex) + 1);
+            root.effect.stepDesktop(1);
             event.accepted = true;
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             const a = root.lay.active;

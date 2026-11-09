@@ -14,6 +14,7 @@
 #include "effect/effectwindow.h"
 #include "effect/quickeffect.h"
 
+#include <KConfigWatcher>
 #include <QElapsedTimer>
 #include <QHash>
 #include <memory>
@@ -85,6 +86,7 @@ public Q_SLOTS:
     void dropWindow(const QString &windowId, const QString &desktopId, int column, int tile);
     void dropFloating(const QString &windowId, const QString &desktopId, qreal x, qreal y);
     void goToDesktop(int index);
+    void stepDesktop(int direction);
     void scrollView(const QString &desktopId, qreal delta);
     void requestClose();
 
@@ -110,6 +112,12 @@ private:
     };
 
     void run(bool on);
+    void loadHotCorner();
+    bool inHotCorner(const QPointF &pos) const;
+    void pointerMoved(const QPointF &pos, const QPointF &, Qt::MouseButtons buttons, Qt::MouseButtons, Qt::KeyboardModifiers, Qt::KeyboardModifiers);
+    KConfigWatcher::Ptr m_watcher;
+    bool m_hotCorner = true;
+    bool m_insideCorner = false;
     void holdWindow(EffectWindow *w);
     std::unordered_map<EffectWindow *, std::unique_ptr<EffectWindowVisibleRef>> m_visibleRefs;
 
@@ -155,6 +163,7 @@ private:
     qint64 m_costMax = 0;  // the longest prePaint-to-postPaint time of this animation
     bool m_moving = false; // an animation runs: ask for the next frame (see postPaintScreen)
     bool m_warm = false;
+    bool m_repaintAfter = false; // one more full repaint after the hand-back frame
     bool m_closedZoom = false; // the zoom is back at 0, the hand-back waits for the desktops to settle
     QVariantMap m_startRects;
     qint64 m_openCall = 0;

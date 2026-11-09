@@ -6,7 +6,13 @@
 #include "effect/effecthandler.h"
 #include "effect/effectwindow.h"
 
+#include "core/output.h"
+
+#include <KConfigGroup>
+#include <KSharedConfig>
 #include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCallWatcher>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -50,16 +56,85 @@ OverviewEffect::OverviewEffect()
     connect(effects, &EffectsHandler::windowDeleted, this, [this](EffectWindow *w) {
         m_visibleRefs.erase(w);
     });
+    loadHotCorner();
+    m_watcher = KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("kwinrc")));
+    connect(m_watcher.data(), &KConfigWatcher::configChanged, this, [this](const KConfigGroup &group) {
+        if (group.name() == QLatin1String("Script-kiri") || group.name() == QLatin1String("Plugins")) {
+            loadHotCorner();
+        }
+    });
+    connect(effects, &EffectsHandler::mouseChanged, this, &OverviewEffect::pointerMoved);
     connect(effects, &EffectsHandler::screenAboutToLock, this, [this]() {
         if (isRunning()) {
             m_open = false;
             m_gesture = false;
             m_progress = 0;
             m_progressAnimating = false;
+            m_closedZoom = false;
             run(false);
+            effects->addRepaintFull();
             Q_EMIT progressChanged();
             Q_EMIT closingChanged();
         }
+    });
+}
+
+// ---- hot corner --------------------------------------------------------------------------------------------
+// niri's hot corner (src/input/mod.rs, Niri::is_inside_hot_corner): the 1x1 logical pixel at the top-left of an output
+// toggles the overview the moment the pointer enters it, once per entry (it re-arms when the pointer has been outside).
+// No button may be held (niri: a click grab keeps the pointer focus on the window, so the corner does not fire; a
+// window drag does, which is why a held button is not checked once the overview is up: a drag-and-drop across
+// desktops needs it) and a full-screen window on the output covers it (niri: render_above_top_layer). It is a pointer
+// check, not KWin's screen edge, which has an activation delay and a pushback, and would clash with Plasma's own corner.
+// The toggle goes through Kiri's "overview" shortcut so that the script supplies the layout, like Meta+O does.
+void OverviewEffect::loadHotCorner()
+{
+    auto config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
+    config->reparseConfiguration();
+    m_hotCorner = config->group(QStringLiteral("Plugins")).readEntry("kiriEnabled", false)
+        && config->group(QStringLiteral("Script-kiri")).readEntry("hotCorner", true);
+    if (!m_hotCorner) {
+        m_insideCorner = false;
+    }
+}
+
+bool OverviewEffect::inHotCorner(const QPointF &pos) const
+{
+    for (LogicalOutput *output : effects->screens()) {
+        const RectF g = output->geometry();
+        if (pos.x() >= g.x() && pos.x() < g.x() + 1 && pos.y() >= g.y() && pos.y() < g.y() + 1) {
+            if (!isRunning()) {
+                for (EffectWindow *w : effects->stackingOrder()) {
+                    if (w->isFullScreen() && w->isOnCurrentDesktop() && !w->isMinimized() && w->screen() == output && w->frameGeometry().contains(g.topLeft() + QPointF(1, 1))) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+void OverviewEffect::pointerMoved(const QPointF &pos, const QPointF &, Qt::MouseButtons buttons, Qt::MouseButtons, Qt::KeyboardModifiers, Qt::KeyboardModifiers)
+{
+    if (!m_hotCorner) {
+        return;
+    }
+    const bool inside = inHotCorner(pos) && (buttons == Qt::NoButton || isRunning());
+    const bool was = std::exchange(m_insideCorner, inside);
+    if (!inside || was || effects->isScreenLocked()) {
+        return;
+    }
+    QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/component/kiri"),
+                                                          QStringLiteral("org.kde.kglobalaccel.Component"), QStringLiteral("invokeShortcut"));
+    message << QStringLiteral("overview");
+    auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, watcher, [](QDBusPendingCallWatcher *w) {
+        if (w->isError()) {
+            qCWarning(KIRI_OVERVIEW) << "hot corner: invoking the overview shortcut failed:" << w->error().message();
+        }
+        w->deleteLater();
     });
 }
 
@@ -215,11 +290,20 @@ bool OverviewEffect::tick()
     if (offsetsChanged) {
         Q_EMIT viewOffsetsChanged();
     }
+    // closed, but the script has not yet moved to the desktop the user chose in the overview: the real screen would
+    // show the old one when the scene goes (a jump); wait for it (setLayout moves the scene's desktop to the real one)
+    if (m_closedZoom && !m_open && !m_gesture && m_pendingCurrent >= 0 && t < m_pendingUntil) {
+        more = true;
+    }
     if (m_closedZoom && !more && !m_open && !m_gesture && !m_warm) {
         // closed, and the desktops sit where they are on the real screen (the view offsets and the desktop spring have
         // arrived: handing back earlier would show them jumping): hand the screen back
         m_closedZoom = false;
         run(false);
+        // the real windows come back on a screen the scene covered: repaint all of it now and once more after this
+        // frame, so no region keeps what the overview left
+        effects->addRepaintFull();
+        m_repaintAfter = true;
         logFrames();
         return false;
     }
@@ -276,7 +360,8 @@ void OverviewEffect::postPaintScreen()
         m_costMax = std::max(m_costMax, cost);
         m_prePaint = 0;
     }
-    if (m_moving && isRunning()) {
+    if ((m_moving && isRunning()) || m_repaintAfter) {
+        m_repaintAfter = false;
         effects->addRepaintFull();
     }
     QuickSceneEffect::postPaintScreen();
@@ -382,6 +467,8 @@ bool OverviewEffect::acquire()
     effects->setProperty("kiriSwitchVisual", QVariant());
     m_openCall = now();
     m_closedZoom = false;
+    m_events.clear(); // answers to an earlier run (a key pressed in its last frames) must not act on this one
+    m_pendingCurrent = -1;
     run(true);
     if (!isRunning()) {
         return false;
@@ -454,6 +541,7 @@ QString OverviewEffect::warm(const QString &layout)
             m_warm = false;
             m_progressAnimating = false;
             run(false);
+            effects->addRepaintFull();
             Q_EMIT warmingChanged();
         }
     });
@@ -559,9 +647,10 @@ void OverviewEffect::queue(const QString &json)
 
 QString OverviewEffect::poll()
 {
-    QString out = QStringLiteral("{\"open\":%1,\"p\":%2,\"events\":[")
+    QString out = QStringLiteral("{\"open\":%1,\"run\":%3,\"p\":%2,\"events\":[")
                       .arg(isRunning() && m_open ? QStringLiteral("true") : QStringLiteral("false"))
-                      .arg(m_progress, 0, 'f', 4);
+                      .arg(m_progress, 0, 'f', 4)
+                      .arg(isRunning() ? QStringLiteral("true") : QStringLiteral("false"));
     out += m_events.join(QLatin1Char(','));
     out += QStringLiteral("]}");
     m_events.clear();
@@ -608,6 +697,12 @@ void OverviewEffect::goToDesktop(int index)
     m_pendingCurrent = index;
     m_pendingUntil = now() + 600;
     startWorkspace(index);
+}
+
+// Up/Down/wheel: one desktop from where the view is heading, so fast presses move on instead of repeating the target
+void OverviewEffect::stepDesktop(int direction)
+{
+    goToDesktop(int(std::lround(m_wsTarget)) + direction);
 }
 
 void OverviewEffect::dropWindow(const QString &windowId, const QString &desktopId, int column, int tile)

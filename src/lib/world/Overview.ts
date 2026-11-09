@@ -124,7 +124,7 @@ class Overview {
 
     // the answer of the effect's poll(): {"open":bool,"p":progress,"events":[...]}
     public poll(json: string) {
-        let answer: { open: boolean, p: number, events: any[] };
+        let answer: { open: boolean, run?: boolean, p: number, events: any[] };
         try {
             answer = JSON.parse(json);
         } catch (error: any) {
@@ -141,11 +141,12 @@ class Overview {
         if (this.gesture === null) {
             this.open = answer.open;
         }
-        if (this.open || changed) {
+        // while the scene is still up (its close animation) the layout keeps flowing: a desktop switched meanwhile moves the scene
+        if (this.open || changed || answer.run === true) {
             this.sendLayout();
         }
         // the effect is back to the normal view: stop asking (after a moment: the open call may still be on its way)
-        if (!answer.open && answer.p < 0.005 && this.gesture === null && Date.now() - this.openedAt > 400) {
+        if (!answer.open && answer.run !== true && answer.p < 0.005 && this.gesture === null && Date.now() - this.openedAt > 400) {
             this.open = false;
             setOverviewPolling(false);
         }

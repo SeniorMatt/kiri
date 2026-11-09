@@ -202,3 +202,13 @@ tests.register("NiriImport window rules: open-fullscreen, default-window-height,
     Assert.equal(rules[2].exclude[0].caption, ".*Private.*");
     Assert.assert(result.skipped.some(line => line.includes("is-urgent")));
 });
+
+tests.register("NiriImport hot corners", 1, () => {
+    const off = NiriImport.parse(`gestures { hot-corners { off; } }`);
+    Assert.equal(off.settings["hotCorner"], false);
+    const other = NiriImport.parse(`gestures { hot-corners { bottom-right; } }`);
+    Assert.equal(other.settings["hotCorner"], false);
+    const both = NiriImport.parse(`gestures { hot-corners { top-left; bottom-right; } }`);
+    Assert.equal(both.settings["hotCorner"], undefined);
+    Assert.equal(NiriImport.parse(`layout { gaps 8; }`).settings["hotCorner"], undefined);
+});

@@ -63,6 +63,10 @@ class KiriAnimations {
 
     // niri's window-close: 150 ms ease-out-quad, scale 1 -> 0.8 while fading out
     closed(window) {
+        // a move animation that is still running would add its scale and translation to the close animation
+        if (window.kiriAnim) {
+            this.stop(window);
+        }
         if (this.duration <= 0 || !this.animatable(window)) {
             return;
         }

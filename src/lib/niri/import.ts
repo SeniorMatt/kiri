@@ -455,8 +455,19 @@ namespace NiriImport {
                 out["cursorFollowsFocus"] = true;
             }
         }
-        if (Kdl.find(nodes, "gestures").length > 0) {
-            warn("gestures block (Kiri has no matching options)");
+        const gestures = Kdl.find(nodes, "gestures");
+        if (gestures.length > 0) {
+            // niri: `off` disables the corners; naming other corners without top-left turns the top-left one off
+            for (const block of gestures) {
+                const corners = Kdl.child(block, "hot-corners");
+                if (corners !== undefined) {
+                    const others = ["top-right", "bottom-left", "bottom-right"].some(name => Kdl.child(corners, name) !== undefined);
+                    if (Kdl.child(corners, "off") !== undefined || (others && Kdl.child(corners, "top-left") === undefined)) {
+                        out["hotCorner"] = false;
+                    }
+                }
+            }
+            warn("gestures block (Kiri maps only hot-corners off; no other gesture options)");
         }
         return out;
     }

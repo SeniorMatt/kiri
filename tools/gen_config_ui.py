@@ -243,6 +243,7 @@ behavior_tab = tab("behavior", "Behavior", [
         check("focusFollowsMouse", "Focus follows mouse", "Like niri: the window under the mouse gets the focus, except while a Plasma popup such as the launcher is open. Kiri sets KWin's focus policy to \"Click to focus\" when installing"),
         spin("focusFollowsMouseMaxScroll", "Focus follows mouse, max scroll:", "Like niri's max-scroll-amount: do not focus a window that needs more scrolling than this to be fully shown, in percent of the screen width (100 = no limit)", 0, 100, " %"),
         check("cursorFollowsFocus", "Cursor follows focus", "Move the mouse cursor to a window focused from the keyboard"),
+        check("hotCorner", "Hot corner", "Like niri: pushing the pointer into the top-left corner of the screen toggles the overview"),
         check("hideTitlebars", "Tiled windows have no title bar", "Like niri: tiled windows lose their title bar and frame (the focus ring is the outline). They get them back when they float or Kiri stops"),
         check("skipSwitcher", "Tiled windows skip Alt+Tab", "Hide tiled windows from the window switcher"),
         check("dynamicDesktops", "Dynamic desktops (experimental)", "Experimental, off by default. Like niri's workspaces: there is always one empty desktop at the bottom, and empty desktops are removed when you leave them. Moving a window or column down from the last desktop opens a new one"),
