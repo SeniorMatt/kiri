@@ -33,7 +33,7 @@ class ClientManager {
     private lastActivationTime = 0;
     private lastActivationByKiri = false;
     // the shell window (KRunner, a panel popup) that had the focus last, and when its closing hands the focus back:
-    // to the app window under the pointer, else to the app window that had it before
+    // to the app window that had it before (niri)
     private lastShellFocused: KwinClient|null = null;
     private shellReturnUntil = 0;
     private floatingFocusOrder: KwinClient[] = []; // most recently focused last
