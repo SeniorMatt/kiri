@@ -589,6 +589,21 @@ Item {
         property string state: ""
     }
 
+    // The keys Kiri gave to KWin's own actions (see syncTwins), so they can be told from the user's and taken back
+    QC.Settings {
+        id: twinStore
+        category: "Twins"
+        location: QC.StandardPaths.writableLocation(QC.StandardPaths.GenericConfigLocation) + "/kiri-twins.conf"
+        property string given: ""
+    }
+
+    // Read only: KWin's own default keys (see kwinDefaultKeys), so Kiri can tell them from keys the user set
+    QC.Settings {
+        id: kglobalshortcutsrc
+        category: "kwin"
+        location: QC.StandardPaths.writableLocation(QC.StandardPaths.GenericConfigLocation) + "/kglobalshortcutsrc"
+    }
+
     function saveState() {
         try {
             const json = qmlBase.karouselInstance.saveState();

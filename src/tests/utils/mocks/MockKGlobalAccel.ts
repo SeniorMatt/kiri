@@ -4,6 +4,13 @@ class MockKGlobalAccel {
     public onReleased: ((name: string) => void)|null = null;
     public readonly registered = new Map<string, number[]>();
     public readonly lastFlags = new Map<string, number>();
+    // KWin's own actions (component "kwin"), as kglobalaccel keeps them: keys and default keys
+    public readonly kwinActions = new Map<string, { keys: number[], defaults: number[] }>();
+    // actions of other components (Plasma's): "component/action" -> keys
+    public readonly otherActions = new Map<string, number[]>();
+    // kglobalshortcutsrc, group [kwin]: name -> [current, default, description], keys of an entry joined by a tab
+    public readonly rc = new Map<string, string[]>();
+    public readonly inactive = new Set<string>();
     private readonly stored = new Map<string, number[]>(); // like kglobalshortcutsrc
 
     public call(path: string, iface: string, member: string, types: string[], args: any[], resolve: (value: any) => void) {
@@ -27,9 +34,29 @@ class MockKGlobalAccel {
             resolve(this.stored.get(name));
             break;
         }
-        case "getGlobalShortcutsByKey":
+        case "getGlobalShortcutsByKey": {
+            const infos: string[][] = [];
+            this.kwinActions.forEach((action, name) => action.keys.includes(args[0]) && infos.push([name, "", "kwin", ""]));
+            this.otherActions.forEach((keys, id) => keys.includes(args[0]) && infos.push([id.split("/")[1], "", id.split("/")[0], ""]));
+            resolve(infos);
+            break;
+        }
         case "shortcutNames":
-            resolve([]);
+            resolve(Array.from(this.kwinActions.keys()));
+            break;
+        case "shortcut":
+            resolve(this.kwinActions.get(args[0][1])?.keys ?? []);
+            break;
+        case "defaultShortcut":
+            resolve(this.kwinActions.get(args[0][1])?.defaults ?? []);
+            break;
+        case "setForeignShortcut":
+            this.kwinActions.get(args[0][1])!.keys = args[1];
+            resolve(undefined);
+            break;
+        case "setInactive":
+            this.inactive.add(args[0][0] + "/" + args[0][1]);
+            resolve(undefined);
             break;
         default:
             resolve(undefined);

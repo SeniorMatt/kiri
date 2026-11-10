@@ -15,6 +15,16 @@ namespace Clients {
             /^(org\.kde\.)?(plasmashell|krunner)$/.test(kwinClient.resourceClass);
     }
 
+    // Plasma's shell and other transient UI (panels and their popups, the launcher, KRunner, notifications, OSDs, menus,
+    // tooltips, the desktop, the lock screen): it keeps the keyboard focus, but the pointer never warps to it and it
+    // does not scroll the strip. Only windows that are not apps, never a window that cannot be moved (a full-screen app).
+    export function isShellUi(kwinClient: KwinClient) {
+        return kwinClient.dock || kwinClient.desktopWindow || kwinClient.popupWindow || kwinClient.appletPopup ||
+            !(kwinClient.normalWindow || kwinClient.dialog) ||
+            /^(org\.kde\.)?(plasmashell|krunner|kscreenlocker_greet)$/.test(kwinClient.resourceClass) ||
+            isProhibitedClass(kwinClient);
+    }
+
     export function canTileEver(kwinClient: KwinClient) {
         const shapeable = (kwinClient.moveable && kwinClient.resizeable) || kwinClient.fullScreen; // full-screen windows may become shapeable after exiting full-screen mode
         return shapeable &&

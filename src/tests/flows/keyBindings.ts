@@ -111,3 +111,89 @@ tests.register("Shift with a symbol key is also registered the way KWin reports 
     Assert.assert(keys.includes(meta | "+".charCodeAt(0)), { message: "Meta++, what KWin sends for Shift+=" });
     Assert.assert(registered.get("window-height-decrease")!.includes(meta | "_".charCodeAt(0)));
 });
+
+// Plasma-mode twins: KWin's own actions get Kiri's keys
+const kwinAction = (accel: MockKGlobalAccel, name: string, keys: string[], defaults: string[]) => {
+    accel.kwinActions.set(name, { keys: keys.map(key => parseKeySequence(key)!), defaults: defaults.map(key => parseKeySequence(key)!) });
+    accel.rc.set(name, [keys.join("\t") || "none", defaults.join("\t") || "none", name]);
+};
+const twinInit = (setup: (accel: MockKGlobalAccel) => void, config = getDefaultConfig()) => {
+    kwinSetup = setup;
+    try {
+        init(config);
+    } finally {
+        kwinSetup = null;
+    }
+    return kglobalaccel as MockKGlobalAccel;
+};
+const keysOf = (accel: MockKGlobalAccel, name: string) => accel.kwinActions.get(name)!.keys;
+const code = (key: string) => parseKeySequence(key)!;
+
+tests.register("An empty KWin twin action gets Kiri's keys", 1, () => {
+    const accel = twinInit(a => kwinAction(a, "Window Move Center", [], []));
+    Assert.equalArrays(keysOf(accel, "Window Move Center"), [code("Meta+C")]);
+    Assert.equal(twinStore.given, "Window Move Center~" + code("Meta+C"));
+    // no twin is made for an action KWin does not have
+    Assert.equal(accel.kwinActions.has("Window Close"), false);
+});
+
+tests.register("Kiri's keys are added next to KWin's default keys", 1, () => {
+    const accel = twinInit(a => {
+        kwinAction(a, "Switch to Desktop 1", ["Ctrl+F1"], ["Ctrl+F1"]);
+        kwinAction(a, "Window Close", ["Alt+F4"], ["Alt+F4"]);
+    });
+    Assert.equalArrays(keysOf(accel, "Switch to Desktop 1"), [code("Ctrl+F1"), code("Meta+1")]);
+    // Kiri's Alt+F4 is the default already, only Meta+Q is added
+    Assert.equalArrays(keysOf(accel, "Window Close"), [code("Alt+F4"), code("Meta+Q")]);
+    Assert.equal(twinStore.given.includes("Window Close~" + code("Meta+Q") + "|"), true);
+});
+
+tests.register("A key the user set on a KWin action stays", 1, () => {
+    const mine = "Meta+Ctrl+Alt+Z";
+    const accel = twinInit(a => {
+        kwinAction(a, "Window Move Center", [mine], []);
+        kwinAction(a, "Window Close", ["Alt+F4", mine], ["Alt+F4"]);
+        kwinAction(a, "Window Fullscreen", [], ["Meta+Ctrl+Alt+Y"]); // the user removed the default
+    });
+    Assert.equalArrays(keysOf(accel, "Window Move Center"), [code(mine)]);
+    Assert.equalArrays(keysOf(accel, "Window Close"), [code("Alt+F4"), code(mine)]);
+    Assert.equalArrays(keysOf(accel, "Window Fullscreen"), []);
+    Assert.equal(twinStore.given, "");
+});
+
+tests.register("A key another action uses is not taken for a twin", 1, () => {
+    const accel = twinInit(a => {
+        kwinAction(a, "Window Move Center", [], []);
+        a.otherActions.set("plasmashell/activate task manager entry 1", [code("Meta+C")]);
+    });
+    Assert.equalArrays(keysOf(accel, "Window Move Center"), []);
+});
+
+tests.register("A twin follows a changed Kiri key and keeps its default", 1, () => {
+    const config = getDefaultConfig();
+    config.shortcutKeys = { "window-close": ["Meta+D"] };
+    const old = code("Meta+Q");
+    const accel = twinInit(a => {
+        // the default from kglobalshortcutsrc is still Alt+F4, the live keys carry Kiri's old key
+        kwinAction(a, "Window Close", ["Alt+F4"], ["Alt+F4"]);
+        a.kwinActions.get("Window Close")!.keys.push(old);
+        twinStore.given = "Window Close~" + old;
+    }, config);
+    Assert.equalArrays(keysOf(accel, "Window Close"), [code("Alt+F4"), code("Meta+D")]);
+    Assert.equal(twinStore.given, "Window Close~" + code("Meta+D"));
+    // the user then replaced the twin's keys: they are theirs, nothing is added
+    const record = twinStore.given;
+    const other = twinInit(a => {
+        kwinAction(a, "Window Close", ["Meta+Ctrl+Alt+Z"], ["Alt+F4"]);
+        twinStore.given = record;
+    }, config);
+    Assert.equalArrays(keysOf(other, "Window Close"), [code("Meta+Ctrl+Alt+Z")]);
+    Assert.equal(twinStore.given, "");
+});
+
+tests.register("Kiri's own action keeps its key next to its twin", 1, () => {
+    const accel = twinInit(a => kwinAction(a, "Window Move Center", [], []));
+    Assert.equalArrays(accel.registered.get("grid-scroll-focused")!, [code("Meta+C")]);
+    // takePriority found the twin on Kiri's key, so it is switched off while Kiri runs
+    Assert.equal(accel.inactive.has("kwin/Window Move Center"), true);
+});

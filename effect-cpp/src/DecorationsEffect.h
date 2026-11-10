@@ -257,6 +257,15 @@ private:
     QHash<QUuid, VisualRelease> m_releasing;
     KWin::RectF m_insertHint; // empty = none
     QUuid m_hintWindow;       // the window being dragged
+    // niri's moving-window alpha: a window that leaves the grid for a drag fades to 0.75 with the window-movement spring,
+    // and back to 1 when it is dropped
+    struct AlphaAnim
+    {
+        double from = 1, to = 1, start = 0;
+    };
+    QHash<QUuid, AlphaAnim> m_alpha;
+    double alphaOf(const QUuid &id) const;
+    void fadeTo(const QUuid &id, double to);
     void drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion);
     // where each window's ring/border was last drawn: repainted when it moves, or the old one stays as a trail
     QHash<KWin::EffectWindow *, KWin::RectF> m_painted;

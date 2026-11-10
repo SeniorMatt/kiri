@@ -47,6 +47,7 @@ namespace
 constexpr int CaptureRole = 0x4B495249; // set by kiri_motion while it snapshots a window
 // set here on a parked window (see setParkedPositions): the QPointF from its real top-left corner to where it is painted
 constexpr int ParkedOffsetRole = 0x4B495250;
+constexpr double DraggedAlpha = 0.75; // niri's INTERACTIVE_MOVE_ALPHA
 QString shaderPath(const QString &name)
 {
     return QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("kwin/shaders/") + name);
@@ -492,6 +493,16 @@ void Effect::postPaintScreen()
         }
         ++it;
     }
+    for (auto it = m_alpha.begin(); it != m_alpha.end();) {
+        const bool done = speed <= 0 || NiriAnim::moveSpring().isDone((m_frameTime - it->start) * speed);
+        if (done && it->to == 1.0) {
+            it = m_alpha.erase(it);
+            again = true; // one more frame at full opacity
+        } else {
+            again = again || !done;
+            ++it;
+        }
+    }
     for (auto it = m_tabOpen.begin(); it != m_tabOpen.end();) {
         const double length = it->second ? NiriAnim::Defaults::openMs / 1000 : NiriAnim::moveSpring().duration();
         if (speed <= 0 || (m_frameTime - it->first) * speed >= length) {
@@ -636,6 +647,7 @@ Effect::Effect()
         m_park.remove(w->internalId());
         m_parkPainted.remove(w->internalId());
         m_painted.remove(w);
+        m_alpha.remove(w->internalId());
         m_expanded.remove(w); // KWin frees the window right after this
     });
 }
@@ -980,6 +992,14 @@ void Effect::setInsertHint(const QString &json)
         KWin::effects->addRepaint(m_insertHint);
     }
     m_insertHint = hint;
+    if (dragged != m_hintWindow) {
+        if (!m_hintWindow.isNull()) {
+            fadeTo(m_hintWindow, 1.0);
+        }
+        if (!dragged.isNull()) {
+            fadeTo(dragged, DraggedAlpha);
+        }
+    }
     m_hintWindow = dragged;
     if (!m_insertHint.isEmpty()) {
         KWin::effects->addRepaint(m_insertHint);
@@ -1059,6 +1079,30 @@ bool Effect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::Ren
         drawInsertHint(viewport, region);
     }
     return result;
+}
+
+double Effect::alphaOf(const QUuid &id) const
+{
+    const auto it = m_alpha.constFind(id);
+    if (it == m_alpha.constEnd()) {
+        return 1.0;
+    }
+    const double factor = KWin::effects->animationTimeFactor();
+    const double k = factor > 0 ? NiriAnim::moveSpring().value((m_frameTime - it->start) / factor) : 0.0;
+    return it->to + (it->from - it->to) * k;
+}
+
+void Effect::fadeTo(const QUuid &id, double to)
+{
+    const double from = alphaOf(id);
+    if (from == to) {
+        if (to == 1.0) {
+            m_alpha.remove(id);
+        }
+        return;
+    }
+    m_alpha.insert(id, AlphaAnim{from, to, clock()});
+    KWin::effects->addRepaintFull();
 }
 
 void Effect::setTabGroups(const QString &json)
@@ -1321,19 +1365,17 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     if (radiusFor(w) > 0 || (decorated(w) && lookOf(w).shadow.on)) {
         data.setTranslucent(); // the cut corners show what is behind the window, and so does a shadow that is not under it
     }
+    if (decorated(w)) {
+        // The ring, border and tab indicator are outside of the window. KWin paints a window that is not transformed
+        // only inside its bounding rect (the frame and its shadow, and a window without a title bar has none), which
+        // cut the ring away whenever the window had no shadow, as a window that is dragged out of the layout has not.
+        data.setTransformed();
+    }
     if (m_visualPositions.contains(w->internalId()) || m_releasing.contains(w->internalId()) || m_park.contains(w->internalId())) {
         data.setTransformed(); // painted somewhere else than where KWin thinks it is
     }
-    // The ring, border, shadow and tab indicator are outside of the window's frame. KWin clips the painting of a window that is
-    // not transformed to the window's own area (its expanded geometry, which is the frame when the client has no shadow or
-    // server-side decoration), so they could only ever be drawn in the corner squares that the rounded corners cut away, and
-    // were otherwise left over from earlier frames until something repainted the screen. A transformed window gets the
-    // region that is really being repainted.
-    if (decorated(w)) {
-        const Look &look = lookOf(w);
-        if ((look.border.enabled && look.border.width > 0) || (w == m_active && look.ring.enabled && look.ring.width > 0) || look.shadow.on || tabGroupOf(w)) {
-            data.setTransformed();
-        }
+    if (m_alpha.contains(w->internalId())) {
+        data.setTranslucent();
     }
     // kiri_swipe (which paints before this effect) reads where a parked window is painted: it has to be this frame's place, not
     // the last frame's, or the window jumps for one frame when it gets parked or unparked or its place changes
@@ -1391,6 +1433,9 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
         data.setYTranslation(data.yTranslation() + releaseIt->offset.y() * k);
     }
 
+    if (!m_alpha.isEmpty()) {
+        data.multiplyOpacity(alphaOf(w->internalId()));
+    }
     if (isActive() && !w->data(CaptureRole).toBool() && (w->isNormalWindow() || w->isDialog())) {
         drawBackdrop(viewport, w, deviceRegion, data.opacity());
         if (decorated(w) && lookOf(w).shadow.on) {

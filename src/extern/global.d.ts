@@ -6,6 +6,8 @@ declare const notificationInvalidTiledDesktops: Notification;
 declare const notificationInvalidWindowRules: Notification;
 declare const notificationInvalidPresetWidths: Notification;
 declare const moveCursorToFocus: DBusCall;
+declare const kglobalshortcutsrc: { value(key: string, defaultValue: unknown): any; sync(): void };
+declare const twinStore: { given: string; sync(): void };
 declare const kglobalaccel: {
     onPressed: ((name: string) => void)|null;
     onRepeated: ((name: string) => void)|null;

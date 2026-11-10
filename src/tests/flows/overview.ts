@@ -387,3 +387,32 @@ tests.register("Overview: no cursor warps and no focus follows mouse while it is
         ffm.destroy();
     }
 });
+
+// niri: hovering never changes the focus in the overview and closing it (key, Escape, swipe, hot corner) keeps the
+// focused window; only a click ("activate" event) switches to the window, its desktop and its column.
+tests.register("Overview: closing keeps the focus, a click activates the window on its desktop", 1, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock, world } = init(config);
+    overviewCalls.length = 0;
+
+    const [a, b, c] = workspaceMock.createClientsWithWidths(600, 600, 600);
+    const desktop1 = workspaceMock.desktops[1];
+    workspaceMock.activeWindow = b;
+    qtMock.fireShortcut("overview");
+    overviewPoll(world, []);
+    qtMock.fireShortcut("overview"); // closed with no click: nothing moves the focus
+    overviewPoll(world, [], false);
+    Assert.equal(workspaceMock.activeWindow, b);
+    Assert.equal(workspaceMock.currentDesktop, workspaceMock.desktops[0]);
+
+    // a window on another desktop is clicked: its desktop is shown and it is focused
+    workspaceMock.activeWindow = c;
+    qtMock.fireShortcut("window-move-to-desktop-2");
+    workspaceMock.currentDesktop = workspaceMock.desktops[0];
+    workspaceMock.activeWindow = a;
+    qtMock.fireShortcut("overview");
+    overviewPoll(world, [{ t: "activate", w: String(c.internalId), d: desktop1.id }]);
+    Assert.equal(workspaceMock.activeWindow, c);
+    Assert.equal(workspaceMock.currentDesktop, desktop1);
+});

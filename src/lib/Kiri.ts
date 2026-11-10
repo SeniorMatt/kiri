@@ -236,8 +236,10 @@ function setInsertHint(rect: { x: number, y: number, width: number, height: numb
     if (typeof qmlBase === "undefined") {
         return; // tests
     }
-    const json = rect === null ? "null" : JSON.stringify({
-        r: [Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height)],
+    // `windowId` is the window that is being dragged out of the grid; the effect fades it to niri's moving alpha. A hint
+    // without a rectangle (the pointer is not over anything) still tells that.
+    const json = rect === null && windowId === "" ? "null" : JSON.stringify({
+        r: rect === null ? [] : [Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height)],
         w: windowId, // the dragged window, so the effect draws the hint under it
     });
     if (json !== lastInsertHintJson) {
@@ -350,7 +352,7 @@ function flushCursorWarp() {
         return; // a desktop switch is still handing the focus over: the window that has it is on the desktop that is left
     }
     // niri does not warp while the overview is up (it has no focused window rectangle then), nor without a window
-    if (overviewActive() || active === null || active.desktopWindow || active.dock || active.minimized) {
+    if (overviewActive() || active === null || active.desktopWindow || active.dock || active.minimized || Clients.isShellUi(active)) {
         warpPending = false;
         warpBoth = false;
         return;

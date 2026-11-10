@@ -56,6 +56,31 @@ else
     w Plugins kiriEnabled false
     q org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript kiri
 fi
+# ---- the keys Kiri gave to KWin's own actions (Plasma-mode twins): taken back, your own keys stay ----------------
+twins="$config/kiri-twins.conf"
+if [ -f "$twins" ]; then
+    given=$(kreadconfig6 --file "$twins" --group Twins --key given)
+    old_ifs=$IFS
+    IFS='|'
+    for entry in $given; do
+        IFS=$old_ifs
+        name=${entry%%~*}
+        ours=${entry#*~}
+        ours=${ours%%~*}
+        [ -n "$name" ] && [ "$name" != "$entry" ] || continue
+        now=$(dbus-send --session --print-reply --dest=org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel.shortcut \
+            "array:string:kwin,$name,KWin,$name" 2>/dev/null | awk '$1 == "int32" { print $2 }') || now=
+        left=
+        for key in $now; do
+            case ".$ours." in *".$key."*) ;; *) left="${left:+$left,}$key" ;; esac
+        done
+        dbus-send --session --type=method_call --dest=org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel.setForeignShortcut \
+            "array:string:kwin,$name,KWin,$name" "array:int32:$left" >/dev/null 2>&1 || true
+        IFS='|'
+    done
+    IFS=$old_ifs
+    rm -f "$twins"
+fi
 for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
     d Plugins ${e}Enabled
     q org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e

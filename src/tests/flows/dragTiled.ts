@@ -64,3 +64,21 @@ tests.register("Drag tiled window, drop to tile (niri)", 10, () => {
     Assert.assert(Math.abs(c.getActualFrameGeometry().x - b.getActualFrameGeometry().x) < 1, { message: "c joined b's column" });
     Assert.assert(c.getActualFrameGeometry().y < b.getActualFrameGeometry().y, { message: "c is above b" });
 });
+
+tests.register("Drag tiled window out past the screen edge, no jump (niri)", 10, () => {
+    const config = getDefaultConfig();
+    config.untileOnDrag = true;
+    config.dropToTile = false;
+    const { qtMock, workspaceMock, world } = init(config);
+    const clientManager = getClientManager(world);
+
+    const [client0, client1] = workspaceMock.createClients(2);
+    const width = client0.getActualFrameGeometry().width;
+    // the pointer takes the window over the right edge of the screen in one step; once it has left the grid it stays
+    // where the pointer puts it (it used to be pushed back inside the screen for a moment)
+    const target = screen.width - width / 2;
+    const dx = target - client0.getActualFrameGeometry().x;
+    workspaceMock.moveWindow(client0, new MockQmlPoint(dx, 0));
+    Assert.notTiledClient(clientManager, client0);
+    Assert.equal(Math.round(client0.getActualFrameGeometry().x), Math.round(target), { message: "the dragged window is not moved back into the screen" });
+});

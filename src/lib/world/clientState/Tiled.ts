@@ -400,7 +400,9 @@ namespace ClientState {
             if (client.kwinClient.tile === null) {
                 client.setMaximize(false, false);
             }
-            client.ensureVisible(screenSize);
+            if (!client.keepTitlebarHidden) { // a window that is being dragged out follows the pointer, wherever that is (niri)
+                client.ensureVisible(screenSize);
+            }
         }
     }
 

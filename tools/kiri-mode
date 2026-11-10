@@ -3,7 +3,7 @@
 #   kiri-mode kiri | plasma | toggle | status
 # Your Plasma settings stay the truth in kwinrc. Kiri mode loads the Kiri script and the kiri_* effects at runtime,
 # unloads Plasma's Slide, Overview, Geometry change, Fade, Scale, Glide and Maximize, and sets the few settings that have
-# no runtime switch (focus policy, desktop wrap-around, desktop rows), keeping your values in [Kiri-mode] of kwinrc.
+# no runtime switch (focus policy, desktop wrap-around, desktop rows, window snapping and edge tiling), keeping your values in [Kiri-mode] of kwinrc.
 # Plasma mode undoes all of that. The mode is "Plasma Plugins kiriEnabled" in kwinrc, so the next login starts in the
 # same mode. Options: --no-osd (no on-screen message).
 set -e
@@ -37,8 +37,10 @@ effect_loaded() { [ "$(fx isEffectLoaded "$1")" = true ]; }
 # focus), so it is saved. Already in Kiri mode (login), a saved value is replaced only when the current one is
 # not Kiri's: the user changed the setting in System Settings while in Kiri mode.
 from_plasma=false
+UNSET=__unset__
 keep_user_value() { # name group key kiriValue
     cur=$(r "$2" "$3")
+    [ -n "$cur" ] || cur=$UNSET # the user has not set it: KWin's default is given back by deleting the key
     saved=$(r Kiri-mode "$1")
     if $from_plasma || [ "$cur" != "$4" ]; then
         w Kiri-mode "$1" "$cur"
@@ -54,7 +56,7 @@ give_back() { # name group key
     cur=$(r "$2" "$3")
     # only when Kiri's value is still there: otherwise the user changed it in System Settings and that stays
     if [ -n "$saved" ] && [ "$cur" = "$applied" ]; then
-        w "$2" "$3" "$saved"
+        if [ "$saved" = "$UNSET" ]; then d "$2" "$3"; else w "$2" "$3" "$saved"; fi
     fi
     d Kiri-mode "$1"
     d Kiri-mode "${1}Applied"
@@ -68,6 +70,13 @@ apply_settings() {
         keep_user_value nextFocusPrefersMouse Windows NextFocusPrefersMouse false
     fi
     keep_user_value rollOver Windows RollOverDesktops false
+    # niri moves windows only where the pointer puts them: no snapping to screen edges, other windows or the screen
+    # centre, and no quick tiling or maximizing at the screen edges (KWin 6.8, options.cpp)
+    keep_user_value borderSnapZone Windows BorderSnapZone 0
+    keep_user_value windowSnapZone Windows WindowSnapZone 0
+    keep_user_value centerSnapZone Windows CenterSnapZone 0
+    keep_user_value electricBorderMaximize Windows ElectricBorderMaximize false
+    keep_user_value electricBorderTiling Windows ElectricBorderTiling false
     number=$(r Desktops Number 1)
     rows=$(r Desktops Rows 1)
     if [ "$number" -gt 1 ] && [ "$rows" -lt "$number" ]; then
@@ -78,6 +87,11 @@ restore_settings() {
     give_back focusPolicy Windows FocusPolicy
     give_back nextFocusPrefersMouse Windows NextFocusPrefersMouse
     give_back rollOver Windows RollOverDesktops
+    give_back borderSnapZone Windows BorderSnapZone
+    give_back windowSnapZone Windows WindowSnapZone
+    give_back centerSnapZone Windows CenterSnapZone
+    give_back electricBorderMaximize Windows ElectricBorderMaximize
+    give_back electricBorderTiling Windows ElectricBorderTiling
     give_back rows Desktops Rows
 }
 apply_rows() {

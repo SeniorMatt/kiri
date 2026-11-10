@@ -166,6 +166,7 @@ class KeyBindings {
     private readonly actions = new Map<string, () => void>();
     private readonly activeKeys = new Set<number>();
     private readonly borrowed = new Map<string, string[]>();
+    private readonly kiriKeys = new Map<string, number[]>();
     private readonly priorityDelayer: Delayer;
     private destroyed = false;
 
@@ -203,10 +204,14 @@ class KeyBindings {
                 for (const key of keys ?? []) {
                     this.activeKeys.add(key);
                 }
+                this.kiriKeys.set(shortcut.name, keys ?? []);
                 pending--;
                 if (pending === 0) {
-                    this.takePriority();
-                    this.priorityDelayer.run();
+                    // the twins first, so that taking priority also switches off KWin's twin actions
+                    syncTwins(this.kiriKeys, () => this.destroyed, () => {
+                        this.takePriority();
+                        this.priorityDelayer.run();
+                    });
                 }
             });
         }
@@ -300,6 +305,150 @@ function parseKeys(keySequences: string[]) {
         }
     }
     return keys;
+}
+
+
+// Plasma-mode twins: KWin's own action for what a Kiri action does gets the same keys, so the key still works after
+// `kiri-mode plasma` (when the script is unloaded). Only actions that do the same thing are paired.
+const KWIN_TWINS: Record<string, string> = {
+    "grid-scroll-focused": "Window Move Center",
+    "window-close": "Window Close",
+    "window-toggle-fullscreen": "Window Fullscreen",
+    "window-maximize-to-edges": "Window Maximize",
+    "desktop-next": "Switch to Next Desktop",
+    "desktop-previous": "Switch to Previous Desktop",
+    "overview": "Overview",
+};
+
+function twinOf(kiriName: string): string|undefined {
+    const desktop = /^desktop-(\d+)$/.exec(kiriName);
+    return desktop !== null ? "Switch to Desktop " + desktop[1] : KWIN_TWINS[kiriName];
+}
+
+// What Kiri gave to KWin's actions, kept in ~/.config/kiri-twins.conf: "action name~key.key|action name~key". The keys
+// are Qt key codes. An action whose keys are not exactly these any more was changed by the user.
+function readTwinRecord(): Map<string, number[]> {
+    const record = new Map<string, number[]>();
+    for (const entry of String(twinStore.given ?? "").split("|")) {
+        const [name, keys] = entry.split("~");
+        if (name && keys) {
+            record.set(name, keys.split(".").map(Number).filter(key => key > 0));
+        }
+    }
+    return record;
+}
+
+function writeTwinRecord(record: Map<string, number[]>) {
+    const text = Array.from(record).filter(([, keys]) => keys.length > 0).map(([name, keys]) => name + "~" + keys.join(".")).join("|");
+    if (text !== twinStore.given) {
+        twinStore.given = text;
+        twinStore.sync();
+    }
+}
+
+// D-Bus replies come as list-like objects (not real arrays) whose items can still be wrapped in an object with a `value`
+function plainKeys(keys: any): number[] {
+    const result: number[] = [];
+    for (let i = 0; i < (keys?.length ?? 0); i++) {
+        const key = Number(typeof keys[i] === "object" && keys[i] !== null ? keys[i].value : keys[i]);
+        if (key > 0) {
+            result.push(key);
+        }
+    }
+    return result;
+}
+
+function sameKeys(a: number[], b: number[]) {
+    return a.length === b.length && a.every(key => b.includes(key));
+}
+
+// Gives the twins their keys. kiriKeys: the keys each Kiri action ended up with. Keys that another action uses are
+// never taken.
+function syncTwins(kiriKeys: Map<string, number[]>, isDestroyed: () => boolean, done: () => void) {
+    kglobalshortcutsrc.sync();
+    kglobalaccel.call("/component/kwin", KGlobalAccel.componentIface, "shortcutNames", [], [], (names: string[]|undefined) => {
+        const existing = new Set(names ?? []);
+        const pairs: [string, string][] = [];
+        for (const [kiriName] of kiriKeys) {
+            const twin = twinOf(kiriName);
+            if (twin !== undefined && existing.has(twin)) {
+                pairs.push([kiriName, twin]);
+            }
+        }
+        const record = readTwinRecord();
+        const next = (i: number) => {
+            if (isDestroyed() || i >= pairs.length) {
+                if (!isDestroyed()) {
+                    writeTwinRecord(record);
+                }
+                done();
+                return;
+            }
+            syncTwin(pairs[i][1], plainKeys(kiriKeys.get(pairs[i][0])), record, () => next(i + 1));
+        };
+        next(0);
+    });
+}
+
+// KWin's own default keys of an action, from ~/.config/kglobalshortcutsrc: [kwin] "Name=current,default,description" (keys
+// of one entry are separated by a tab). It is read through a QtCore Settings object on that file (kglobalshortcutsrc in
+// main.qml). The default D-Bus reports follows every change, this one only changes when KWin registers the action.
+function kwinDefaultKeys(twin: string): number[]|undefined {
+    const entry = kglobalshortcutsrc.value(twin, undefined);
+    const fields: string[] = typeof entry === "string" ? [entry] : Array.from(entry ?? []);
+    if (fields.length < 2) {
+        return undefined;
+    }
+    const keys: number[] = [];
+    for (const text of String(fields[1]).split("\t")) {
+        const key = parseKeySequence(text.trim());
+        if (key !== undefined) {
+            keys.push(key);
+        }
+    }
+    return keys;
+}
+
+function syncTwin(twin: string, wanted: number[], record: Map<string, number[]>, done: () => void) {
+    const id = ["kwin", twin, "", ""];
+    KGlobalAccel.call("shortcut", ["as"], [id], (current: number[]|undefined) => {
+        const now = plainKeys(current);
+        // what the action has apart from the keys Kiri gave it earlier
+        const given = record.get(twin) ?? [];
+        const base = given.length > 0 && given.every(key => now.includes(key)) ? now.filter(key => !given.includes(key)) : now;
+        // Kiri adds its keys next to KWin's defaults (or to an action that has none); an action the user changed, even by removing its keys, is left alone
+        if (!sameKeys(base, kwinDefaultKeys(twin) ?? [])) {
+            record.delete(twin);
+            done();
+            return;
+        }
+        const candidates = wanted.filter((key, i) => !base.includes(key) && wanted.indexOf(key) === i).slice(0, Math.max(0, 4 - base.length));
+        const free: number[] = [];
+        const check = (i: number) => {
+            if (i < candidates.length) {
+                KGlobalAccel.call("getGlobalShortcutsByKey", ["i"], [candidates[i]], (infos: string[][]|undefined) => {
+                    const taken = Array.from(infos ?? []).some(info => String(info[2]) !== KGlobalAccel.component && !(String(info[2]) === "kwin" && String(info[0]) === twin));
+                    if (!taken) {
+                        free.push(candidates[i]);
+                    }
+                    check(i + 1);
+                });
+                return;
+            }
+            if (free.length > 0) {
+                record.set(twin, free);
+            } else {
+                record.delete(twin);
+            }
+            const keys = base.concat(free);
+            if (!sameKeys(keys, now)) {
+                log("twin", twin, "gets", free.length, "key(s)");
+                KGlobalAccel.call("setForeignShortcut", ["as", "ai"], [id, keys]);
+            }
+            done();
+        };
+        check(0);
+    });
 }
 
 // Earlier versions registered their shortcuts in KWin's group as "kiri-*"

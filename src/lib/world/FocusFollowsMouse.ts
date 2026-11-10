@@ -78,7 +78,7 @@ class FocusFollowsMouse {
         return false;
     }
 
-    private static topWindowAt(point: { x: number, y: number }) {
+    public static topWindowAt(point: { x: number, y: number }) {
         // runs for every pointer event: the cheap geometry test comes first, so that only the windows under the
         // pointer pay for the desktops list
         const stack = Workspace.stackingOrder;

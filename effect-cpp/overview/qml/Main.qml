@@ -317,9 +317,8 @@ FocusScope {
         anchors.fill: parent
         color: root.backdropColor
         opacity: root.pc
-        TapHandler {
-            onTapped: root.effect.requestClose()
-        }
+        // niri: a click that is on no desktop and no window (the gaps, the sides) does nothing (src/input/mod.rs,
+        // the click handler only reacts to a window or workspace under the pointer)
     }
 
     Repeater {
@@ -468,7 +467,9 @@ FocusScope {
                 wId: tile.wid
             }
             Rectangle {
-                visible: tile.active && !tile.dragging
+                // niri: the ring belongs to the focused window and goes with it, also while it is dragged (a click focuses
+                // the window it picks up) and while it settles into its drop
+                visible: tile.active || tile.dragging || tile.held
                 anchors.fill: parent
                 anchors.margins: -border.width
                 color: "transparent"

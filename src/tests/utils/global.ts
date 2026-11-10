@@ -7,6 +7,10 @@ let notificationInvalidWindowRules: Notification;
 let notificationInvalidPresetWidths: Notification;
 let moveCursorToFocus: DBusCall;
 let kglobalaccel: MockKGlobalAccel;
+// eslint-disable-next-line prefer-const -- assigned by the tests
+let kwinSetup: ((accel: MockKGlobalAccel) => void)|null = null; // fills KWin's own actions before the key bindings register
+let kglobalshortcutsrc: { value: (key: string, def: unknown) => any, sync: () => void } = { value: (key, def) => def, sync: () => {} };
+let twinStore: { given: string, sync: () => void } = { given: "", sync: () => {} };
 
 let screen: MockQmlRect;
 let tilingArea: MockQmlRect;
@@ -33,6 +37,9 @@ function init(config: Config, screenSize: { width: number, height: number } = { 
     Qt = qtMock;
     Workspace = workspaceMock;
     kglobalaccel = new MockKGlobalAccel();
+    twinStore = { given: "", sync: () => {} };
+    kglobalshortcutsrc = { value: (key, def) => (kglobalaccel as MockKGlobalAccel).rc.get(key) ?? def, sync: () => {} };
+    kwinSetup?.(kglobalaccel);
     moveCursorToFocus = {
         __brand: "QmlObject",
         call: () => {

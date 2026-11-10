@@ -32,6 +32,10 @@ class ClientManager {
     private focusedBefore: KwinClient|null = null;
     private lastActivationTime = 0;
     private lastActivationByKiri = false;
+    // the shell window (KRunner, a panel popup) that had the focus last, and when its closing hands the focus back:
+    // to the app window under the pointer, else to the app window that had it before
+    private lastShellFocused: KwinClient|null = null;
+    private shellReturnUntil = 0;
     private floatingFocusOrder: KwinClient[] = []; // most recently focused last
     private focusStamps = new Map<KwinClient, number>(); // for focus-window-previous
     private focusCounter = 0;
@@ -164,7 +168,7 @@ class ClientManager {
 
         if (!existing) {
             this.applyOpenRules(client);
-            if (!kwinClient.dock) {
+            if (!Clients.isShellUi(kwinClient)) {
                 // niri warps the cursor to a newly opened window that it activates (warp-mouse-to-focus)
                 KiriFocus.mark(kwinClient);
                 if (Workspace.activeWindow === kwinClient) {
@@ -363,6 +367,10 @@ class ClientManager {
         const floatingFocusLost = this.isUserFloating(kwinClient) && (kwinClient === this.lastFocusedClient || kwinPicked);
         const closedStamp = this.focusStamps.get(kwinClient) ?? Infinity;
         const floatingDesktop = floatingFocusLost ? this.desktopManager.getDesktopForClient(kwinClient) : undefined;
+        const shellClosed = this.lastShellFocused === kwinClient;
+        if (shellClosed) {
+            this.lastShellFocused = null;
+        }
         const held = mayReturn && this.rememberClosed(kwinClient, client, kwinPicked);
         client.destroy(held ? FocusPassing.Type.None : passFocus);
         this.clientMap.delete(kwinClient);
@@ -371,6 +379,9 @@ class ClientManager {
         this.floatingFrames.delete(kwinClient);
         this.floatingFocusOrder = this.floatingFocusOrder.filter(c => c !== kwinClient);
         setVisualPosition(String(kwinClient.internalId), null); // a window that closes in the middle of a resize
+        if (shellClosed) {
+            this.returnFocusFromShell();
+        }
         if (floatingFocusLost) {
             this.focusAfterFloatingClose(kwinClient, floatingDesktop, kwinPicked, closedStamp);
         }
@@ -380,6 +391,41 @@ class ClientManager {
             slot.grid.desktop.setScroll(slot.scrollX, true);
             this.world.holdArrange();
             this.remapTimer.run();
+        }
+    }
+
+    // KRunner or a panel popup that had the focus is gone: the focus goes back to the app window that had it before
+    // (not to the one under the pointer). Never a warp. A window that opened meanwhile (KRunner launched an app) keeps the focus it took.
+    private returnFocusFromShell() {
+        const active = Workspace.activeWindow;
+        const now = Date.now();
+        if (active === null) {
+            this.shellReturnUntil = now + ClientManager.kwinPickMs;
+        } else if (!Clients.isShellUi(active) && active === this.lastFocusedClient && !this.lastActivationByKiri &&
+            now - this.lastActivationTime < ClientManager.kwinPickMs && !this.isNewClient(active)) {
+            this.shellReturnUntil = now + ClientManager.kwinPickMs; // KWin has picked a window already
+        } else {
+            return;
+        }
+        this.activateShellReturn(active);
+    }
+
+    private isNewClient(kwinClient: KwinClient) {
+        const client = this.clientMap.get(kwinClient);
+        return client === undefined || Date.now() - client.createdAt < 1000;
+    }
+
+    private activateShellReturn(active: KwinClient|null) {
+        if (overviewActive()) {
+            return;
+        }
+        // niri (update_keyboard_focus): when the layer-shell surface lets go, the keyboard focus goes back to the layout's
+        // active window; focus-follows-mouse only acts on the next pointer motion, never on a close
+        const previous = this.lastFocusedClient;
+        const target = previous !== null && this.clientMap.has(previous) && !previous.minimized &&
+            Clients.isOnVirtualDesktop(previous, Workspace.currentDesktop) ? previous : null;
+        if (target !== null && target !== active) {
+            activateWindow(target, "shell-return");
         }
     }
 
@@ -479,8 +525,12 @@ class ClientManager {
     public floatDragged(client: ClientWrapper) {
         const kwinClient = client.kwinClient;
         const opacityBefore = kwinClient.opacity;
-        kwinClient.opacity = ClientManager.dragOpacity; // niri's INTERACTIVE_MOVE_ALPHA
+        const fadedByEffect = canParkWindows(); // kiri_decorations fades the dragged window with niri's movement spring
+        if (!fadedByEffect) {
+            kwinClient.opacity = ClientManager.dragOpacity; // niri's INTERACTIVE_MOVE_ALPHA
+        }
         setVisualPosition(String(kwinClient.internalId), null); // the rubber band is over
+        setInsertHint(null, String(kwinClient.internalId));
         // no limitHeight: the dragged window keeps the size it had in the grid, like niri's moving tile
         if (!(client.stateManager.getState() instanceof ClientState.Floating)) {
             // niri never shows a title bar, so the dragged window keeps it hidden; only a drop as floating brings it back
@@ -495,7 +545,10 @@ class ClientManager {
             const done = new SignalManager();
             done.connect(kwinClient.interactiveMoveResizeFinished, () => {
                 done.destroy();
-                kwinClient.opacity = opacityBefore;
+                setInsertHint(null);
+                if (!fadedByEffect) {
+                    kwinClient.opacity = opacityBefore;
+                }
                 client.restoreTitlebar();
             });
             return;
@@ -505,7 +558,9 @@ class ClientManager {
         manager.connect(kwinClient.frameGeometryChanged, update);
         manager.connect(kwinClient.interactiveMoveResizeFinished, () => {
             manager.destroy();
-            kwinClient.opacity = opacityBefore;
+            if (!fadedByEffect) {
+                kwinClient.opacity = opacityBefore;
+            }
             setInsertHint(null);
             this.world.do(() => this.dropTile(kwinClient));
             if (!(client.stateManager.getState() instanceof ClientState.Tiled)) {
@@ -599,12 +654,12 @@ class ClientManager {
     private updateInsertHint(kwinClient: KwinClient) {
         const client = this.clientMap.get(kwinClient);
         if (client === undefined || !(client.stateManager.getState() instanceof ClientState.Floating)) {
-            setInsertHint(null);
+            setInsertHint(null, String(kwinClient.internalId));
             return;
         }
         const desktop = this.desktopManager.getDesktopForClient(kwinClient);
         if (desktop === undefined) {
-            setInsertHint(null);
+            setInsertHint(null, String(kwinClient.internalId));
             return;
         }
         const target = this.insertTarget(desktop, desktop.grid.getColumns(), Workspace.cursorPos);
@@ -794,6 +849,25 @@ class ClientManager {
     private warpedToTiled: { client: KwinClient, time: number }|null = null;
 
     public onClientFocused(kwinClient: KwinClient) {
+        if (Clients.isShellUi(kwinClient)) {
+            // KRunner, panels and their popups keep the keyboard focus but are no focus change for the layout: no
+            // scroll, no pointer warp (the user wants to type, not to point), and the window that had the focus
+            // before stays the layout's focus
+            this.lastShellFocused = this.clientMap.has(kwinClient) ? kwinClient : null;
+            return;
+        }
+        if (this.shellReturnUntil > 0) {
+            // KWin picks a window when the shell window closed (maybe the one under the pointer): the previous one gets it
+            const armed = Date.now() <= this.shellReturnUntil;
+            this.shellReturnUntil = 0;
+            if (armed && !KiriFocus.peek(kwinClient) && !this.isNewClient(kwinClient)) {
+                const before = Workspace.activeWindow;
+                this.activateShellReturn(kwinClient);
+                if (Workspace.activeWindow !== before) {
+                    return; // the nested activation did the bookkeeping for the window that got the focus
+                }
+            }
+        }
         // With focus follows mouse, the warp to a tiled window that sits under a floating window (which is always on
         // top) makes KWin focus the floating one. Floating and tiled windows only swap focus with the switch key
         // (niri's layers), so a floating window that gets the focus right after the warp, not from Kiri, gives it back.
