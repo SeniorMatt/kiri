@@ -32,7 +32,7 @@ tests.register("NiriImport", 1, () => {
     // colours
     Assert.equal(NiriImport.parseColor("#7fc8ff"), "#7fc8ff");
     Assert.equal(NiriImport.parseColor("#abc"), "#aabbcc");
-    Assert.equal(NiriImport.parseColor("#11223344"), "#112233");
+    Assert.equal(NiriImport.parseColor("#11223344"), "#11223344"); // the alpha is kept
     Assert.equal(NiriImport.parseColor("rgb(255 0 0)"), "#ff0000");
     Assert.equal(NiriImport.parseColor("hsl(120, 100%, 50%)"), "#00ff00");
     Assert.equal(NiriImport.parseColor("red"), "#ff0000");
@@ -102,7 +102,9 @@ tests.register("NiriImport", 1, () => {
     Assert.equal(s["cornerRadius"], 12);
     Assert.equal(s["focusRingWidth"], 2);
     Assert.equal(s["focusRingActiveColor"], "#ff0000");
-    Assert.equal(s["focusRingInactiveColor"], "#0000ff");
+    Assert.equal(s["focusRingInactiveGradient"], "from=#0000ff to=#ff0000 angle=45");
+    Assert.equal(s["focusRingInactiveColor"], undefined);
+    Assert.equal(s["tabIndicatorActiveColor"], "#ff0000");
     Assert.equal(s["borderEnabled"], true);
     Assert.equal(s["borderWidth"], 3);
     Assert.equal(s["tabIndicatorWidth"], 6);
@@ -126,7 +128,7 @@ tests.register("NiriImport", 1, () => {
         "desktop-move-down": ["Meta+Ctrl+Shift+PgDown"],
         "desktop-move-up": ["Meta+Ctrl+Shift+PgUp"],
     }));
-    Assert.equal(result.skipped.length, 3); // spawn, wheel, tab indicator colours
+    Assert.equal(result.skipped.length, 2); // spawn, wheel
 
     // apply(): niri on top of the settings, keys typed in Kiri win
     const config = getDefaultConfig();

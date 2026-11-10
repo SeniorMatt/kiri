@@ -164,7 +164,7 @@ namespace NiriImport {
         black: "#000000", white: "#ffffff", red: "#ff0000", green: "#008000", lime: "#00ff00",
         blue: "#0000ff", yellow: "#ffff00", orange: "#ffa500", purple: "#800080", pink: "#ffc0cb",
         cyan: "#00ffff", magenta: "#ff00ff", gray: "#808080", grey: "#808080", silver: "#c0c0c0",
-        brown: "#a52a2a", transparent: "#000000",
+        brown: "#a52a2a", transparent: "#00000000",
     };
 
     function hslToRgb(h: number, s: number, l: number): number[] {
@@ -181,6 +181,7 @@ namespace NiriImport {
         return (v < 16 ? "0" : "") + v.toString(16);
     }
 
+    // "#rrggbb", or "#rrggbbaa" when the colour is not opaque (niri's colours are CSS ones)
     export function parseColor(value: string): string|undefined {
         const v = value.trim().toLowerCase();
         if (has(COLOR_NAMES, v)) {
@@ -192,11 +193,12 @@ namespace NiriImport {
             if (h.length <= 4) {
                 h = h.split("").map(c => c + c).join("");
             }
-            return "#" + h.substring(0, 6);
+            return "#" + (h.length === 8 && h.substring(6) === "ff" ? h.substring(0, 6) : h);
         }
         const func = /^(rgba?|hsla?)\((.*)\)$/.exec(v);
         if (func !== null) {
-            const nums = (func[2].match(/[\d.]+%?/g) ?? []).slice(0, 3).map(x => parseFloat(x));
+            const parts = (func[2].match(/[\d.]+%?/g) ?? []);
+            const nums = parts.slice(0, 3).map(x => parseFloat(x));
             if (nums.length === 3 && nums.every(x => !isNaN(x))) {
                 let rgb: number[];
                 if (func[1].startsWith("rgb")) {
@@ -205,10 +207,36 @@ namespace NiriImport {
                     const hue = (((nums[0] / 360) % 1) + 1) % 1;
                     rgb = hslToRgb(hue, nums[1] / 100, nums[2] / 100).map(x => x * 255);
                 }
-                return "#" + rgb.map(hex2).join("");
+                let alpha = parts.length > 3 ? parseFloat(parts[3]) : 1;
+                if (parts.length > 3 && parts[3].endsWith("%")) {
+                    alpha /= 100;
+                }
+                alpha = isNaN(alpha) ? 1 : Math.max(0, Math.min(1, alpha));
+                return "#" + rgb.map(hex2).join("") + (alpha < 1 ? hex2(alpha * 255) : "");
             }
         }
         return undefined;
+    }
+
+    // niri's `active-gradient from="#80c8ff" to="#bbddff" angle=45 relative-to="workspace-view" in="oklch longer hue"` in the
+    // one-line format of the Kiri settings: "from=#80c8ff to=#bbddff angle=45 relative-to=workspace-view in=oklch longer hue"
+    function gradientString(node: Kdl.Node|undefined, warn: (msg: string) => void): string|undefined {
+        if (node === undefined) {
+            return undefined;
+        }
+        const from = parseColor(node.props["from"] ?? "");
+        const to = parseColor(node.props["to"] ?? "");
+        if (from === undefined || to === undefined) {
+            warn(`${node.name} needs from and to colours`);
+            return undefined;
+        }
+        let out = `from=${from} to=${to}`;
+        for (const name of ["angle", "relative-to", "in"]) {
+            if (node.props[name] !== undefined) {
+                out += ` ${name}=${node.props[name]}`;
+            }
+        }
+        return out;
     }
 
     // proportion 0.5 -> "50%", fixed 800 -> "800px"
@@ -242,6 +270,27 @@ namespace NiriImport {
         return isNaN(value) ? undefined : Math.trunc(value);
     }
 
+    function colorSetting(node: Kdl.Node|undefined, key: string, out: Record<string, any>, warn: (msg: string) => void) {
+        if (node === undefined || node.args.length === 0) {
+            return;
+        }
+        const color = parseColor(node.args[0]);
+        if (color !== undefined) {
+            out[key] = color;
+        } else {
+            warn(`${key}: colour '${node.args[0]}' not understood`);
+        }
+    }
+
+    // niri: a colour and a gradient of one state; the gradient wins, and a colour set after it (in the block) is ignored by niri too
+    function colorOrGradient(node: Kdl.Node, name: string, key: string, out: Record<string, any>, warn: (msg: string) => void) {
+        colorSetting(Kdl.child(node, name + "-color"), key + "Color", out, warn);
+        const gradient = gradientString(Kdl.child(node, name + "-gradient"), warn);
+        if (gradient !== undefined) {
+            out[key + "Gradient"] = gradient;
+        }
+    }
+
     function ringSettings(node: Kdl.Node|undefined, prefix: string, out: Record<string, any>, warn: (msg: string) => void) {
         if (node === undefined) {
             return;
@@ -255,20 +304,41 @@ namespace NiriImport {
         if (width !== undefined && number(width.args) !== undefined) {
             out[prefix + "Width"] = number(width.args);
         }
-        for (const state of ["active", "inactive"]) {
-            const colorNode = Kdl.child(node, state + "-color");
-            const gradient = Kdl.child(node, state + "-gradient");
-            const raw = colorNode !== undefined && colorNode.args.length > 0 ? colorNode.args[0] : gradient?.props["from"];
-            if (raw === undefined) {
-                continue;
-            }
-            const color = parseColor(raw);
-            if (color !== undefined) {
-                out[prefix + (state === "active" ? "Active" : "Inactive") + "Color"] = color;
-            } else {
-                warn(`${prefix} ${state} colour '${raw}' not understood`);
+        for (const state of ["Active", "Inactive", "Urgent"]) {
+            colorOrGradient(node, state.toLowerCase(), prefix + state, out, warn);
+        }
+    }
+
+    function shadowSettings(node: Kdl.Node|undefined, out: Record<string, any>, warn: (msg: string) => void) {
+        if (node === undefined) {
+            return;
+        }
+        if (Kdl.child(node, "on")) {
+            out["shadowEnabled"] = true;
+        }
+        if (Kdl.child(node, "off")) {
+            out["shadowEnabled"] = false;
+        }
+        const offset = Kdl.child(node, "offset");
+        if (offset !== undefined) {
+            for (const [axis, key] of [["x", "shadowOffsetX"], ["y", "shadowOffsetY"]]) {
+                if (offset.props[axis] !== undefined && !isNaN(parseFloat(offset.props[axis]))) {
+                    out[key] = Math.round(parseFloat(offset.props[axis]));
+                }
             }
         }
+        for (const [name, key] of [["softness", "shadowSoftness"], ["spread", "shadowSpread"]]) {
+            const value = Kdl.child(node, name);
+            if (value !== undefined && value.args.length > 0 && !isNaN(parseFloat(value.args[0]))) {
+                out[key] = Math.round(parseFloat(value.args[0]));
+            }
+        }
+        const behind = Kdl.child(node, "draw-behind-window");
+        if (behind !== undefined) {
+            out["shadowDrawBehindWindow"] = (behind.args[0] ?? "true") !== "false";
+        }
+        colorSetting(Kdl.child(node, "color"), "shadowColor", out, warn);
+        colorSetting(Kdl.child(node, "inactive-color"), "shadowInactiveColor", out, warn);
     }
 
     // niri regexes match anywhere in the string; Kiri's match the whole string
@@ -443,10 +513,36 @@ namespace NiriImport {
             if (Kdl.child(tab, "hide-when-single-tab")) {
                 out["tabIndicatorHideWhenSingleTab"] = true;
             }
-            if (["active-color", "inactive-color", "active-gradient", "inactive-gradient", "place-within-column"].some(name => Kdl.child(tab, name))) {
-                warn("tab-indicator colours and place-within-column (Kiri has no such options)");
+            if (Kdl.child(tab, "place-within-column")) {
+                out["tabIndicatorPlaceWithinColumn"] = true;
+            }
+            for (const [niri, kiri] of [["gaps-between-tabs", "tabIndicatorGapsBetweenTabs"], ["corner-radius", "tabIndicatorCornerRadius"]]) {
+                const node = Kdl.child(tab, niri);
+                if (node !== undefined && number(node.args) !== undefined) {
+                    out[kiri] = number(node.args);
+                }
+            }
+            for (const state of ["Active", "Inactive", "Urgent"]) {
+                colorOrGradient(tab, state.toLowerCase(), "tabIndicator" + state, out, warn);
             }
         }
+
+        shadowSettings(L("shadow"), out, warn);
+        const hint = L("insert-hint");
+        if (hint !== undefined) {
+            if (Kdl.child(hint, "off")) {
+                out["insertHintEnabled"] = false;
+            } else if (Kdl.child(hint, "on")) {
+                out["insertHintEnabled"] = true;
+            }
+            colorSetting(Kdl.child(hint, "color"), "insertHintColor", out, warn);
+            const hintGradient = gradientString(Kdl.child(hint, "gradient"), warn);
+            if (hintGradient !== undefined) {
+                out["insertHintGradient"] = hintGradient;
+            }
+        }
+        colorSetting(L("fullscreen-backdrop-color"), "fullscreenBackdropColor", out, warn);
+        colorSetting(L("background-color"), "backgroundColor", out, warn);
 
         out["hideTitlebars"] = Kdl.find(nodes, "prefer-no-csd").length > 0;
         // niri always has dynamic workspaces, but Kiri's are experimental: they stay as the user set them

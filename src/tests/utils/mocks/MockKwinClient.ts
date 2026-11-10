@@ -39,6 +39,15 @@ class MockKwinClient {
     public opacity = 1.0;
 
     public readonly fullScreenChanged = new MockQSignal<[]>();
+    public readonly demandsAttentionChanged = new MockQSignal<[]>();
+    private _demandsAttention = false;
+    public get demandsAttention() {
+        return this._demandsAttention;
+    }
+    public set demandsAttention(value: boolean) {
+        this._demandsAttention = value;
+        this.demandsAttentionChanged.fire();
+    }
     public readonly desktopsChanged = new MockQSignal<[]>();
     public readonly activitiesChanged = new MockQSignal<[]>();
     public readonly minimizedChanged = new MockQSignal<[]>();

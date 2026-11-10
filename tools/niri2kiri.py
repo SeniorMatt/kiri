@@ -334,11 +334,12 @@ COLOR_NAMES = {
     "black": "#000000", "white": "#ffffff", "red": "#ff0000", "green": "#008000", "lime": "#00ff00",
     "blue": "#0000ff", "yellow": "#ffff00", "orange": "#ffa500", "purple": "#800080", "pink": "#ffc0cb",
     "cyan": "#00ffff", "magenta": "#ff00ff", "gray": "#808080", "grey": "#808080", "silver": "#c0c0c0",
-    "brown": "#a52a2a", "transparent": "#000000",
+    "brown": "#a52a2a", "transparent": "#00000000",
 }
 
 
 def parse_color(value):
+    """'#rrggbb', or '#rrggbbaa' when the colour is not opaque (niri's colours are CSS ones)"""
     v = value.strip().lower()
     if v in COLOR_NAMES:
         return COLOR_NAMES[v]
@@ -347,17 +348,39 @@ def parse_color(value):
         h = m.group(1)
         if len(h) in (3, 4):
             h = "".join(c * 2 for c in h)
-        return "#" + h[:6]
+        return "#" + (h[:6] if len(h) == 8 and h[6:] == "ff" else h)
     m = re.fullmatch(r"(rgba?|hsla?)\((.*)\)", v)
     if m:
-        nums = [float(x.rstrip("%")) for x in re.findall(r"[\d.]+%?", m.group(2))][:3]
+        parts = re.findall(r"[\d.]+%?", m.group(2))
+        nums = [float(x.rstrip("%")) for x in parts][:3]
         if len(nums) == 3:
             if m.group(1).startswith("rgb"):
                 r, g, b = (x / 255 for x in nums)
             else:
                 r, g, b = colorsys.hls_to_rgb(nums[0] / 360 % 1, nums[2] / 100, nums[1] / 100)
-            return "#%02x%02x%02x" % tuple(round(x * 255) for x in (r, g, b))
+            alpha = 1.0
+            if len(parts) > 3:
+                alpha = float(parts[3].rstrip("%")) / (100 if parts[3].endswith("%") else 1)
+                alpha = max(0.0, min(1.0, alpha))
+            out = "#%02x%02x%02x" % tuple(round(x * 255) for x in (r, g, b))
+            return out + ("%02x" % round(alpha * 255) if alpha < 1 else "")
     return None
+
+
+def gradient_string(node, warn):
+    """niri's `active-gradient from=.. to=.. angle=.. relative-to=.. in=..` as one line of the Kiri settings"""
+    if node is None:
+        return None
+    frm = parse_color(node[2].get("from", ""))
+    to = parse_color(node[2].get("to", ""))
+    if frm is None or to is None:
+        warn(f"{node[0]} needs from and to colours")
+        return None
+    out = f"from={frm} to={to}"
+    for name in ("angle", "relative-to", "in"):
+        if name in node[2]:
+            out += f" {name}={node[2][name]}"
+    return out
 
 
 def one_size(kind, args):
@@ -387,6 +410,23 @@ def number(args):
         return None
 
 
+def color_setting(node, key, out, warn):
+    if node is None or not node[1]:
+        return
+    color = parse_color(node[1][0])
+    if color:
+        out[key] = color
+    else:
+        warn(f"{key}: colour {node[1][0]!r} not understood")
+
+
+def color_or_gradient(node, name, key, out, warn):
+    color_setting(child(node, name + "-color"), key + "Color", out, warn)
+    gradient = gradient_string(child(node, name + "-gradient"), warn)
+    if gradient:
+        out[key + "Gradient"] = gradient
+
+
 def ring_settings(node, prefix, out, warn):
     if node is None:
         return
@@ -396,17 +436,36 @@ def ring_settings(node, prefix, out, warn):
         out[prefix + "Enabled"] = True
     if child(node, "width") and number(child(node, "width")[1]) is not None:
         out[prefix + "Width"] = number(child(node, "width")[1])
-    for state in ("active", "inactive"):
-        c = child(node, state + "-color")
-        grad = child(node, state + "-gradient")
-        raw = c[1][0] if c and c[1] else grad[2].get("from") if grad else None
-        if raw is None:
-            continue
-        color = parse_color(raw)
-        if color:
-            out[f"{prefix}{state.title()}Color"] = color
-        else:
-            warn(f"{prefix} {state} colour {raw!r} not understood")
+    for state in ("active", "inactive", "urgent"):
+        color_or_gradient(node, state, prefix + state.title(), out, warn)
+
+
+def shadow_settings(node, out, warn):
+    if node is None:
+        return
+    if child(node, "on"):
+        out["shadowEnabled"] = True
+    if child(node, "off"):
+        out["shadowEnabled"] = False
+    offset = child(node, "offset")
+    if offset:
+        for axis, key in (("x", "shadowOffsetX"), ("y", "shadowOffsetY")):
+            try:
+                out[key] = round(float(offset[2][axis]))
+            except (KeyError, ValueError):
+                pass
+    for name, key in (("softness", "shadowSoftness"), ("spread", "shadowSpread")):
+        n = child(node, name)
+        if n and n[1]:
+            try:
+                out[key] = round(float(n[1][0]))
+            except ValueError:
+                pass
+    behind = child(node, "draw-behind-window")
+    if behind:
+        out["shadowDrawBehindWindow"] = (behind[1] or ["true"])[0] != "false"
+    color_setting(child(node, "color"), "shadowColor", out, warn)
+    color_setting(child(node, "inactive-color"), "shadowInactiveColor", out, warn)
 
 
 def anchored(regex):
@@ -544,8 +603,27 @@ def read_settings_inner(path, warn):
             out["tabIndicatorPosition"] = child(tab, "position")[1][0]
         if child(tab, "hide-when-single-tab"):
             out["tabIndicatorHideWhenSingleTab"] = True
-        if any(child(tab, c) for c in ("active-color", "inactive-color", "active-gradient", "inactive-gradient", "place-within-column")):
-            warn("tab-indicator colours and place-within-column (Kiri has no such options)")
+        if child(tab, "place-within-column"):
+            out["tabIndicatorPlaceWithinColumn"] = True
+        for niri, kiri in (("gaps-between-tabs", "tabIndicatorGapsBetweenTabs"), ("corner-radius", "tabIndicatorCornerRadius")):
+            if child(tab, niri) and number(child(tab, niri)[1]) is not None:
+                out[kiri] = number(child(tab, niri)[1])
+        for state in ("active", "inactive", "urgent"):
+            color_or_gradient(tab, state, "tabIndicator" + state.title(), out, warn)
+
+    shadow_settings(L("shadow"), out, warn)
+    hint = L("insert-hint")
+    if hint:
+        if child(hint, "off"):
+            out["insertHintEnabled"] = False
+        elif child(hint, "on"):
+            out["insertHintEnabled"] = True
+        color_setting(child(hint, "color"), "insertHintColor", out, warn)
+        gradient = gradient_string(child(hint, "gradient"), warn)
+        if gradient:
+            out["insertHintGradient"] = gradient
+    color_setting(L("fullscreen-backdrop-color"), "fullscreenBackdropColor", out, warn)
+    color_setting(L("background-color"), "backgroundColor", out, warn)
 
     out["hideTitlebars"] = bool(find(nodes, "prefer-no-csd"))
     # niri always has dynamic workspaces, but Kiri's are experimental: they stay as the user set them

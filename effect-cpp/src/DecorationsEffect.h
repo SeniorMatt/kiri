@@ -18,6 +18,8 @@
 #include <QColor>
 #include <QHash>
 #include <QList>
+#include <QSet>
+#include <QVariantMap>
 #include <QUuid>
 #include <KConfigWatcher>
 #include <chrono>
@@ -34,25 +36,76 @@ class GLShader;
 namespace KiriDecorations
 {
 
+// a niri gradient (niri-config Gradient): `from` to `to` along `angle` degrees (niri's: 0 up, 90 right, 180 down, the default),
+// in a colour space. A plain colour is a gradient whose ends are equal.
+struct Gradient
+{
+    QColor from = QColor(Qt::transparent);
+    QColor to = QColor(Qt::transparent);
+    double angle = 180;
+    bool viewRelative = false; // relative-to="workspace-view": the gradient spans the whole screen, not the window
+    int space = 0;             // srgb, srgb-linear, oklab, oklch
+    int hue = 0;               // oklch hue interpolation: shorter, longer, increasing, decreasing
+    bool operator==(const Gradient &o) const
+    {
+        return from == o.from && to == o.to && angle == o.angle && viewRelative == o.viewRelative && space == o.space && hue == o.hue;
+    }
+};
+
+// the focus ring and the border: colours for active, inactive and urgent windows (index 0, 1, 2)
+struct BandStyle
+{
+    bool enabled = true;
+    int width = 4;
+    Gradient colors[3];
+};
+
+// niri's shadow (niri-config Shadow)
+struct ShadowStyle
+{
+    bool on = false;
+    double offsetX = 0, offsetY = 5;
+    double softness = 30, spread = 5;
+    bool drawBehindWindow = false;
+    QColor color = QColor(0, 0, 0, 0x77);
+    bool hasInactiveColor = false;
+    QColor inactiveColor;
+};
+
+// what a window rule can change per window (see setWindowDecorations): the tab indicator's colours, set or not (niri's
+// TabIndicatorRule); the indicator's geometry is global
+struct TabColors
+{
+    bool set[3] = {false, false, false};
+    Gradient colors[3];
+};
+
+// everything a window is decorated with. Settings holds the global one; a window with overrides from window rules has its own
+struct Look
+{
+    int cornerRadius = 0;
+    BandStyle ring{true, 4, {}};
+    BandStyle border{false, 4, {}};
+    ShadowStyle shadow;
+    TabColors tabColors;
+};
+
 struct Settings
 {
     bool kiriEnabled = false;
-    int cornerRadius = 0;
-    bool ringEnabled = true;
-    int ringWidth = 4;
-    QColor ringColor = QColor(QStringLiteral("#7fc8ff"));
-    bool borderEnabled = false;
-    int borderWidth = 4;
-    QColor borderActiveColor = QColor(QStringLiteral("#ffc87f"));
-    QColor borderInactiveColor = QColor(QStringLiteral("#505050"));
+    Look look;
     bool tabEnabled = true;
     int tabWidth = 4;
     int tabGap = 5;
+    int tabGapsBetween = 0;
+    int tabCornerRadius = 0;
     double tabLength = 0.5;
     QString tabPosition = QStringLiteral("left");
     bool tabHideWhenSingle = false;
-    QColor tabActiveColor = QColor(QStringLiteral("#7fc8ff"));
-    QColor tabInactiveColor = QColor(QStringLiteral("#505050"));
+    bool insertHintEnabled = true;
+    Gradient insertHint;
+    QColor fullscreenBackdrop = QColor(Qt::black);
+    QColor background; // invalid: the wallpaper stays
 };
 
 // a tabbed column as Kiri reports it: its windows in tab order and the shown one
@@ -104,6 +157,17 @@ public Q_SLOTS:
     // where Kiri wants full-screen X11 windows painted while their real place is parked in the bottom-right corner of the
     // screen (see ClientWrapper.park): {"{uuid}": [x, y], ...}. The painted place is animated with niri's movement spring.
     Q_SCRIPTABLE void setParkedPositions(const QString &json);
+    // Kiri's resolved appearance settings as JSON (the keys of the config, niri import included); until the first call the effect
+    // reads them from kwinrc itself
+    Q_SCRIPTABLE void setConfig(const QString &json);
+    // Per-window overrides from niri's window rules: {"{uuid}": {"cornerRadius": 12, "focusRing": {"enabled": false, "width": 2,
+    // "activeColor": "#f00", "activeGradient": "from=#f00 to=#00f angle=45"}, "border": {...same...}, "shadow": {"enabled": true,
+    // "offsetX", "offsetY", "softness", "spread", "drawBehindWindow", "color", "inactiveColor"}, "tabIndicator": {"activeColor",
+    // "inactiveColor", "urgentColor", "activeGradient", ...}}, ...}. A field that is missing keeps the global setting; the whole
+    // map is replaced by every call. See WindowDecorationRule in src/lib/Kiri.ts.
+    Q_SCRIPTABLE void setWindowDecorations(const QString &json);
+    // ids of the windows that ask for attention (niri's urgent): ["{uuid}", ...]
+    Q_SCRIPTABLE void setUrgentWindows(const QString &json);
     // niri's insert hint while a window is dragged: {"r": [x, y, w, h] (screen coordinates), "w": "{uuid}" of the dragged window}, or "null"
     Q_SCRIPTABLE void setInsertHint(const QString &json);
     // the pointer buttons held right now (Qt::MouseButtons bits), for Kiri's focus-follows-mouse: niri ignores the pointer while it is grabbed
@@ -121,6 +185,11 @@ public Q_SLOTS:
 
 private:
     void loadSettings();
+    Settings parseSettings(const QVariantMap &map, bool kiriEnabled) const;
+    Look parseLook(const QVariantMap &map) const;
+    void applyOverride(Look &look, const QVariantMap &rule) const;
+    const Look &lookOf(KWin::EffectWindow *w) const;
+    void updateReach();
     void registerWheelShortcuts();
     void wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection direction, const QString &shortcut, int cooldownMs);
     bool decorated(KWin::EffectWindow *w) const;
@@ -132,11 +201,29 @@ private:
     void repaintAround(KWin::EffectWindow *w);
     double reach() const;
     const TabGroup *tabGroupOf(KWin::EffectWindow *w) const;
-    void drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, double progress);
+    void drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, KWin::EffectWindow *active, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, double progress);
+    void drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity);
+    void drawBackdrop(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::Region &deviceRegion, double opacity);
+    void setGradient(KWin::GLShader *shader, int layer, const Gradient &gradient, const QRectF &area) const;
+    void clickOnTab(const QPointF &pos);
     void fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &rect, const QColor &color, const KWin::Region &deviceRegion, double opacity);
     void drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity);
 
     Settings m_settings;
+    double m_reach = 12;
+    QVariantMap m_config;      // the settings the script sent (setConfig); empty: read kwinrc
+    bool m_haveConfig = false;
+    QVariantMap m_overrides;   // setWindowDecorations, by window id
+    QHash<QUuid, Look> m_looks; // m_settings.look with the override of each window applied
+    QSet<QUuid> m_urgent;
+    // where the tabs of a tab indicator were last drawn, for clicks: the group's windows in tab order and their rectangles
+    struct TabHit
+    {
+        QList<QUuid> windows;
+        QList<QRectF> rects;
+    };
+    QHash<QUuid, TabHit> m_tabHits; // by the shown window of the column
+    std::unique_ptr<KWin::GLShader> m_shadowShader;
     KConfigWatcher::Ptr m_watcher;
     std::unique_ptr<KWin::GLShader> m_cornerShader;
     std::unique_ptr<KWin::GLShader> m_ringShader;

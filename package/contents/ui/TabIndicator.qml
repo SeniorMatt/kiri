@@ -8,7 +8,9 @@ QtWin.Window {
     id: indicator
 
     property string tag: "0"
-    property var info: ({ x: 0, y: 0, width: 1, height: 1, vertical: true, count: 1, active: 0 })
+    // info.tabs: niri's tab_rects in screen coordinates (the window covers their bounding box, info.x/y/width/height)
+    property var info: ({ x: 0, y: 0, width: 1, height: 1, vertical: true, count: 1, active: 0, tabs: [] })
+    property real cornerRadius: 0
     property color activeColor: "#7fc8ff"
     property color inactiveColor: "#505050"
     property bool wanted: true
@@ -25,15 +27,13 @@ QtWin.Window {
     height: Math.max(1, info.height)
 
     Repeater {
-        model: indicator.info.count
+        model: indicator.info.tabs ?? []
         Rectangle {
-            readonly property real total: indicator.info.vertical ? indicator.height : indicator.width
-            readonly property int from: Math.round(index * total / indicator.info.count)
-            readonly property int to: Math.round((index + 1) * total / indicator.info.count)
-            x: indicator.info.vertical ? 0 : from
-            y: indicator.info.vertical ? from : 0
-            width: indicator.info.vertical ? indicator.width : to - from
-            height: indicator.info.vertical ? to - from : indicator.height
+            x: modelData.x - indicator.info.x
+            y: modelData.y - indicator.info.y
+            width: modelData.width
+            height: modelData.height
+            radius: indicator.cornerRadius
             color: index === indicator.info.active ? indicator.activeColor : indicator.inactiveColor
         }
     }

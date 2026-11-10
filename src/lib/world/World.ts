@@ -129,6 +129,8 @@ class World {
             tabIndicatorLength: config.tabIndicatorLength,
             tabIndicatorPosition: config.tabIndicatorPosition,
             tabIndicatorHideWhenSingleTab: config.tabIndicatorHideWhenSingleTab,
+            tabIndicatorPlaceWithinColumn: config.tabIndicatorPlaceWithinColumn,
+            tabIndicatorGapsBetweenTabs: config.tabIndicatorGapsBetweenTabs,
             resizeNeighborColumn: config.resizeNeighborColumn,
             reMaximize: config.reMaximize,
             tileMaximized: config.tileMaximized,

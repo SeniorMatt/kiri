@@ -62,6 +62,9 @@ const defaultWindowRules = `[
     }
 ]`;
 
+// Where a key goes in the settings page is decided by tools/gen_config_ui.py (see the comment at its top). A new key
+// needs nothing here, but may say  section: "Appearance/Shadow"  (tab/group) to choose its place; a "// comment" after its
+// name becomes its tooltip.
 const configDef = [
     {
         name: "gapsOuterTop",
@@ -170,7 +173,7 @@ const configDef = [
     },
     {
         name: "tabIndicatorGap",
-        type: "UInt",
+        type: "Int",
         default: 5,
     },
     {
@@ -188,6 +191,51 @@ const configDef = [
         name: "tabIndicatorHideWhenSingleTab",
         type: "Bool",
         default: false,
+    },
+    {
+        name: "tabIndicatorPlaceWithinColumn",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "tabIndicatorGapsBetweenTabs",
+        type: "UInt",
+        default: 0,
+    },
+    {
+        name: "tabIndicatorCornerRadius",
+        type: "UInt",
+        default: 0,
+    },
+    {
+        name: "tabIndicatorActiveColor",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "tabIndicatorInactiveColor",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "tabIndicatorUrgentColor",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "tabIndicatorActiveGradient",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "tabIndicatorInactiveGradient",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "tabIndicatorUrgentGradient",
+        type: "String",
+        default: "",
     },
     {
         name: "resizeNeighborColumn",
@@ -330,6 +378,26 @@ const configDef = [
         default: "#505050",
     },
     {
+        name: "focusRingUrgentColor",
+        type: "String",
+        default: "#9b0000",
+    },
+    {
+        name: "focusRingActiveGradient",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "focusRingInactiveGradient",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "focusRingUrgentGradient",
+        type: "String",
+        default: "",
+    },
+    {
         name: "borderEnabled",
         type: "Bool",
         default: false,
@@ -348,6 +416,91 @@ const configDef = [
         name: "borderInactiveColor",
         type: "String",
         default: "#505050",
+    },
+    {
+        name: "borderUrgentColor",
+        type: "String",
+        default: "#9b0000",
+    },
+    {
+        name: "borderActiveGradient",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "borderInactiveGradient",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "borderUrgentGradient",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "shadowEnabled",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "shadowOffsetX",
+        type: "Int",
+        default: 0,
+    },
+    {
+        name: "shadowOffsetY",
+        type: "Int",
+        default: 5,
+    },
+    {
+        name: "shadowSoftness",
+        type: "UInt",
+        default: 30,
+    },
+    {
+        name: "shadowSpread",
+        type: "Int",
+        default: 5,
+    },
+    {
+        name: "shadowDrawBehindWindow",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "shadowColor",
+        type: "String",
+        default: "#00000077",
+    },
+    {
+        name: "shadowInactiveColor",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "insertHintEnabled",
+        type: "Bool",
+        default: true,
+    },
+    {
+        name: "insertHintColor",
+        type: "String",
+        default: "#7fc8ff80",
+    },
+    {
+        name: "insertHintGradient",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "fullscreenBackdropColor",
+        type: "String",
+        default: "#000000",
+    },
+    {
+        name: "backgroundColor",
+        type: "String",
+        default: "",
     },
     {
         name: "floatClasses",

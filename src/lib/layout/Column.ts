@@ -1,3 +1,11 @@
+interface TabRectsConfig {
+    tabIndicatorWidth: number;
+    tabIndicatorGap: number;
+    tabIndicatorGapsBetweenTabs: number;
+    tabIndicatorLength: number;
+    tabIndicatorPosition: string;
+}
+
 class Column {
     public grid: Grid;
     public gridX: number;
@@ -521,46 +529,106 @@ class Column {
         }
     }
 
-    // every window gets the whole column, only the active one is raised above the others
+    // every window gets the whole column (less the room of a tab indicator placed within the column), only the active one is
+    // raised above the others
     private arrangeTabbed(x: number) {
         const area = this.grid.desktop.tilingArea;
+        const width = this.getWidth();
+        const extra = this.tabIndicatorExtra();
+        const position = this.grid.config.tabIndicatorPosition;
+        const toLeft = position === "left" ? extra : 0;
+        const toTop = position === "top" ? extra : 0;
+        const toWidth = position === "left" || position === "right" ? extra : 0;
+        const toHeight = position === "top" || position === "bottom" ? extra : 0;
         for (const window of this.windows.iterator()) {
-            window.arrange(x, area.y, this.getWidth(), area.height);
+            window.arrange(x + toLeft, area.y + toTop, width - toWidth, area.height - toHeight);
         }
         this.arrangeZ();
-        this.grid.desktop.addTabIndicator(this.getTabIndicator(x));
+        this.grid.desktop.addTabIndicator(this.getTabIndicator(x + toLeft, area.y + toTop, width - toWidth, area.height - toHeight));
     }
 
-    private getTabIndicator(x: number): TabIndicator {
+    // niri's tab_indicator.rs `extra_size`: room the windows give up to a tab indicator with `place-within-column`
+    private tabIndicatorExtra() {
         const config = this.grid.config;
-        const area = this.grid.desktop.tilingArea;
-        const width = this.getWidth();
+        if (!config.tabIndicatorEnabled || !config.tabIndicatorPlaceWithinColumn || (config.tabIndicatorHideWhenSingleTab && this.windows.length() === 1)) {
+            return 0;
+        }
+        return Math.max(0, Math.round(config.tabIndicatorWidth) + Math.round(config.tabIndicatorGap));
+    }
+
+    // niri's tab_indicator.rs `tab_rects`, for a column area (x, y, width, height) with the indicator fully open: the rectangle
+    // of every tab, in screen coordinates. Physical pixels are logical ones here (the effect rounds to physical pixels itself).
+    public static tabRects(config: TabRectsConfig, count: number, x: number, y: number, width: number, height: number, progress = 1): { x: number, y: number, width: number, height: number }[] {
+        // Rust's f64::round: halves go away from zero
+        const round = (value: number) => Math.sign(value) * Math.round(Math.abs(value));
+        const max1 = (value: number) => Math.max(1, round(value));
+        const tabWidth = max1(config.tabIndicatorWidth);
+        const gap = (config.tabIndicatorGap < 0 ? -1 : 1) * max1(Math.abs(config.tabIndicatorGap));
+        const gapsBetweenShortest = max1(config.tabIndicatorGapsBetweenTabs);
         const position = config.tabIndicatorPosition;
-        const vertical = position === "left" || position === "right";
-        const thickness = config.tabIndicatorWidth;
-        const total = vertical ? area.height : width;
-        const length = Math.max(1, Math.round(total * clamp(config.tabIndicatorLength, 0, 1)));
-        const start = (vertical ? area.y : x) + Math.round((total - length) / 2);
-        let tabX: number;
-        let tabY: number;
+        const side = position === "left" || position === "right" ? height : width;
+        const minLength = round(side * clamp(config.tabIndicatorLength, 0, 2));
+        const shortestLength = count * (1 + gapsBetweenShortest) - gapsBetweenShortest;
+        const requested = Math.max(minLength, shortestLength);
+        let perTab = (requested + gapsBetweenShortest) / count - gapsBetweenShortest;
+        perTab *= progress;
+        const gapsBetween = round(config.tabIndicatorGapsBetweenTabs * progress);
+        const length = count * (perTab + gapsBetween) - gapsBetween;
+        perTab = Math.max(1, Math.floor(perTab));
+        const flooredLength = count * (perTab + gapsBetween) - gapsBetween;
+        let onesLeft = Math.max(0, round(length - flooredLength));
+        const a = -gap - tabWidth; // across the tabs
+        const b = round((side - length) / 2); // along them
+        let lx: number;
+        let ly: number;
         switch (position) {
         case "right":
-            tabX = x + width + config.tabIndicatorGap;
-            tabY = start;
+            lx = width + gap;
+            ly = b;
             break;
         case "top":
-            tabX = start;
-            tabY = area.y - config.tabIndicatorGap - thickness;
+            lx = b;
+            ly = a;
             break;
         case "bottom":
-            tabX = start;
-            tabY = area.y + area.height + config.tabIndicatorGap;
+            lx = b;
+            ly = height + gap;
             break;
         default:
-            tabX = x - config.tabIndicatorGap - thickness;
-            tabY = start;
+            lx = a;
+            ly = b;
             break;
         }
+        lx += x;
+        ly += y;
+        const vertical = position === "left" || position === "right";
+        const rects = [];
+        for (let i = 0; i < count; i++) {
+            let size = perTab;
+            if (onesLeft > 0) {
+                onesLeft--;
+                size++;
+            }
+            rects.push({ x: lx, y: ly, width: vertical ? tabWidth : size, height: vertical ? size : tabWidth });
+            if (vertical) {
+                ly += size + gapsBetween;
+            } else {
+                lx += size + gapsBetween;
+            }
+        }
+        return rects;
+    }
+
+    private getTabIndicator(x: number, y: number, width: number, height: number): TabIndicator {
+        const config = this.grid.config;
+        const position = config.tabIndicatorPosition;
+        const vertical = position === "left" || position === "right";
+        const count = this.windows.length();
+        const tabs = Column.tabRects(config, count, x, y, width, height);
+        const left = Math.min(...tabs.map(tab => tab.x));
+        const top = Math.min(...tabs.map(tab => tab.y));
+        const right = Math.max(...tabs.map(tab => tab.x + tab.width));
+        const bottom = Math.max(...tabs.map(tab => tab.y + tab.height));
         const active = this.getWindowToFocus();
         let activeIndex = 0;
         let i = 0;
@@ -571,14 +639,15 @@ class Column {
             i++;
         }
         return {
-            x: tabX,
-            y: tabY,
-            width: vertical ? thickness : length,
-            height: vertical ? length : thickness,
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
             vertical: vertical,
-            count: this.windows.length(),
+            count: count,
             active: activeIndex,
             windows: Array.from(this.windows.iterator()).map(window => String(window.client.kwinClient.internalId)),
+            tabs: tabs,
         };
     }
 

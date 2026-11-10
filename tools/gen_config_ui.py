@@ -1,77 +1,363 @@
 #!/usr/bin/env python3
-"""Generates package/contents/ui/config.ui. The Shortcuts tab grid is kept from the existing file."""
-import re, sys
+"""Generates package/contents/ui/config.ui (Kiri's settings page) from the two definition files.
+
+    python3 tools/gen_config_ui.py          # run from the repository root
+
+HOW KEYS GET A PLACE ON THE PAGE
+  Settings tabs (not Shortcuts) are built from src/lib/config/definition.ts. Every key there ends up in the page:
+  1. If the key has a row in FIELDS below, it goes where that row says: (tab, group), in the order of FIELDS.
+     The widget kind comes from the key's type in definition.ts (Bool: check box, UInt: spin box, Double: decimal
+     spin box, String: line edit, Enum: drop-down). FIELDS only adds the label, tooltip, units and limits.
+  2. Else, if the entry in definition.ts has a  section: "Tab/Group"  field (e.g. section: "Appearance/Shadow"),
+     it goes there. Use this for new keys, it needs no change in this file. A "// comment" after the entry's name is
+     used as its tooltip, and the label is made from the key name (focusRingWidth -> "Focus ring width").
+  3. Else it is placed by its name (AUTO_TABS below: gesture* -> Gestures & Overview, shadow* -> Appearance,
+     anim*/*Duration -> Animations, *Rules -> Window Rules, ...) in a group called "More" of that tab, and
+     anything unknown lands in Advanced > More. Number fields get " ms"/" px"/" %" from the name (*Delay, *Duration,
+     ...Width, ...Percent), so the page stays consistent without manual work.
+  The script prints the keys it placed by rule 2 or 3 so that they can get a FIELDS row later (optional).
+  Tab order is TABS; groups and rows appear in the order of FIELDS (auto-placed ones after them).
+  Config key names and stored values never depend on this file: every widget is called kcfg_<key>.
+
+  The Shortcuts tab is built from src/lib/keyBindings/definition.ts: a description "Focus: column left" becomes the
+  row "Column left" in the group "Focus" (one page per group, listed on the left). Descriptions without "Group: "
+  go to "Other". Numbered bindings ("{}" in name and description) get rows 1 to 9. Group order is SHORTCUT_GROUPS,
+  unknown groups follow alphabetically; rows are sorted alphabetically like System Settings does.
+"""
+import re
 from xml.sax.saxutils import escape
 
 PATH = "package/contents/ui/config.ui"
-old = open(PATH, encoding="utf-8").read()
-start = old.index('<layout class="QGridLayout" name="grid_shortcuts">') + len('<layout class="QGridLayout" name="grid_shortcuts">')
-end = re.compile(r"^\s*</layout>", re.M).search(old, start).start()
-grid = old[start:end]
+CONFIG_DEF = "src/lib/config/definition.ts"
+KEYS_DEF = "src/lib/keyBindings/definition.ts"
 
-# parse the existing grid into sections of (label, key name), so rows can be added and renumbered
-sections = []
-for m in re.finditer(r'<item row="\d+" column="0"( colspan="3")?><widget class="QLabel"><property name="text"><string>(.*?)</string></property></widget></item>\s*'
-                     r'(?:<item row="\d+" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_(\w+)")?', grid):
-    if m.group(1):
-        sections.append([m.group(2), []])
-    elif m.group(3):
-        sections[-1][1].append((m.group(2), m.group(3)))
+# "&" is a mnemonic marker in Qt tab titles, "&&" shows one
+TABS = ["Layout", "Focus & Mouse", "Animations", "Appearance", "Gestures & Overview", "Window Rules", "Shortcuts", "Advanced"]
+LABEL_WIDTH = 170  # px, the same in every group so the fields line up from group to group
+SHORTCUT_GROUPS = ["Focus", "Move", "Column", "Width", "Height", "Window", "Scroll", "Desktop", "Screen", "Overview"]
 
-# actions that had no field yet: (after this key, label, key)
-extra_rows = [
-    ("cycle_preset_widths_reverse", "Expand column to available width", "column_width_expand"),
-    ("window_height_increase_down", "Cycle preset window heights", "window_height_cycle_presets"),
-    ("window_height_cycle_presets", "Cycle preset window heights in reverse", "window_height_cycle_presets_reverse"),
-    ("window_height_cycle_presets_reverse", "Reset window height", "window_height_reset"),
-    ("window_move_right", "Consume the window into the left column, or expel it to the left", "window_consume_or_expel_left"),
-    ("window_consume_or_expel_left", "Consume the window into the right column, or expel it to the right", "window_consume_or_expel_right"),
-    ("window_consume_or_expel_right", "Move the window on the right into this column", "window_consume_into_column"),
-    ("window_toggle_floating", "Switch focus between floating and tiled windows", "window_switch_focus_floating_tiling"),
-    ("column_move_to_previous_desktop", "Move window to the next desktop", "window_move_to_next_desktop"),
-    ("window_move_to_next_desktop", "Move window to the previous desktop", "window_move_to_previous_desktop"),
-    ("window_toggle_fullscreen", "Maximize window to the screen edges", "window_maximize_to_edges"),
-    ("window_consume_into_column", "Move window out of its column", "window_expel_from_column"),
-    ("focus_end", "Focus the column on the right, the first one at the end", "focus_column_right_or_first"),
-    ("focus_column_right_or_first", "Focus the column on the left, the last one at the start", "focus_column_left_or_last"),
-    ("focus_column_left_or_last", "Focus the window below, or the column on the left", "focus_window_down_or_column_left"),
-    ("focus_window_down_or_column_left", "Focus the window below, or the column on the right", "focus_window_down_or_column_right"),
-    ("focus_window_down_or_column_right", "Focus the window above, or the column on the left", "focus_window_up_or_column_left"),
-    ("focus_window_up_or_column_left", "Focus the window above, or the column on the right", "focus_window_up_or_column_right"),
-    ("focus_window_up_or_column_right", "Focus the top window of the column", "focus_window_top"),
-    ("focus_window_top", "Focus the bottom window of the column", "focus_window_bottom"),
-    ("focus_window_bottom", "Focus the window below, the top one at the bottom", "focus_window_down_or_top"),
-    ("focus_window_down_or_top", "Focus the window above, the bottom one at the top", "focus_window_up_or_bottom"),
-    ("focus_window_up_or_bottom", "Focus the window below, or the next desktop", "focus_window_or_desktop_down"),
-    ("focus_window_or_desktop_down", "Focus the window above, or the previous desktop", "focus_window_or_desktop_up"),
-    ("focus_window_or_desktop_up", "Focus the previously focused window", "focus_window_previous"),
-    ("focus_window_previous", "Focus the floating windows", "focus_floating"),
-    ("focus_floating", "Focus the tiled windows", "focus_tiling"),
-    ("window_move_down", "Move the window down, or to the next desktop", "window_move_down_or_to_desktop_down"),
-    ("window_move_down_or_to_desktop_down", "Move the window up, or to the previous desktop", "window_move_up_or_to_desktop_up"),
-    ("window_move_up_or_to_desktop_up", "Swap the window with the one in the column on the left", "window_swap_left"),
-    ("window_swap_left", "Swap the window with the one in the column on the right", "window_swap_right"),
-    ("window_swap_right", "Move the window to the floating layer", "window_move_to_floating"),
-    ("window_move_to_floating", "Move the window to the tiled layer", "window_move_to_tiling"),
-    ("column_toggle_tabbed", "Show the column normally", "column_display_normal"),
-    ("column_display_normal", "Show the column as tabs", "column_display_tabbed"),
-    ("grid_scroll_focused", "Center the columns that are on screen", "column_center_visible"),
-    ("column_width_decrease", "Increase column width to the next size that fits the visible columns", "column_width_fit_increase"),
-    ("column_width_fit_increase", "Decrease column width to the next size that fits the visible columns", "column_width_fit_decrease"),
-    ("window_height_cycle_presets_reverse", "Increase window height by a share of the screen", "window_height_increase"),
-    ("window_height_increase", "Decrease window height by a share of the screen", "window_height_decrease"),
-    ("desktop_previous", "Switch back to the previously used desktop", "desktop_previous_used"),
-    ("desktop_previous_used", "Move the current desktop down, below the next one", "desktop_move_down"),
-    ("desktop_move_down", "Move the current desktop up, above the previous one", "desktop_move_up"),
+# name pattern -> tab, for keys that have no FIELDS row and no section field. First match wins.
+AUTO_TABS = [
+    (r"^(gesture|swipe|pinch|touchpad|hotCorner|overview)", "Gestures & Overview"),
+    (r"(anim|Duration|Easing|Spring|Curve)", "Animations"),
+    (r"^(focusRing|border|shadow|corner|decoration|tabIndicator|opacity|offScreenOpacity|color|theme|blur)", "Appearance"),
+    (r"(Rules?|Classes)$", "Window Rules"),
+    (r"^(focus|cursor|mouse|pointer|drag|untile|drop|skip)", "Focus & Mouse"),
+    (r"^(gaps?|scroll|center|column|window|width|height|preset|default|tile|manual|vertical|workspace|desktop|strut)", "Layout"),
 ]
-for after, label, key in extra_rows:
-    for _, rows in sections:
-        names = [k for _, k in rows]
-        if key in names:
-            break
-        if after in names:
-            rows.insert(names.index(after) + 1, (label, key))
-            break
+
+# Extra rows: (key, tab, group, label, tooltip, options). Options: suffix, lo, hi, step, decimals, special (spin box text
+# for the lowest value), radio, color, lines (text edit height in lines), placeholder, mono, labels (drop-down texts, in
+# the order of the choices), above (label above the field).
+def F(key, tab, group, label, tip="", **o):
+    return (key, tab, group, label, tip, o)
+
+FIELDS = [
+    # Layout
+    F("gapsInnerHorizontal", "Layout", "Gaps", "Between columns", "Horizontal gap between neighbouring columns", suffix="px", hi=999),
+    F("gapsInnerVertical", "Layout", "Gaps", "Between windows", "Vertical gap between windows in a column", suffix="px", hi=999),
+    F("gapsOuterTop", "Layout", "Outer gaps", "Top", "Gap between the windows and the top screen edge", suffix="px", hi=999),
+    F("gapsOuterBottom", "Layout", "Outer gaps", "Bottom", "Gap between the windows and the bottom screen edge", suffix="px", hi=999),
+    F("gapsOuterLeft", "Layout", "Outer gaps", "Left", "Gap between the windows and the left screen edge", suffix="px", hi=999),
+    F("gapsOuterRight", "Layout", "Outer gaps", "Right", "Gap between the windows and the right screen edge", suffix="px", hi=999),
+    F("defaultColumnWidth", "Layout", "Column width", "Default width", "Width of new columns, like 50% or 800px. Empty keeps the window's own width", placeholder="window's own width"),
+    F("presetWidths", "Layout", "Column width", "Preset widths", "Widths used when cycling the column width. Comma-separated, units: px and %", placeholder="33.333%, 50%, 66.667%"),
+    F("columnWidthStep", "Layout", "Column width", "Key step", "Share of the screen a column grows or shrinks by with the width keys (niri: set-column-width \"+10%\")", suffix="%", lo=1, hi=100),
+    F("presetHeights", "Layout", "Window height", "Preset heights", "Heights used when cycling the window height. Comma-separated, units: px and %", placeholder="33.333%, 50%, 66.667%"),
+    F("windowHeightStep", "Layout", "Window height", "Key step", "Share of the screen a window grows or shrinks by with the height keys", suffix="%", lo=1, hi=100),
+    F("verticalResizeStep", "Layout", "Window height", "Fine key step", "Step when making a window taller or shorter with the up/down resize keys", suffix="px", lo=1, hi=999),
+    F("scrollingLazy", "Layout", "Centering", "Focused column", "Move the view just enough to show the focused column (niri: never)", radio=True, label_text="Scroll only as needed (niri)"),
+    F("scrollingCentered", "Layout", "Centering", "", "Keep the focused column in the middle of the screen (niri: always)", radio=True, label_text="Always center it"),
+    F("scrollingOnOverflow", "Layout", "Centering", "", "No scrolling while the focused column fits next to its neighbours, otherwise center it (niri: on-overflow)", radio=True, label_text="Center it when columns overflow"),
+    F("scrollingGrouped", "Layout", "Centering", "", "Center the group of columns that fit on screen", radio=True, label_text="Center all visible columns"),
+    F("centerGridWhenFits", "Layout", "Centering", "", "If every column fits on screen, center them instead of aligning to the left", label_text="Center all columns when they fit"),
+    F("alwaysCenterSingleColumn", "Layout", "Centering", "", "A lone column is centered even if the other settings would not", label_text="Always center a single column"),
+    F("manualScrollStep", "Layout", "Scrolling", "Scroll key distance", "Distance moved by the scroll left/right keys", suffix="px", lo=1, hi=99999),
+    F("tabbedColumnsByDefault", "Layout", "Windows", "", "New columns start in tabbed display (only the active window is visible)", label_text="New columns are tabbed"),
+    F("tileMaximized", "Layout", "Windows", "", "They stay in their column and fill the work area; they stay maximized when focus moves away", label_text="Keep maximized windows in the grid"),
+    F("tileFullScreen", "Layout", "Windows", "", "They stay in their column and fill the screen; you can scroll past them", label_text="Keep full-screen windows in the grid"),
+    F("reMaximize", "Layout", "Windows", "", "Re-maximize and re-fullscreen tiled windows when they are focused again", label_text="Restore maximized and full-screen state on focus"),
+
+    # Focus & Mouse
+    F("focusFollowsMouse", "Focus & Mouse", "Focus", "", "Like niri: the window under the mouse gets the focus, except while a Plasma popup such as the launcher is open. Kiri sets KWin's focus policy to \"Click to focus\" when installing", label_text="Focus follows mouse"),
+    F("focusFollowsMouseMaxScroll", "Focus & Mouse", "Focus", "Max scroll", "Like niri's max-scroll-amount: do not focus a window that needs more scrolling than this to be fully shown, in percent of the screen width", suffix="%", hi=100),
+    F("cursorFollowsFocus", "Focus & Mouse", "Focus", "", "Move the mouse cursor to a window focused from the keyboard (niri: warp-mouse-to-focus)", label_text="Cursor follows keyboard focus"),
+    F("skipSwitcher", "Focus & Mouse", "Focus", "", "Hide tiled windows from the window switcher", label_text="Hide tiled windows from Alt+Tab"),
+    F("untileOnDrag", "Focus & Mouse", "Dragging windows", "", "Dragging a tiled window takes it out of the grid", label_text="Float a window when it is dragged"),
+    F("dropToTile", "Focus & Mouse", "Dragging windows", "", "Like niri: a window dragged out of the grid goes back in at the gap closest to the cursor when you let go", label_text="Tile a window where it is dropped"),
+    F("resizeNeighborColumn", "Focus & Mouse", "Dragging windows", "", "When dragging a column's edge, inversely resize the column on the other side", label_text="Resize the neighbouring column too"),
+
+    # Animations
+    F("closeRelayoutDelay", "Animations", "Closing windows", "Delay before the gap closes", "Wait this long before the other columns close the gap, so the closing animation can finish", suffix="ms", hi=5000, special="None"),
+
+    # Appearance
+    F("hideTitlebars", "Appearance", "Windows", "", "Like niri: tiled windows lose their title bar and frame (the focus ring is the outline). They get them back when they float or Kiri stops", label_text="Hide title bars of tiled windows"),
+    F("cornerRadius", "Appearance", "Windows", "Corner radius", "Rounds window corners, needs the Kiri decorations effect (0 = square, like niri's default)", suffix="px", hi=99),
+    F("offScreenOpacity", "Appearance", "Windows", "Off-screen opacity", "Opacity of windows that are not fully visible", suffix="%", hi=100),
+    F("focusRingEnabled", "Appearance", "Focus ring", "", "Draw a ring around the focused window", label_text="Show a focus ring around the focused window"),
+    F("focusRingWidth", "Appearance", "Focus ring", "Width", "Thickness of the ring", suffix="px", hi=99),
+    F("focusRingActiveColor", "Appearance", "Focus ring", "Active color", "Ring color on the active screen", color=True),
+    F("focusRingInactiveColor", "Appearance", "Focus ring", "Inactive color", "Ring color when the screen is not active", color=True),
+    F("focusRingUrgentColor", "Appearance", "Focus ring", "Urgent color", "Ring color of a window that asks for attention", placeholder="#9b0000"),
+    F("focusRingActiveGradient", "Appearance", "Focus ring", "Active gradient", "Overrides the active color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]", placeholder="from=#80c8ff to=#bbddff angle=45"),
+    F("focusRingInactiveGradient", "Appearance", "Focus ring", "Inactive gradient", "Overrides the inactive color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]", placeholder="from=#80c8ff to=#bbddff angle=45"),
+    F("focusRingUrgentGradient", "Appearance", "Focus ring", "Urgent gradient", "Overrides the urgent color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]", placeholder="from=#80c8ff to=#bbddff angle=45"),
+    F("borderEnabled", "Appearance", "Border", "", "Always-visible border, drawn inside the window frame", label_text="Show a border around every window"),
+    F("borderWidth", "Appearance", "Border", "Width", "Thickness of the border", suffix="px", hi=99),
+    F("borderActiveColor", "Appearance", "Border", "Active color", "Border color of the focused window", color=True),
+    F("borderInactiveColor", "Appearance", "Border", "Inactive color", "Border color of other windows", color=True),
+    F("borderUrgentColor", "Appearance", "Border", "Urgent color", "Border color of a window that asks for attention", placeholder="#9b0000"),
+    F("borderActiveGradient", "Appearance", "Border", "Active gradient", "Overrides the active color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]", placeholder="from=#80c8ff to=#bbddff angle=45"),
+    F("borderInactiveGradient", "Appearance", "Border", "Inactive gradient", "Overrides the inactive color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]", placeholder="from=#80c8ff to=#bbddff angle=45"),
+    F("borderUrgentGradient", "Appearance", "Border", "Urgent gradient", "Overrides the urgent color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]", placeholder="from=#80c8ff to=#bbddff angle=45"),
+    F("tabIndicatorEnabled", "Appearance", "Tab indicator", "", "A strip next to a tabbed column showing its windows", label_text="Show the tab indicator next to tabbed columns"),
+    F("tabIndicatorHideWhenSingleTab", "Appearance", "Tab indicator", "", "Hide the strip when the column has only one window", label_text="Hide it when the column has one window"),
+    F("tabIndicatorPosition", "Appearance", "Tab indicator", "Position", "Side of the column where the indicator is drawn"),
+    F("tabIndicatorWidth", "Appearance", "Tab indicator", "Thickness", "Thickness of the indicator strip", suffix="px", lo=1, hi=99),
+    F("tabIndicatorGap", "Appearance", "Tab indicator", "Gap to column", "Distance between the column and the indicator", suffix="px", hi=99),
+    F("tabIndicatorLength", "Appearance", "Tab indicator", "Length", "Length of the strip as a share of the column side (1 = full)", lo=0.05, hi=1.0, step=0.05, suffix=""),
+    F("tabIndicatorPlaceWithinColumn", "Appearance", "Tab indicator", "", "Shrink the windows so the indicator fits inside the column", label_text="Place it inside the column"),
+    F("tabIndicatorGapsBetweenTabs", "Appearance", "Tab indicator", "Gap between tabs", "Space between the tabs of the indicator", suffix="px", hi=99),
+    F("tabIndicatorCornerRadius", "Appearance", "Tab indicator", "Corner radius", "Rounding of each tab", suffix="px", hi=99),
+    F("tabIndicatorActiveColor", "Appearance", "Tab indicator", "Active color", "Empty uses the focus ring colors", placeholder="focus ring color"),
+    F("tabIndicatorInactiveColor", "Appearance", "Tab indicator", "Inactive color", "Empty uses the focus ring colors", placeholder="focus ring color"),
+    F("tabIndicatorUrgentColor", "Appearance", "Tab indicator", "Urgent color", "Empty uses the focus ring colors", placeholder="focus ring color"),
+    F("tabIndicatorActiveGradient", "Appearance", "Tab indicator", "Active gradient", "Overrides the active color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]", placeholder="from=#80c8ff to=#bbddff angle=45"),
+    F("tabIndicatorInactiveGradient", "Appearance", "Tab indicator", "Inactive gradient", "Overrides the inactive color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]", placeholder="from=#80c8ff to=#bbddff angle=45"),
+    F("tabIndicatorUrgentGradient", "Appearance", "Tab indicator", "Urgent gradient", "Overrides the urgent color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]", placeholder="from=#80c8ff to=#bbddff angle=45"),
+    F("shadowEnabled", "Appearance", "Shadow", "", "A soft shadow under every window, like niri's", label_text="Draw window shadows"),
+    F("shadowSoftness", "Appearance", "Shadow", "Softness", "Blur radius of the shadow", suffix="px", hi=999),
+    F("shadowSpread", "Appearance", "Shadow", "Spread", "How far the shadow grows past the window", suffix="px", lo=-999, hi=999),
+    F("shadowOffsetX", "Appearance", "Shadow", "Offset X", "Horizontal shift of the shadow", suffix="px", lo=-999, hi=999),
+    F("shadowOffsetY", "Appearance", "Shadow", "Offset Y", "Vertical shift of the shadow", suffix="px", lo=-999, hi=999),
+    F("shadowColor", "Appearance", "Shadow", "Color", "#RRGGBBAA, alpha allowed", placeholder="#00000077"),
+    F("shadowInactiveColor", "Appearance", "Shadow", "Inactive color", "Shadow of unfocused windows. Empty uses the color above", placeholder="same as color"),
+    F("shadowDrawBehindWindow", "Appearance", "Shadow", "", "Also draw the shadow under the window itself, for see-through windows", label_text="Draw behind the window too"),
+    F("insertHintEnabled", "Appearance", "Insert hint", "", "Shows where a dragged window will land", label_text="Show the insert hint"),
+    F("insertHintColor", "Appearance", "Insert hint", "Color", "#RRGGBBAA, alpha allowed", placeholder="#7fc8ff80"),
+    F("insertHintGradient", "Appearance", "Insert hint", "Gradient", "Overrides the color. Format: from=COLOR to=COLOR [angle=DEG]", placeholder="from=#80c8ff to=#bbddff angle=45"),
+    F("backgroundColor", "Appearance", "Background", "Desktop color", "Paints the desktop in one color instead of the wallpaper. Empty keeps the wallpaper", placeholder="wallpaper"),
+    F("fullscreenBackdropColor", "Appearance", "Background", "Behind full screen", "Color shown around a full-screen window that does not fill the screen", placeholder="#000000"),
+
+    # Gestures & Overview
+    F("gestureScroll", "Gestures & Overview", "Touchpad (Wayland only)", "", "Scroll the columns with a three-finger horizontal swipe", label_text="Scroll the columns with a three-finger horizontal swipe"),
+    F("gestureScrollInvert", "Gestures & Overview", "Touchpad (Wayland only)", "", "Invert the swipe direction", label_text="Natural scrolling"),
+    F("gestureScrollStep", "Gestures & Overview", "Touchpad (Wayland only)", "Swipe distance", "Distance scrolled by one edge-to-edge swipe", suffix="px", lo=1, hi=99999),
+    F("gestureSettleDuration", "Gestures & Overview", "Touchpad (Wayland only)", "Settle time", "How long the view keeps following the fingers' momentum after release", suffix="ms", hi=5000),
+    F("gestureDesktopSwitch", "Gestures & Overview", "Touchpad (Wayland only)", "", "Three-finger swipe up/down changes the virtual desktop", label_text="Switch desktops with a three-finger vertical swipe"),
+    F("hotCorner", "Gestures & Overview", "Overview", "", "Like niri: pushing the pointer into the top-left corner of the screen toggles the overview", label_text="Top-left hot corner opens the overview"),
+
+    # Window Rules
+    F("floatClasses", "Window Rules", "Simple rules", "Always float", "Window classes that are never tiled. One per line, regular expressions are allowed", lines=4, above=True, placeholder="calc\nmpv"),
+    F("tileClasses", "Window Rules", "Simple rules", "Always tile", "Window classes that are always tiled, even if Kiri would float them. One per line", lines=4, above=True, placeholder="kfind"),
+    F("columnWidthRules", "Window Rules", "Simple rules", "Column width", "One class=width per line, like firefox=66.667%", lines=4, above=True, placeholder="firefox=66.667%\norg\\.kde\\.dolphin=800px"),
+    F("windowRules", "Window Rules", "JSON rules", "Rules", "A JSON array of rule objects, applied together with the simple rules. Fields: class, caption (regexes), tile (true/false), width. "
+      "Example: {\"class\": \"steam\", \"caption\": \"Friends List\", \"tile\": false}", lines=12, above=True),
+
+    # Advanced
+    F("tiledKeepBelow", "Advanced", "Stacking order", "Tiled windows", "Sets \"Keep Below\" on tiled windows so floating ones stay on top", radio=True, label_text="Keep below"),
+    F("floatingKeepAbove", "Advanced", "Stacking order", "Floating windows", "Sets \"Keep Above\" on floating windows", radio=True, label_text="Keep above"),
+    F("noLayering", "Advanced", "Stacking order", "", "Leave the stacking order to KWin", radio=True, label_text="Do not change it"),
+    F("dynamicDesktops", "Advanced", "Desktops", "Dynamic desktops", "Experimental, off by default. Like niri's workspaces: there is always one empty desktop at the bottom, and empty desktops are removed when you leave them. Moving a window or column down from the last desktop opens a new one", label_text="Always keep one empty desktop (experimental)"),
+    F("tiledDesktops", "Advanced", "Desktops", "Tiled desktops", "Regular expression matched against the virtual desktop names. Only matching desktops are tiled", placeholder=".* (all)"),
+    F("niriConfigEnabled", "Advanced", "Import niri config", "", "When off, the pasted text is kept but not used", label_text="Use this niri config"),
+    F("niriConfig", "Advanced", "Import niri config", "", "Paste your niri config.kdl (usually ~/.config/niri/config.kdl). Kiri reads it every time the settings change and applies it on top of the other tabs, "
+      "so the values it sets win. It sets: key binds (keys typed in the Shortcuts tab still win), gaps and struts, center-focused-column, always-center-single-column, preset widths and heights, "
+      "default column width and display, focus ring, border, tab indicator, warp-mouse-to-focus, and window rules with open-floating or default-column-width. "
+      "Everything else is ignored; lines Kiri can't use are listed in the KWin log.", lines=14, above=True, placeholder="layout {\n    gaps 16\n}\nbinds {\n    Mod+H { focus-column-left; }\n}"),
+]
+
+# One-line hints shown at the top of a group: (tab, group) -> text. Keep them to a line or two, details go in tooltips.
+NOTES = {
+    ("Window Rules", "Simple rules"): "One window class per line, regular expressions are allowed. Find a class with: qdbus6 org.kde.KWin /KWin org.kde.KWin.queryWindowInfo",
+    ("Window Rules", "JSON rules"): "For rules that also match the window title. Hover over the box for the fields.",
+    ("Advanced", "Import niri config"): "Kiri applies the pasted config on top of the other tabs. Hover over the box for what it reads.",
+}
+
+# ---------------------------------------------------------------- reading the definition files
+
+def read_config_def():
+    """[(name, type, default, choices, section, comment)] in file order"""
+    src = open(CONFIG_DEF, encoding="utf-8").read()
+    body = src[src.index("const configDef"):]
+    entries = []
+    for block in re.findall(r"^    \{\n(.*?)^    \},?\n", body, re.M | re.S):
+        name = re.search(r'name:\s*"(\w+)",?[ \t]*(?://\s*([^\n]*))?', block)
+        typ = re.search(r'type:\s*"(\w+)"', block)
+        if not name or not typ:
+            continue
+        choices = re.search(r"choices:\s*\[(.*?)\]", block, re.S)
+        section = re.search(r'section:\s*"([^"]+)"', block)
+        default = re.search(r"default:\s*([^\n]*?),?\s*(?://[^\n]*)?\n", block)
+        entries.append(dict(
+            name=name.group(1), comment=(name.group(2) or "").strip(), type=typ.group(1),
+            default=default.group(1) if default else "",
+            choices=re.findall(r'"([^"]*)"', choices.group(1)) if choices else None,
+            section=section.group(1) if section else None))
+    return entries
+
+def read_key_bindings():
+    """[(name, description)] in file order; numbered ones keep their "{}" """
+    src = open(KEYS_DEF, encoding="utf-8").read()
+    return [(m.group(1), m.group(2)) for m in re.finditer(r'name:\s*"([\w{}-]+)",\s*description:\s*"([^"]*)"', src)] + \
+           [(m.group(1), m.group(2)) for m in re.finditer(r'name:\s*"([\w{}-]+)",\s*defaultModifiers:[^\n]*\n\s*description:\s*"([^"]*)"', src)]
+
+# ---------------------------------------------------------------- XML helpers
+
+def prop(name, inner):
+    return f'<property name="{name}">{inner}</property>'
+
+def sprop(name, text):
+    return prop(name, f"<string>{escape(text)}</string>")
+
+def tip(t):
+    return sprop("toolTip", t) if t else ""
+
+def tab_title(title):
+    return title.replace("&", "&&")
+
+def guess_suffix(name):
+    if re.search(r"(Delay|Duration|Time|Ms|Millis)$", name):
+        return "ms"
+    if re.search(r"(Percent|Opacity|Share)$", name):
+        return "%"
+    if re.search(r"(Width|Height|Gap|Radius|Size|Offset|Spread|Distance|Margin|Step|Thickness|Length|Softness)", name):
+        return "px"
+    return ""
+
+def humanize(name):
+    words = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name).split()
+    return " ".join([words[0].capitalize()] + [w.lower() for w in words[1:]])
+
+def spin(entry, o):
+    suffix = o.get("suffix", guess_suffix(entry["name"]))
+    sp = sprop("suffix", " " + suffix) if suffix else ""
+    if entry["type"] == "Double":
+        return (f'<widget class="QDoubleSpinBox" name="kcfg_{entry["name"]}">{prop("decimals", "<number>2</number>")}{sp}'
+                f'{prop("minimum", f"<double>{o.get('lo', 0.0)}</double>")}{prop("maximum", f"<double>{o.get('hi', 1000.0)}</double>")}'
+                f'{prop("singleStep", f"<double>{o.get('step', 0.1)}</double>")}')
+    special = ""
+    if "special" in o:
+        special = sprop("specialValueText", o["special"])
+    return (f'<widget class="QSpinBox" name="kcfg_{entry["name"]}">{sp}{special}'
+            f'{prop("minimum", f"<number>{o.get('lo', 0)}</number>")}{prop("maximum", f"<number>{o.get('hi', 9999)}</number>")}')
+
+def field_widget(entry, o, tooltip):
+    """XML of the widget for a key, by its type; the closing tag is added here"""
+    name, typ = entry["name"], entry["type"]
+    t = tip(tooltip)
+    if typ == "Bool":
+        cls = "QRadioButton" if o.get("radio") else "QCheckBox"
+        text = o.get("label_text") or humanize(name)
+        return f'<widget class="{cls}" name="kcfg_{name}">{sprop("text", text)}{t}</widget>'
+    if typ in ("UInt", "Int", "Double"):
+        w = spin(entry, o)
+        return w + t + "</widget>"
+    if typ == "Enum":
+        labels = o.get("labels") or [humanize(c) if c.islower() else c for c in entry["choices"]]
+        labels = [l[:1].upper() + l[1:] for l in labels]
+        its = "".join(f'<item>{sprop("text", l)}</item>' for l in labels)
+        return f'<widget class="QComboBox" name="kcfg_{name}">{t}{its}</widget>'
+    if o.get("color"):
+        return f'<widget class="KColorButton" name="kcfg_{name}">{t}</widget>'
+    if o.get("lines"):
+        px = 17 * o["lines"] + 14
+        mono = prop("font", "<font><family>Monospace</family></font>")
+        ph = sprop("placeholderText", o["placeholder"]) if o.get("placeholder") else ""
+        return (f'<widget class="QPlainTextEdit" name="kcfg_{name}">{prop("tabChangesFocus", "<bool>true</bool>")}'
+                f'{prop("lineWrapMode", "<enum>QPlainTextEdit::NoWrap</enum>")}{mono}{t}{ph}'
+                f'{prop("minimumSize", f"<size><width>0</width><height>{px}</height></size>")}'
+                + (prop("maximumSize", f"<size><width>16777215</width><height>{px}</height></size>") if o["lines"] <= 6 else "") + '</widget>')
+    ph = sprop("placeholderText", o["placeholder"]) if o.get("placeholder") else ""
+    return f'<widget class="QLineEdit" name="kcfg_{name}">{t}{ph}{prop("clearButtonEnabled", "<bool>true</bool>")}</widget>'
+
+# one row of a form: (label, widget xml, tooltip, above)
+def group_xml(title, rows):
+    out = ['<item><widget class="QGroupBox">', sprop("title", title), '<layout class="QFormLayout">',
+           prop("fieldGrowthPolicy", "<enum>QFormLayout::ExpandingFieldsGrow</enum>"),
+           prop("labelAlignment", "<set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>"),
+           prop("verticalSpacing", "<number>6</number>")]
+    r = 0
+    labelled = any(label for label, _, _, _ in rows if label is not None)  # a group of bare check boxes has no label column
+    for label, widget, tooltip, above in rows:
+        if label is None:  # a note
+            out.append(f'<item row="{r}" column="0" colspan="2"><widget class="QLabel">{sprop("text", widget)}{prop("wordWrap", "<bool>true</bool>")}'
+                       '</widget></item>')
+            r += 1
+            continue
+        lab = (f'<widget class="QLabel">{sprop("text", label)}{tip(tooltip)}'
+               f'{prop("alignment", "<set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>")}'
+               f'{prop("minimumSize", "<size><width>%d</width><height>0</height></size>" % LABEL_WIDTH)}</widget>') if label else None
+        if above:
+            if lab:
+                lab = lab.replace("</widget>", prop("alignment", "<set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>") + "</widget>")
+                out.append(f'<item row="{r}" column="0" colspan="2">{lab}</item>')
+                r += 1
+            out.append(f'<item row="{r}" column="0" colspan="2">{widget}</item>')
+        elif lab:
+            out.append(f'<item row="{r}" column="0">{lab}</item>')
+            out.append(f'<item row="{r}" column="1">{widget}</item>')
+        elif labelled:
+            out.append(f'<item row="{r}" column="1">{widget}</item>')
+        else:
+            out.append(f'<item row="{r}" column="0" colspan="2">{widget}</item>')
+        r += 1
+    out.append('</layout></widget></item>')
+    return "".join(out)
+
+def scroll_page(name, title, groups_xml):
+    return (f'<widget class="QWidget" name="tab_{name}"><attribute name="title"><string>{escape(tab_title(title))}</string></attribute>'
+            f'<layout class="QVBoxLayout">{prop("margin", "<number>0</number>")}<item><widget class="QScrollArea" name="scroll_{name}">'
+            f'{prop("frameShape", "<enum>QFrame::NoFrame</enum>")}{prop("widgetResizable", "<bool>true</bool>")}'
+            f'<widget class="QWidget" name="scrollContents_{name}"><layout class="QVBoxLayout">'
+            + "".join(groups_xml) +
+            f'<item><spacer name="spacer_{name}"><property name="orientation"><enum>Qt::Vertical</enum></property>'
+            '<property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>'
+            '</layout></widget></widget></item></layout></widget>')
+
+# ---------------------------------------------------------------- settings tabs
+
+def place_by_name(name):
+    for pattern, tab in AUTO_TABS:
+        if re.search(pattern, name):
+            return tab
+    return "Advanced"
+
+def build_settings():
+    entries = {e["name"]: e for e in read_config_def()}
+    layout = {t: {} for t in TABS}  # tab -> group -> rows
+    used, auto, unknown = set(), [], []
+
+    def add(tab, group, entry, o, label, tooltip):
+        if tab not in layout:
+            layout[tab] = {}
+        w = field_widget(entry, o, tooltip)
+        layout[tab].setdefault(group, []).append((label, w, tooltip, o.get("above", False)))
+
+    for key, tab, group, label, tooltip, o in FIELDS:
+        if key not in entries:
+            unknown.append(key)
+            continue
+        used.add(key)
+        add(tab, group, entries[key], o, label, tooltip)
+    for e in entries.values():
+        if e["name"] in used or e["name"].startswith("key1_") or e["name"].startswith("key2_"):
+            continue
+        if e["section"]:
+            tab, _, group = e["section"].partition("/")
+            group = group or "More"
+        else:
+            tab, group = place_by_name(e["name"]), "More"
+        o = {}
+        add(tab, group, e, o, humanize(e["name"]) if e["type"] != "Bool" else "", e["comment"])
+        auto.append(f'{e["name"]} -> {tab}/{group}')
+    return layout, auto, unknown
+
+def settings_page(tab, groups):
+    name = re.sub(r"\W+", "", tab)
+    return scroll_page(name, tab, [group_xml(g, ([(None, NOTES[(tab, g)], "", False)] if (tab, g) in NOTES else []) + rows) for g, rows in groups.items()])
+
+# ---------------------------------------------------------------- shortcuts tab
 
 def keyfield(row, col, key):
     return (f'<item row="{row}" column="{col}"><widget class="KKeySequenceWidget" name="kcfg_key{col}_{key}">\n'
@@ -81,236 +367,77 @@ def keyfield(row, col, key):
             '<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>\n'
             '</widget></item>')
 
-out = []
-row = 0
-for title, rows in sections:
-    out.append(f'<item row="{row}" column="0" colspan="3"><widget class="QLabel"><property name="text"><string>{title}</string></property></widget></item>')
-    row += 1
-    if title == sections[0][0]:
-        out.append(f'<item row="{row}" column="1"><widget class="QLabel"><property name="text"><string>Key</string></property></widget></item>')
-        out.append(f'<item row="{row}" column="2"><widget class="QLabel"><property name="text"><string>Alternate key</string></property></widget></item>')
-        row += 1
-    for label, key in rows:
-        out.append(f'<item row="{row}" column="0"><widget class="QLabel"><property name="text"><string>{label}</string></property></widget></item>')
-        out.append(keyfield(row, 1, key))
-        out.append(keyfield(row, 2, key))
-        row += 1
-shortcut_items = "\n".join(out)
+def shortcut_rows():
+    """{group: [(label, config key)]}, sorted like System Settings sorts them"""
+    groups = {}
+    for name, desc in read_key_bindings():
+        group, sep, label = desc.partition(": ")
+        if not sep:
+            group, label = "Other", desc
+        label = label[:1].upper() + label[1:]
+        if "{}" in name:
+            for i in range(1, 10):
+                groups.setdefault(group, []).append((label.replace("{}", str(i)), name.replace("{}", str(i)).replace("-", "_"), label.replace("{}", "{") , i))
+        else:
+            groups.setdefault(group, []).append((label, name.replace("-", "_"), label, 0))
+    result = {}
+    for group, rows in groups.items():
+        rows.sort(key=lambda r: (r[2].lower(), r[3]))
+        result[group] = [(label, key) for label, key, _, _ in rows]
+    order = [g for g in SHORTCUT_GROUPS if g in result] + sorted(g for g in result if g not in SHORTCUT_GROUPS and g != "Other") + \
+            (["Other"] if "Other" in result else [])
+    return {g: result[g] for g in order}
 
-def prop(name, inner):
-    return f'<property name="{name}">{inner}</property>'
-
-def common(tip):
-    return prop("toolTip", f"<string>{escape(tip)}</string>") if tip else ""
-
-class W:
-    """a form row: (label, widget xml) or a spanning widget"""
-
-def check(name, text, tip=""):
-    return ("span", f'<widget class="QCheckBox" name="kcfg_{name}">{prop("text", f"<string>{escape(text)}</string>")}{common(tip)}</widget>')
-
-def radio(name, text, tip=""):
-    return ("span", f'<widget class="QRadioButton" name="kcfg_{name}">{prop("text", f"<string>{escape(text)}</string>")}{common(tip)}</widget>')
-
-def spin(name, label, tip, lo, hi, suffix=" px"):
-    w = (f'<widget class="QSpinBox" name="kcfg_{name}">{prop("suffix", f"<string>{escape(suffix)}</string>")}'
-         f'{prop("minimum", f"<number>{lo}</number>")}{prop("maximum", f"<number>{hi}</number>")}{common(tip)}</widget>')
-    return ("row", label, w, tip)
-
-def dspin(name, label, tip, lo, hi, step, decimals=2):
-    w = (f'<widget class="QDoubleSpinBox" name="kcfg_{name}">{prop("decimals", f"<number>{decimals}</number>")}'
-         f'{prop("minimum", f"<double>{lo}</double>")}{prop("maximum", f"<double>{hi}</double>")}'
-         f'{prop("singleStep", f"<double>{step}</double>")}{common(tip)}</widget>')
-    return ("row", label, w, tip)
-
-def line(name, label, tip, placeholder=""):
-    w = f'<widget class="QLineEdit" name="kcfg_{name}">{common(tip)}{prop("placeholderText", f"<string>{escape(placeholder)}</string>") if placeholder else ""}</widget>'
-    return ("row", label, w, tip)
-
-def color(name, label, tip):
-    w = f'<widget class="KColorButton" name="kcfg_{name}">{common(tip)}</widget>'
-    return ("row", label, w, tip)
-
-def combo(name, label, tip, items):
-    its = "".join(f'<item>{prop("text", f"<string>{escape(i)}</string>")}</item>' for i in items)
-    w = f'<widget class="QComboBox" name="kcfg_{name}">{common(tip)}{its}</widget>'
-    return ("row", label, w, tip)
-
-def text(name, label, tip, height=90, mono=True, placeholder="", fixed=False):
-    f = prop("font", "<font><family>Monospace</family></font>") if mono else ""
-    w = (f'<widget class="QPlainTextEdit" name="kcfg_{name}">{prop("tabChangesFocus", "<bool>true</bool>")}'
-         f'{prop("lineWrapMode", "<enum>QPlainTextEdit::NoWrap</enum>")}{f}{common(tip)}'
-         f'{prop("minimumSize", f"<size><width>0</width><height>{height}</height></size>")}'
-         + (prop("maximumSize", f"<size><width>16777215</width><height>{height}</height></size>") if fixed else "")
-         + (prop("placeholderText", f"<string>{escape(placeholder)}</string>") if placeholder else "") + '</widget>')
-    return ("block", label, w, tip)
-
-def note(t):
-    return ("span", f'<widget class="QLabel">{prop("text", f"<string>{escape(t)}</string>")}{prop("wordWrap", "<bool>true</bool>")}</widget>')
-
-def group(title, rows):
-    out = ['<item><widget class="QGroupBox">', prop("title", f"<string>{escape(title)}</string>"), '<layout class="QFormLayout">',
-           prop("fieldGrowthPolicy", "<enum>QFormLayout::AllNonFixedFieldsGrow</enum>")]
-    r = 0
-    for row in rows:
-        kind = row[0]
-        if kind == "span":
-            out.append(f'<item row="{r}" column="0" colspan="2">{row[1]}</item>')
-        elif kind == "row":
-            out.append(f'<item row="{r}" column="0"><widget class="QLabel">{prop("text", f"<string>{escape(row[1])}</string>")}{common(row[3])}</widget></item>')
-            out.append(f'<item row="{r}" column="1">{row[2]}</item>')
-        else:  # block: label above a wide widget
-            out.append(f'<item row="{r}" column="0" colspan="2"><widget class="QLabel">{prop("text", f"<string>{escape(row[1])}</string>")}</widget></item>')
-            r += 1
-            out.append(f'<item row="{r}" column="0" colspan="2">{row[2]}</item>')
-        r += 1
-    out.append('</layout></widget></item>')
-    return "".join(out)
-
-def tab(name, title, groups):
-    return (f'<widget class="QWidget" name="tab_{name}"><attribute name="title"><string>{escape(title)}</string></attribute>'
-            f'<layout class="QVBoxLayout">{prop("margin", "<number>0</number>")}<item><widget class="QScrollArea" name="scroll_{name}">'
-            f'{prop("frameShape", "<enum>QFrame::NoFrame</enum>")}{prop("widgetResizable", "<bool>true</bool>")}'
-            f'<widget class="QWidget" name="scrollContents_{name}"><layout class="QVBoxLayout">'
-            + "".join(groups) +
-            '<item><spacer name="spacer_' + name + '"><property name="orientation"><enum>Qt::Vertical</enum></property>'
+def shortcuts_page():
+    groups = shortcut_rows()
+    names = "".join(f'<item><property name="text"><string>{escape(g)}</string></property></item>' for g in groups)
+    pages = []
+    for index, (group, rows) in enumerate(groups.items()):
+        cells = [f'<item row="0" column="1"><widget class="QLabel"><property name="text"><string>Shortcut</string></property></widget></item>',
+                 f'<item row="0" column="2"><widget class="QLabel"><property name="text"><string>Alternate</string></property></widget></item>']
+        for r, (label, key) in enumerate(rows, 1):
+            cells.append(f'<item row="{r}" column="0"><widget class="QLabel"><property name="text"><string>{escape(label)}</string></property></widget></item>')
+            cells += [keyfield(r, 1, key), keyfield(r, 2, key)]
+        pages.append(
+            f'<widget class="QWidget" name="page_shortcuts_{index}"><layout class="QVBoxLayout">{prop("margin", "<number>0</number>")}'
+            f'<item><widget class="QScrollArea" name="scroll_shortcuts_{index}">{prop("frameShape", "<enum>QFrame::NoFrame</enum>")}{prop("widgetResizable", "<bool>true</bool>")}'
+            f'<widget class="QWidget" name="scrollContents_shortcuts_{index}"><layout class="QVBoxLayout"><item><layout class="QGridLayout" name="grid_shortcuts_{index}">{prop("verticalSpacing", "<number>2</number>")}\n' + "\n".join(cells) + '\n</layout></item>'
+            '<item><spacer name="spacer_shortcuts_%d"><property name="orientation"><enum>Qt::Vertical</enum></property>'
             '<property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>'
-            '</layout></widget></widget></item></layout></widget>')
+            '</layout></widget></widget></item></layout></widget>' % index)
+    return ('<widget class="QWidget" name="tab_Shortcuts"><attribute name="title"><string>Shortcuts</string></attribute><layout class="QVBoxLayout">'
+            '<item><widget class="QLabel" name="label_shortcutsRule">' +
+            sprop("text", "Keys set here are copied to Shortcuts > Kiri in System Settings, without a conflict check. Leave both fields empty to use the keys set there.") +
+            '<property name="wordWrap"><bool>true</bool></property></widget></item>'
+            '<item><layout class="QHBoxLayout"><item><widget class="QListWidget" name="list_shortcutGroups">'
+            '<property name="maximumSize"><size><width>170</width><height>16777215</height></size></property>' + names +
+            '</widget></item><item><widget class="QStackedWidget" name="stack_shortcuts">' + "".join(pages) +
+            '</widget></item></layout></item></layout></widget>')
 
-layout_tab = tab("layout", "Layout", [
-    group("Gaps", [
-        spin("gapsInnerHorizontal", "Between columns:", "Horizontal gap between neighbouring columns", 0, 999),
-        spin("gapsInnerVertical", "Between windows:", "Vertical gap between windows in a column", 0, 999),
-        spin("gapsOuterTop", "Top:", "Gap between the windows and the top screen edge", 0, 999),
-        spin("gapsOuterBottom", "Bottom:", "Gap between the windows and the bottom screen edge", 0, 999),
-        spin("gapsOuterLeft", "Left:", "Gap between the windows and the left screen edge", 0, 999),
-        spin("gapsOuterRight", "Right:", "Gap between the windows and the right screen edge", 0, 999),
-    ]),
-    group("Column width and height", [
-        line("defaultColumnWidth", "Default column width:", "Width of new columns, like 50% or 800px. Empty keeps the window's own width", "window's own width"),
-        line("presetWidths", "Preset widths:", "Widths used when cycling column width. Comma-separated, units: px and %"),
-        line("presetHeights", "Preset heights:", "Heights used when cycling window height. Comma-separated, units: px and %"),
-        spin("columnWidthStep", "Column width step:", "Share of the screen a column grows or shrinks by with the width keys (niri: set-column-width \"+10%\")", 1, 100, " %"),
-        spin("windowHeightStep", "Window height step:", "Share of the screen a window grows or shrinks by with the height keys", 1, 100, " %"),
-        spin("verticalResizeStep", "Height resize step:", "Step when making a window taller or shorter with a key", 1, 999),
-        check("resizeNeighborColumn", "Resize the neighbour column too", "When dragging a column's edge, inversely resize the column on the other side"),
-    ]),
-    group("Scrolling and centering", [
-        radio("scrollingLazy", "Scroll only as needed", "Move the view just enough to show the focused column"),
-        radio("scrollingCentered", "Always center the focused column", "Keep the focused column in the middle of the screen"),
-        radio("scrollingGrouped", "Center the visible columns", "Center the group of columns that fit on screen"),
-        radio("scrollingOnOverflow", "Center only when columns overflow", "Like niri's center-focused-column \"on-overflow\": no scrolling while the focused column fits next to its neighbours"),
-        check("centerGridWhenFits", "Center all columns when they fit", "If every column fits on screen, center them instead of aligning to the left"),
-        check("alwaysCenterSingleColumn", "Always center a single column", "A lone column is centered even if it is wider than the screen allows otherwise"),
-        spin("manualScrollStep", "Manual scroll step:", "Distance moved by the scroll left/right keys", 1, 99999),
-    ]),
-])
+# ---------------------------------------------------------------- the document
 
-appearance_tab = tab("appearance", "Appearance", [
-    group("Corners", [
-        spin("cornerRadius", "Corner radius:", "Rounds window corners, needs the Kiri decorations effect (0 = square, like niri's default)", 0, 99),
-    ]),
-    group("Focus ring", [
-        check("focusRingEnabled", "Draw a ring around the focused window"),
-        spin("focusRingWidth", "Width:", "Thickness of the ring", 0, 99),
-        color("focusRingActiveColor", "Active color:", "Ring color on the active screen"),
-        color("focusRingInactiveColor", "Inactive color:", "Ring color when the screen is not active"),
-    ]),
-    group("Border", [
-        check("borderEnabled", "Draw a border around every window", "Always-visible border, drawn inside the window frame"),
-        spin("borderWidth", "Width:", "Thickness of the border", 0, 99),
-        color("borderActiveColor", "Active color:", "Border color of the focused window"),
-        color("borderInactiveColor", "Inactive color:", "Border color of other windows"),
-    ]),
-    group("Tab indicator (tabbed columns)", [
-        check("tabIndicatorEnabled", "Show the tab indicator", "A strip next to a tabbed column showing its windows"),
-        check("tabIndicatorHideWhenSingleTab", "Hide it when the column has one window"),
-        combo("tabIndicatorPosition", "Position:", "Side of the column where the indicator is drawn", ["Left", "Right", "Top", "Bottom"]),
-        spin("tabIndicatorWidth", "Thickness:", "Thickness of the indicator strip", 1, 99),
-        spin("tabIndicatorGap", "Gap to column:", "Distance between the column and the indicator", 0, 99),
-        dspin("tabIndicatorLength", "Length:", "Length of the strip as a fraction of the column side (1 = full)", 0.05, 1.0, 0.05),
-    ]),
-    group("Other", [
-        spin("offScreenOpacity", "Off-screen window opacity:", "Opacity of windows that are not fully visible", 0, 100, " %"),
-    ]),
-])
+def main():
+    layout, auto, unknown = build_settings()
+    pages = []
+    for tab in TABS:
+        if tab == "Shortcuts":
+            pages.append(shortcuts_page())
+        elif layout.get(tab):
+            pages.append(settings_page(tab, layout[tab]))
+    for tab in layout:
+        if tab not in TABS and layout[tab]:
+            pages.append(settings_page(tab, layout[tab]))  # a section field named a tab that does not exist yet
+    doc = ('<?xml version="1.0" encoding="UTF-8"?>\n<ui version="4.0">\n<class>KWin::KarouselConfigForm</class>\n'
+           '<widget class="QWidget" name="KWin::KarouselConfigForm"><property name="windowTitle"><string>Kiri</string></property>'
+           '<layout class="QVBoxLayout" name="layout_main"><item><widget class="QTabWidget" name="tabContainer">'
+           + "".join(pages) +
+           '</widget></item></layout></widget>\n'
+           '<resources/><connections><connection><sender>list_shortcutGroups</sender><signal>currentRowChanged(int)</signal>'
+           '<receiver>stack_shortcuts</receiver><slot>setCurrentIndex(int)</slot></connection></connections></ui>\n')
+    open(PATH, "w", encoding="utf-8").write(doc)
+    for line in auto:
+        print("placed by rule:", line)
+    for key in unknown:
+        print("FIELDS row for a key that is not in definition.ts:", key)
 
-behavior_tab = tab("behavior", "Behavior", [
-    group("Windows", [
-        check("untileOnDrag", "Float a window when it is dragged", "Dragging a tiled window takes it out of the grid"),
-        check("dropToTile", "Tile a dragged window where it is dropped", "Like niri: a window dragged out of the grid goes back in at the gap closest to the cursor when you let go"),
-        check("tabbedColumnsByDefault", "New columns are tabbed", "New columns start in tabbed display (only the active window is visible)"),
-        check("focusFollowsMouse", "Focus follows mouse", "Like niri: the window under the mouse gets the focus, except while a Plasma popup such as the launcher is open. Kiri sets KWin's focus policy to \"Click to focus\" when installing"),
-        spin("focusFollowsMouseMaxScroll", "Focus follows mouse, max scroll:", "Like niri's max-scroll-amount: do not focus a window that needs more scrolling than this to be fully shown, in percent of the screen width (100 = no limit)", 0, 100, " %"),
-        check("cursorFollowsFocus", "Cursor follows focus", "Move the mouse cursor to a window focused from the keyboard"),
-        check("hotCorner", "Hot corner", "Like niri: pushing the pointer into the top-left corner of the screen toggles the overview"),
-        check("hideTitlebars", "Tiled windows have no title bar", "Like niri: tiled windows lose their title bar and frame (the focus ring is the outline). They get them back when they float or Kiri stops"),
-        check("skipSwitcher", "Tiled windows skip Alt+Tab", "Hide tiled windows from the window switcher"),
-        check("dynamicDesktops", "Dynamic desktops (experimental)", "Experimental, off by default. Like niri's workspaces: there is always one empty desktop at the bottom, and empty desktops are removed when you leave them. Moving a window or column down from the last desktop opens a new one"),
-        line("tiledDesktops", "Tiled desktops:", "Regex matched against virtual desktop names. Only matching desktops are tiled"),
-    ]),
-    group("Maximized and full-screen windows", [
-        check("tileMaximized", "Keep maximized windows in the grid", "They stay in their column and fill the work area; they stay maximized when focus moves away"),
-        check("tileFullScreen", "Keep full-screen windows in the grid", "They stay in their column and fill the screen; you can scroll past them"),
-        check("reMaximize", "Restore maximized state on focus", "Re-maximize and re-fullscreen tiled windows when they are focused again"),
-    ]),
-    group("Stacking order", [
-        radio("tiledKeepBelow", "Tiled windows are kept below", "Sets \"Keep Below\" on tiled windows so floating ones stay on top"),
-        radio("floatingKeepAbove", "Floating windows are kept above", "Sets \"Keep Above\" on floating windows"),
-        radio("noLayering", "Do not change the stacking order"),
-    ]),
-])
-
-gestures_tab = tab("gestures", "Gestures and Animations", [
-    group("Touchpad gestures (Wayland only)", [
-        check("gestureScroll", "Scroll with a three-finger horizontal swipe"),
-        check("gestureScrollInvert", "Natural scrolling", "Invert the swipe direction"),
-        spin("gestureScrollStep", "Scroll distance per swipe:", "Distance scrolled by one edge-to-edge swipe", 1, 99999),
-        spin("gestureSettleDuration", "Settle time:", "How long the view keeps following the fingers' momentum after release", 0, 5000, " ms"),
-        check("gestureDesktopSwitch", "Switch desktops with a vertical swipe", "Three-finger swipe up/down changes the virtual desktop"),
-    ]),
-    group("Animations", [
-        spin("closeRelayoutDelay", "Delay after closing a window:", "Wait this long before the other columns close the gap, so the closing animation can finish", 0, 5000, " ms"),
-    ]),
-])
-
-rules_tab = tab("windowRules", "Window Rules", [
-    group("Simple rules", [
-        note("One entry per line. Entries are window classes (regular expressions are allowed, e.g. org\\.kde\\..*). "
-             "Find a class with: qdbus6 org.kde.KWin /KWin org.kde.KWin.queryWindowInfo"),
-        text("floatClasses", "Always float these windows:", "Window classes that are never tiled", 64, placeholder="calc\nmpv", fixed=True),
-        text("tileClasses", "Always tile these windows:", "Window classes that are always tiled, even if Kiri would float them", 64, placeholder="kfind", fixed=True),
-        text("columnWidthRules", "Column width per window:", "One class=width per line, like firefox=66.667%", 64, placeholder="firefox=66.667%\norg\\.kde\\.dolphin=800px", fixed=True),
-    ]),
-    group("Advanced: JSON rules", [
-        note("Rules with a caption match, applied together with the simple rules above. Fields: class, caption (regexes), tile (true/false), width. "
-             "Example: {\"class\": \"steam\", \"caption\": \"Friends List\", \"tile\": false}"),
-        text("windowRules", "JSON list:", "A JSON array of rule objects", 220),
-    ]),
-])
-
-niri_tab = tab("niri", "niri", [
-    group("Import niri config", [
-        note("Paste the contents of your niri config.kdl (usually ~/.config/niri/config.kdl) below and tick the box. Kiri reads it every time the settings change "
-             "and applies it on top of the other tabs, so the values it sets win over the Layout, Appearance and Behavior tabs. "
-             "It sets: the key binds (Shortcuts; keys typed in the Shortcuts tab still win), gaps and struts, center-focused-column, always-center-single-column, "
-             "preset column widths and window heights, default column width and display, focus ring, border, tab indicator, warp-mouse-to-focus, "
-             "and window rules that set open-floating or default-column-width (matched by app-id and title). "
-             "Everything else in the file is ignored; lines Kiri can't use are listed in the KWin log."),
-        check("niriConfigEnabled", "Use this niri config", "When off, the pasted text is kept but not used"),
-        text("niriConfig", "niri config.kdl:", "The text of your niri config", 360, placeholder="layout {\n    gaps 16\n}\nbinds {\n    Mod+H { focus-column-left; }\n}"),
-    ]),
-])
-
-shortcuts_tab = ('<widget class="QWidget" name="tab_shortcuts"><attribute name="title"><string>Shortcuts</string></attribute><layout class="QVBoxLayout">'
-    '<item><widget class="QLabel" name="label_shortcutsRule"><property name="text"><string>Keys set here take priority and are copied to the Kiri group in System Settings &gt; Shortcuts, without a conflict check. Leave both fields empty to use the keys set in System Settings.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>'
-    '<item><widget class="QScrollArea" name="scroll_shortcuts"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property>'
-    '<widget class="QWidget" name="scrollContents_shortcuts"><layout class="QGridLayout" name="grid_shortcuts">\n' + shortcut_items + '\n</layout></widget></widget></item></layout></widget>')
-
-doc = ('<?xml version="1.0" encoding="UTF-8"?>\n<ui version="4.0">\n<class>KWin::KarouselConfigForm</class>\n'
-       '<widget class="QWidget" name="KWin::KarouselConfigForm"><property name="windowTitle"><string>Kiri</string></property>'
-       '<layout class="QVBoxLayout" name="layout_main"><item><widget class="QTabWidget" name="tabContainer">'
-       + layout_tab + appearance_tab + behavior_tab + gestures_tab + rules_tab + shortcuts_tab + niri_tab +
-       '</widget></item><item><widget class="QLabel" name="label"><property name="text"><string>Changes apply as soon as you press Apply.</string></property></widget></item></layout></widget>\n'
-       '<resources/><connections/></ui>\n')
-open(PATH, "w", encoding="utf-8").write(doc)
+main()

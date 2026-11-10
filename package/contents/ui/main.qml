@@ -19,6 +19,11 @@ Item {
     property string visualPositions: "{}"
     property string parkedPositions: "{}"
     property string insertHint: "null"
+    // JSON for the compiled effect: every appearance setting as the script resolves it (niri import included), the per-window
+    // overrides of niri's window rules, and the ids of the windows that ask for attention
+    property string decorationsConfig: ""
+    property string windowDecorations: "{}"
+    property string urgentWindows: "[]"
     // true while the C++ effect kiri_decorations is loaded: it paints the ring and borders (and rounds corners)
     // with the window itself, so these QML windows are only the fallback
     property bool decorationsEffect: false
@@ -33,6 +38,7 @@ Item {
             wanted: info.count >= 1 && (info.count >= 2 || qmlBase.ringConfig.tabIndicatorHideWhenSingleTab !== true)
             activeColor: qmlBase.ringConfig.tabIndicatorActiveColor
             inactiveColor: qmlBase.ringConfig.tabIndicatorInactiveColor
+            cornerRadius: qmlBase.ringConfig.tabIndicatorCornerRadius ?? 0
         }
     }
 
@@ -308,6 +314,21 @@ Item {
         );
     }
 
+    function sendToDecorations(member, json) {
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriDecorations",
+                iface: "org.kde.kiri.Decorations",
+                member: member,
+                arguments: [new DBus.string(json)],
+                signature: "(s)",
+            },
+            () => {},
+            (error) => {},
+        );
+    }
+
     function sendInsertHint() {
         DBus.SessionBus.asyncCall(
             {
@@ -445,7 +466,15 @@ Item {
     onTabGroupsChanged: if (decorationsEffect) sendTabGroups()
     onVisualPositionsChanged: if (decorationsEffect) sendVisualPositions()
     onInsertHintChanged: if (decorationsEffect) sendInsertHint()
-    onDecorationsEffectChanged: if (decorationsEffect) { sendTabGroups(); sendVisualPositions(); sendParkedPositions(); }
+    onDecorationsConfigChanged: if (decorationsEffect && decorationsConfig !== "") sendToDecorations("setConfig", decorationsConfig)
+    onWindowDecorationsChanged: if (decorationsEffect) sendToDecorations("setWindowDecorations", windowDecorations)
+    onUrgentWindowsChanged: if (decorationsEffect) sendToDecorations("setUrgentWindows", urgentWindows)
+    onDecorationsEffectChanged: if (decorationsEffect) {
+        sendTabGroups(); sendVisualPositions(); sendParkedPositions();
+        if (decorationsConfig !== "") sendToDecorations("setConfig", decorationsConfig);
+        sendToDecorations("setWindowDecorations", windowDecorations);
+        sendToDecorations("setUrgentWindows", urgentWindows);
+    }
 
     Timer {
         interval: 3000

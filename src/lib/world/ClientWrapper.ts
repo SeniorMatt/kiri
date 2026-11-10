@@ -281,6 +281,8 @@ class ClientWrapper {
 
     public destroy(passFocus: FocusPassing.Type) {
         setParkedPosition(String(this.kwinClient.internalId), null);
+        setWindowUrgent(String(this.kwinClient.internalId), false);
+        setWindowDecorations(String(this.kwinClient.internalId), null);
         this.stateManager.destroy(passFocus);
         this.signalManager.destroy();
         if (this.rulesSignalManager !== null) {
@@ -304,6 +306,11 @@ class ClientWrapper {
                 client.windowedFullScreen = false; // the client left full-screen mode (niri: unset-fullscreen ends the windowed one too)
             }
         });
+
+        // niri's urgent colours: the compiled effect paints the ring, border and tab indicator of a window that asks for attention
+        const noteUrgent = () => setWindowUrgent(String(client.kwinClient.internalId), client.kwinClient.demandsAttention === true);
+        manager.connect(client.kwinClient.demandsAttentionChanged, noteUrgent);
+        noteUrgent();
 
         manager.connect(client.kwinClient.maximizedAboutToChange, (mode: MaximizedMode) => {
             if (mode !== MaximizedMode.Unmaximized) {

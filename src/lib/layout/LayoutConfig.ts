@@ -9,6 +9,8 @@ interface LayoutConfig {
     tabIndicatorLength: number;
     tabIndicatorPosition: string;
     tabIndicatorHideWhenSingleTab: boolean;
+    tabIndicatorPlaceWithinColumn: boolean;
+    tabIndicatorGapsBetweenTabs: number;
     resizeNeighborColumn: boolean;
     reMaximize: boolean;
     tileMaximized: boolean;

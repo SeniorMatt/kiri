@@ -12,10 +12,27 @@ function loadConfig(): Config {
     return config;
 }
 
+// Every appearance setting (corners, focus ring, border, shadow, insert hint, tab indicator, backdrops) as the script sees it,
+// niri import included, as JSON for the compiled effect. The effect reads kwinrc by itself until the first call.
+function decorationsConfig(config: Config) {
+    const out: Record<string, any> = {};
+    for (const [name, value] of Object.entries(config)) {
+        if (/^(cornerRadius|focusRing|border|shadow|insertHint|tabIndicator|fullscreenBackdropColor|backgroundColor)/.test(name)) {
+            out[name] = value;
+        }
+    }
+    return out;
+}
+
+// what tests look at: the last JSON handed to the effect
+let lastDecorationsConfigJson = "";
+
 function setRingConfig(config: Config) {
+    lastDecorationsConfigJson = JSON.stringify(decorationsConfig(config));
     if (typeof qmlBase === "undefined") {
         return; // tests
     }
+    (qmlBase as any).decorationsConfig = lastDecorationsConfigJson;
     (qmlBase as any).ringConfig = {
         cornerRadius: config.cornerRadius,
         focusRingEnabled: config.focusRingEnabled,
@@ -28,9 +45,68 @@ function setRingConfig(config: Config) {
         borderInactiveColor: config.borderInactiveColor,
         tabIndicatorEnabled: config.tabIndicatorEnabled,
         tabIndicatorHideWhenSingleTab: config.tabIndicatorHideWhenSingleTab,
-        tabIndicatorActiveColor: config.focusRingActiveColor,
-        tabIndicatorInactiveColor: config.focusRingInactiveColor,
+        tabIndicatorCornerRadius: config.tabIndicatorCornerRadius,
+        // the fallback windows draw solid colours only: the colour of the gradient's start, like niri does for a missing shader
+        tabIndicatorActiveColor: config.tabIndicatorActiveColor !== "" ? config.tabIndicatorActiveColor : config.focusRingActiveColor,
+        tabIndicatorInactiveColor: config.tabIndicatorInactiveColor !== "" ? config.tabIndicatorInactiveColor : config.focusRingInactiveColor,
     };
+}
+
+// Per-window overrides of the appearance settings, for niri's window rules (`focus-ring`, `border`, `shadow`, `tab-indicator`
+// and `geometry-corner-radius` inside a `window-rule`). Whoever matches the rules (rules/WindowRuleEnforcer) calls
+// setWindowDecorations(id, rule) with a rule that holds only the fields the window rule sets, or null to clear it:
+//   { cornerRadius: 12,
+//     focusRing: { enabled: false, width: 2, activeColor: "#f00", activeGradient: "from=#f00 to=#00f angle=45", ... },
+//     border:    { enabled, width, activeColor, inactiveColor, urgentColor, activeGradient, inactiveGradient, urgentGradient },
+//     shadow:    { enabled, offsetX, offsetY, softness, spread, drawBehindWindow, color, inactiveColor },
+//     tabIndicator: { activeColor, inactiveColor, urgentColor, activeGradient, inactiveGradient, urgentGradient } }
+// Colours and gradients are strings in the format of the config keys (niri's CSS colours; gradients as niri's properties,
+// e.g. "from=#80c7ff to=#ffc87f angle=45 relative-to=workspace-view in=oklch longer hue"). A field that is missing keeps
+// the global setting. The effect (DecorationsEffect.cpp, D-Bus `setWindowDecorations`) merges it over the settings per window.
+interface WindowDecorationRule {
+    cornerRadius?: number;
+    focusRing?: { enabled?: boolean, width?: number, activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
+    border?: { enabled?: boolean, width?: number, activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
+    shadow?: { enabled?: boolean, offsetX?: number, offsetY?: number, softness?: number, spread?: number, drawBehindWindow?: boolean, color?: string, inactiveColor?: string };
+    tabIndicator?: { activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
+}
+
+const windowDecorations = new Map<string, WindowDecorationRule>();
+const urgentWindows = new Set<string>();
+let lastWindowDecorationsJson = "{}";
+let lastUrgentWindowsJson = "[]";
+
+function setWindowDecorations(id: string, rule: WindowDecorationRule | null) {
+    if (rule === null || Object.keys(rule).length === 0) {
+        windowDecorations.delete(id);
+    } else {
+        windowDecorations.set(id, rule);
+    }
+    const obj: Record<string, WindowDecorationRule> = {};
+    windowDecorations.forEach((v, k) => { obj[k] = v; });
+    const json = JSON.stringify(obj);
+    if (json !== lastWindowDecorationsJson) {
+        lastWindowDecorationsJson = json;
+        if (typeof qmlBase !== "undefined") {
+            (qmlBase as any).windowDecorations = json;
+        }
+    }
+}
+
+// a window that asks for attention (niri's is_urgent) gets the urgent colours
+function setWindowUrgent(id: string, urgent: boolean) {
+    if (urgent === urgentWindows.has(id)) {
+        return;
+    }
+    if (urgent) {
+        urgentWindows.add(id);
+    } else {
+        urgentWindows.delete(id);
+    }
+    lastUrgentWindowsJson = JSON.stringify(Array.from(urgentWindows));
+    if (typeof qmlBase !== "undefined") {
+        (qmlBase as any).urgentWindows = lastUrgentWindowsJson;
+    }
 }
 
 // geometry of the current desktop's tab indicators, drawn by main.qml
@@ -43,6 +119,7 @@ interface TabIndicator {
     count: number;
     active: number;
     windows: string[]; // internal ids, in tab order
+    tabs: { x: number, y: number, width: number, height: number }[]; // niri's tab_rects, one per window
 }
 
 let lastTabIndicatorsJson = "[]";

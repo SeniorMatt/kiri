@@ -88,6 +88,7 @@ interface KwinClient {
     readonly pid: number;
 
     fullScreen: boolean;
+    readonly demandsAttention: boolean;
     activities: string[]; // empty array means all activities
     skipSwitcher: boolean;
     noBorder: boolean; // no title bar and frame (server-side decorations); KWin ignores changes while full-screen
@@ -100,6 +101,7 @@ interface KwinClient {
     opacity: number;
 
     readonly fullScreenChanged: QSignal<[]>;
+    readonly demandsAttentionChanged: QSignal<[]>;
     readonly desktopsChanged: QSignal<[]>;
     readonly activitiesChanged: QSignal<[]>;
     readonly minimizedChanged: QSignal<[]>;
