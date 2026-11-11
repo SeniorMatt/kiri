@@ -46,6 +46,14 @@ class Column {
             for (const window of this.windows.iterator()) {
                 window.client.kwinClient.desktops = [targetGrid.desktop.kwinDesktop];
             }
+            // A column that was alone on its desktop has no neighbour to hand the focus to, so its window is still the
+            // active one. KWin does not announce the activation of the active window again, so the focus that
+            // follows the move would never reach the new grid: the view would stay where it was and the column
+            // could sit off-centre or half off the screen. The new grid learns of the focus here.
+            const focused = this.getWindows().find(window => window.isFocused());
+            if (focused !== undefined) {
+                this.onWindowFocused(focused);
+            }
         }
     }
 

@@ -100,6 +100,86 @@ apply_rows() {
         org.freedesktop.DBus.Properties.Set string:org.kde.KWin.VirtualDesktopManager string:rows variant:uint32:"$rows" >/dev/null 2>&1 || true
 }
 
+# ---- the user's own virtual desktops ----
+# Kiri's dynamic desktops (like niri's workspaces) add and remove desktops by themselves: an empty one at the bottom, the
+# named ones of the niri config. The user's own list is kept in [Kiri-mode] (desktopCount, desktopName_N) when Kiri mode
+# starts, and put back when Plasma mode starts: the count and the names. Windows of a desktop that has to go move to the
+# desktop next to it; a desktop that still has windows is only removed when there are more desktops than the user had.
+dynamic_on() { [ "$(r Script-kiri dynamicDesktops true)" = true ] || [ -n "$(r Script-kiri namedDesktops)" ]; }
+live_desktops() { # one line per desktop: id, tab, name
+    qdbus6 --literal org.kde.KWin /VirtualDesktopManager org.kde.KWin.VirtualDesktopManager.desktops 2>/dev/null |
+        grep -o '(uss) [0-9]*, "[^"]*", "[^"]*"' | sed 's/^(uss) [0-9]*, "\([^"]*\)", "\(.*\)"$/\1\t\2/'
+}
+save_user_desktops() {
+    list=$(live_desktops)
+    [ -n "$list" ] || return 0
+    old=$(r Kiri-mode desktopCount 0)
+    n=0
+    tab=$(printf '\t')
+    while IFS=$tab read -r _ name; do
+        n=$((n + 1))
+        w Kiri-mode "desktopName_$n" "$name"
+    done <<LIST
+$list
+LIST
+    i=$((n + 1))
+    while [ "$i" -le "$old" ]; do d Kiri-mode "desktopName_$i"; i=$((i + 1)); done
+    w Kiri-mode desktopCount "$n"
+}
+restore_user_desktops() {
+    n=$(r Kiri-mode desktopCount 0)
+    [ "$n" -gt 0 ] && dynamic_on || return 0
+    js=$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/kiri-desktops-XXXXXX.js")
+    {
+        printf 'var want = ['
+        i=1
+        while [ "$i" -le "$n" ]; do
+            [ "$i" -gt 1 ] && printf ', '
+            printf '"%s"' "$(r Kiri-mode "desktopName_$i" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+            i=$((i + 1))
+        done
+        printf '];\n'
+        cat <<'JS'
+function windowsOn(d) {
+    return workspace.windowList().filter(function (w) { return w.desktops.length > 0 && w.desktops.indexOf(d) >= 0 && !w.desktopWindow && !w.dock; });
+}
+while (workspace.desktops.length > want.length) {
+    var list = workspace.desktops, pick = null, i;
+    for (i = list.length - 1; i >= 0 && pick === null; i--) {
+        if (list[i] !== workspace.currentDesktop && windowsOn(list[i]).length === 0) { pick = list[i]; }
+    }
+    for (i = list.length - 1; i >= 0 && pick === null; i--) {
+        if (list[i] !== workspace.currentDesktop) { pick = list[i]; }
+    }
+    if (pick === null) { break; }
+    var heir = list[list.indexOf(pick) > 0 ? list.indexOf(pick) - 1 : 1];
+    windowsOn(pick).forEach(function (w) {
+        w.desktops = w.desktops.map(function (d) { return d === pick ? heir : d; }).filter(function (d, k, all) { return all.indexOf(d) === k; });
+    });
+    workspace.removeDesktop(pick);
+}
+while (workspace.desktops.length < want.length) {
+    workspace.createDesktop(workspace.desktops.length, want[workspace.desktops.length]);
+}
+for (var k = 0; k < want.length; k++) {
+    if (workspace.desktops[k].name !== want[k]) { workspace.desktops[k].name = want[k]; }
+}
+JS
+    } >"$js"
+    $KWIN /Scripting org.kde.kwin.Scripting.loadScript "$js" kiri-restore-desktops >/dev/null 2>&1 || true
+    $KWIN /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1 || true
+    sleep 1
+    $KWIN /Scripting org.kde.kwin.Scripting.unloadScript kiri-restore-desktops >/dev/null 2>&1 || true
+    rm -f "$js"
+    # the rows go back as well, they were set to one per desktop
+    saved=$(r Kiri-mode rows)
+    if [ -n "$saved" ]; then
+        w Desktops Rows "$saved"
+        d Kiri-mode rows
+        d Kiri-mode rowsApplied
+    fi
+}
+
 # the effects: the script does this itself when it starts and stops; this makes sure of it (and covers a script
 # that was stopped without getting to do it)
 effects_kiri() {
@@ -127,6 +207,8 @@ show() { # text
 
 go_kiri() {
     [ "$(current)" = plasma ] && from_plasma=true
+    # before Kiri's dynamic desktops change them (and once when an older Kiri mode never saved them)
+    if $from_plasma || [ -z "$(r Kiri-mode desktopCount)" ]; then save_user_desktops; fi
     w Plugins kiriEnabled true
     apply_settings
     reconfigure
@@ -141,6 +223,7 @@ go_plasma() {
     w Plugins kiriEnabled false
     $KWIN /Scripting org.kde.kwin.Scripting.unloadScript kiri >/dev/null 2>&1 || true
     sleep 0.3
+    restore_user_desktops
     restore_settings
     reconfigure
     apply_rows

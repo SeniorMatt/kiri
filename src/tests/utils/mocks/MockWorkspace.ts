@@ -46,6 +46,9 @@ class MockWorkspace {
         this.cursorPosChanged.fire();
     }
 
+    // Real KWin does not announce the activation of the window that is the active one already
+    public ignoreSameActivation = false;
+
     private desktopCounter = 100;
 
     public createDesktop(position: number, name: string) {
@@ -207,6 +210,9 @@ class MockWorkspace {
     }
 
     public set activeWindow(activeWindow: KwinClient|null) {
+        if (this.ignoreSameActivation && activeWindow !== null && activeWindow === this._activeWindow) {
+            return;
+        }
         this._activeWindow = activeWindow;
         this.windowActivated.fire(activeWindow);
     }

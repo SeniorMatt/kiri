@@ -159,6 +159,10 @@ FIELDS = [
     F("floatingKeepAbove", "Advanced", "Stacking order", "Floating windows", "Sets \"Keep Above\" on floating windows", radio=True, label_text="Keep above"),
     F("noLayering", "Advanced", "Stacking order", "", "Leave the stacking order to KWin", radio=True, label_text="Do not change it"),
     F("dynamicDesktops", "Advanced", "Desktops", "Dynamic desktops", "Experimental, off by default. Like niri's workspaces: there is always one empty desktop at the bottom, and empty desktops are removed when you leave them. Moving a window or column down from the last desktop opens a new one", label_text="Always keep one empty desktop (experimental)"),
+    F("emptyDesktopAboveFirst", "Advanced", "Desktops", "", "With dynamic desktops: also keep an empty desktop above the first one (niri: empty-workspace-above-first)", label_text="Keep an empty desktop above the first too"),
+    F("desktopAutoBackAndForth", "Advanced", "Desktops", "", "Switching to the desktop you are on goes back to the previous one (niri: workspace-auto-back-and-forth)", label_text="Go back when switching to the current desktop"),
+    F("namedDesktops", "Advanced", "Desktops", "Named desktops", "Desktops that always exist, at the top, in this order (niri: workspace \"name\"). A JSON list, e.g. [\"web\", \"chat\"]. The niri import fills it", placeholder='["web", "chat"]'),
+    F("desktopBindNames", "Advanced", "Desktops", "Names for shortcuts", "The names the \"Desktop: focus named N\" shortcuts go to, Nth name for N (a JSON list). The niri import fills it", placeholder='["web", "chat"]'),
     F("tiledDesktops", "Advanced", "Desktops", "Tiled desktops", "Regular expression matched against the virtual desktop names. Only matching desktops are tiled", placeholder=".* (all)"),
     F("niriConfigEnabled", "Advanced", "Import niri config", "", "When off, the pasted text is kept but not used", label_text="Use this niri config"),
     F("niriConfig", "Advanced", "Import niri config", "", "Paste your niri config.kdl (usually ~/.config/niri/config.kdl). Kiri reads it every time the settings change and applies it on top of the other tabs, "

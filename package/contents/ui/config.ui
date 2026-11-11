@@ -3,7 +3,7 @@
 <class>KWin::KarouselConfigForm</class>
 <widget class="QWidget" name="KWin::KarouselConfigForm"><property name="windowTitle"><string>Kiri</string></property><layout class="QVBoxLayout" name="layout_main"><item><widget class="QTabWidget" name="tabContainer"><widget class="QWidget" name="tab_Layout"><attribute name="title"><string>Layout</string></attribute><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_Layout"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_Layout"><layout class="QVBoxLayout"><item><widget class="QGroupBox"><property name="title"><string>Gaps</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Between columns</string></property><property name="toolTip"><string>Horizontal gap between neighbouring columns</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QSpinBox" name="kcfg_gapsInnerHorizontal"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>Horizontal gap between neighbouring columns</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Between windows</string></property><property name="toolTip"><string>Vertical gap between windows in a column</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QSpinBox" name="kcfg_gapsInnerVertical"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>Vertical gap between windows in a column</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Outer gaps</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Top</string></property><property name="toolTip"><string>Gap between the windows and the top screen edge</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QSpinBox" name="kcfg_gapsOuterTop"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>Gap between the windows and the top screen edge</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Bottom</string></property><property name="toolTip"><string>Gap between the windows and the bottom screen edge</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QSpinBox" name="kcfg_gapsOuterBottom"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>Gap between the windows and the bottom screen edge</string></property></widget></item><item row="2" column="0"><widget class="QLabel"><property name="text"><string>Left</string></property><property name="toolTip"><string>Gap between the windows and the left screen edge</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="2" column="1"><widget class="QSpinBox" name="kcfg_gapsOuterLeft"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>Gap between the windows and the left screen edge</string></property></widget></item><item row="3" column="0"><widget class="QLabel"><property name="text"><string>Right</string></property><property name="toolTip"><string>Gap between the windows and the right screen edge</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="3" column="1"><widget class="QSpinBox" name="kcfg_gapsOuterRight"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>Gap between the windows and the right screen edge</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Column width</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Default width</string></property><property name="toolTip"><string>Width of new columns, like 50% or 800px. Empty keeps the window's own width</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QLineEdit" name="kcfg_defaultColumnWidth"><property name="toolTip"><string>Width of new columns, like 50% or 800px. Empty keeps the window's own width</string></property><property name="placeholderText"><string>window's own width</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Preset widths</string></property><property name="toolTip"><string>Widths used when cycling the column width. Comma-separated, units: px and %</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QLineEdit" name="kcfg_presetWidths"><property name="toolTip"><string>Widths used when cycling the column width. Comma-separated, units: px and %</string></property><property name="placeholderText"><string>33.333%, 50%, 66.667%</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="2" column="0"><widget class="QLabel"><property name="text"><string>Key step</string></property><property name="toolTip"><string>Share of the screen a column grows or shrinks by with the width keys (niri: set-column-width "+10%")</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="2" column="1"><widget class="QSpinBox" name="kcfg_columnWidthStep"><property name="suffix"><string> %</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="toolTip"><string>Share of the screen a column grows or shrinks by with the width keys (niri: set-column-width "+10%")</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Window height</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Preset heights</string></property><property name="toolTip"><string>Heights used when cycling the window height. Comma-separated, units: px and %</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QLineEdit" name="kcfg_presetHeights"><property name="toolTip"><string>Heights used when cycling the window height. Comma-separated, units: px and %</string></property><property name="placeholderText"><string>33.333%, 50%, 66.667%</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Key step</string></property><property name="toolTip"><string>Share of the screen a window grows or shrinks by with the height keys</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QSpinBox" name="kcfg_windowHeightStep"><property name="suffix"><string> %</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="toolTip"><string>Share of the screen a window grows or shrinks by with the height keys</string></property></widget></item><item row="2" column="0"><widget class="QLabel"><property name="text"><string>Fine key step</string></property><property name="toolTip"><string>Step when making a window taller or shorter with the up/down resize keys</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="2" column="1"><widget class="QSpinBox" name="kcfg_verticalResizeStep"><property name="suffix"><string> px</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>Step when making a window taller or shorter with the up/down resize keys</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Centering</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Focused column</string></property><property name="toolTip"><string>Move the view just enough to show the focused column (niri: never)</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QRadioButton" name="kcfg_scrollingLazy"><property name="text"><string>Scroll only as needed (niri)</string></property><property name="toolTip"><string>Move the view just enough to show the focused column (niri: never)</string></property></widget></item><item row="1" column="1"><widget class="QRadioButton" name="kcfg_scrollingCentered"><property name="text"><string>Always center it</string></property><property name="toolTip"><string>Keep the focused column in the middle of the screen (niri: always)</string></property></widget></item><item row="2" column="1"><widget class="QRadioButton" name="kcfg_scrollingOnOverflow"><property name="text"><string>Center it when columns overflow</string></property><property name="toolTip"><string>No scrolling while the focused column fits next to its neighbours, otherwise center it (niri: on-overflow)</string></property></widget></item><item row="3" column="1"><widget class="QRadioButton" name="kcfg_scrollingGrouped"><property name="text"><string>Center all visible columns</string></property><property name="toolTip"><string>Center the group of columns that fit on screen</string></property></widget></item><item row="4" column="1"><widget class="QCheckBox" name="kcfg_centerGridWhenFits"><property name="text"><string>Center all columns when they fit</string></property><property name="toolTip"><string>If every column fits on screen, center them instead of aligning to the left</string></property></widget></item><item row="5" column="1"><widget class="QCheckBox" name="kcfg_alwaysCenterSingleColumn"><property name="text"><string>Always center a single column</string></property><property name="toolTip"><string>A lone column is centered even if the other settings would not</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Scrolling</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Scroll key distance</string></property><property name="toolTip"><string>Distance moved by the scroll left/right keys</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QSpinBox" name="kcfg_manualScrollStep"><property name="suffix"><string> px</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>99999</number></property><property name="toolTip"><string>Distance moved by the scroll left/right keys</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Windows</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_tabbedColumnsByDefault"><property name="text"><string>New columns are tabbed</string></property><property name="toolTip"><string>New columns start in tabbed display (only the active window is visible)</string></property></widget></item><item row="1" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_tileMaximized"><property name="text"><string>Keep maximized windows in the grid</string></property><property name="toolTip"><string>They stay in their column and fill the work area; they stay maximized when focus moves away</string></property></widget></item><item row="2" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_tileFullScreen"><property name="text"><string>Keep full-screen windows in the grid</string></property><property name="toolTip"><string>They stay in their column and fill the screen; you can scroll past them</string></property></widget></item><item row="3" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_reMaximize"><property name="text"><string>Restore maximized and full-screen state on focus</string></property><property name="toolTip"><string>Re-maximize and re-fullscreen tiled windows when they are focused again</string></property></widget></item></layout></widget></item><item><spacer name="spacer_Layout"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item></layout></widget></widget></item></layout></widget><widget class="QWidget" name="tab_FocusMouse"><attribute name="title"><string>Focus &amp;&amp; Mouse</string></attribute><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_FocusMouse"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_FocusMouse"><layout class="QVBoxLayout"><item><widget class="QGroupBox"><property name="title"><string>Focus</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="1"><widget class="QCheckBox" name="kcfg_focusFollowsMouse"><property name="text"><string>Focus follows mouse</string></property><property name="toolTip"><string>Like niri: the window under the mouse gets the focus, except while a Plasma popup such as the launcher is open. Kiri sets KWin's focus policy to "Click to focus" when installing</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Max scroll</string></property><property name="toolTip"><string>Like niri's max-scroll-amount: do not focus a window that needs more scrolling than this to be fully shown, in percent of the screen width</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QSpinBox" name="kcfg_focusFollowsMouseMaxScroll"><property name="suffix"><string> %</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="toolTip"><string>Like niri's max-scroll-amount: do not focus a window that needs more scrolling than this to be fully shown, in percent of the screen width</string></property></widget></item><item row="2" column="1"><widget class="QCheckBox" name="kcfg_cursorFollowsFocus"><property name="text"><string>Cursor follows keyboard focus</string></property><property name="toolTip"><string>Move the mouse cursor to a window focused from the keyboard (niri: warp-mouse-to-focus)</string></property></widget></item><item row="3" column="1"><widget class="QCheckBox" name="kcfg_skipSwitcher"><property name="text"><string>Hide tiled windows from Alt+Tab</string></property><property name="toolTip"><string>Hide tiled windows from the window switcher</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Dragging windows</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_untileOnDrag"><property name="text"><string>Float a window when it is dragged</string></property><property name="toolTip"><string>Dragging a tiled window takes it out of the grid</string></property></widget></item><item row="1" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_dropToTile"><property name="text"><string>Tile a window where it is dropped</string></property><property name="toolTip"><string>Like niri: a window dragged out of the grid goes back in at the gap closest to the cursor when you let go</string></property></widget></item><item row="2" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_resizeNeighborColumn"><property name="text"><string>Resize the neighbouring column too</string></property><property name="toolTip"><string>When dragging a column's edge, inversely resize the column on the other side</string></property></widget></item></layout></widget></item><item><spacer name="spacer_FocusMouse"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item></layout></widget></widget></item></layout></widget><widget class="QWidget" name="tab_Animations"><attribute name="title"><string>Animations</string></attribute><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_Animations"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_Animations"><layout class="QVBoxLayout"><item><widget class="QGroupBox"><property name="title"><string>Closing windows</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Delay before the gap closes</string></property><property name="toolTip"><string>Wait this long before the other columns close the gap, so the closing animation can finish</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QSpinBox" name="kcfg_closeRelayoutDelay"><property name="suffix"><string> ms</string></property><property name="specialValueText"><string>None</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>5000</number></property><property name="toolTip"><string>Wait this long before the other columns close the gap, so the closing animation can finish</string></property></widget></item></layout></widget></item><item><spacer name="spacer_Animations"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item></layout></widget></widget></item></layout></widget><widget class="QWidget" name="tab_Appearance"><attribute name="title"><string>Appearance</string></attribute><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_Appearance"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_Appearance"><layout class="QVBoxLayout"><item><widget class="QGroupBox"><property name="title"><string>Windows</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="1"><widget class="QCheckBox" name="kcfg_hideTitlebars"><property name="text"><string>Hide title bars of tiled windows</string></property><property name="toolTip"><string>Like niri: tiled windows lose their title bar and frame (the focus ring is the outline). They get them back when they float or Kiri stops</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Corner radius</string></property><property name="toolTip"><string>Rounds window corners, needs the Kiri decorations effect (0 = square, like niri's default)</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QSpinBox" name="kcfg_cornerRadius"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>99</number></property><property name="toolTip"><string>Rounds window corners, needs the Kiri decorations effect (0 = square, like niri's default)</string></property></widget></item><item row="2" column="0"><widget class="QLabel"><property name="text"><string>Off-screen opacity</string></property><property name="toolTip"><string>Opacity of windows that are not fully visible</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="2" column="1"><widget class="QSpinBox" name="kcfg_offScreenOpacity"><property name="suffix"><string> %</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="toolTip"><string>Opacity of windows that are not fully visible</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Focus ring</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="1"><widget class="QCheckBox" name="kcfg_focusRingEnabled"><property name="text"><string>Show a focus ring around the focused window</string></property><property name="toolTip"><string>Draw a ring around the focused window</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Width</string></property><property name="toolTip"><string>Thickness of the ring</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QSpinBox" name="kcfg_focusRingWidth"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>99</number></property><property name="toolTip"><string>Thickness of the ring</string></property></widget></item><item row="2" column="0"><widget class="QLabel"><property name="text"><string>Active color</string></property><property name="toolTip"><string>Ring color on the active screen</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="2" column="1"><widget class="KColorButton" name="kcfg_focusRingActiveColor"><property name="toolTip"><string>Ring color on the active screen</string></property></widget></item><item row="3" column="0"><widget class="QLabel"><property name="text"><string>Inactive color</string></property><property name="toolTip"><string>Ring color when the screen is not active</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="3" column="1"><widget class="KColorButton" name="kcfg_focusRingInactiveColor"><property name="toolTip"><string>Ring color when the screen is not active</string></property></widget></item><item row="4" column="0"><widget class="QLabel"><property name="text"><string>Urgent color</string></property><property name="toolTip"><string>Ring color of a window that asks for attention</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="4" column="1"><widget class="QLineEdit" name="kcfg_focusRingUrgentColor"><property name="toolTip"><string>Ring color of a window that asks for attention</string></property><property name="placeholderText"><string>#9b0000</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="5" column="0"><widget class="QLabel"><property name="text"><string>Active gradient</string></property><property name="toolTip"><string>Overrides the active color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="5" column="1"><widget class="QLineEdit" name="kcfg_focusRingActiveGradient"><property name="toolTip"><string>Overrides the active color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="placeholderText"><string>from=#80c8ff to=#bbddff angle=45</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="6" column="0"><widget class="QLabel"><property name="text"><string>Inactive gradient</string></property><property name="toolTip"><string>Overrides the inactive color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="6" column="1"><widget class="QLineEdit" name="kcfg_focusRingInactiveGradient"><property name="toolTip"><string>Overrides the inactive color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="placeholderText"><string>from=#80c8ff to=#bbddff angle=45</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="7" column="0"><widget class="QLabel"><property name="text"><string>Urgent gradient</string></property><property name="toolTip"><string>Overrides the urgent color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="7" column="1"><widget class="QLineEdit" name="kcfg_focusRingUrgentGradient"><property name="toolTip"><string>Overrides the urgent color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="placeholderText"><string>from=#80c8ff to=#bbddff angle=45</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Border</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="1"><widget class="QCheckBox" name="kcfg_borderEnabled"><property name="text"><string>Show a border around every window</string></property><property name="toolTip"><string>Always-visible border, drawn inside the window frame</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Width</string></property><property name="toolTip"><string>Thickness of the border</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QSpinBox" name="kcfg_borderWidth"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>99</number></property><property name="toolTip"><string>Thickness of the border</string></property></widget></item><item row="2" column="0"><widget class="QLabel"><property name="text"><string>Active color</string></property><property name="toolTip"><string>Border color of the focused window</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="2" column="1"><widget class="KColorButton" name="kcfg_borderActiveColor"><property name="toolTip"><string>Border color of the focused window</string></property></widget></item><item row="3" column="0"><widget class="QLabel"><property name="text"><string>Inactive color</string></property><property name="toolTip"><string>Border color of other windows</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="3" column="1"><widget class="KColorButton" name="kcfg_borderInactiveColor"><property name="toolTip"><string>Border color of other windows</string></property></widget></item><item row="4" column="0"><widget class="QLabel"><property name="text"><string>Urgent color</string></property><property name="toolTip"><string>Border color of a window that asks for attention</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="4" column="1"><widget class="QLineEdit" name="kcfg_borderUrgentColor"><property name="toolTip"><string>Border color of a window that asks for attention</string></property><property name="placeholderText"><string>#9b0000</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="5" column="0"><widget class="QLabel"><property name="text"><string>Active gradient</string></property><property name="toolTip"><string>Overrides the active color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="5" column="1"><widget class="QLineEdit" name="kcfg_borderActiveGradient"><property name="toolTip"><string>Overrides the active color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="placeholderText"><string>from=#80c8ff to=#bbddff angle=45</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="6" column="0"><widget class="QLabel"><property name="text"><string>Inactive gradient</string></property><property name="toolTip"><string>Overrides the inactive color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="6" column="1"><widget class="QLineEdit" name="kcfg_borderInactiveGradient"><property name="toolTip"><string>Overrides the inactive color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="placeholderText"><string>from=#80c8ff to=#bbddff angle=45</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="7" column="0"><widget class="QLabel"><property name="text"><string>Urgent gradient</string></property><property name="toolTip"><string>Overrides the urgent color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="7" column="1"><widget class="QLineEdit" name="kcfg_borderUrgentGradient"><property name="toolTip"><string>Overrides the urgent color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="placeholderText"><string>from=#80c8ff to=#bbddff angle=45</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Tab indicator</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="1"><widget class="QCheckBox" name="kcfg_tabIndicatorEnabled"><property name="text"><string>Show the tab indicator next to tabbed columns</string></property><property name="toolTip"><string>A strip next to a tabbed column showing its windows</string></property></widget></item><item row="1" column="1"><widget class="QCheckBox" name="kcfg_tabIndicatorHideWhenSingleTab"><property name="text"><string>Hide it when the column has one window</string></property><property name="toolTip"><string>Hide the strip when the column has only one window</string></property></widget></item><item row="2" column="0"><widget class="QLabel"><property name="text"><string>Position</string></property><property name="toolTip"><string>Side of the column where the indicator is drawn</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="2" column="1"><widget class="QComboBox" name="kcfg_tabIndicatorPosition"><property name="toolTip"><string>Side of the column where the indicator is drawn</string></property><item><property name="text"><string>Left</string></property></item><item><property name="text"><string>Right</string></property></item><item><property name="text"><string>Top</string></property></item><item><property name="text"><string>Bottom</string></property></item></widget></item><item row="3" column="0"><widget class="QLabel"><property name="text"><string>Thickness</string></property><property name="toolTip"><string>Thickness of the indicator strip</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="3" column="1"><widget class="QSpinBox" name="kcfg_tabIndicatorWidth"><property name="suffix"><string> px</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>99</number></property><property name="toolTip"><string>Thickness of the indicator strip</string></property></widget></item><item row="4" column="0"><widget class="QLabel"><property name="text"><string>Gap to column</string></property><property name="toolTip"><string>Distance between the column and the indicator</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="4" column="1"><widget class="QSpinBox" name="kcfg_tabIndicatorGap"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>99</number></property><property name="toolTip"><string>Distance between the column and the indicator</string></property></widget></item><item row="5" column="0"><widget class="QLabel"><property name="text"><string>Length</string></property><property name="toolTip"><string>Length of the strip as a share of the column side (1 = full)</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="5" column="1"><widget class="QDoubleSpinBox" name="kcfg_tabIndicatorLength"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.05</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.05</double></property><property name="toolTip"><string>Length of the strip as a share of the column side (1 = full)</string></property></widget></item><item row="6" column="1"><widget class="QCheckBox" name="kcfg_tabIndicatorPlaceWithinColumn"><property name="text"><string>Place it inside the column</string></property><property name="toolTip"><string>Shrink the windows so the indicator fits inside the column</string></property></widget></item><item row="7" column="0"><widget class="QLabel"><property name="text"><string>Gap between tabs</string></property><property name="toolTip"><string>Space between the tabs of the indicator</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="7" column="1"><widget class="QSpinBox" name="kcfg_tabIndicatorGapsBetweenTabs"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>99</number></property><property name="toolTip"><string>Space between the tabs of the indicator</string></property></widget></item><item row="8" column="0"><widget class="QLabel"><property name="text"><string>Corner radius</string></property><property name="toolTip"><string>Rounding of each tab</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="8" column="1"><widget class="QSpinBox" name="kcfg_tabIndicatorCornerRadius"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>99</number></property><property name="toolTip"><string>Rounding of each tab</string></property></widget></item><item row="9" column="0"><widget class="QLabel"><property name="text"><string>Active color</string></property><property name="toolTip"><string>Empty uses the focus ring colors</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="9" column="1"><widget class="QLineEdit" name="kcfg_tabIndicatorActiveColor"><property name="toolTip"><string>Empty uses the focus ring colors</string></property><property name="placeholderText"><string>focus ring color</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="10" column="0"><widget class="QLabel"><property name="text"><string>Inactive color</string></property><property name="toolTip"><string>Empty uses the focus ring colors</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="10" column="1"><widget class="QLineEdit" name="kcfg_tabIndicatorInactiveColor"><property name="toolTip"><string>Empty uses the focus ring colors</string></property><property name="placeholderText"><string>focus ring color</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="11" column="0"><widget class="QLabel"><property name="text"><string>Urgent color</string></property><property name="toolTip"><string>Empty uses the focus ring colors</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="11" column="1"><widget class="QLineEdit" name="kcfg_tabIndicatorUrgentColor"><property name="toolTip"><string>Empty uses the focus ring colors</string></property><property name="placeholderText"><string>focus ring color</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="12" column="0"><widget class="QLabel"><property name="text"><string>Active gradient</string></property><property name="toolTip"><string>Overrides the active color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="12" column="1"><widget class="QLineEdit" name="kcfg_tabIndicatorActiveGradient"><property name="toolTip"><string>Overrides the active color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="placeholderText"><string>from=#80c8ff to=#bbddff angle=45</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="13" column="0"><widget class="QLabel"><property name="text"><string>Inactive gradient</string></property><property name="toolTip"><string>Overrides the inactive color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="13" column="1"><widget class="QLineEdit" name="kcfg_tabIndicatorInactiveGradient"><property name="toolTip"><string>Overrides the inactive color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="placeholderText"><string>from=#80c8ff to=#bbddff angle=45</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="14" column="0"><widget class="QLabel"><property name="text"><string>Urgent gradient</string></property><property name="toolTip"><string>Overrides the urgent color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="14" column="1"><widget class="QLineEdit" name="kcfg_tabIndicatorUrgentGradient"><property name="toolTip"><string>Overrides the urgent color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]</string></property><property name="placeholderText"><string>from=#80c8ff to=#bbddff angle=45</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Shadow</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="1"><widget class="QCheckBox" name="kcfg_shadowEnabled"><property name="text"><string>Draw window shadows</string></property><property name="toolTip"><string>A soft shadow under every window, like niri's</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Softness</string></property><property name="toolTip"><string>Blur radius of the shadow</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QSpinBox" name="kcfg_shadowSoftness"><property name="suffix"><string> px</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>Blur radius of the shadow</string></property></widget></item><item row="2" column="0"><widget class="QLabel"><property name="text"><string>Spread</string></property><property name="toolTip"><string>How far the shadow grows past the window</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="2" column="1"><widget class="QSpinBox" name="kcfg_shadowSpread"><property name="suffix"><string> px</string></property><property name="minimum"><number>-999</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>How far the shadow grows past the window</string></property></widget></item><item row="3" column="0"><widget class="QLabel"><property name="text"><string>Offset X</string></property><property name="toolTip"><string>Horizontal shift of the shadow</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="3" column="1"><widget class="QSpinBox" name="kcfg_shadowOffsetX"><property name="suffix"><string> px</string></property><property name="minimum"><number>-999</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>Horizontal shift of the shadow</string></property></widget></item><item row="4" column="0"><widget class="QLabel"><property name="text"><string>Offset Y</string></property><property name="toolTip"><string>Vertical shift of the shadow</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="4" column="1"><widget class="QSpinBox" name="kcfg_shadowOffsetY"><property name="suffix"><string> px</string></property><property name="minimum"><number>-999</number></property><property name="maximum"><number>999</number></property><property name="toolTip"><string>Vertical shift of the shadow</string></property></widget></item><item row="5" column="0"><widget class="QLabel"><property name="text"><string>Color</string></property><property name="toolTip"><string>#RRGGBBAA, alpha allowed</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="5" column="1"><widget class="QLineEdit" name="kcfg_shadowColor"><property name="toolTip"><string>#RRGGBBAA, alpha allowed</string></property><property name="placeholderText"><string>#00000077</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="6" column="0"><widget class="QLabel"><property name="text"><string>Inactive color</string></property><property name="toolTip"><string>Shadow of unfocused windows. Empty uses the color above</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="6" column="1"><widget class="QLineEdit" name="kcfg_shadowInactiveColor"><property name="toolTip"><string>Shadow of unfocused windows. Empty uses the color above</string></property><property name="placeholderText"><string>same as color</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="7" column="1"><widget class="QCheckBox" name="kcfg_shadowDrawBehindWindow"><property name="text"><string>Draw behind the window too</string></property><property name="toolTip"><string>Also draw the shadow under the window itself, for see-through windows</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Insert hint</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="1"><widget class="QCheckBox" name="kcfg_insertHintEnabled"><property name="text"><string>Show the insert hint</string></property><property name="toolTip"><string>Shows where a dragged window will land</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Color</string></property><property name="toolTip"><string>#RRGGBBAA, alpha allowed</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QLineEdit" name="kcfg_insertHintColor"><property name="toolTip"><string>#RRGGBBAA, alpha allowed</string></property><property name="placeholderText"><string>#7fc8ff80</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="2" column="0"><widget class="QLabel"><property name="text"><string>Gradient</string></property><property name="toolTip"><string>Overrides the color. Format: from=COLOR to=COLOR [angle=DEG]</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="2" column="1"><widget class="QLineEdit" name="kcfg_insertHintGradient"><property name="toolTip"><string>Overrides the color. Format: from=COLOR to=COLOR [angle=DEG]</string></property><property name="placeholderText"><string>from=#80c8ff to=#bbddff angle=45</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Background</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Desktop color</string></property><property name="toolTip"><string>Paints the desktop in one color instead of the wallpaper. Empty keeps the wallpaper</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QLineEdit" name="kcfg_backgroundColor"><property name="toolTip"><string>Paints the desktop in one color instead of the wallpaper. Empty keeps the wallpaper</string></property><property name="placeholderText"><string>wallpaper</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Behind full screen</string></property><property name="toolTip"><string>Color shown around a full-screen window that does not fill the screen</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QLineEdit" name="kcfg_fullscreenBackdropColor"><property name="toolTip"><string>Color shown around a full-screen window that does not fill the screen</string></property><property name="placeholderText"><string>#000000</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item></layout></widget></item><item><spacer name="spacer_Appearance"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item></layout></widget></widget></item></layout></widget><widget class="QWidget" name="tab_GesturesOverview"><attribute name="title"><string>Gestures &amp;&amp; Overview</string></attribute><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_GesturesOverview"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_GesturesOverview"><layout class="QVBoxLayout"><item><widget class="QGroupBox"><property name="title"><string>Touchpad (Wayland only)</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="1"><widget class="QCheckBox" name="kcfg_gestureScroll"><property name="text"><string>Scroll the columns with a three-finger horizontal swipe</string></property><property name="toolTip"><string>Scroll the columns with a three-finger horizontal swipe</string></property></widget></item><item row="1" column="1"><widget class="QCheckBox" name="kcfg_gestureScrollInvert"><property name="text"><string>Natural scrolling</string></property><property name="toolTip"><string>Invert the swipe direction</string></property></widget></item><item row="2" column="0"><widget class="QLabel"><property name="text"><string>Swipe distance</string></property><property name="toolTip"><string>Distance scrolled by one edge-to-edge swipe</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="2" column="1"><widget class="QSpinBox" name="kcfg_gestureScrollStep"><property name="suffix"><string> px</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>99999</number></property><property name="toolTip"><string>Distance scrolled by one edge-to-edge swipe</string></property></widget></item><item row="3" column="0"><widget class="QLabel"><property name="text"><string>Settle time</string></property><property name="toolTip"><string>How long the view keeps following the fingers' momentum after release</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="3" column="1"><widget class="QSpinBox" name="kcfg_gestureSettleDuration"><property name="suffix"><string> ms</string></property><property name="minimum"><number>0</number></property><property name="maximum"><number>5000</number></property><property name="toolTip"><string>How long the view keeps following the fingers' momentum after release</string></property></widget></item><item row="4" column="1"><widget class="QCheckBox" name="kcfg_gestureDesktopSwitch"><property name="text"><string>Switch desktops with a three-finger vertical swipe</string></property><property name="toolTip"><string>Three-finger swipe up/down changes the virtual desktop</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Overview</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_hotCorner"><property name="text"><string>Top-left hot corner opens the overview</string></property><property name="toolTip"><string>Like niri: pushing the pointer into the top-left corner of the screen toggles the overview</string></property></widget></item></layout></widget></item><item><spacer name="spacer_GesturesOverview"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item></layout></widget></widget></item></layout></widget><widget class="QWidget" name="tab_WindowRules"><attribute name="title"><string>Window Rules</string></attribute><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_WindowRules"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_WindowRules"><layout class="QVBoxLayout"><item><widget class="QGroupBox"><property name="title"><string>Simple rules</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0" colspan="2"><widget class="QLabel"><property name="text"><string>One window class per line, regular expressions are allowed. Find a class with: qdbus6 org.kde.KWin /KWin org.kde.KWin.queryWindowInfo</string></property><property name="wordWrap"><bool>true</bool></property></widget></item><item row="1" column="0" colspan="2"><widget class="QLabel"><property name="text"><string>Always float</string></property><property name="toolTip"><string>Window classes that are never tiled. One per line, regular expressions are allowed</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property><property name="alignment"><set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item><item row="2" column="0" colspan="2"><widget class="QPlainTextEdit" name="kcfg_floatClasses"><property name="tabChangesFocus"><bool>true</bool></property><property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property><property name="font"><font><family>Monospace</family></font></property><property name="toolTip"><string>Window classes that are never tiled. One per line, regular expressions are allowed</string></property><property name="placeholderText"><string>calc
 mpv</string></property><property name="minimumSize"><size><width>0</width><height>82</height></size></property><property name="maximumSize"><size><width>16777215</width><height>82</height></size></property></widget></item><item row="3" column="0" colspan="2"><widget class="QLabel"><property name="text"><string>Always tile</string></property><property name="toolTip"><string>Window classes that are always tiled, even if Kiri would float them. One per line</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property><property name="alignment"><set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item><item row="4" column="0" colspan="2"><widget class="QPlainTextEdit" name="kcfg_tileClasses"><property name="tabChangesFocus"><bool>true</bool></property><property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property><property name="font"><font><family>Monospace</family></font></property><property name="toolTip"><string>Window classes that are always tiled, even if Kiri would float them. One per line</string></property><property name="placeholderText"><string>kfind</string></property><property name="minimumSize"><size><width>0</width><height>82</height></size></property><property name="maximumSize"><size><width>16777215</width><height>82</height></size></property></widget></item><item row="5" column="0" colspan="2"><widget class="QLabel"><property name="text"><string>Column width</string></property><property name="toolTip"><string>One class=width per line, like firefox=66.667%</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property><property name="alignment"><set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item><item row="6" column="0" colspan="2"><widget class="QPlainTextEdit" name="kcfg_columnWidthRules"><property name="tabChangesFocus"><bool>true</bool></property><property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property><property name="font"><font><family>Monospace</family></font></property><property name="toolTip"><string>One class=width per line, like firefox=66.667%</string></property><property name="placeholderText"><string>firefox=66.667%
-org\.kde\.dolphin=800px</string></property><property name="minimumSize"><size><width>0</width><height>82</height></size></property><property name="maximumSize"><size><width>16777215</width><height>82</height></size></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>JSON rules</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0" colspan="2"><widget class="QLabel"><property name="text"><string>For rules that also match the window title. Hover over the box for the fields.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item><item row="1" column="0" colspan="2"><widget class="QLabel"><property name="text"><string>Rules</string></property><property name="toolTip"><string>A JSON array of rule objects, applied together with the simple rules. Fields: class, caption (regexes), tile (true/false), width. Example: {"class": "steam", "caption": "Friends List", "tile": false}</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property><property name="alignment"><set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item><item row="2" column="0" colspan="2"><widget class="QPlainTextEdit" name="kcfg_windowRules"><property name="tabChangesFocus"><bool>true</bool></property><property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property><property name="font"><font><family>Monospace</family></font></property><property name="toolTip"><string>A JSON array of rule objects, applied together with the simple rules. Fields: class, caption (regexes), tile (true/false), width. Example: {"class": "steam", "caption": "Friends List", "tile": false}</string></property><property name="minimumSize"><size><width>0</width><height>218</height></size></property></widget></item></layout></widget></item><item><spacer name="spacer_WindowRules"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item></layout></widget></widget></item></layout></widget><widget class="QWidget" name="tab_Shortcuts"><attribute name="title"><string>Shortcuts</string></attribute><layout class="QVBoxLayout"><item><widget class="QLabel" name="label_shortcutsRule"><property name="text"><string>Keys set here are copied to Shortcuts &gt; Kiri in System Settings, without a conflict check. Leave both fields empty to use the keys set there.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item><item><layout class="QHBoxLayout"><item><widget class="QListWidget" name="list_shortcutGroups"><property name="maximumSize"><size><width>170</width><height>16777215</height></size></property><item><property name="text"><string>Focus</string></property></item><item><property name="text"><string>Move</string></property></item><item><property name="text"><string>Column</string></property></item><item><property name="text"><string>Width</string></property></item><item><property name="text"><string>Height</string></property></item><item><property name="text"><string>Window</string></property></item><item><property name="text"><string>Scroll</string></property></item><item><property name="text"><string>Desktop</string></property></item><item><property name="text"><string>Screen</string></property></item><item><property name="text"><string>Overview</string></property></item></widget></item><item><widget class="QStackedWidget" name="stack_shortcuts"><widget class="QWidget" name="page_shortcuts_0"><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_shortcuts_0"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_shortcuts_0"><layout class="QVBoxLayout"><item><layout class="QGridLayout" name="grid_shortcuts_0"><property name="verticalSpacing"><number>2</number></property>
+org\.kde\.dolphin=800px</string></property><property name="minimumSize"><size><width>0</width><height>82</height></size></property><property name="maximumSize"><size><width>16777215</width><height>82</height></size></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>JSON rules</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0" colspan="2"><widget class="QLabel"><property name="text"><string>For rules that also match the window title. Hover over the box for the fields.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item><item row="1" column="0" colspan="2"><widget class="QLabel"><property name="text"><string>Rules</string></property><property name="toolTip"><string>A JSON array of rule objects, applied together with the simple rules. Fields: class, caption (regexes), tile (true/false), width. Example: {"class": "steam", "caption": "Friends List", "tile": false}</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property><property name="alignment"><set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item><item row="2" column="0" colspan="2"><widget class="QPlainTextEdit" name="kcfg_windowRules"><property name="tabChangesFocus"><bool>true</bool></property><property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property><property name="font"><font><family>Monospace</family></font></property><property name="toolTip"><string>A JSON array of rule objects, applied together with the simple rules. Fields: class, caption (regexes), tile (true/false), width. Example: {"class": "steam", "caption": "Friends List", "tile": false}</string></property><property name="minimumSize"><size><width>0</width><height>218</height></size></property></widget></item></layout></widget></item><item><spacer name="spacer_WindowRules"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item></layout></widget></widget></item></layout></widget><widget class="QWidget" name="tab_Shortcuts"><attribute name="title"><string>Shortcuts</string></attribute><layout class="QVBoxLayout"><item><widget class="QLabel" name="label_shortcutsRule"><property name="text"><string>Keys set here are copied to Shortcuts &gt; Kiri in System Settings, without a conflict check. Leave both fields empty to use the keys set there.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item><item><layout class="QHBoxLayout"><item><widget class="QListWidget" name="list_shortcutGroups"><property name="maximumSize"><size><width>170</width><height>16777215</height></size></property><item><property name="text"><string>Focus</string></property></item><item><property name="text"><string>Move</string></property></item><item><property name="text"><string>Column</string></property></item><item><property name="text"><string>Width</string></property></item><item><property name="text"><string>Height</string></property></item><item><property name="text"><string>Window</string></property></item><item><property name="text"><string>Scroll</string></property></item><item><property name="text"><string>Desktop</string></property></item><item><property name="text"><string>Screen</string></property></item><item><property name="text"><string>Overview</string></property></item><item><property name="text"><string>Other</string></property></item></widget></item><item><widget class="QStackedWidget" name="stack_shortcuts"><widget class="QWidget" name="page_shortcuts_0"><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_shortcuts_0"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_shortcuts_0"><layout class="QVBoxLayout"><item><layout class="QGridLayout" name="grid_shortcuts_0"><property name="verticalSpacing"><number>2</number></property>
 <item row="0" column="1"><widget class="QLabel"><property name="text"><string>Shortcut</string></property></widget></item>
 <item row="0" column="2"><widget class="QLabel"><property name="text"><string>Alternate</string></property></widget></item>
 <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Bottom window</string></property></widget></item>
@@ -2191,7 +2191,998 @@ org\.kde\.dolphin=800px</string></property><property name="minimumSize"><size><w
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-</layout></item><item><spacer name="spacer_shortcuts_9"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item></layout></widget></widget></item></layout></widget></widget></item></layout></item></layout></widget><widget class="QWidget" name="tab_Advanced"><attribute name="title"><string>Advanced</string></attribute><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_Advanced"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_Advanced"><layout class="QVBoxLayout"><item><widget class="QGroupBox"><property name="title"><string>Stacking order</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Tiled windows</string></property><property name="toolTip"><string>Sets "Keep Below" on tiled windows so floating ones stay on top</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QRadioButton" name="kcfg_tiledKeepBelow"><property name="text"><string>Keep below</string></property><property name="toolTip"><string>Sets "Keep Below" on tiled windows so floating ones stay on top</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Floating windows</string></property><property name="toolTip"><string>Sets "Keep Above" on floating windows</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QRadioButton" name="kcfg_floatingKeepAbove"><property name="text"><string>Keep above</string></property><property name="toolTip"><string>Sets "Keep Above" on floating windows</string></property></widget></item><item row="2" column="1"><widget class="QRadioButton" name="kcfg_noLayering"><property name="text"><string>Do not change it</string></property><property name="toolTip"><string>Leave the stacking order to KWin</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Desktops</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Dynamic desktops</string></property><property name="toolTip"><string>Experimental, off by default. Like niri's workspaces: there is always one empty desktop at the bottom, and empty desktops are removed when you leave them. Moving a window or column down from the last desktop opens a new one</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QCheckBox" name="kcfg_dynamicDesktops"><property name="text"><string>Always keep one empty desktop (experimental)</string></property><property name="toolTip"><string>Experimental, off by default. Like niri's workspaces: there is always one empty desktop at the bottom, and empty desktops are removed when you leave them. Moving a window or column down from the last desktop opens a new one</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Tiled desktops</string></property><property name="toolTip"><string>Regular expression matched against the virtual desktop names. Only matching desktops are tiled</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QLineEdit" name="kcfg_tiledDesktops"><property name="toolTip"><string>Regular expression matched against the virtual desktop names. Only matching desktops are tiled</string></property><property name="placeholderText"><string>.* (all)</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Import niri config</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0" colspan="2"><widget class="QLabel"><property name="text"><string>Kiri applies the pasted config on top of the other tabs. Hover over the box for what it reads.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item><item row="1" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_niriConfigEnabled"><property name="text"><string>Use this niri config</string></property><property name="toolTip"><string>When off, the pasted text is kept but not used</string></property></widget></item><item row="2" column="0" colspan="2"><widget class="QPlainTextEdit" name="kcfg_niriConfig"><property name="tabChangesFocus"><bool>true</bool></property><property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property><property name="font"><font><family>Monospace</family></font></property><property name="toolTip"><string>Paste your niri config.kdl (usually ~/.config/niri/config.kdl). Kiri reads it every time the settings change and applies it on top of the other tabs, so the values it sets win. It sets: key binds (keys typed in the Shortcuts tab still win), gaps and struts, center-focused-column, always-center-single-column, preset widths and heights, default column width and display, focus ring, border, tab indicator, warp-mouse-to-focus, and window rules with open-floating or default-column-width. Everything else is ignored; lines Kiri can't use are listed in the KWin log.</string></property><property name="placeholderText"><string>layout {
+</layout></item><item><spacer name="spacer_shortcuts_9"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item></layout></widget></widget></item></layout></widget><widget class="QWidget" name="page_shortcuts_10"><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_shortcuts_10"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_shortcuts_10"><layout class="QVBoxLayout"><item><layout class="QGridLayout" name="grid_shortcuts_10"><property name="verticalSpacing"><number>2</number></property>
+<item row="0" column="1"><widget class="QLabel"><property name="text"><string>Shortcut</string></property></widget></item>
+<item row="0" column="2"><widget class="QLabel"><property name="text"><string>Alternate</string></property></widget></item>
+<item row="1" column="0"><widget class="QLabel"><property name="text"><string>Move column to a new desktop above this one</string></property></widget></item>
+<item row="1" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_new_desktop_above">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="1" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_new_desktop_above">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="2" column="0"><widget class="QLabel"><property name="text"><string>Move column to a new desktop above this one, the focus stays here</string></property></widget></item>
+<item row="2" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_new_desktop_above_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="2" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_new_desktop_above_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="3" column="0"><widget class="QLabel"><property name="text"><string>Move column to a new desktop below this one</string></property></widget></item>
+<item row="3" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_new_desktop_below">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="3" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_new_desktop_below">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="4" column="0"><widget class="QLabel"><property name="text"><string>Move column to a new desktop below this one, the focus stays here</string></property></widget></item>
+<item row="4" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_new_desktop_below_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="4" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_new_desktop_below_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="5" column="0"><widget class="QLabel"><property name="text"><string>Move column to desktop 1, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="5" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_nofocus_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="5" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_nofocus_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="6" column="0"><widget class="QLabel"><property name="text"><string>Move column to desktop 2, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="6" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_nofocus_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="6" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_nofocus_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="7" column="0"><widget class="QLabel"><property name="text"><string>Move column to desktop 3, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="7" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_nofocus_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="7" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_nofocus_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="8" column="0"><widget class="QLabel"><property name="text"><string>Move column to desktop 4, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="8" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_nofocus_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="8" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_nofocus_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="9" column="0"><widget class="QLabel"><property name="text"><string>Move column to desktop 5, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="9" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_nofocus_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="9" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_nofocus_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="10" column="0"><widget class="QLabel"><property name="text"><string>Move column to desktop 6, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="10" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_nofocus_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="10" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_nofocus_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="11" column="0"><widget class="QLabel"><property name="text"><string>Move column to desktop 7, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="11" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_nofocus_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="11" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_nofocus_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="12" column="0"><widget class="QLabel"><property name="text"><string>Move column to desktop 8, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="12" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_nofocus_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="12" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_nofocus_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="13" column="0"><widget class="QLabel"><property name="text"><string>Move column to desktop 9, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="13" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_nofocus_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="13" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_nofocus_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="14" column="0"><widget class="QLabel"><property name="text"><string>Move column to the next desktop, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="14" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_next_desktop_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="14" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_next_desktop_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="15" column="0"><widget class="QLabel"><property name="text"><string>Move column to the previous desktop, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="15" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_previous_desktop_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="15" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_previous_desktop_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="16" column="0"><widget class="QLabel"><property name="text"><string>Move column to the 1th desktop name of the niri binds (niri's move-column-to-workspace \</string></property></widget></item>
+<item row="16" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_named_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="16" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_named_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="17" column="0"><widget class="QLabel"><property name="text"><string>Move column to the 2th desktop name of the niri binds (niri's move-column-to-workspace \</string></property></widget></item>
+<item row="17" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_named_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="17" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_named_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="18" column="0"><widget class="QLabel"><property name="text"><string>Move column to the 3th desktop name of the niri binds (niri's move-column-to-workspace \</string></property></widget></item>
+<item row="18" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_named_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="18" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_named_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="19" column="0"><widget class="QLabel"><property name="text"><string>Move column to the 4th desktop name of the niri binds (niri's move-column-to-workspace \</string></property></widget></item>
+<item row="19" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_named_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="19" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_named_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="20" column="0"><widget class="QLabel"><property name="text"><string>Move column to the 5th desktop name of the niri binds (niri's move-column-to-workspace \</string></property></widget></item>
+<item row="20" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_named_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="20" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_named_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="21" column="0"><widget class="QLabel"><property name="text"><string>Move column to the 6th desktop name of the niri binds (niri's move-column-to-workspace \</string></property></widget></item>
+<item row="21" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_named_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="21" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_named_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="22" column="0"><widget class="QLabel"><property name="text"><string>Move column to the 7th desktop name of the niri binds (niri's move-column-to-workspace \</string></property></widget></item>
+<item row="22" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_named_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="22" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_named_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="23" column="0"><widget class="QLabel"><property name="text"><string>Move column to the 8th desktop name of the niri binds (niri's move-column-to-workspace \</string></property></widget></item>
+<item row="23" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_named_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="23" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_named_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="24" column="0"><widget class="QLabel"><property name="text"><string>Move column to the 9th desktop name of the niri binds (niri's move-column-to-workspace \</string></property></widget></item>
+<item row="24" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_column_move_to_desktop_named_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="24" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_column_move_to_desktop_named_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="25" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop to position 1 (niri's move-workspace-to-index)</string></property></widget></item>
+<item row="25" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_move_desktop_to_index_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="25" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_move_desktop_to_index_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="26" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop to position 2 (niri's move-workspace-to-index)</string></property></widget></item>
+<item row="26" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_move_desktop_to_index_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="26" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_move_desktop_to_index_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="27" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop to position 3 (niri's move-workspace-to-index)</string></property></widget></item>
+<item row="27" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_move_desktop_to_index_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="27" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_move_desktop_to_index_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="28" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop to position 4 (niri's move-workspace-to-index)</string></property></widget></item>
+<item row="28" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_move_desktop_to_index_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="28" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_move_desktop_to_index_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="29" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop to position 5 (niri's move-workspace-to-index)</string></property></widget></item>
+<item row="29" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_move_desktop_to_index_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="29" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_move_desktop_to_index_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="30" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop to position 6 (niri's move-workspace-to-index)</string></property></widget></item>
+<item row="30" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_move_desktop_to_index_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="30" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_move_desktop_to_index_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="31" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop to position 7 (niri's move-workspace-to-index)</string></property></widget></item>
+<item row="31" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_move_desktop_to_index_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="31" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_move_desktop_to_index_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="32" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop to position 8 (niri's move-workspace-to-index)</string></property></widget></item>
+<item row="32" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_move_desktop_to_index_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="32" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_move_desktop_to_index_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="33" column="0"><widget class="QLabel"><property name="text"><string>Move the current desktop to position 9 (niri's move-workspace-to-index)</string></property></widget></item>
+<item row="33" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_move_desktop_to_index_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="33" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_move_desktop_to_index_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="34" column="0"><widget class="QLabel"><property name="text"><string>Move window to a new desktop above this one</string></property></widget></item>
+<item row="34" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_new_desktop_above">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="34" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_new_desktop_above">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="35" column="0"><widget class="QLabel"><property name="text"><string>Move window to a new desktop above this one, the focus stays here</string></property></widget></item>
+<item row="35" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_new_desktop_above_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="35" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_new_desktop_above_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="36" column="0"><widget class="QLabel"><property name="text"><string>Move window to a new desktop below this one</string></property></widget></item>
+<item row="36" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_new_desktop_below">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="36" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_new_desktop_below">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="37" column="0"><widget class="QLabel"><property name="text"><string>Move window to a new desktop below this one, the focus stays here</string></property></widget></item>
+<item row="37" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_new_desktop_below_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="37" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_new_desktop_below_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="38" column="0"><widget class="QLabel"><property name="text"><string>Move window to desktop 1, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="38" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_nofocus_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="38" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_nofocus_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="39" column="0"><widget class="QLabel"><property name="text"><string>Move window to desktop 2, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="39" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_nofocus_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="39" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_nofocus_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="40" column="0"><widget class="QLabel"><property name="text"><string>Move window to desktop 3, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="40" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_nofocus_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="40" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_nofocus_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="41" column="0"><widget class="QLabel"><property name="text"><string>Move window to desktop 4, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="41" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_nofocus_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="41" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_nofocus_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="42" column="0"><widget class="QLabel"><property name="text"><string>Move window to desktop 5, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="42" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_nofocus_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="42" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_nofocus_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="43" column="0"><widget class="QLabel"><property name="text"><string>Move window to desktop 6, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="43" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_nofocus_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="43" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_nofocus_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="44" column="0"><widget class="QLabel"><property name="text"><string>Move window to desktop 7, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="44" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_nofocus_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="44" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_nofocus_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="45" column="0"><widget class="QLabel"><property name="text"><string>Move window to desktop 8, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="45" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_nofocus_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="45" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_nofocus_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="46" column="0"><widget class="QLabel"><property name="text"><string>Move window to desktop 9, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="46" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_nofocus_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="46" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_nofocus_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="47" column="0"><widget class="QLabel"><property name="text"><string>Move window to the next desktop, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="47" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_next_desktop_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="47" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_next_desktop_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="48" column="0"><widget class="QLabel"><property name="text"><string>Move window to the previous desktop, the focus stays here (niri's focus=false)</string></property></widget></item>
+<item row="48" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_previous_desktop_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="48" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_previous_desktop_nofocus">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="49" column="0"><widget class="QLabel"><property name="text"><string>Move window to the 1th desktop name of the niri binds (niri's move-window-to-workspace \</string></property></widget></item>
+<item row="49" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_named_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="49" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_named_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="50" column="0"><widget class="QLabel"><property name="text"><string>Move window to the 2th desktop name of the niri binds (niri's move-window-to-workspace \</string></property></widget></item>
+<item row="50" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_named_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="50" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_named_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="51" column="0"><widget class="QLabel"><property name="text"><string>Move window to the 3th desktop name of the niri binds (niri's move-window-to-workspace \</string></property></widget></item>
+<item row="51" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_named_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="51" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_named_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="52" column="0"><widget class="QLabel"><property name="text"><string>Move window to the 4th desktop name of the niri binds (niri's move-window-to-workspace \</string></property></widget></item>
+<item row="52" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_named_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="52" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_named_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="53" column="0"><widget class="QLabel"><property name="text"><string>Move window to the 5th desktop name of the niri binds (niri's move-window-to-workspace \</string></property></widget></item>
+<item row="53" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_named_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="53" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_named_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="54" column="0"><widget class="QLabel"><property name="text"><string>Move window to the 6th desktop name of the niri binds (niri's move-window-to-workspace \</string></property></widget></item>
+<item row="54" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_named_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="54" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_named_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="55" column="0"><widget class="QLabel"><property name="text"><string>Move window to the 7th desktop name of the niri binds (niri's move-window-to-workspace \</string></property></widget></item>
+<item row="55" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_named_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="55" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_named_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="56" column="0"><widget class="QLabel"><property name="text"><string>Move window to the 8th desktop name of the niri binds (niri's move-window-to-workspace \</string></property></widget></item>
+<item row="56" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_named_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="56" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_named_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="57" column="0"><widget class="QLabel"><property name="text"><string>Move window to the 9th desktop name of the niri binds (niri's move-window-to-workspace \</string></property></widget></item>
+<item row="57" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_move_to_desktop_named_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="57" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_move_to_desktop_named_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="58" column="0"><widget class="QLabel"><property name="text"><string>Name the current desktop with the 1th desktop name of the niri binds (niri's set-workspace-name)</string></property></widget></item>
+<item row="58" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_set_desktop_name_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="58" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_set_desktop_name_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="59" column="0"><widget class="QLabel"><property name="text"><string>Name the current desktop with the 2th desktop name of the niri binds (niri's set-workspace-name)</string></property></widget></item>
+<item row="59" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_set_desktop_name_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="59" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_set_desktop_name_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="60" column="0"><widget class="QLabel"><property name="text"><string>Name the current desktop with the 3th desktop name of the niri binds (niri's set-workspace-name)</string></property></widget></item>
+<item row="60" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_set_desktop_name_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="60" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_set_desktop_name_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="61" column="0"><widget class="QLabel"><property name="text"><string>Name the current desktop with the 4th desktop name of the niri binds (niri's set-workspace-name)</string></property></widget></item>
+<item row="61" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_set_desktop_name_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="61" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_set_desktop_name_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="62" column="0"><widget class="QLabel"><property name="text"><string>Name the current desktop with the 5th desktop name of the niri binds (niri's set-workspace-name)</string></property></widget></item>
+<item row="62" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_set_desktop_name_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="62" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_set_desktop_name_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="63" column="0"><widget class="QLabel"><property name="text"><string>Name the current desktop with the 6th desktop name of the niri binds (niri's set-workspace-name)</string></property></widget></item>
+<item row="63" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_set_desktop_name_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="63" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_set_desktop_name_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="64" column="0"><widget class="QLabel"><property name="text"><string>Name the current desktop with the 7th desktop name of the niri binds (niri's set-workspace-name)</string></property></widget></item>
+<item row="64" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_set_desktop_name_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="64" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_set_desktop_name_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="65" column="0"><widget class="QLabel"><property name="text"><string>Name the current desktop with the 8th desktop name of the niri binds (niri's set-workspace-name)</string></property></widget></item>
+<item row="65" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_set_desktop_name_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="65" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_set_desktop_name_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="66" column="0"><widget class="QLabel"><property name="text"><string>Name the current desktop with the 9th desktop name of the niri binds (niri's set-workspace-name)</string></property></widget></item>
+<item row="66" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_set_desktop_name_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="66" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_set_desktop_name_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="67" column="0"><widget class="QLabel"><property name="text"><string>Remove the name of the current desktop (niri's unset-workspace-name)</string></property></widget></item>
+<item row="67" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_unset_desktop_name">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="67" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_unset_desktop_name">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="68" column="0"><widget class="QLabel"><property name="text"><string>Switch to the 1th desktop name of the niri binds (niri's focus-workspace \</string></property></widget></item>
+<item row="68" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_named_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="68" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_named_1">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="69" column="0"><widget class="QLabel"><property name="text"><string>Switch to the 2th desktop name of the niri binds (niri's focus-workspace \</string></property></widget></item>
+<item row="69" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_named_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="69" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_named_2">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="70" column="0"><widget class="QLabel"><property name="text"><string>Switch to the 3th desktop name of the niri binds (niri's focus-workspace \</string></property></widget></item>
+<item row="70" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_named_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="70" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_named_3">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="71" column="0"><widget class="QLabel"><property name="text"><string>Switch to the 4th desktop name of the niri binds (niri's focus-workspace \</string></property></widget></item>
+<item row="71" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_named_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="71" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_named_4">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="72" column="0"><widget class="QLabel"><property name="text"><string>Switch to the 5th desktop name of the niri binds (niri's focus-workspace \</string></property></widget></item>
+<item row="72" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_named_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="72" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_named_5">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="73" column="0"><widget class="QLabel"><property name="text"><string>Switch to the 6th desktop name of the niri binds (niri's focus-workspace \</string></property></widget></item>
+<item row="73" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_named_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="73" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_named_6">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="74" column="0"><widget class="QLabel"><property name="text"><string>Switch to the 7th desktop name of the niri binds (niri's focus-workspace \</string></property></widget></item>
+<item row="74" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_named_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="74" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_named_7">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="75" column="0"><widget class="QLabel"><property name="text"><string>Switch to the 8th desktop name of the niri binds (niri's focus-workspace \</string></property></widget></item>
+<item row="75" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_named_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="75" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_named_8">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="76" column="0"><widget class="QLabel"><property name="text"><string>Switch to the 9th desktop name of the niri binds (niri's focus-workspace \</string></property></widget></item>
+<item row="76" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_desktop_named_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+<item row="76" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_desktop_named_9">
+<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
+<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
+<property name="kcfg_property"><cstring>keySequence</cstring></property>
+<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
+</widget></item>
+</layout></item><item><spacer name="spacer_shortcuts_10"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item></layout></widget></widget></item></layout></widget></widget></item></layout></item></layout></widget><widget class="QWidget" name="tab_Advanced"><attribute name="title"><string>Advanced</string></attribute><layout class="QVBoxLayout"><property name="margin"><number>0</number></property><item><widget class="QScrollArea" name="scroll_Advanced"><property name="frameShape"><enum>QFrame::NoFrame</enum></property><property name="widgetResizable"><bool>true</bool></property><widget class="QWidget" name="scrollContents_Advanced"><layout class="QVBoxLayout"><item><widget class="QGroupBox"><property name="title"><string>Stacking order</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Tiled windows</string></property><property name="toolTip"><string>Sets "Keep Below" on tiled windows so floating ones stay on top</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QRadioButton" name="kcfg_tiledKeepBelow"><property name="text"><string>Keep below</string></property><property name="toolTip"><string>Sets "Keep Below" on tiled windows so floating ones stay on top</string></property></widget></item><item row="1" column="0"><widget class="QLabel"><property name="text"><string>Floating windows</string></property><property name="toolTip"><string>Sets "Keep Above" on floating windows</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="1" column="1"><widget class="QRadioButton" name="kcfg_floatingKeepAbove"><property name="text"><string>Keep above</string></property><property name="toolTip"><string>Sets "Keep Above" on floating windows</string></property></widget></item><item row="2" column="1"><widget class="QRadioButton" name="kcfg_noLayering"><property name="text"><string>Do not change it</string></property><property name="toolTip"><string>Leave the stacking order to KWin</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Desktops</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0"><widget class="QLabel"><property name="text"><string>Dynamic desktops</string></property><property name="toolTip"><string>Experimental, off by default. Like niri's workspaces: there is always one empty desktop at the bottom, and empty desktops are removed when you leave them. Moving a window or column down from the last desktop opens a new one</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="0" column="1"><widget class="QCheckBox" name="kcfg_dynamicDesktops"><property name="text"><string>Always keep one empty desktop (experimental)</string></property><property name="toolTip"><string>Experimental, off by default. Like niri's workspaces: there is always one empty desktop at the bottom, and empty desktops are removed when you leave them. Moving a window or column down from the last desktop opens a new one</string></property></widget></item><item row="1" column="1"><widget class="QCheckBox" name="kcfg_emptyDesktopAboveFirst"><property name="text"><string>Keep an empty desktop above the first too</string></property><property name="toolTip"><string>With dynamic desktops: also keep an empty desktop above the first one (niri: empty-workspace-above-first)</string></property></widget></item><item row="2" column="1"><widget class="QCheckBox" name="kcfg_desktopAutoBackAndForth"><property name="text"><string>Go back when switching to the current desktop</string></property><property name="toolTip"><string>Switching to the desktop you are on goes back to the previous one (niri: workspace-auto-back-and-forth)</string></property></widget></item><item row="3" column="0"><widget class="QLabel"><property name="text"><string>Named desktops</string></property><property name="toolTip"><string>Desktops that always exist, at the top, in this order (niri: workspace "name"). A JSON list, e.g. ["web", "chat"]. The niri import fills it</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="3" column="1"><widget class="QLineEdit" name="kcfg_namedDesktops"><property name="toolTip"><string>Desktops that always exist, at the top, in this order (niri: workspace "name"). A JSON list, e.g. ["web", "chat"]. The niri import fills it</string></property><property name="placeholderText"><string>["web", "chat"]</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="4" column="0"><widget class="QLabel"><property name="text"><string>Names for shortcuts</string></property><property name="toolTip"><string>The names the "Desktop: focus named N" shortcuts go to, Nth name for N (a JSON list). The niri import fills it</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="4" column="1"><widget class="QLineEdit" name="kcfg_desktopBindNames"><property name="toolTip"><string>The names the "Desktop: focus named N" shortcuts go to, Nth name for N (a JSON list). The niri import fills it</string></property><property name="placeholderText"><string>["web", "chat"]</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item><item row="5" column="0"><widget class="QLabel"><property name="text"><string>Tiled desktops</string></property><property name="toolTip"><string>Regular expression matched against the virtual desktop names. Only matching desktops are tiled</string></property><property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="minimumSize"><size><width>170</width><height>0</height></size></property></widget></item><item row="5" column="1"><widget class="QLineEdit" name="kcfg_tiledDesktops"><property name="toolTip"><string>Regular expression matched against the virtual desktop names. Only matching desktops are tiled</string></property><property name="placeholderText"><string>.* (all)</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item></layout></widget></item><item><widget class="QGroupBox"><property name="title"><string>Import niri config</string></property><layout class="QFormLayout"><property name="fieldGrowthPolicy"><enum>QFormLayout::ExpandingFieldsGrow</enum></property><property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property><property name="verticalSpacing"><number>6</number></property><item row="0" column="0" colspan="2"><widget class="QLabel"><property name="text"><string>Kiri applies the pasted config on top of the other tabs. Hover over the box for what it reads.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item><item row="1" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_niriConfigEnabled"><property name="text"><string>Use this niri config</string></property><property name="toolTip"><string>When off, the pasted text is kept but not used</string></property></widget></item><item row="2" column="0" colspan="2"><widget class="QPlainTextEdit" name="kcfg_niriConfig"><property name="tabChangesFocus"><bool>true</bool></property><property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property><property name="font"><font><family>Monospace</family></font></property><property name="toolTip"><string>Paste your niri config.kdl (usually ~/.config/niri/config.kdl). Kiri reads it every time the settings change and applies it on top of the other tabs, so the values it sets win. It sets: key binds (keys typed in the Shortcuts tab still win), gaps and struts, center-focused-column, always-center-single-column, preset widths and heights, default column width and display, focus ring, border, tab indicator, warp-mouse-to-focus, and window rules with open-floating or default-column-width. Everything else is ignored; lines Kiri can't use are listed in the KWin log.</string></property><property name="placeholderText"><string>layout {
     gaps 16
 }
 binds {

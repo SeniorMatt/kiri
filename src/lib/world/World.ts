@@ -21,6 +21,8 @@ class World {
     private readonly closeRelayoutDelay: number;
     private arrangeHeld = false;
     public readonly dynamicDesktops: DynamicDesktops;
+    public readonly desktopAutoBackAndForth: boolean; // niri's workspace-auto-back-and-forth
+    public readonly desktopBindNames: string[]; // the names the "...-named-N" shortcuts mean
     private currentDesktop: KwinDesktop|null = null;
     private overview!: Overview;
     public previousDesktop: KwinDesktop|null = null; // niri's focus-workspace-previous
@@ -74,6 +76,8 @@ class World {
             verticalResizeStep: config.verticalResizeStep,
             columnResizer: config.scrollingCentered ? new RawResizer(presetWidths) : new ContextualResizer(presetWidths),
             clampDesktopIndex: (index: number) => this.dynamicDesktops.clampIndex(index),
+            emptyDesktopNextToCurrent: (below: boolean) => this.dynamicDesktops.emptyDesktopNextToCurrent(below),
+            releaseNewDesktop: () => this.dynamicDesktops.releaseReserved(),
         };
         if (keyBindings === null) {
             this.keyBindings = new KeyBindings(this, actionsConfig, config.shortcutKeys);
@@ -162,7 +166,25 @@ class World {
         );
         this.clientManager = new ClientManager(config, this, this.desktopManager, this.pinManager);
         warpFrame.provider = kwinClient => this.clientManager.getWarpFrame(kwinClient);
-        this.dynamicDesktops = new DynamicDesktops(config.dynamicDesktops, desktop => this.clientManager.isDesktopOccupied(desktop));
+        this.dynamicDesktops = new DynamicDesktops(
+            {
+                enabled: config.dynamicDesktops,
+                emptyAbove: config.emptyDesktopAboveFirst,
+                names: DynamicDesktops.parseNames(config.namedDesktops),
+            },
+            desktop => this.clientManager.isDesktopOccupied(desktop),
+            layout?.namedDesktops ?? [],
+            (oldDesktop, newDesktop) => {
+                if (this.previousDesktop === oldDesktop) {
+                    this.previousDesktop = newDesktop; // niri keeps the id of the previous workspace when workspaces move
+                }
+            },
+        );
+        this.desktopAutoBackAndForth = config.desktopAutoBackAndForth;
+        this.desktopBindNames = DynamicDesktops.parseNames(config.desktopBindNames);
+        if (layout?.previousDesktop !== undefined) {
+            this.previousDesktop = Workspace.desktops.find(desktop => desktop.id === layout.previousDesktop) ?? null;
+        }
         this.overview = new Overview(this, this.clientManager, this.desktopManager);
         if (layout !== null) {
             this.clientManager.prepareRestore(layout.floating, layout.manual, layout.floatingFrames);
@@ -245,7 +267,11 @@ class World {
             });
         }
         const floating = this.clientManager.captureFloating();
-        return { columns, views, floating: floating.floating, manual: floating.manual, floatingFrames: floating.floatingFrames };
+        return {
+            columns, views, floating: floating.floating, manual: floating.manual, floatingFrames: floating.floatingFrames,
+            namedDesktops: this.dynamicDesktops.captureNamed(),
+            previousDesktop: this.previousDesktop !== null && Workspace.desktops.includes(this.previousDesktop) ? this.previousDesktop.id : undefined,
+        };
     }
 
     private restoreLayout(layout: World.Layout) {
@@ -717,6 +743,7 @@ class World {
 
     public destroy() {
         this.overview.close();
+        this.dynamicDesktops.destroy();
         this.gestureEndDelayer.destroy();
         this.gestureAnimationTimer.destroy();
         this.minSizeTimer.destroy();
@@ -736,6 +763,7 @@ class World {
             this.previousDesktop = this.currentDesktop;
             this.currentDesktop = Workspace.currentDesktop;
         }
+        this.dynamicDesktops.onDesktopChanged();
     }
 
     public onScreenResized(outputChanged = false) {
@@ -768,5 +796,7 @@ namespace World {
         manual: string[]; // windows the user floated or tiled by hand (rules leave them alone)
         floatingFrames: { id: string, x: number, y: number, width: number, height: number }[];
         views: { desktop: string, scrollX: number, focused: string | null }[];
+        namedDesktops?: string[]; // ids of the desktops that have a niri workspace name
+        previousDesktop?: string; // id of the desktop before the current one (focus-workspace-previous)
     }
 }

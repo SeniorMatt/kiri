@@ -39,7 +39,7 @@ This replaces the earlier checklist (which had a few stale entries: the wheel bi
 | default-column-width | initial width; empty block = window decides; default proportion 0.5 | layout.rs 43, `DefaultPresetSize` | done | `defaultColumnWidth` ("" = window's own); import handles the empty block | behaviorOptions |
 | center-focused-column never/always/on-overflow | when to centre on focus change | scrolling.rs 655-710 | done | `scrollingLazy/Centered/OnOverflow` (+ Kiri-only `scrollingGrouped`); behavior/scroller/*.ts | behaviorOptions, centerFocused |
 | always-center-single-column | lone column centred | scrolling.rs `compute_new_view_offset` 5647 | done | `alwaysCenterSingleColumn`; scrollClamper/*.ts | singleColumnResize |
-| empty-workspace-above-first | extra empty workspace above the first one too | layout.rs; monitor.rs `clean_up_workspaces` 664 | missing | DynamicDesktops.ts only keeps one empty desktop at the bottom; feasible with `Workspace.createDesktop(0)` | - |
+| empty-workspace-above-first | extra empty workspace above the first one too | layout.rs; monitor.rs `clean_up_workspaces` 664 | done | `emptyDesktopAboveFirst` (needs `dynamicDesktops`); DynamicDesktops.ts `ensureEmptyDesktops`, `cleanup` incl. niri's two-empty special case | workspaces |
 | default-column-display normal/tabbed | new columns tabbed | layout.rs; scrolling.rs | done | `tabbedColumnsByDefault`; Column.ts | tabbed |
 | background-color | colour behind the workspace (wallpaper replaced) | layout.rs; appearance.rs `DEFAULT_BACKGROUND_COLOR` | done | `backgroundColor` (empty keeps the wallpaper). The wallpaper is Plasma's desktop window, which the FX paints as a solid colour instead of drawing it (drawWindow on `isDesktop()`), so desktop icons and widgets go too. Not exercised visually: the nested KWin has no plasmashell | decorations (config only) |
 | fullscreen-backdrop-color | solid backdrop behind a full-screen window (default black; transparent lets it see through) | layout.rs; tile.rs 1285; wiki Fullscreen-and-Maximize | done | `fullscreenBackdropColor`; FX drawBackdrop paints it over the whole screen under a full-screen window, faded in with the expand spring | decorations (config only) |
@@ -66,7 +66,7 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | focus-window-or-monitor-up/down, focus-column-or-monitor-left/right | window/column, else monitor | layout/mod.rs | partial | no monitor concept in Kiri's layout; on one output they equal plain focus; import skips them | - |
 | focus-floating, focus-tiling, switch-focus-between-floating-and-tiling | layer focus | layout/workspace.rs | done | `focus-floating`, `focus-tiling`, `window-switch-focus-floating-tiling` | floatingKeys, leaveUntiled |
 | focus-workspace-down/up, N, previous | | monitor.rs | done | `desktop-next/previous`, `desktop-{}`, `desktop-previous-used`; DesktopManager.ts, DynamicDesktops.ts `clampIndex` | keyBindings, dynamicDesktops |
-| focus-workspace "name" | by workspace name | layout/mod.rs `find_workspace_by_name` | missing | no named workspaces (see section 5) | - |
+| focus-workspace "name" | by workspace name | layout/mod.rs `find_workspace_by_name` | done | `desktop-named-N` (the Nth name of `desktopBindNames`, which the importer fills); DynamicDesktops.ts `findByName` | workspaces |
 | focus-monitor-left/right/up/down/next/previous/NAME | | layout/mod.rs | n/a | desktops are shared by every output; Kiri keeps one grid per desktop on the chosen screen. `screen-switch` is the nearest thing | - |
 | focus-window ID (IPC) | | binds.rs `skip` | n/a | no IPC | - |
 
@@ -80,15 +80,15 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | consume-or-expel-window-left/right, consume-window-into-column, expel-window-from-column | | scrolling.rs | done | `window-consume-or-expel-*`, `window-consume-into-column`, `window-expel-from-column` | layout |
 | swap-window-left/right | swap with the neighbour column's window | scrolling.rs | done | `window-swap-left/right` | nirActions |
 | move-column-left-or-to-monitor-left, right | move, else to monitor | layout/mod.rs | partial | on one output these equal move-column-left/right; not mapped by import | - |
-| move-column-to-workspace-down/up/N | follows the column unless `focus=false` | layout/mod.rs | partial | `column-move-to-*desktop*`; no `focus=false` | columnMoveToDesktop, followWindowToDesktop |
-| move-window-to-workspace-down/up/N | same for a window | layout/mod.rs | partial | `window-move-to-*desktop*`; no `focus=false` | followWindowToDesktop |
-| move-column-to-workspace "name", move-window-to-workspace "name" | | layout/mod.rs | missing | no names | - |
-| move-window-to-new-workspace-below/above, move-column-to-new-workspace-below/above | new workspace next to the current one | layout/mod.rs | missing | feasible with `Workspace.createDesktop(index)` (as DynamicDesktops.moveCurrent does) | - |
+| move-column-to-workspace-down/up/N | follows the column unless `focus=false` | layout/mod.rs | done | `column-move-to-*desktop*`; `focus=false`: `column-move-to-next/previous-desktop-nofocus`, `column-move-to-desktop-nofocus-N` | columnMoveToDesktop, followWindowToDesktop, workspaces |
+| move-window-to-workspace-down/up/N | same for a window | layout/mod.rs | done | `window-move-to-*desktop*`; `focus=false`: `window-move-to-next/previous-desktop-nofocus`, `window-move-to-desktop-nofocus-N` | followWindowToDesktop, workspaces |
+| move-column-to-workspace "name", move-window-to-workspace "name" | | layout/mod.rs | done | `column-move-to-desktop-named-N`, `window-move-to-desktop-named-N` (see focus-workspace "name"); `focus=false` with a name is not mapped | workspaces |
+| move-window-to-new-workspace-below/above, move-column-to-new-workspace-below/above | new workspace next to the current one | layout/mod.rs | done | `window/column-move-to-new-desktop-below/above` (+ `-nofocus`); the empty desktop at the bottom/top is reused like `add_or_reuse_empty_workspace_at`; a workspace reference argument is not mapped | workspaces |
 | move-window/column-to-monitor-* | | layout/mod.rs | n/a | see focus-monitor | - |
-| move-workspace-down/up | reorder workspaces | monitor.rs `move_workspace_down` 1257 | partial | `desktop-move-down/up` emulated by replacing the neighbour desktop (DynamicDesktops.moveCurrent); KWin cannot reorder | dynamicDesktops |
-| move-workspace-to-index N | | monitor.rs | missing | feasible with the same emulation | - |
+| move-workspace-down/up | reorder workspaces | monitor.rs `move_workspace_down` 1257 | done | `desktop-move-down/up` emulated by replacing the neighbour desktop (DynamicDesktops.moveCurrent: columns, view and focus move along, named stays named, previous desktop follows); KWin cannot reorder | dynamicDesktops, workspaces |
+| move-workspace-to-index N | | monitor.rs | done | `move-desktop-to-index-N`, the same emulation repeated | workspaces |
 | move-workspace-to-monitor-* | | layout/mod.rs | n/a | no monitors | - |
-| set-workspace-name / unset-workspace-name | name a workspace | layout/mod.rs 4683 | missing | `Workspace.createDesktop(index, name)` names new desktops and KWin's D-Bus `VirtualDesktopManager` has `setDesktopName` (check on a live KWin); the old checklist called it impossible | - |
+| set-workspace-name / unset-workspace-name | name a workspace | layout/mod.rs 4683 | done | `set-desktop-name-N` (the Nth of `desktopBindNames`), `unset-desktop-name`; the script sets `desktop.name` (works on a live KWin). A named desktop counts as occupied; its id is kept in Kiri's saved state. The `reference` variants are not mapped | workspaces |
 
 ### 2.3 Sizes, display, state
 
@@ -192,12 +192,12 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 
 | Item | niri behaviour | niri source | Status | Kiri | Test |
 |---|---|---|---|---|---|
-| One empty workspace always at the bottom | filling it creates a new empty one below | monitor.rs `clean_up_workspaces` 664; wiki Workspaces | partial | `dynamicDesktops` option, default OFF and marked experimental; DynamicDesktops.ts; install.sh switched it off for existing users | dynamicDesktops |
-| Empty workspace in the middle is removed when switching away | | monitor.rs 664 | partial | same option | dynamicDesktops |
-| workspace-auto-back-and-forth | `focus-workspace N` on the current workspace goes to the previous one | input.rs `workspace_auto_back_and_forth`; layout/mod.rs 2354; monitor.rs 1025 | missing | `desktop-previous-used` exists; the option does not | - |
+| One empty workspace always at the bottom | filling it creates a new empty one below | monitor.rs `clean_up_workspaces` 664; wiki Workspaces | done | `dynamicDesktops` option, OFF by default (owner's decision for 1.0: fixed desktops unless chosen); DynamicDesktops.ts. Nothing is added or removed while a desktop switch animates (KWin effects end their animation on a desktop change), so there is no jump; kiri-mode puts the user's own desktops back in Plasma mode | dynamicDesktops, workspaces |
+| Empty workspace in the middle is removed when switching away | | monitor.rs 664 | done | same option; removed 500 ms after the last switch (niri: when the animation ends) | dynamicDesktops, workspaces |
+| workspace-auto-back-and-forth | `focus-workspace N` on the current workspace goes to the previous one | input.rs `workspace_auto_back_and_forth`; layout/mod.rs 2354; monitor.rs 1025 | done | `desktopAutoBackAndForth`; applies to `desktop-N` and `desktop-named-N` | workspaces |
 | focus-workspace-previous | | monitor.rs 1037 | done | `desktop-previous-used` | keyBindings |
 | Workspaces per monitor, move between monitors | | wiki Workspaces | n/a | KWin desktops are global; outputs share them | - |
-| Named workspaces (`workspace "name" {}`, open-on-output, layout) | persist when empty, addressable by name | workspace.rs; wiki Configuration:-Named-Workspaces; layout/mod.rs `ensure_named_workspace` 3046 | missing | create named desktops at start with `Workspace.createDesktop(i, name)` and exempt them from removal in DynamicDesktops | - |
+| Named workspaces (`workspace "name" {}`, open-on-output, layout) | persist when empty, addressable by name | workspace.rs; wiki Configuration:-Named-Workspaces; layout/mod.rs `ensure_named_workspace` 3046 | partial | `namedDesktops` (JSON list; the importer maps `workspace "name"`): created at the top in config order at start, never removed (also with dynamic desktops off). `open-on-output` and the per-workspace `layout {}` are not mapped. For `open-on-workspace` (WP3): `world.dynamicDesktops.findByName(name)` returns the KwinDesktop to put `kwinClient.desktops` on | workspaces |
 | Workspace index addressing (`focus-workspace 2` = whatever is 2nd) | | wiki Workspaces | done | desktop order | keyBindings |
 | Workspace switch with a window moved along | | layout/mod.rs | done | `window-move-to-*desktop` + follow | followWindowToDesktop |
 | Windows keep their layout on other desktops | | | done | World.ts / DesktopManager.ts | otherDesktopLayout |
@@ -231,7 +231,7 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 |---|---|---|---|---|---|
 | focus-follows-mouse (max-scroll-amount, outputs-only) | focus under the pointer, no scrolling beyond the limit | input.rs `FocusFollowsMouse` 396; input/mod.rs 3052 | partial | `focusFollowsMouse`, `focusFollowsMouseMaxScroll`; `outputs-only` n/a; needs KWin "click to focus" (install.sh) | focusFollowsMouse |
 | warp-mouse-to-focus (mode center-xy, center-xy-always) | pointer to the focused window | input.rs 404 | partial | `cursorFollowsFocus` bool: no mode choice | cursorFollowsFocus |
-| workspace-auto-back-and-forth | | input.rs | missing | see section 4 | - |
+| workspace-auto-back-and-forth | | input.rs | done | see section 4 | workspaces |
 | mod-key, mod-key-nested | | input.rs | partial | fixed to Meta | - |
 | disable-power-key-handling | | input.rs | n/a | Plasma | - |
 | keyboard (xkb, repeat, numlock, track-layout), touchpad, mouse, trackpoint, trackball, tablet, touch, scroll-factor | device settings | input.rs 94-410 | n/a | Plasma System Settings | - |

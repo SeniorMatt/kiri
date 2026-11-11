@@ -243,14 +243,63 @@ def child(node, name):
 
 # ---- shortcuts ----
 
+def declared_workspaces(nodes):
+    """workspace "name" { ... } at the top level, in the order of the config"""
+    names = []
+    for node in find(nodes, "workspace"):
+        if node[1] and node[1][0] not in names and len(names) < 12:
+            names.append(node[1][0])
+    return names
+
+
+def desktop_action(name, args, props, names):
+    """Workspace binds that need more than a name lookup: a workspace by name (the Nth name of the bind list is the
+    shortcut "...-named-N", 12 at most), focus=false, new workspaces, move-workspace-to-index."""
+    arg = args[0] if args else None
+    nofocus = "-nofocus" if props.get("focus") == "false" else ""
+
+    def slot(workspace):
+        if workspace not in names and len(names) < 12:
+            names.append(workspace)
+        return names.index(workspace) + 1 if workspace in names else 0
+
+    if name in ("focus-workspace", "move-column-to-workspace", "move-window-to-workspace"):
+        kind = {"focus-workspace": "desktop", "move-column-to-workspace": "column-move-to-desktop", "move-window-to-workspace": "window-move-to-desktop"}[name]
+        if arg is None:
+            return None
+        if arg.isdigit():
+            return None if name == "focus-workspace" else f"{kind}{nofocus}-{arg}"
+        return None if nofocus or not slot(arg) else f"{kind}-named-{slot(arg)}"
+    if name == "set-workspace-name":
+        return f"set-desktop-name-{slot(arg)}" if arg is not None and slot(arg) else None
+    if name == "unset-workspace-name":
+        return "unset-desktop-name" if arg is None else None
+    if name == "move-workspace-to-index":
+        return f"move-desktop-to-index-{arg}" if arg is not None and arg.isdigit() else None
+    if name in ("move-column-to-workspace-down", "move-column-to-workspace-up"):
+        return f"column-move-to-{'next' if name.endswith('down') else 'previous'}-desktop-nofocus" if nofocus else None
+    if name in ("move-window-to-workspace-down", "move-window-to-workspace-up"):
+        return f"window-move-to-{'next' if name.endswith('down') else 'previous'}-desktop-nofocus" if nofocus else None
+    if name in ("move-column-to-new-workspace-below", "move-column-to-new-workspace-above",
+                "move-window-to-new-workspace-below", "move-window-to-new-workspace-above"):
+        # a workspace reference is not mapped
+        return None if arg is not None else name.replace("-to-new-workspace-", "-to-new-desktop-") + nofocus
+    return None
+
+
 def read_binds(path):
     binds, skipped, steps = {}, [], {}
-    for blk in find(parse_kdl(path), "binds"):
+    nodes = parse_kdl(path)
+    bind_names = declared_workspaces(nodes)  # the names that binds refer to; declared workspaces come first
+    for blk in find(nodes, "binds"):
         for key, _, _, cmds in blk[3]:
             if not cmds:
                 continue
             name, args = cmds[0][0], cmds[0][1]
-            if name in NUMBERED and args and args[0].isdigit():
+            action = desktop_action(name, args, cmds[0][2], bind_names)
+            if action is not None:
+                pass  # a workspace bind
+            elif name in NUMBERED and args and args[0].isdigit():
                 action = NUMBERED[name].format(args[0])
             elif name in ("set-column-width", "set-window-height") and args and re.fullmatch(r"[+-]\d+(\.\d+)?%", args[0]):
                 kind = "column-width" if name == "set-column-width" else "window-height"
@@ -267,6 +316,8 @@ def read_binds(path):
                 skipped.append(f"{key} {' '.join([name] + args)}")
                 continue
             binds.setdefault(action, []).append(kiri_key)
+    if bind_names:
+        steps["desktopBindNames"] = json.dumps(bind_names)
     return binds, skipped, steps
 
 
@@ -626,10 +677,19 @@ def read_settings_inner(path, warn):
     color_setting(L("background-color"), "backgroundColor", out, warn)
 
     out["hideTitlebars"] = bool(find(nodes, "prefer-no-csd"))
-    # niri always has dynamic workspaces, but Kiri's are experimental: they stay as the user set them
+    # niri always has dynamic workspaces; Kiri's are an option that stays as the user set it
+    if L("empty-workspace-above-first"):
+        out["emptyDesktopAboveFirst"] = True
+    declared = declared_workspaces(nodes)
+    if declared:
+        out["namedDesktops"] = json.dumps(declared)
+        if any(node[3] for node in find(nodes, "workspace")):
+            warn("workspace blocks: open-on-output and layout are not mapped (the names are)")
     for blk in find(nodes, "input"):
         if child(blk, "warp-mouse-to-focus"):
             out["cursorFollowsFocus"] = True
+        if child(blk, "workspace-auto-back-and-forth"):
+            out["desktopAutoBackAndForth"] = True
     if find(nodes, "gestures"):
         warn("gestures block (Kiri has no matching options)")
 

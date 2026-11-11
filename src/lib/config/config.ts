@@ -90,6 +90,10 @@ interface Config {
     windowRules: string;
     tiledDesktops: string;
     dynamicDesktops: boolean;
+    emptyDesktopAboveFirst: boolean;
+    desktopAutoBackAndForth: boolean;
+    namedDesktops: string;
+    desktopBindNames: string;
     niriConfigEnabled: boolean;
     niriConfig: string;
     shortcutKeys: Record<string, string[]>;

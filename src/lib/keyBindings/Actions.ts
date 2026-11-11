@@ -833,8 +833,9 @@ class Actions {
     };
 
     // like niri: the column goes to the right of the target's active column, the target becomes the current
-    // desktop and the moved column keeps the focus
-    public readonly columnMoveToDesktop = (desktopIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+    // desktop and the moved column keeps the focus. `follow` false is niri's focus=false: the view stays on this
+    // desktop, which passes the focus to the next column.
+    public readonly columnMoveToDesktop = (desktopIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid, follow = true) => {
         desktopIndex = this.config.clampDesktopIndex(desktopIndex);
         const newGrid = this.getOtherGrid(desktopIndex, dm, oldGrid);
         if (newGrid === null) {
@@ -842,16 +843,16 @@ class Actions {
         }
         const wasFocused = window.isFocused();
         column.moveToGrid(newGrid, newGrid.getLastFocusedColumn() ?? newGrid.getLastColumn());
-        if (wasFocused) {
+        if (wasFocused && follow) {
             gotoDesktop(newGrid.desktop.kwinDesktop, "move-window-follow");
             window.focus();
         }
     };
 
-    public readonly windowMoveToDesktop = (desktopIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+    public readonly windowMoveToDesktop = (desktopIndex: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid, follow = true) => {
         desktopIndex = this.config.clampDesktopIndex(desktopIndex);
         if (column.getWindowCount() === 1) {
-            this.columnMoveToDesktop(desktopIndex, cm, dm, window, column, oldGrid);
+            this.columnMoveToDesktop(desktopIndex, cm, dm, window, column, oldGrid, follow);
             return;
         }
         const newGrid = this.getOtherGrid(desktopIndex, dm, oldGrid);
@@ -862,9 +863,27 @@ class Actions {
         const newColumn = new Column(newGrid, newGrid.getLastFocusedColumn() ?? newGrid.getLastColumn());
         window.moveToColumn(newColumn, true, wasFocused ? FocusPassing.Type.Immediate : FocusPassing.Type.None);
         window.client.kwinClient.desktops = [newGrid.desktop.kwinDesktop];
-        if (wasFocused) {
+        if (wasFocused && follow) {
             gotoDesktop(newGrid.desktop.kwinDesktop, "move-window-follow");
             window.focus();
+        }
+    };
+
+    // niri's move-column-to-new-workspace-below/above and move-window-to-new-workspace-below/above: the desktop is
+    // made next to the current one (the empty one at the bottom or top is used as it is), then the move is the usual one
+    public readonly columnMoveToNewDesktop = (below: boolean, follow: boolean, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        const target = this.config.emptyDesktopNextToCurrent(below);
+        if (target !== null) {
+            this.columnMoveToDesktop(target, cm, dm, window, column, oldGrid, follow);
+            this.config.releaseNewDesktop();
+        }
+    };
+
+    public readonly windowMoveToNewDesktop = (below: boolean, follow: boolean, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        const target = this.config.emptyDesktopNextToCurrent(below);
+        if (target !== null) {
+            this.windowMoveToDesktop(target, cm, dm, window, column, oldGrid, follow);
+            this.config.releaseNewDesktop();
         }
     };
 
@@ -887,31 +906,31 @@ class Actions {
         return index < 0 || target < 0 || target >= Workspace.desktops.length ? null : target;
     }
 
-    public readonly windowMoveToNextDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+    public readonly windowMoveToNextDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid, follow = true) => {
         const target = this.adjacentDesktopIndex(oldGrid, 1);
         if (target !== null) {
-            this.windowMoveToDesktop(target, cm, dm, window, column, oldGrid);
+            this.windowMoveToDesktop(target, cm, dm, window, column, oldGrid, follow);
         }
     };
 
-    public readonly windowMoveToPreviousDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+    public readonly windowMoveToPreviousDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid, follow = true) => {
         const target = this.adjacentDesktopIndex(oldGrid, -1);
         if (target !== null) {
-            this.windowMoveToDesktop(target, cm, dm, window, column, oldGrid);
+            this.windowMoveToDesktop(target, cm, dm, window, column, oldGrid, follow);
         }
     };
 
-    public readonly columnMoveToNextDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+    public readonly columnMoveToNextDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid, follow = true) => {
         const target = this.adjacentDesktopIndex(oldGrid, 1);
         if (target !== null) {
-            this.columnMoveToDesktop(target, cm, dm, window, column, oldGrid);
+            this.columnMoveToDesktop(target, cm, dm, window, column, oldGrid, follow);
         }
     };
 
-    public readonly columnMoveToPreviousDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+    public readonly columnMoveToPreviousDesktop = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid, follow = true) => {
         const target = this.adjacentDesktopIndex(oldGrid, -1);
         if (target !== null) {
-            this.columnMoveToDesktop(target, cm, dm, window, column, oldGrid);
+            this.columnMoveToDesktop(target, cm, dm, window, column, oldGrid, follow);
         }
     };
 
@@ -970,6 +989,8 @@ namespace Actions {
         };
         columnResizer: ColumnResizer;
         clampDesktopIndex: (index: number) => number; // niri: a desktop number past the last one means the last one
+        emptyDesktopNextToCurrent: (below: boolean) => number|null; // index of the empty desktop to move to, made if it does not exist
+        releaseNewDesktop: () => void; // the move into that desktop is done
     }
 
     export interface ColumnResizer {

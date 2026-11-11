@@ -263,6 +263,9 @@ class Grid {
             this.columns.insertAfter(column, leftColumn);
         }
         this.columnsSetX(column);
+        if (this.getLastFocusedColumn() === null) {
+            this.lastFocusedColumn = column; // niri: the first column of a workspace is its active one
+        }
         this.desktop.onLayoutChanged();
         this.desktop.autoAdjustScroll();
     }
@@ -410,8 +413,13 @@ class Grid {
     }
 
     public evacuate(targetGrid: Grid) {
+        const focused = this.getLastFocusedColumn();
         for (const column of this.columns.iterator()) {
             column.moveToGrid(targetGrid, targetGrid.getLastColumn());
+        }
+        // the whole desktop moves, so the column that had the focus keeps it there
+        if (focused !== null && focused.grid === targetGrid && targetGrid.getLastFocusedColumn() === null) {
+            targetGrid.lastFocusedColumn = focused;
         }
     }
 

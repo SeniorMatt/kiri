@@ -496,6 +496,71 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.do((clientManager, desktopManager) => world.dynamicDesktops.moveCurrent(desktopManager, -1)),
         },
         {
+            name: "column-move-to-next-desktop-nofocus",
+            description: "Move column to the next desktop, the focus stays here (niri's focus=false)",
+            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.columnMoveToNextDesktop(cm, dm, window, column, grid, false)),
+        },
+        {
+            name: "column-move-to-previous-desktop-nofocus",
+            description: "Move column to the previous desktop, the focus stays here (niri's focus=false)",
+            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.columnMoveToPreviousDesktop(cm, dm, window, column, grid, false)),
+        },
+        {
+            name: "window-move-to-next-desktop-nofocus",
+            description: "Move window to the next desktop, the focus stays here (niri's focus=false)",
+            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.windowMoveToNextDesktop(cm, dm, window, column, grid, false)),
+        },
+        {
+            name: "window-move-to-previous-desktop-nofocus",
+            description: "Move window to the previous desktop, the focus stays here (niri's focus=false)",
+            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.windowMoveToPreviousDesktop(cm, dm, window, column, grid, false)),
+        },
+        {
+            name: "column-move-to-new-desktop-below",
+            description: "Move column to a new desktop below this one",
+            action: () => world.doIfTiledFocused(actions.columnMoveToNewDesktop.partial(true, true)),
+        },
+        {
+            name: "column-move-to-new-desktop-above",
+            description: "Move column to a new desktop above this one",
+            action: () => world.doIfTiledFocused(actions.columnMoveToNewDesktop.partial(false, true)),
+        },
+        {
+            name: "window-move-to-new-desktop-below",
+            description: "Move window to a new desktop below this one",
+            action: () => world.doIfTiledFocused(actions.windowMoveToNewDesktop.partial(true, true)),
+        },
+        {
+            name: "window-move-to-new-desktop-above",
+            description: "Move window to a new desktop above this one",
+            action: () => world.doIfTiledFocused(actions.windowMoveToNewDesktop.partial(false, true)),
+        },
+        {
+            name: "column-move-to-new-desktop-below-nofocus",
+            description: "Move column to a new desktop below this one, the focus stays here",
+            action: () => world.doIfTiledFocused(actions.columnMoveToNewDesktop.partial(true, false)),
+        },
+        {
+            name: "column-move-to-new-desktop-above-nofocus",
+            description: "Move column to a new desktop above this one, the focus stays here",
+            action: () => world.doIfTiledFocused(actions.columnMoveToNewDesktop.partial(false, false)),
+        },
+        {
+            name: "window-move-to-new-desktop-below-nofocus",
+            description: "Move window to a new desktop below this one, the focus stays here",
+            action: () => world.doIfTiledFocused(actions.windowMoveToNewDesktop.partial(true, false)),
+        },
+        {
+            name: "window-move-to-new-desktop-above-nofocus",
+            description: "Move window to a new desktop above this one, the focus stays here",
+            action: () => world.doIfTiledFocused(actions.windowMoveToNewDesktop.partial(false, false)),
+        },
+        {
+            name: "unset-desktop-name",
+            description: "Remove the name of the current desktop (niri's unset-workspace-name)",
+            action: () => world.do(() => world.dynamicDesktops.unsetName()),
+        },
+        {
             name: "window-close",
             description: "Window: close",
             defaultKeys: ["Meta+Q", "Alt+F4"],
@@ -555,13 +620,34 @@ function switchToDesktop(index: number) {
     }
 }
 
+// niri's focus-workspace N and focus-workspace "name": with workspace-auto-back-and-forth, asking for the desktop that
+// is shown goes to the previous one (monitor.rs switch_workspace_auto_back_and_forth)
+function focusDesktop(world: World, index: number) {
+    const desktop = Workspace.desktops[index];
+    if (desktop === undefined) {
+        return;
+    }
+    if (world.desktopAutoBackAndForth && desktop === Workspace.currentDesktop) {
+        switchToPreviousDesktop(world);
+    } else {
+        switchToDesktop(index);
+    }
+}
+
+// the desktop a "...-named-N" shortcut means: the Nth name of the niri binds
+function boundDesktopIndex(world: World, slot: number) {
+    const name = world.desktopBindNames[slot];
+    const desktop = name === undefined ? undefined : world.dynamicDesktops.findByName(name);
+    return desktop === undefined ? -1 : Workspace.desktops.indexOf(desktop);
+}
+
 function getNumKeyBindings(world: World, actions: Actions): NumKeyBinding[] {
     return [
         {
             name: "desktop-{}",
             description: "Desktop: go to {}",
             defaultModifiers: "Meta",
-            action: (i: number) => switchToDesktop(actions.config.clampDesktopIndex(i)),
+            action: (i: number) => focusDesktop(world, actions.config.clampDesktopIndex(i)),
         },
         {
             name: "focus-{}",
@@ -598,6 +684,61 @@ function getNumKeyBindings(world: World, actions: Actions): NumKeyBinding[] {
             name: "tail-move-to-desktop-{}",
             description: "Desktop: move this and later columns to {}",
             action: (i: number) => world.doIfTiledFocused(actions.tailMoveToDesktop.partial(i)),
+        },
+        {
+            name: "column-move-to-desktop-nofocus-{}",
+            description: "Move column to desktop {}, the focus stays here (niri's focus=false)",
+            action: (i: number) => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.columnMoveToDesktop(i, cm, dm, window, column, grid, false)),
+        },
+        {
+            name: "window-move-to-desktop-nofocus-{}",
+            description: "Move window to desktop {}, the focus stays here (niri's focus=false)",
+            action: (i: number) => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.windowMoveToDesktop(i, cm, dm, window, column, grid, false)),
+        },
+        {
+            name: "move-desktop-to-index-{}",
+            description: "Move the current desktop to position {} (niri's move-workspace-to-index)",
+            action: (i: number) => world.do((clientManager, desktopManager) => world.dynamicDesktops.moveCurrentToIndex(desktopManager, i)),
+        },
+        {
+            name: "desktop-named-{}",
+            description: "Switch to the {}th desktop name of the niri binds (niri's focus-workspace \"name\")",
+            action: (i: number) => {
+                const index = boundDesktopIndex(world, i);
+                if (index >= 0) {
+                    focusDesktop(world, index);
+                }
+            },
+        },
+        {
+            name: "column-move-to-desktop-named-{}",
+            description: "Move column to the {}th desktop name of the niri binds (niri's move-column-to-workspace \"name\")",
+            action: (i: number) => {
+                const index = boundDesktopIndex(world, i);
+                if (index >= 0) {
+                    world.doIfTiledFocused(actions.columnMoveToDesktop.partial(index));
+                }
+            },
+        },
+        {
+            name: "window-move-to-desktop-named-{}",
+            description: "Move window to the {}th desktop name of the niri binds (niri's move-window-to-workspace \"name\")",
+            action: (i: number) => {
+                const index = boundDesktopIndex(world, i);
+                if (index >= 0) {
+                    world.doIfTiledFocused(actions.windowMoveToDesktop.partial(index));
+                }
+            },
+        },
+        {
+            name: "set-desktop-name-{}",
+            description: "Name the current desktop with the {}th desktop name of the niri binds (niri's set-workspace-name)",
+            action: (i: number) => {
+                const name = world.desktopBindNames[i];
+                if (name !== undefined) {
+                    world.do(() => world.dynamicDesktops.setName(name));
+                }
+            },
         },
     ];
 }

@@ -548,6 +548,8 @@ class Kiri {
                 manual: Array.isArray(data.manual) ? data.manual : [],
                 floatingFrames: Array.isArray(data.floatingFrames) ? data.floatingFrames : [],
                 views: Array.isArray(data.views) ? data.views : [],
+                namedDesktops: Array.isArray(data.namedDesktops) ? data.namedDesktops.filter((id: unknown) => typeof id === "string") : [],
+                previousDesktop: typeof data.previousDesktop === "string" ? data.previousDesktop : undefined,
             };
         } catch (error: any) {
             log("the saved state is not valid:", error);

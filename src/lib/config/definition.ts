@@ -525,7 +525,27 @@ const configDef = [
     {
         name: "dynamicDesktops",
         type: "Bool",
-        default: false, // experimental
+        default: false, // niri's workspaces; off by default, desktops stay as the user set them
+    },
+    {
+        name: "emptyDesktopAboveFirst",
+        type: "Bool",
+        default: false, // niri: layout { empty-workspace-above-first }
+    },
+    {
+        name: "desktopAutoBackAndForth",
+        type: "Bool",
+        default: false, // niri: input { workspace-auto-back-and-forth }
+    },
+    {
+        name: "namedDesktops",
+        type: "String",
+        default: "", // niri's `workspace "name"`: a JSON list of names; the desktops exist from the start and are never removed
+    },
+    {
+        name: "desktopBindNames",
+        type: "String",
+        default: "", // the names the niri binds refer to (a JSON list); the shortcuts "...-named-N" mean the Nth of them
     },
     {
         name: "tiledDesktops",

@@ -123,10 +123,51 @@ namespace NiriImport {
         return [...sorted, key].join("+");
     }
 
+    // Workspace binds that need more than a name lookup: a workspace by name (the Nth name of the bind list is the
+    // shortcut "...-named-N", 12 at most), focus=false, new workspaces, move-workspace-to-index.
+    function desktopAction(command: Kdl.Node, names: string[]): string|undefined {
+        const arg = command.args[0];
+        const nofocus = command.props["focus"] === "false" ? "-nofocus" : "";
+        const slot = (name: string) => {
+            if (!names.includes(name) && names.length < 12) {
+                names.push(name);
+            }
+            return names.indexOf(name) + 1;
+        };
+        switch (command.name) {
+        case "focus-workspace": case "move-column-to-workspace": case "move-window-to-workspace": {
+            const kind = command.name === "focus-workspace" ? "desktop" : command.name === "move-column-to-workspace" ? "column-move-to-desktop" : "window-move-to-desktop";
+            if (arg === undefined) {
+                return undefined;
+            }
+            if (/^\d+$/.test(arg)) {
+                return command.name === "focus-workspace" ? undefined : `${kind}${nofocus}-${arg}`;
+            }
+            return nofocus !== "" || slot(arg) < 1 ? undefined : `${kind}-named-${slot(arg)}`;
+        }
+        case "set-workspace-name":
+            return arg === undefined || slot(arg) < 1 ? undefined : `set-desktop-name-${slot(arg)}`;
+        case "unset-workspace-name":
+            return arg === undefined ? "unset-desktop-name" : undefined;
+        case "move-workspace-to-index":
+            return arg !== undefined && /^\d+$/.test(arg) ? `move-desktop-to-index-${arg}` : undefined;
+        case "move-column-to-workspace-down": case "move-column-to-workspace-up":
+            return nofocus === "" ? undefined : `column-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-nofocus`;
+        case "move-window-to-workspace-down": case "move-window-to-workspace-up":
+            return nofocus === "" ? undefined : `window-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-nofocus`;
+        case "move-column-to-new-workspace-below": case "move-column-to-new-workspace-above":
+        case "move-window-to-new-workspace-below": case "move-window-to-new-workspace-above":
+            // a workspace reference is not mapped
+            return arg !== undefined ? undefined : command.name.replace("-to-new-workspace-", "-to-new-desktop-") + nofocus;
+        }
+        return undefined;
+    }
+
     function readBinds(nodes: Kdl.Node[]) {
         const binds: Record<string, string[]> = {};
         const skipped: string[] = [];
         const steps: Record<string, any> = {}; // set-column-width "+5%" gives the step of the width keys
+        const bindNames = declaredWorkspaces(nodes); // the names that binds refer to; declared workspaces come first
         for (const block of Kdl.find(nodes, "binds")) {
             for (const bind of block.children) {
                 if (bind.children.length === 0) {
@@ -134,8 +175,10 @@ namespace NiriImport {
                 }
                 const command = bind.children[0];
                 const args = command.args;
-                let action: string|undefined;
-                if (has(NUMBERED, command.name) && args.length > 0 && /^\d+$/.test(args[0])) {
+                let action: string|undefined = desktopAction(command, bindNames);
+                if (action !== undefined) {
+                    // a workspace bind
+                } else if (has(NUMBERED, command.name) && args.length > 0 && /^\d+$/.test(args[0])) {
                     action = NUMBERED[command.name].replace("{}", args[0]);
                 } else if ((command.name === "set-column-width" || command.name === "set-window-height") && args.length > 0 && /^[+-]\d+(\.\d+)?%$/.test(args[0])) {
                     const kind = command.name === "set-column-width" ? "column-width" : "window-height";
@@ -157,7 +200,21 @@ namespace NiriImport {
                 (binds[action] = binds[action] ?? []).push(key);
             }
         }
+        if (bindNames.length > 0) {
+            steps["desktopBindNames"] = JSON.stringify(bindNames);
+        }
         return { binds, skipped, steps };
+    }
+
+    // workspace "name" { ... } at the top level, in the order of the config
+    function declaredWorkspaces(nodes: Kdl.Node[]) {
+        const names: string[] = [];
+        for (const node of Kdl.find(nodes, "workspace")) {
+            if (node.args.length > 0 && !names.includes(node.args[0]) && names.length < 12) {
+                names.push(node.args[0]);
+            }
+        }
+        return names;
     }
 
     const COLOR_NAMES: Record<string, string> = {
@@ -545,10 +602,23 @@ namespace NiriImport {
         colorSetting(L("background-color"), "backgroundColor", out, warn);
 
         out["hideTitlebars"] = Kdl.find(nodes, "prefer-no-csd").length > 0;
-        // niri always has dynamic workspaces, but Kiri's are experimental: they stay as the user set them
+        // niri always has dynamic workspaces; Kiri's are an option that stays as the user set it
+        if (L("empty-workspace-above-first") !== undefined) {
+            out["emptyDesktopAboveFirst"] = true;
+        }
+        const declared = declaredWorkspaces(nodes);
+        if (declared.length > 0) {
+            out["namedDesktops"] = JSON.stringify(declared);
+            if (Kdl.find(nodes, "workspace").some(node => node.children.length > 0)) {
+                warn("workspace blocks: open-on-output and layout are not mapped (the names are)");
+            }
+        }
         for (const block of Kdl.find(nodes, "input")) {
             if (Kdl.child(block, "warp-mouse-to-focus")) {
                 out["cursorFollowsFocus"] = true;
+            }
+            if (Kdl.child(block, "workspace-auto-back-and-forth")) {
+                out["desktopAutoBackAndForth"] = true;
             }
         }
         const gestures = Kdl.find(nodes, "gestures");
