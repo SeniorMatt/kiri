@@ -78,6 +78,8 @@ class World {
             clampDesktopIndex: (index: number) => this.dynamicDesktops.clampIndex(index),
             emptyDesktopNextToCurrent: (below: boolean) => this.dynamicDesktops.emptyDesktopNextToCurrent(below),
             releaseNewDesktop: () => this.dynamicDesktops.releaseReserved(),
+            columnWidthChanges: SizeChange.parseList(config.columnWidthSet),
+            windowHeightChanges: SizeChange.parseList(config.windowHeightSet),
         };
         if (keyBindings === null) {
             this.keyBindings = new KeyBindings(this, actionsConfig, config.shortcutKeys);
@@ -620,6 +622,19 @@ class World {
     public toggleOverview() {
         if (!this.overview.toggle()) {
             kglobalaccel.call("/component/kwin", "org.kde.kglobalaccel.Component", "invokeShortcut", ["s"], ["Overview"], () => {});
+        }
+    }
+
+    // niri's open-overview and close-overview
+    public openOverview() {
+        if (!this.overview.isOpen()) {
+            this.toggleOverview();
+        }
+    }
+
+    public closeOverview() {
+        if (this.overview.isOpen()) {
+            this.toggleOverview();
         }
     }
 

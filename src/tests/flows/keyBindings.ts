@@ -197,3 +197,18 @@ tests.register("Kiri's own action keeps its key next to its twin", 1, () => {
     // takePriority found the twin on Kiri's key, so it is switched off while Kiri runs
     Assert.equal(accel.inactive.has("kwin/Window Move Center"), true);
 });
+
+tests.register("A failed D-Bus lookup leaves a twin's keys alone", 1, () => {
+    const mine = "Meta+Ctrl+Alt+Z";
+    const accel = twinInit(a => {
+        kwinAction(a, "Window Move Center", [mine], []);
+        a.failing.add("shortcut");
+    });
+    Assert.equalArrays(keysOf(accel, "Window Move Center"), [code(mine)]);
+    Assert.equal(twinStore.given, "");
+    const other = twinInit(a => {
+        kwinAction(a, "Window Move Center", [], []);
+        a.failing.add("getGlobalShortcutsByKey");
+    });
+    Assert.equalArrays(keysOf(other, "Window Move Center"), []);
+});

@@ -184,15 +184,16 @@ class Actions {
 
     // niri's swap-window-left/right: the active window changes places with the active window of the neighbouring
     // column (two single-window columns just swap, like move-column); the focus follows the window
-    public readonly swapWindowLeft = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        this.swapWindow(window, column, grid, grid.getLeftColumn(column), true);
+    public readonly swapWindowLeft = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid, focus = true) => {
+        this.swapWindow(window, column, grid, grid.getLeftColumn(column), true, focus);
     };
 
-    public readonly swapWindowRight = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        this.swapWindow(window, column, grid, grid.getRightColumn(column), false);
+    public readonly swapWindowRight = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid, focus = true) => {
+        this.swapWindow(window, column, grid, grid.getRightColumn(column), false, focus);
     };
 
-    private swapWindow(window: Window, column: Column, grid: Grid, target: Column|null, left: boolean) {
+    // focus=false: the active place stays, so the other window, which took the place of this one, gets the focus
+    private swapWindow(window: Window, column: Column, grid: Grid, target: Column|null, left: boolean, focus: boolean) {
         if (target === null) {
             return;
         }
@@ -201,6 +202,9 @@ class Actions {
                 grid.moveColumnLeft(column);
             } else {
                 grid.moveColumnRight(column);
+            }
+            if (!focus) {
+                this.focusColumn(target, grid);
             }
             return;
         }
@@ -219,9 +223,57 @@ class Actions {
         }
         column.setFocusTaker(other);
         target.setFocusTaker(window);
-        window.focus();
+        (focus ? window : other).focus();
         grid.desktop.autoAdjustScroll();
     }
+
+    private focusColumn(column: Column, grid: Grid) {
+        column.getWindowToFocus().focus();
+        grid.desktop.autoAdjustScroll();
+    }
+
+    // niri's focus=false on the move-column actions: the active position of the view stays, so the neighbour column that
+    // took the place of the moved one gets the focus
+    public readonly columnMoveNoFocus = (kind: "left"|"right"|"start"|"end"|number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const before = grid.getLeftColumn(column);
+        let target: Column|null;
+        let towardsRight: boolean;
+        if (typeof kind === "number") {
+            target = grid.getColumnAtIndex(kind) ?? grid.getLastColumn();
+            towardsRight = target !== null && target.isToTheRightOf(column);
+        } else {
+            towardsRight = kind === "right" || kind === "end";
+        }
+        const neighbour = towardsRight ? grid.getRightColumn(column) : grid.getLeftColumn(column);
+        if (kind === "left") {
+            this.columnMoveLeft(cm, dm, window, column, grid);
+        } else if (kind === "right") {
+            this.columnMoveRight(cm, dm, window, column, grid);
+        } else if (kind === "start") {
+            this.columnMoveStart(cm, dm, window, column, grid);
+        } else if (kind === "end") {
+            this.columnMoveEnd(cm, dm, window, column, grid);
+        } else {
+            this.columnMoveToColumn(kind, cm, dm, window, column, grid);
+        }
+        if (neighbour !== null && grid.getLeftColumn(column) !== before) {
+            this.focusColumn(neighbour, grid);
+        }
+    };
+
+    // niri's move-window-up / move-window-down with focus=false: the window that changed places with it gets the focus
+    public readonly windowMoveVerticalNoFocus = (up: boolean, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const neighbour = up ? column.getAboveWindow(window) : column.getBelowWindow(window);
+        if (neighbour === null) {
+            return;
+        }
+        if (up) {
+            column.moveWindowUp(window);
+        } else {
+            column.moveWindowDown(window);
+        }
+        neighbour.focus();
+    };
 
     // niri's set-column-display
     public readonly columnDisplayNormal = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
@@ -232,8 +284,8 @@ class Actions {
         column.setTabbed(true);
     };
 
-    public readonly focusWindowPrevious = (cm: ClientManager, dm: DesktopManager) => {
-        const previous = cm.findPreviousFocused();
+    public readonly focusWindowPrevious = (cm: ClientManager, dm: DesktopManager, scope: "all"|"output"|"workspace" = "all", appOnly = false) => {
+        const previous = cm.findPreviousFocused(scope, appOnly);
         if (previous !== null) {
             KiriFocus.mark(previous);
             activateWindow(previous, "actions");
@@ -467,6 +519,26 @@ class Actions {
         column.setWidth(column.getWidth() + Math.round(full * percent / 100), true, false, true); // may exceed the view, like niri
     };
 
+    // niri's set-column-width and set-window-width with a size ("50%", "800", "+100"); in niri's scrolling layout the width
+    // of a window is the width of its column
+    public readonly columnWidthSet = (change: SizeChange, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const gap = grid.config.gapsInnerHorizontal;
+        const full = grid.desktop.tilingArea.width + gap;
+        column.widthBeforeMaximize = undefined;
+        column.setWidth(change.resolve(column.getWidth(), full, gap), true, false, true);
+    };
+
+    // niri's set-window-height with a size
+    public readonly windowHeightSet = (change: SizeChange, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        const gap = grid.config.gapsInnerVertical;
+        const full = grid.desktop.tilingArea.height + gap;
+        column.setFixedHeight(window, change.resolve(window.height, full, gap), null);
+    };
+
+    public readonly floatingSizeSet = (horizontal: boolean, change: SizeChange, cm: ClientManager, active: KwinClient) => {
+        cm.setFloatingSize(active, horizontal, change);
+    };
+
     // the same keys on a floating window (niri's floating layer): sizes relative to the work area
     public readonly floatingSizeStep = (horizontal: boolean, percent: number, cm: ClientManager, active: KwinClient) => {
         cm.adjustFloatingSize(active, horizontal, percent);
@@ -484,6 +556,13 @@ class Actions {
     public readonly windowHeightStep = (percent: number, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         const full = grid.desktop.tilingArea.height + grid.config.gapsInnerVertical;
         column.setFixedHeight(window, window.height + Math.round(full * percent / 100), null);
+    };
+
+    // niri's set-window-maximized-to-edges and unset-window-maximized-to-edges
+    public readonly windowSetMaximizedToEdges = (maximize: boolean, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
+        if ((window.client.getMaximizedMode() === MaximizedMode.Maximized) !== maximize) {
+            window.client.setMaximize(maximize, maximize);
+        }
     };
 
     // like niri's maximize-column: the column takes the whole tiling width (gaps kept), a second press restores the old width
@@ -991,6 +1070,8 @@ namespace Actions {
         clampDesktopIndex: (index: number) => number; // niri: a desktop number past the last one means the last one
         emptyDesktopNextToCurrent: (below: boolean) => number|null; // index of the empty desktop to move to, made if it does not exist
         releaseNewDesktop: () => void; // the move into that desktop is done
+        columnWidthChanges: (SizeChange|undefined)[]; // the entries of the `columnWidthSet` setting, for column-width-set-N
+        windowHeightChanges: (SizeChange|undefined)[];
     }
 
     export interface ColumnResizer {

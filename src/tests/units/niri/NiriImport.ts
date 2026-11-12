@@ -28,6 +28,13 @@ tests.register("NiriImport", 1, () => {
     Assert.equal(NiriImport.convertKey("Mod+f11"), "Meta+F11");
     Assert.equal(NiriImport.convertKey("Mod+WheelScrollDown"), undefined);
     Assert.equal(NiriImport.convertKey("XF86AudioMute"), undefined);
+    Assert.equal(NiriImport.convertKey("Mod+Shift+H", "Alt"), "Alt+Shift+H", { message: "Mod is the mod-key" });
+    Assert.equal(NiriImport.convertKey("Super+H", "Alt"), "Meta+H", { message: "Super stays Super" });
+    Assert.equal(NiriImport.convertPointerKey("Mod+Ctrl+WheelScrollDown"), "Meta+Ctrl+WheelScrollDown");
+    Assert.equal(NiriImport.convertPointerKey("Mod+MouseMiddle"), "Meta+MouseMiddle");
+    Assert.equal(NiriImport.convertPointerKey("WheelScrollUp"), "WheelScrollUp");
+    Assert.equal(NiriImport.convertPointerKey("Mod+TouchpadScrollUp"), undefined);
+    Assert.equal(NiriImport.convertPointerKey("Mod+H"), undefined);
 
     // colours
     Assert.equal(NiriImport.parseColor("#7fc8ff"), "#7fc8ff");
@@ -36,6 +43,7 @@ tests.register("NiriImport", 1, () => {
     Assert.equal(NiriImport.parseColor("rgb(255 0 0)"), "#ff0000");
     Assert.equal(NiriImport.parseColor("hsl(120, 100%, 50%)"), "#00ff00");
     Assert.equal(NiriImport.parseColor("red"), "#ff0000");
+    Assert.equal(NiriImport.parseColor("rgb(300 0 0 / 0.5)"), "#ff000080"); // clamped; tools/niri2kiri.py must agree
     Assert.equal(NiriImport.parseColor("nonsense"), undefined);
 
     // window-rule anchoring
@@ -79,7 +87,9 @@ tests.register("NiriImport", 1, () => {
             Mod+Ctrl+Shift+Page_Down { move-workspace-down; }
             Mod+Ctrl+Shift+Page_Up { move-workspace-up; }
             Mod+T { spawn "alacritty"; }
-            Mod+WheelScrollDown { focus-workspace-down; }
+            Mod+WheelScrollDown cooldown-ms=150 { focus-workspace-down; }
+            Mod+Shift+MouseMiddle { close-window; }
+            Mod+TouchpadScrollUp { focus-workspace-up; }
             /-Mod+X { close-window; }
         }
     `, '[{"class":"mine","tile":false}]');
@@ -128,7 +138,9 @@ tests.register("NiriImport", 1, () => {
         "desktop-move-down": ["Meta+Ctrl+Shift+PgDown"],
         "desktop-move-up": ["Meta+Ctrl+Shift+PgUp"],
     }));
-    Assert.equal(result.skipped.length, 2); // spawn, wheel
+    Assert.equal(result.settings["pointerBinds"], "Meta+WheelScrollDown=desktop-next@150;Meta+Shift+MouseMiddle=window-close");
+    Assert.equal(result.skipped.length, 2); // spawn, touchpad scroll
+    Assert.assert(result.skipped.every(line => line.includes(": ")), { message: "each skipped line has a reason" });
 
     // apply(): niri on top of the settings, keys typed in Kiri win
     const config = getDefaultConfig();
@@ -161,15 +173,6 @@ tests.register("NiriImport", 1, () => {
     Assert.equal(def.shortcutKeys["window-close"].join(), "Meta+Q,Alt+F4");
     Assert.equal(def.shortcutKeys["column-width-maximize"].join(), "Meta+F");
     Assert.equal(def.shortcutKeys["window-maximize-to-edges"].join(), "Meta+M");
-
-    // the owner's config, when present
-    const owner = "/tmp/claude-1001/-home-matthew-karousel/965f5914-ffa6-4c87-9792-e98cdab55c88/scratchpad/nixos/modules/session/niri/config.kdl";
-    if (fs.existsSync(owner)) {
-        const mine = NiriImport.parse(fs.readFileSync(owner, "utf8"));
-        Assert.assert(Object.keys(mine.shortcutKeys).length > 10, { message: "owner's binds are read" });
-        Assert.assert(mine.settings["gapsInnerHorizontal"] !== undefined, { message: "owner's gaps are read" });
-        console.log("owner's config:", Object.keys(mine.settings).length, "settings,", Object.keys(mine.shortcutKeys).length, "actions bound,", mine.skipped.length, "skipped");
-    }
 });
 
 tests.register("NiriImport window rules: open-fullscreen, default-window-height, matchers and exclude", 1, () => {

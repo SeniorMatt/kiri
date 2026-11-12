@@ -9,6 +9,7 @@ interface NumKeyBinding {
     name: string;
     description: string;
     defaultModifiers?: string;
+    count?: number; // how many numbered actions there are, 12 if not given
     action: (i: number) => void;
 }
 
@@ -47,8 +48,15 @@ const WARPING_SHORTCUTS = new Set([
     "column-move-start", "column-move-end", "column-move-to-next-desktop", "column-move-to-previous-desktop",
     "window-move-to-next-desktop", "window-move-to-previous-desktop", "desktop-previous-used", "desktop-next",
     "desktop-previous",
+    "focus-window-previous-workspace", "focus-window-previous-output", "focus-window-previous-app",
+    "focus-window-previous-workspace-app", "focus-window-previous-output-app",
+    "column-move-left-no-focus", "column-move-right-no-focus", "column-move-start-no-focus", "column-move-end-no-focus",
+    "window-move-up-no-focus", "window-move-down-no-focus", "window-swap-left-no-focus", "window-swap-right-no-focus",
+    "column-move-to-next-desktop-no-focus", "column-move-to-previous-desktop-no-focus",
+    "window-move-to-next-desktop-no-focus", "window-move-to-previous-desktop-no-focus",
 ]);
-const WARPING_PREFIXES = ["desktop-", "focus-", "focus-window-in-column-", "window-move-to-column-", "column-move-to-column-", "column-move-to-desktop-", "window-move-to-desktop-"];
+const WARPING_PREFIXES = ["desktop-", "focus-", "focus-window-in-column-", "window-move-to-column-", "column-move-to-column-", "column-move-to-desktop-", "window-move-to-desktop-",
+    "column-move-to-column-no-focus-", "column-move-to-desktop-no-focus-", "window-move-to-desktop-no-focus-"];
 // niri's maybe_warp_cursor_to_focus_centered: after a move to another screen
 const WARPING_BOTH = new Set(["screen-switch"]);
 
@@ -83,7 +91,7 @@ function getShortcuts(world: World, actions: Actions): Shortcut[] {
     }));
 
     for (const numKeyBinding of getNumKeyBindings(world, actions)) {
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < (numKeyBinding.count ?? 12); i++) {
             const numKey = String(i + 1);
             shortcuts.push({
                 name: applyMacro(numKeyBinding.name, numKey),
@@ -103,7 +111,7 @@ const NO_REPEAT = new Set([
     "window-close", "overview", "window-toggle-floating", "window-toggle-fullscreen", "window-toggle-windowed-fullscreen", "window-move-to-floating",
     "window-move-to-tiling", "column-toggle-tabbed", "column-display-normal", "column-display-tabbed",
     "column-width-maximize", "column-width-expand", "window-maximize-to-edges", "window-switch-focus-floating-tiling",
-    "desktop-previous-used", "screen-switch",
+    "desktop-previous-used", "screen-switch", "overview-open", "overview-close",
 ]);
 
 // Actions that had no default keys in earlier versions (kglobalacceld stored them as "no key" and never applies a new default)
@@ -412,6 +420,11 @@ function kwinDefaultKeys(twin: string): number[]|undefined {
 function syncTwin(twin: string, wanted: number[], record: Map<string, number[]>, done: () => void) {
     const id = ["kwin", twin, "", ""];
     KGlobalAccel.call("shortcut", ["as"], [id], (current: number[]|undefined) => {
+        if (current === undefined) {
+            // the call failed: the action's keys are unknown, and setting them would replace the user's
+            done();
+            return;
+        }
         const now = plainKeys(current);
         // what the action has apart from the keys Kiri gave it earlier
         const given = record.get(twin) ?? [];
@@ -427,7 +440,8 @@ function syncTwin(twin: string, wanted: number[], record: Map<string, number[]>,
         const check = (i: number) => {
             if (i < candidates.length) {
                 KGlobalAccel.call("getGlobalShortcutsByKey", ["i"], [candidates[i]], (infos: string[][]|undefined) => {
-                    const taken = Array.from(infos ?? []).some(info => String(info[2]) !== KGlobalAccel.component && !(String(info[2]) === "kwin" && String(info[0]) === twin));
+                    // a failed lookup says nothing about the key: it is not taken then
+                    const taken = infos === undefined || Array.from(infos).some(info => String(info[2]) !== KGlobalAccel.component && !(String(info[2]) === "kwin" && String(info[0]) === twin));
                     if (!taken) {
                         free.push(candidates[i]);
                     }

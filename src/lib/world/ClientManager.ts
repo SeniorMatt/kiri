@@ -915,15 +915,29 @@ class ClientManager {
         }
     }
 
-    // niri's focus-window-previous: the window that had the focus before the current one
-    public findPreviousFocused(): KwinClient|null {
+    // niri's focus-window-previous: the window that had the focus before the current one. `scope` "workspace" and
+    // "output" keep to the windows of the current desktop and screen, `appOnly` (filter="app-id") to the windows of the
+    // application of the current one.
+    public findPreviousFocused(scope: "all"|"output"|"workspace" = "all", appOnly = false): KwinClient|null {
+        const active = Workspace.activeWindow;
+        const activeApp = appOnly && active !== null ? active.resourceClass : null;
         let best: KwinClient|null = null;
         let bestStamp = -1;
         for (const [kwinClient, stamp] of this.focusStamps) {
-            if (kwinClient !== Workspace.activeWindow && !kwinClient.minimized && stamp > bestStamp && this.clientMap.has(kwinClient)) {
-                best = kwinClient;
-                bestStamp = stamp;
+            if (kwinClient === active || kwinClient.minimized || stamp <= bestStamp || !this.clientMap.has(kwinClient)) {
+                continue;
             }
+            if (scope === "workspace" && kwinClient.desktops.length > 0 && !kwinClient.desktops.includes(Workspace.currentDesktop)) {
+                continue;
+            }
+            if (scope === "output" && kwinClient.output !== (active !== null ? active.output : Workspace.activeScreen)) {
+                continue;
+            }
+            if (activeApp !== null && kwinClient.resourceClass !== activeApp) {
+                continue;
+            }
+            best = kwinClient;
+            bestStamp = stamp;
         }
         return best;
     }
@@ -1086,6 +1100,14 @@ class ClientManager {
         const current = horizontal ? frame.width : frame.height;
         (horizontal ? this.floatingPresetIndex.width : this.floatingPresetIndex.height).delete(kwinClient);
         this.resizeFloatingClient(kwinClient, horizontal, current + available * percent / 100);
+    }
+
+    // niri's set-column-width / set-window-width / set-window-height with any size change on a floating window
+    public setFloatingSize(kwinClient: KwinClient, horizontal: boolean, change: SizeChange) {
+        const frame = kwinClient.frameGeometry;
+        const current = horizontal ? frame.width : frame.height;
+        (horizontal ? this.floatingPresetIndex.width : this.floatingPresetIndex.height).delete(kwinClient);
+        this.resizeFloatingClient(kwinClient, horizontal, change.resolve(current, this.floatingAreaSize(kwinClient, horizontal), 0));
     }
 
     // niri's switch-preset-column-width / switch-preset-window-height on a floating window (Floating::toggle_window_width):

@@ -46,6 +46,9 @@ interface Config {
     alwaysCenterSingleColumn: boolean;
     defaultColumnWidth: string;
     presetHeights: string;
+    columnWidthSet: string;
+    pointerBinds: string;
+    windowHeightSet: string;
     gestureScroll: boolean;
     gestureScrollInvert: boolean;
     gestureScrollStep: number;

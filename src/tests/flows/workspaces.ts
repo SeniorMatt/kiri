@@ -274,3 +274,54 @@ tests.register("Dynamic desktops are off by default (fixed desktops, like Plasma
     Assert.equal(config.emptyDesktopAboveFirst, false);
     Assert.equal(config.desktopAutoBackAndForth, false);
 });
+
+tests.register("niri import: workspace binds, named workspaces and options", 1, () => {
+    const result = NiriImport.parse(`
+        layout { empty-workspace-above-first }
+        input { workspace-auto-back-and-forth }
+        workspace "browser"
+        workspace "chat" { open-on-output "DP-2"; }
+        binds {
+            Mod+1 { focus-workspace "browser"; }
+            Mod+2 { focus-workspace "chat"; }
+            Mod+3 { focus-workspace 3; }
+            Mod+Shift+1 { move-column-to-workspace "browser"; }
+            Mod+Shift+3 { move-column-to-workspace 3 focus=false; }
+            Mod+Ctrl+W { move-window-to-workspace "extra"; }
+            Mod+N { set-workspace-name "later"; }
+            Mod+Shift+N { unset-workspace-name; }
+            Mod+Ctrl+U { move-column-to-workspace-down focus=false; }
+            Mod+Ctrl+I { move-window-to-workspace-up focus=false; }
+            Mod+Y { move-workspace-to-index 2; }
+            Mod+B { move-column-to-new-workspace-below; }
+            Mod+A { move-window-to-new-workspace-above focus=false; }
+            Mod+Z { move-column-to-new-workspace-below "chat"; }
+            Mod+U { focus-workspace-down; }
+        }
+    `);
+    Assert.equal(result.settings["emptyDesktopAboveFirst"], true);
+    Assert.equal(result.settings["desktopAutoBackAndForth"], true);
+    Assert.equal(result.settings["namedDesktops"], JSON.stringify(["browser", "chat"]));
+    Assert.equal(result.settings["desktopBindNames"], JSON.stringify(["browser", "chat", "extra", "later"]));
+    const keys = result.shortcutKeys;
+    Assert.equalArrays(keys["desktop-named-1"], ["Meta+1"]);
+    Assert.equalArrays(keys["desktop-named-2"], ["Meta+2"]);
+    Assert.equalArrays(keys["desktop-3"], ["Meta+3"]);
+    Assert.equalArrays(keys["column-move-to-desktop-named-1"], ["Meta+Shift+1"]);
+    Assert.equalArrays(keys["column-move-to-desktop-nofocus-3"], ["Meta+Shift+3"]);
+    Assert.equalArrays(keys["window-move-to-desktop-named-3"], ["Meta+Ctrl+W"]);
+    Assert.equalArrays(keys["set-desktop-name-4"], ["Meta+N"]);
+    Assert.equalArrays(keys["unset-desktop-name"], ["Meta+Shift+N"]);
+    Assert.equalArrays(keys["column-move-to-next-desktop-nofocus"], ["Meta+Ctrl+U"]);
+    Assert.equalArrays(keys["window-move-to-previous-desktop-nofocus"], ["Meta+Ctrl+I"]);
+    Assert.equalArrays(keys["move-desktop-to-index-2"], ["Meta+Y"]);
+    Assert.equalArrays(keys["column-move-to-new-desktop-below"], ["Meta+B"]);
+    Assert.equalArrays(keys["window-move-to-new-desktop-above-nofocus"], ["Meta+A"]);
+    Assert.equalArrays(keys["desktop-next"], ["Meta+U"]);
+    Assert.assert(result.skipped.some(line => line.includes("move-column-to-new-workspace-below chat")), { message: "a workspace reference is skipped" });
+    // every shortcut name that is bound exists
+    const known = new Set(getShortcuts({} as any, {} as any).map(shortcut => shortcut.name));
+    for (const name of Object.keys(keys)) {
+        Assert.assert(known.has(name), { message: "unknown shortcut " + name });
+    }
+});

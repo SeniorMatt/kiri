@@ -308,6 +308,28 @@ const configDef = [
         default: "33.333%, 50%, 66.667%",
     },
     {
+        name: "columnWidthSet",
+        type: "String",
+        default: "",
+    },
+    {
+        name: "windowHeightSet",
+        type: "String",
+        default: "",
+    },
+    {
+        // the wheel and mouse button binds of the compiled effect: "Meta+WheelScrollDown=desktop-next@150;...", each
+        // "<modifiers>+<trigger>=<Kiri action>[@<cooldown ms>]" like niri's binds (the default is niri's default wheel binds)
+        name: "pointerBinds",
+        type: "String",
+        default: "Meta+WheelScrollDown=desktop-next@150;Meta+WheelScrollUp=desktop-previous@150;" +
+            "Meta+Ctrl+WheelScrollDown=column-move-to-next-desktop@150;Meta+Ctrl+WheelScrollUp=column-move-to-previous-desktop@150;" +
+            "Meta+WheelScrollRight=focus-right;Meta+WheelScrollLeft=focus-left;" +
+            "Meta+Ctrl+WheelScrollRight=column-move-right;Meta+Ctrl+WheelScrollLeft=column-move-left;" +
+            "Meta+Shift+WheelScrollDown=focus-right;Meta+Shift+WheelScrollUp=focus-left;" +
+            "Meta+Ctrl+Shift+WheelScrollDown=column-move-right;Meta+Ctrl+Shift+WheelScrollUp=column-move-left",
+    },
+    {
         name: "gestureScroll",
         type: "Bool",
         default: true,

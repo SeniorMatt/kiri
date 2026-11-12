@@ -129,6 +129,31 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.do(actions.focusWindowPrevious),
         },
         {
+            name: "focus-window-previous-workspace",
+            description: "Focus the previously focused window on this desktop",
+            action: () => world.do((cm, dm) => actions.focusWindowPrevious(cm, dm, "workspace", false)),
+        },
+        {
+            name: "focus-window-previous-output",
+            description: "Focus the previously focused window on this screen",
+            action: () => world.do((cm, dm) => actions.focusWindowPrevious(cm, dm, "output", false)),
+        },
+        {
+            name: "focus-window-previous-app",
+            description: "Focus the previously focused window of the same application",
+            action: () => world.do((cm, dm) => actions.focusWindowPrevious(cm, dm, "all", true)),
+        },
+        {
+            name: "focus-window-previous-workspace-app",
+            description: "Focus the previously focused window of the same application on this desktop",
+            action: () => world.do((cm, dm) => actions.focusWindowPrevious(cm, dm, "workspace", true)),
+        },
+        {
+            name: "focus-window-previous-output-app",
+            description: "Focus the previously focused window of the same application on this screen",
+            action: () => world.do((cm, dm) => actions.focusWindowPrevious(cm, dm, "output", true)),
+        },
+        {
             name: "focus-floating",
             description: "Focus: floating windows",
             action: () => world.do(actions.focusFloating),
@@ -185,6 +210,16 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.doIfTiledFocusedOrMoveFloating(actions.windowMoveDown, 0, 50),
         },
         {
+            name: "window-move-up-no-focus",
+            description: "Move window up, the focus stays in place",
+            action: () => world.doIfTiledFocusedOrMoveFloating(actions.windowMoveVerticalNoFocus.partial(true), 0, -50),
+        },
+        {
+            name: "window-move-down-no-focus",
+            description: "Move window down, the focus stays in place",
+            action: () => world.doIfTiledFocusedOrMoveFloating(actions.windowMoveVerticalNoFocus.partial(false), 0, 50),
+        },
+        {
             name: "window-move-down-or-to-desktop-down",
             description: "Move: window down or to desktop below",
             action: () => world.doIfTiledFocused(actions.windowMoveDownOrToDesktopDown),
@@ -203,6 +238,16 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             name: "window-swap-right",
             description: "Move: swap window right",
             action: () => world.doIfTiledFocused(actions.swapWindowRight),
+        },
+        {
+            name: "window-swap-left-no-focus",
+            description: "Swap the window with the one on the left, the focus stays in place",
+            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.swapWindowLeft(cm, dm, window, column, grid, false)),
+        },
+        {
+            name: "window-swap-right-no-focus",
+            description: "Swap the window with the one on the right, the focus stays in place",
+            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.swapWindowRight(cm, dm, window, column, grid, false)),
         },
         {
             name: "window-move-to-floating",
@@ -308,6 +353,26 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.doIfTiledFocused(actions.columnMoveEnd),
         },
         {
+            name: "column-move-left-no-focus",
+            description: "Move column left, the focus stays in place",
+            action: () => world.doIfTiledFocusedOrMoveFloating(actions.columnMoveNoFocus.partial("left"), -50, 0),
+        },
+        {
+            name: "column-move-right-no-focus",
+            description: "Move column right, the focus stays in place",
+            action: () => world.doIfTiledFocusedOrMoveFloating(actions.columnMoveNoFocus.partial("right"), 50, 0),
+        },
+        {
+            name: "column-move-start-no-focus",
+            description: "Move column to start, the focus stays in place",
+            action: () => world.doIfTiledFocused(actions.columnMoveNoFocus.partial("start")),
+        },
+        {
+            name: "column-move-end-no-focus",
+            description: "Move column to end, the focus stays in place",
+            action: () => world.doIfTiledFocused(actions.columnMoveNoFocus.partial("end")),
+        },
+        {
             name: "column-move-to-next-desktop",
             description: "Desktop: move column to next",
             defaultKeys: ["Meta+Ctrl+PgDown", "Meta+Ctrl+U"],
@@ -320,6 +385,16 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.doIfTiledFocused(actions.columnMoveToPreviousDesktop),
         },
         {
+            name: "column-move-to-next-desktop-no-focus",
+            description: "Move column to the next desktop, staying on this one",
+            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.columnMoveToNextDesktop(cm, dm, window, column, grid, false)),
+        },
+        {
+            name: "column-move-to-previous-desktop-no-focus",
+            description: "Move column to the previous desktop, staying on this one",
+            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.columnMoveToPreviousDesktop(cm, dm, window, column, grid, false)),
+        },
+        {
             name: "window-move-to-next-desktop",
             description: "Desktop: move window to next",
             defaultKeys: [],
@@ -330,6 +405,16 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             description: "Desktop: move window to previous",
             defaultKeys: [],
             action: () => world.doIfTiledFocused(actions.windowMoveToPreviousDesktop),
+        },
+        {
+            name: "window-move-to-next-desktop-no-focus",
+            description: "Move window to the next desktop, staying on this one",
+            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.windowMoveToNextDesktop(cm, dm, window, column, grid, false)),
+        },
+        {
+            name: "window-move-to-previous-desktop-no-focus",
+            description: "Move window to the previous desktop, staying on this one",
+            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.windowMoveToPreviousDesktop(cm, dm, window, column, grid, false)),
         },
         {
             name: "column-width-increase",
@@ -594,12 +679,82 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.doIfTiledFocused(actions.windowToggleWindowedFullScreen),
         },
         {
+            name: "window-set-fullscreen",
+            description: "Set full-screen",
+            action: () => setFullScreen(world, true),
+        },
+        {
+            name: "window-unset-fullscreen",
+            description: "Leave full-screen (also windowed full-screen)",
+            action: () => setFullScreen(world, false),
+        },
+        {
+            name: "window-set-windowed-fullscreen",
+            description: "Set windowed (fake) full-screen",
+            action: () => setWindowedFullScreen(world, true),
+        },
+        {
+            name: "window-unset-windowed-fullscreen",
+            description: "Unset windowed (fake) full-screen",
+            action: () => setWindowedFullScreen(world, false),
+        },
+        {
+            name: "window-set-maximized-to-edges",
+            description: "Maximize window to the screen edges",
+            action: () => world.doIfTiledFocused(actions.windowSetMaximizedToEdges.partial(true)),
+        },
+        {
+            name: "window-unset-maximized-to-edges",
+            description: "Unmaximize window from the screen edges",
+            action: () => world.doIfTiledFocused(actions.windowSetMaximizedToEdges.partial(false)),
+        },
+        {
             name: "overview",
             description: "Overview: toggle",
             defaultKeys: ["Meta+O"],
             action: () => world.toggleOverview(),
         },
+        {
+            name: "overview-open",
+            description: "Open the overview",
+            action: () => world.openOverview(),
+        },
+        {
+            name: "overview-close",
+            description: "Close the overview",
+            action: () => world.closeOverview(),
+        },
     ];
+}
+
+// niri's set-window-fullscreen and unset-window-fullscreen. A windowed full-screen window becomes full-screen for
+// real on set; on unset, windowed full-screen ends (niri: request_windowed_fullscreen(false)).
+function setFullScreen(world: World, fullScreen: boolean) {
+    const window = Workspace.activeWindow;
+    if (window === null || !window.fullScreenable) {
+        return;
+    }
+    let windowed = false;
+    world.doIfTiled(window, (cm, dm, tiled) => {
+        windowed = tiled.client.windowedFullScreen && window.fullScreen;
+        if (windowed && fullScreen) {
+            tiled.makeFullScreenReal();
+        } else if (windowed) {
+            tiled.toggleWindowedFullScreen();
+        }
+    });
+    if (!windowed && window.fullScreen !== fullScreen) {
+        window.fullScreen = fullScreen;
+    }
+}
+
+// niri's set-windowed-fullscreen and unset-windowed-fullscreen: the application thinks it is full-screen, the tile stays
+function setWindowedFullScreen(world: World, windowed: boolean) {
+    world.doIfTiledFocused((cm, dm, window) => {
+        if ((window.client.windowedFullScreen && window.client.kwinClient.fullScreen) !== windowed) {
+            window.toggleWindowedFullScreen();
+        }
+    });
 }
 
 function switchToPreviousDesktop(world: World) {
@@ -679,6 +834,44 @@ function getNumKeyBindings(world: World, actions: Actions): NumKeyBinding[] {
             name: "window-move-to-desktop-{}",
             description: "Desktop: move window to {}",
             action: (i: number) => world.doIfTiledFocused(actions.windowMoveToDesktop.partial(i)),
+        },
+        {
+            name: "column-width-set-{}",
+            description: "Set column width to entry {} of the list of widths to set",
+            action: (i: number) => {
+                const change = actions.config.columnWidthChanges[i];
+                if (change !== undefined) {
+                    world.doIfTiledFocusedOrFloating(actions.columnWidthSet.partial(change), actions.floatingSizeSet.partial(true, change));
+                }
+            },
+        },
+        {
+            name: "window-height-set-{}",
+            description: "Set window height to entry {} of the list of heights to set",
+            action: (i: number) => {
+                const change = actions.config.windowHeightChanges[i];
+                if (change !== undefined) {
+                    world.doIfTiledFocusedOrFloating(actions.windowHeightSet.partial(change), actions.floatingSizeSet.partial(false, change));
+                }
+            },
+        },
+        {
+            name: "column-move-to-column-no-focus-{}",
+            description: "Move column to position {}, the focus stays in place",
+            count: 9,
+            action: (i: number) => world.doIfTiledFocused(actions.columnMoveNoFocus.partial(i)),
+        },
+        {
+            name: "column-move-to-desktop-no-focus-{}",
+            description: "Move column to desktop {}, staying on this one",
+            count: 9,
+            action: (i: number) => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.columnMoveToDesktop(i, cm, dm, window, column, grid, false)),
+        },
+        {
+            name: "window-move-to-desktop-no-focus-{}",
+            description: "Move window to desktop {}, staying on this one",
+            count: 9,
+            action: (i: number) => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.windowMoveToDesktop(i, cm, dm, window, column, grid, false)),
         },
         {
             name: "tail-move-to-desktop-{}",

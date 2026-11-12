@@ -7,6 +7,7 @@ Usage: niri2kiri.py config.kdl [kglobalshortcutsrc]            print the [kiri] 
        niri2kiri.py config.kdl --apply                         also makes Plasma command shortcuts of the spawn / spawn-sh binds
                                                                (~/.local/share/applications/kiri-bind-*.desktop with X-KDE-Shortcuts);
                                                                --no-spawn leaves them out, --remove-spawn removes them again and stops
+       niri2kiri.py config.kdl --json                          settings, keys and skipped lines as JSON (for tests)
        niri2kiri.py config.kdl --input [--apply]               the niri `input` block for Plasma: show (or, with --apply, write)
                                                                touchpad natural-scroll/tap/accel-profile (kcminputrc), key repeat
                                                                (kcminputrc) and xkb layouts/options (kxkbrc). Only with --input.
@@ -17,6 +18,7 @@ kglobalshortcutsrc is printed (Kiri has to have run once for that). Things Kiri 
 """
 import colorsys
 import json
+import math
 import os
 import re
 import shlex
@@ -89,7 +91,39 @@ ACTIONS = {
     "focus-floating": "focus-floating",
     "focus-tiling": "focus-tiling",
     "focus-window-previous": "focus-window-previous",
-    "open-overview": "overview",
+    "open-overview": "overview-open",
+    "close-overview": "overview-close",
+    # in niri's scrolling layout the width of a window is the width of its column
+    "switch-preset-window-width": "cycle-preset-widths",
+    "switch-preset-window-width-back": "cycle-preset-widths-reverse",
+    "set-window-fullscreen": "window-set-fullscreen",
+    "unset-window-fullscreen": "window-unset-fullscreen",
+    "set-windowed-fullscreen": "window-set-windowed-fullscreen",
+    "unset-windowed-fullscreen": "window-unset-windowed-fullscreen",
+    "set-window-maximized-to-edges": "window-set-maximized-to-edges",
+    "unset-window-maximized-to-edges": "window-unset-maximized-to-edges",
+    # with one output these do what the plain action does (niri: no output in that direction)
+    "focus-window-or-monitor-up": "focus-up",
+    "focus-window-or-monitor-down": "focus-down",
+    "focus-column-or-monitor-left": "focus-left",
+    "focus-column-or-monitor-right": "focus-right",
+    "move-column-left-or-to-monitor-left": "column-move-left",
+    "move-column-right-or-to-monitor-right": "column-move-right",
+}
+# the same actions with focus=false (the focus stays where it was)
+NO_FOCUS = {
+    "move-column-left": "column-move-left-no-focus",
+    "move-column-right": "column-move-right-no-focus",
+    "move-column-to-first": "column-move-start-no-focus",
+    "move-column-to-last": "column-move-end-no-focus",
+    "move-window-up": "window-move-up-no-focus",
+    "move-window-down": "window-move-down-no-focus",
+    "swap-window-left": "window-swap-left-no-focus",
+    "swap-window-right": "window-swap-right-no-focus",
+    "move-column-to-workspace-down": "column-move-to-next-desktop-no-focus",
+    "move-column-to-workspace-up": "column-move-to-previous-desktop-no-focus",
+    "move-window-to-workspace-down": "window-move-to-next-desktop-no-focus",
+    "move-window-to-workspace-up": "window-move-to-previous-desktop-no-focus",
 }
 NUMBERED = {
     "focus-workspace": "desktop-{}",
@@ -99,6 +133,13 @@ NUMBERED = {
     "focus-window-in-column": "focus-window-in-column-{}",
     "move-column-to-index": "column-move-to-column-{}",
 }
+NUMBERED_NO_FOCUS = {
+    "move-column-to-workspace": "column-move-to-desktop-no-focus-{}",
+    "move-window-to-workspace": "window-move-to-desktop-no-focus-{}",
+    "move-column-to-index": "column-move-to-column-no-focus-{}",
+}
+NO_FOCUS_SLOTS = 9  # how many numbered no-focus actions Kiri has
+SIZE_SLOTS = 12  # how many column-width-set-N and window-height-set-N actions Kiri has
 MODIFIERS = {"mod": "Meta", "super": "Meta", "win": "Meta", "ctrl": "Ctrl", "control": "Ctrl", "shift": "Shift", "alt": "Alt"}
 KEYS = {
     "page_down": "PgDown", "page_up": "PgUp", "next": "PgDown", "prior": "PgUp",
@@ -110,13 +151,21 @@ KEYS = {
 }
 
 
-def convert_key(niri_key):
+MOD_KEYS = {"super": "Meta", "alt": "Alt", "ctrl": "Ctrl", "shift": "Shift"}  # niri's mod-key names -> Kiri's
+# The pointer triggers of niri's binds that Kiri's effect can take: the wheel and the mouse buttons.
+# TouchpadScroll* is continuous in KWin (no ticks to count) and TabletStylusButton* has no KWin hook.
+POINTER_TRIGGERS = ["WheelScrollDown", "WheelScrollUp", "WheelScrollLeft", "WheelScrollRight",
+                    "MouseLeft", "MouseRight", "MouseMiddle", "MouseForward", "MouseBack"]
+
+
+def convert_key(niri_key, mod="Meta"):
+    """`mod` is what niri's Mod stands for (input { mod-key }): Kiri's name of that modifier, Meta (Super) by default."""
     *mods, key = niri_key.split("+")
     out = []
-    for mod in mods:
-        if mod.lower() not in MODIFIERS:
+    for m in mods:
+        if m.lower() not in MODIFIERS:
             return None
-        out.append(MODIFIERS[mod.lower()])
+        out.append(mod if m.lower() == "mod" else MODIFIERS[m.lower()])
     if re.fullmatch(r"F\d{1,2}", key, re.I):
         key = key.upper()
     elif len(key) == 1:
@@ -128,6 +177,49 @@ def convert_key(niri_key):
     order = ["Meta", "Ctrl", "Alt", "Shift"]
     return "+".join(sorted(set(out), key=order.index) + [key])
 
+
+def convert_pointer_key(niri_key, mod="Meta"):
+    """"Mod+Ctrl+WheelScrollDown" -> "Meta+Ctrl+WheelScrollDown" (Kiri's pointerBinds setting names triggers like niri does)"""
+    *mods, last = niri_key.split("+")
+    trigger = next((t for t in POINTER_TRIGGERS if t.lower() == last.lower()), None)
+    keys = convert_key("+".join(mods + ["A"]), mod) if trigger else None
+    return None if keys is None else keys[:-1] + trigger
+
+
+# why a niri action has no Kiri action (a regex on the name, the reason that is told)
+UNMAPPED = [
+    (r"^(spawn|spawn-sh)$", "starts a program: a Plasma command shortcut (tools/niri2kiri.py --apply makes them)"),
+    (r"^screenshot", "screenshots are Spectacle's"),
+    (r"^(quit|suspend|power-off-monitors|power-on-monitors|change-vt|toggle-touchpad|do-screen-transition)$", "session and hardware actions are Plasma's"),
+    (r"^switch-layout$", "keyboard layouts are Plasma's"),
+    (r"^toggle-keyboard-shortcuts-inhibit$", "KWin has its own shortcut inhibit key"),
+    (r"^(set-dynamic-cast|clear-dynamic-cast|stop-cast)", "screencast targets are Plasma's"),
+    (r"^(toggle-debug-tint|debug-toggle)", "niri renderer debugging"),
+    (r"monitor", "no monitor concept in Kiri's layout (desktops are shared by every screen; screen-switch moves the grid)"),
+    (r"^(move-workspace-to-index|set-workspace-name|unset-workspace-name|move-(window|column)-to-new-workspace)", "workspace actions are not supported yet"),
+    (r"^toggle-window-rule-opacity$", "window rule opacity is not supported yet"),
+    (r"^show-hotkey-overlay$", "Kiri has no hotkey overlay"),
+    (r"-by-id$|^focus-window$|^load-config-file$|^mru-", "IPC and window switcher actions cannot be bound"),
+]
+
+
+def unmapped_reason(name, args):
+    if re.fullmatch(r"focus-workspace|move-(window|column)-to-workspace", name) and args and not re.fullmatch(r"\d+", args[0]):
+        return "workspaces by name are not supported yet"
+    return next((reason for regex, reason in UNMAPPED if re.search(regex, name)), "Kiri has no such action")
+
+
+def key_reason(niri_key):
+    trigger = niri_key.split("+")[-1]
+    if re.match(r"TouchpadScroll", trigger):
+        return "touchpad scrolling gives KWin no ticks to bind"
+    if re.match(r"TabletStylusButton", trigger):
+        return "stylus buttons have no KWin hook"
+    if re.fullmatch(r"Mod|Super|Ctrl|Control|Shift|Alt|Win", trigger, re.I):
+        return "a modifier on its own cannot be bound"
+    if re.match(r"XF86", trigger, re.I):
+        return "media and hardware keys are Plasma's (tools/niri2kiri.py --apply makes command shortcuts of the spawn ones)"
+    return "key or modifier Kiri does not know"
 
 
 # ---- KDL parsing: a node is (name, args, props, children) ----
@@ -256,7 +348,7 @@ def desktop_action(name, args, props, names):
     """Workspace binds that need more than a name lookup: a workspace by name (the Nth name of the bind list is the
     shortcut "...-named-N", 12 at most), focus=false, new workspaces, move-workspace-to-index."""
     arg = args[0] if args else None
-    nofocus = "-nofocus" if props.get("focus") == "false" else ""
+    nofocus = "-no-focus" if props.get("focus") == "false" else ""
 
     def slot(workspace):
         if workspace not in names and len(names) < 12:
@@ -277,48 +369,94 @@ def desktop_action(name, args, props, names):
     if name == "move-workspace-to-index":
         return f"move-desktop-to-index-{arg}" if arg is not None and arg.isdigit() else None
     if name in ("move-column-to-workspace-down", "move-column-to-workspace-up"):
-        return f"column-move-to-{'next' if name.endswith('down') else 'previous'}-desktop-nofocus" if nofocus else None
+        return f"column-move-to-{'next' if name.endswith('down') else 'previous'}-desktop-no-focus" if nofocus else None
     if name in ("move-window-to-workspace-down", "move-window-to-workspace-up"):
-        return f"window-move-to-{'next' if name.endswith('down') else 'previous'}-desktop-nofocus" if nofocus else None
+        return f"window-move-to-{'next' if name.endswith('down') else 'previous'}-desktop-no-focus" if nofocus else None
     if name in ("move-column-to-new-workspace-below", "move-column-to-new-workspace-above",
                 "move-window-to-new-workspace-below", "move-window-to-new-workspace-above"):
         # a workspace reference is not mapped
-        return None if arg is not None else name.replace("-to-new-workspace-", "-to-new-desktop-") + nofocus
+        return None if arg is not None else f"{'column' if name.startswith('move-column') else 'window'}-move-to-new-desktop-{'below' if name.endswith('below') else 'above'}{nofocus}"
     return None
 
 
-def read_binds(path):
-    binds, skipped, steps = {}, [], {}
-    nodes = parse_kdl(path)
-    bind_names = declared_workspaces(nodes)  # the names that binds refer to; declared workspaces come first
-    for blk in find(nodes, "binds"):
-        for key, _, _, cmds in blk[3]:
-            if not cmds:
-                continue
-            name, args = cmds[0][0], cmds[0][1]
-            action = desktop_action(name, args, cmds[0][2], bind_names)
-            if action is not None:
-                pass  # a workspace bind
-            elif name in NUMBERED and args and args[0].isdigit():
-                action = NUMBERED[name].format(args[0])
-            elif name in ("set-column-width", "set-window-height") and args and re.fullmatch(r"[+-]\d+(\.\d+)?%", args[0]):
-                kind = "column-width" if name == "set-column-width" else "window-height"
-                action = kind + ("-decrease" if args[0].startswith("-") else "-increase")
-                steps.setdefault("columnWidthStep" if kind == "column-width" else "windowHeightStep", round(float(args[0][1:-1])))
-            elif name == "set-column-display" and args and args[0] in ("tabbed", "normal"):
-                action = "column-display-" + args[0]
+def is_false(value):
+    return value in ("false", "#false")
+
+
+def size_action(niri_name, value, steps, slots):
+    """The Kiri action for set-column-width, set-window-width and set-window-height: "+10%" keeps to the width and
+    height step keys of the first such bind; any other size gets one of the numbered "set to" actions, with the size
+    stored in the columnWidthSet / windowHeightSet setting."""
+    kind = "window" if niri_name == "set-window-height" else "column"
+    if re.fullmatch(r"[+-]\d+%", value):
+        step_name = "columnWidthStep" if kind == "column" else "windowHeightStep"
+        step = int(value[1:-1])
+        steps.setdefault(step_name, step)
+        if steps[step_name] == step:
+            return ("column-width" if kind == "column" else "window-height") + ("-decrease" if value.startswith("-") else "-increase")
+    lst = slots[kind]
+    if value not in lst:
+        if len(lst) >= SIZE_SLOTS:
+            return None
+        lst.append(value)
+    return ("column-width-set-" if kind == "column" else "window-height-set-") + str(lst.index(value) + 1)
+
+
+SIZE_CHANGE = re.compile(r"^[+-]?\d+%$|^[+-]?\d+(px)?$|^[+-]?\d+\.\d+%$")
+
+
+def focus_previous_action(scope, filt):
+    parts = [p for p in (scope if scope in ("workspace", "output") else "", "app" if filt == "app-id" else "") if p]
+    return "-".join(["focus-window-previous"] + parts)
+
+
+def read_binds(path, mod="Meta", nodes=None):
+    """-> binds {action: [keys]}, skipped [text], steps {setting: value}, pointer "k=action@ms;..." or None, slots {kind: [sizes]}"""
+    binds, skipped, steps, pointer, slots, has_binds = {}, [], {}, [], {"column": [], "window": []}, False
+    for blk in find(nodes if nodes is not None else parse_kdl(path), "binds"):
+        has_binds = True
+        for key, _, bind_props, cmds in blk[3]:
+            # `press { action }` is a plain bind; a `release { action }` needs the key release, which kglobalaccel does not give
+            if cmds and cmds[0][0] in ("press", "release"):
+                cmds = [c for node in cmds for c in (node[3] if node[0] == "press" else [node])]
             else:
-                action = ACTIONS.get(name)
-            kiri_key = convert_key(key)
-            if name in ("spawn", "spawn-sh"):
-                continue  # read_spawns takes these
-            if action is None or kiri_key is None:
-                skipped.append(f"{key} {' '.join([name] + args)}")
-                continue
-            binds.setdefault(action, []).append(kiri_key)
-    if bind_names:
-        steps["desktopBindNames"] = json.dumps(bind_names)
-    return binds, skipped, steps
+                cmds = cmds[:1]
+            for cmd in cmds:
+                name, args, props = cmd[0], cmd[1], cmd[2]
+                action = reason = None
+                if name in NUMBERED and args and args[0].isdigit():
+                    no_focus = is_false(props.get("focus"))
+                    if no_focus and (name not in NUMBERED_NO_FOCUS or int(args[0]) > NO_FOCUS_SLOTS):
+                        reason = f"focus=false only for numbers up to {NO_FOCUS_SLOTS}"
+                    else:
+                        action = (NUMBERED_NO_FOCUS if no_focus else NUMBERED)[name].format(args[0])
+                elif is_false(props.get("focus")) and name in NO_FOCUS:
+                    action = NO_FOCUS[name]
+                elif re.fullmatch(r"set-(column-width|window-width|window-height)", name) and args and SIZE_CHANGE.match(args[0].strip()):
+                    action = size_action(name, args[0].strip(), steps, slots)
+                    reason = f"more than {SIZE_SLOTS} different sizes" if action is None else None
+                elif name == "set-column-display" and args and args[0] in ("tabbed", "normal"):
+                    action = "column-display-" + args[0]
+                elif name == "focus-window-previous":
+                    action = focus_previous_action(props.get("scope"), props.get("filter"))
+                else:
+                    action = ACTIONS.get(name)
+                description = f"bind {key} {' '.join([name] + args)}"
+                kiri_key = convert_key(key, mod)
+                pointer_key = convert_pointer_key(key, mod) if kiri_key is None else None
+                if name == "release":
+                    skipped.append(f"bind {key} release: release actions cannot be bound (kglobalaccel gets no key release)")
+                elif action is None:
+                    skipped.append(f"{description}: {reason or unmapped_reason(name, args)}")
+                elif kiri_key is not None:
+                    binds.setdefault(action, []).append(kiri_key)
+                elif pointer_key is not None:
+                    m = re.match(r"\d+", bind_props.get("cooldown-ms", ""))
+                    cooldown = int(m.group()) if m else 0
+                    pointer.append(f"{pointer_key}={action}" + (f"@{cooldown}" if cooldown > 0 else ""))
+                else:
+                    skipped.append(f"{description}: {key_reason(key)}")
+    return binds, skipped, steps, (";".join(pointer) if has_binds else None), slots
 
 
 def key_fields(binds):
@@ -365,7 +503,8 @@ def read_kiri_section(path):
 
 
 def shortcut_lines(config, shortcuts_file, warn):
-    binds, skipped, _ = read_binds(config)
+    binds, skipped = analyse(config)[0:2]
+    skipped = [line for line in skipped if not is_spawn_line(line)]
     entries = read_kiri_section(shortcuts_file)
     if not entries:
         sys.exit(f"no [kiri] section in {shortcuts_file}, enable Kiri once first")
@@ -374,8 +513,8 @@ def shortcut_lines(config, shortcuts_file, warn):
         default, description = entries[name]
         keys = "\\t".join(k.replace(",", "\\,") for k in binds.get(name, [])) or "none"
         out[name] = f"{keys},{default},{description}"
-    for line in skipped + [f"{a} (not in this Kiri version)" for a in sorted(set(binds) - set(entries))]:
-        warn("bind " + line)
+    for line in skipped + [f"bind {a} (not in this Kiri version)" for a in sorted(set(binds) - set(entries))]:
+        warn(line)
     return out
 
 
@@ -387,6 +526,15 @@ COLOR_NAMES = {
     "cyan": "#00ffff", "magenta": "#ff00ff", "gray": "#808080", "grey": "#808080", "silver": "#c0c0c0",
     "brown": "#a52a2a", "transparent": "#00000000",
 }
+
+
+def js_round(x):
+    """Math.round of the TypeScript importer: halves go up (Python's round() goes to even)"""
+    return int(math.floor(x + 0.5))
+
+
+def byte(x):
+    return max(0, min(255, js_round(x)))
 
 
 def parse_color(value):
@@ -413,8 +561,8 @@ def parse_color(value):
             if len(parts) > 3:
                 alpha = float(parts[3].rstrip("%")) / (100 if parts[3].endswith("%") else 1)
                 alpha = max(0.0, min(1.0, alpha))
-            out = "#%02x%02x%02x" % tuple(round(x * 255) for x in (r, g, b))
-            return out + ("%02x" % round(alpha * 255) if alpha < 1 else "")
+            out = "#%02x%02x%02x" % tuple(byte(x * 255) for x in (r, g, b))
+            return out + ("%02x" % byte(alpha * 255) if alpha < 1 else "")
     return None
 
 
@@ -502,14 +650,14 @@ def shadow_settings(node, out, warn):
     if offset:
         for axis, key in (("x", "shadowOffsetX"), ("y", "shadowOffsetY")):
             try:
-                out[key] = round(float(offset[2][axis]))
+                out[key] = js_round(float(offset[2][axis]))
             except (KeyError, ValueError):
                 pass
     for name, key in (("softness", "shadowSoftness"), ("spread", "shadowSpread")):
         n = child(node, name)
         if n and n[1]:
             try:
-                out[key] = round(float(n[1][0]))
+                out[key] = js_round(float(n[1][0]))
             except ValueError:
                 pass
     behind = child(node, "draw-behind-window")
@@ -546,7 +694,7 @@ def match_of(node, warn):
     props = node[2]
     unknown = [k for k in props if k not in KNOWN_MATCHERS]
     if unknown:
-        warn(f"window-rule matcher {', '.join(unknown)} (a {node[0]} line that uses it is ignored)")
+        warn(f"window-rule/{node[0]}: matcher {', '.join(unknown)} is not supported, a line that uses it is ignored")
         return None
     entry = {}
     for niri, kiri in KNOWN_MATCHERS.items():
@@ -590,14 +738,118 @@ def window_rules(nodes, warn):
     return rules
 
 
-def read_settings(path, warn):
-    out = read_settings_inner(path, warn)
-    out.update(read_binds(path)[2])
-    return out
+# What the importer reads, by path in the config (the blocks that hold options are looked into one level down).
+# Everything else is reported as skipped, with the reason from SKIPPED_OPTIONS.
+MAPPED_OPTIONS = {
+    "binds", "prefer-no-csd", "layout", "input", "gestures", "window-rule",
+    "layout/gaps", "layout/struts", "layout/center-focused-column", "layout/always-center-single-column",
+    "layout/preset-column-widths", "layout/preset-window-heights", "layout/default-column-width",
+    "layout/default-column-display", "layout/focus-ring", "layout/border", "layout/tab-indicator",
+    "input/warp-mouse-to-focus", "input/focus-follows-mouse", "input/mod-key", "gestures/hot-corners",
+    "window-rule/match", "window-rule/exclude", "window-rule/open-floating", "window-rule/open-fullscreen",
+    "window-rule/default-column-width", "window-rule/default-window-height", "window-rule/geometry-corner-radius",
+}
+LOOKED_INTO = ["layout", "input", "gestures", "window-rule", "overview", "hotkey-overlay", "debug"]
+SKIPPED_OPTIONS = {
+    "include": "KWin scripts cannot read files (tools/niri2kiri.py follows includes)",
+    "output": "the display layout is Plasma's (Display settings)",
+    "spawn-at-startup": "programs start with Plasma's autostart",
+    "spawn-sh-at-startup": "programs start with Plasma's autostart",
+    "hotkey-overlay": "Kiri has no hotkey overlay",
+    "hotkey-overlay/skip-at-startup": "Kiri shows no hotkey overlay at startup",
+    "screenshot-path": "screenshots are Spectacle's",
+    "animations": "niri's animation options are not configurable yet",
+    "workspace": "named workspaces are not supported yet",
+    "layer-rule": "layer-shell surfaces (panels, wallpapers) are Plasma's",
+    "debug": "niri debug options",
+    "environment": "environment variables belong to Plasma (~/.config/plasma-workspace/env)",
+    "cursor": "the cursor theme is Plasma's",
+    "clipboard": "the clipboard is Klipper's",
+    "xwayland-satellite": "KWin runs XWayland itself",
+    "switch-events": "KWin scripts get no switch events",
+    "recent-windows": "Alt+Tab is KWin's Task Switcher",
+    "config-notification": "KWin scripts have no config reload notice",
+    "input/keyboard": "Plasma's Keyboard settings (tools/niri2kiri.py --input writes them)",
+    "input/touchpad": "Plasma's Touchpad settings (tools/niri2kiri.py --input writes them)",
+    "input/mouse": "Plasma's Mouse settings",
+    "input/trackpoint": "Plasma's Mouse settings",
+    "input/trackball": "Plasma's Mouse settings",
+    "input/touch": "Plasma's Touchscreen settings",
+    "input/tablet": "Plasma's Drawing Tablet settings",
+    "input/mod-key-nested": "only used when niri runs inside another window",
+    "input/workspace-auto-back-and-forth": "not supported yet",
+    "layout/shadow": "window shadows are not drawn yet",
+    "layout/background-color": "not supported yet",
+    "layout/insert-hint": "the insert hint has one fixed colour",
+    "overview/zoom": "not configurable yet",
+    "overview/backdrop-color": "not configurable yet",
+    "overview/workspace-shadow": "not configurable yet",
+    "window-rule/clip-to-geometry": "not supported yet",
+}
 
 
-def read_settings_inner(path, warn):
+def report_unmapped(nodes, warn):
+    seen = set()
+
+    def visit(path):
+        if path not in seen and path not in MAPPED_OPTIONS:
+            seen.add(path)
+            warn(f"{path}: {SKIPPED_OPTIONS.get(path, 'not supported by Kiri')}")
+    for node in nodes:
+        if node[0] in LOOKED_INTO and node[0] not in SKIPPED_OPTIONS:
+            for c in node[3]:
+                visit(f"{node[0]}/{c[0]}")
+        else:
+            visit(node[0])
+
+
+def mod_key(nodes, warn):
+    """what niri's Mod stands for: input { mod-key "Alt" }, Super by default"""
+    mod = "Meta"
+    for blk in find(nodes, "input"):
+        node = child(blk, "mod-key")
+        if node:
+            name = (node[1][0] if node[1] else "Super").lower()
+            if name in MOD_KEYS:
+                mod = MOD_KEYS[name]
+            else:
+                warn(f"input/mod-key {node[1][0]}: Kiri cannot bind that modifier, Mod stays Super")
+    return mod
+
+
+def is_spawn_line(line):
+    return ": starts a program" in line
+
+
+def analyse(path):
+    """-> binds {action: [keys]}, skipped [text], settings {name: value}"""
     nodes = parse_kdl(path)
+    skipped = []
+    warn = skipped.append
+    binds, bind_skips, steps, pointer, slots = read_binds(path, mod_key(nodes, warn), nodes)
+    skipped += bind_skips
+    settings = read_settings_inner(nodes, warn)
+    settings.update(steps)
+    report_unmapped(nodes, warn)
+    if pointer is not None:
+        # niri has only the binds of the config: the wheel binds Kiri has by default go when the config has none
+        settings["pointerBinds"] = pointer
+    if slots["column"]:
+        settings["columnWidthSet"] = ", ".join(slots["column"])
+    if slots["window"]:
+        settings["windowHeightSet"] = ", ".join(slots["window"])
+    return binds, skipped, settings
+
+
+def read_settings(path, warn):
+    binds, skipped, settings = analyse(path)
+    for line in skipped:
+        if not is_spawn_line(line):
+            warn(line)
+    return settings
+
+
+def read_settings_inner(nodes, warn):
     out = {}
     layout = {}
     for blk in find(nodes, "layout"):
@@ -612,7 +864,7 @@ def read_settings_inner(path, warn):
             s = child(struts, side)
             out["gapsOuter" + side.title()] = gap + (number(s[1]) or 0 if s else 0)
     elif L("struts"):
-        warn("struts without gaps ignored (Kiri's gaps default is 16, niri's too, so add 'gaps 16' to use them)")
+        warn("layout/struts: ignored without gaps (Kiri's gaps default is 16, niri's too, so add 'gaps 16' to use them)")
     if L("center-focused-column"):
         mode = (L("center-focused-column")[1] or ["never"])[0]
         modes = {"never": "scrollingLazy", "always": "scrollingCentered", "on-overflow": "scrollingOnOverflow"}
@@ -690,8 +942,22 @@ def read_settings_inner(path, warn):
             out["cursorFollowsFocus"] = True
         if child(blk, "workspace-auto-back-and-forth"):
             out["desktopAutoBackAndForth"] = True
-    if find(nodes, "gestures"):
-        warn("gestures block (Kiri has no matching options)")
+        follows = child(blk, "focus-follows-mouse")
+        if follows:
+            out["focusFollowsMouse"] = True
+            m = re.match(r"\d+(\.\d+)?", follows[2].get("max-scroll-amount", ""))
+            # the share of the screen the view may scroll for it; without the property there is no limit
+            out["focusFollowsMouseMaxScroll"] = max(0, round(float(m.group()))) if m else 100
+    gestures = find(nodes, "gestures")
+    if gestures:
+        # niri: `off` disables the corners; naming other corners without top-left turns the top-left one off
+        for blk in gestures:
+            corners = child(blk, "hot-corners")
+            if corners:
+                others = any(child(corners, c) for c in ("top-right", "bottom-left", "bottom-right"))
+                if child(corners, "off") or (others and not child(corners, "top-left")):
+                    out["hotCorner"] = False
+        warn("gestures: Kiri maps only hot-corners off, no other gesture options")
 
     rules = window_rules(nodes, warn)
     if rules:
@@ -905,11 +1171,16 @@ def main():
     argv = sys.argv[1:]
     flags = {a for a in argv if a.startswith("--")}
     pos = [a for a in argv if not a.startswith("--")]
-    if not 1 <= len(pos) <= 2 or flags - {"--settings", "--apply", "--input", "--no-spawn", "--remove-spawn"}:
+    if not 1 <= len(pos) <= 2 or flags - {"--settings", "--apply", "--input", "--no-spawn", "--remove-spawn", "--json"}:
         sys.exit(__doc__.strip())
     shortcuts_file = pos[1] if len(pos) == 2 else "~/.config/kglobalshortcutsrc"
     warn = lambda msg: print("# skipped:", msg, file=sys.stderr)
 
+    if "--json" in flags:
+        # what the TypeScript importer (src/lib/niri/import.ts) makes of the file: settings, keys and the skipped lines
+        binds, skipped, settings = analyse(pos[0])
+        print(json.dumps({"settings": settings, "shortcutKeys": binds, "skipped": skipped}, sort_keys=True))
+        return
     if "--remove-spawn" in flags:
         for line in apply_spawns({}, dry=False):
             print(line)
@@ -929,9 +1200,7 @@ def main():
     if "--settings" in flags or "--apply" in flags:
         settings = read_settings(pos[0], warn)
     if "--apply" in flags:
-        binds, skipped, _ = read_binds(pos[0])
-        for line in skipped:
-            warn("bind " + line)
+        binds = analyse(pos[0])[0]
         fields = key_fields(binds)
         stale = stale_key_fields(Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")) / "kwinrc", fields)
         print("kwinrc [Script-kiri]:")

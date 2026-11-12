@@ -11,9 +11,14 @@ class MockKGlobalAccel {
     // kglobalshortcutsrc, group [kwin]: name -> [current, default, description], keys of an entry joined by a tab
     public readonly rc = new Map<string, string[]>();
     public readonly inactive = new Set<string>();
+    public readonly failing = new Set<string>(); // D-Bus members whose call fails (the reply is undefined)
     private readonly stored = new Map<string, number[]>(); // like kglobalshortcutsrc
 
     public call(path: string, iface: string, member: string, types: string[], args: any[], resolve: (value: any) => void) {
+        if (this.failing.has(member)) {
+            resolve(undefined);
+            return;
+        }
         switch (member) {
         case "doRegister":
             this.registered.set(args[0][1], []);

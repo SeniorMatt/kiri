@@ -72,7 +72,36 @@ namespace NiriImport {
         "focus-floating": "focus-floating",
         "focus-tiling": "focus-tiling",
         "focus-window-previous": "focus-window-previous",
-        "open-overview": "overview",
+        "open-overview": "overview-open",
+        "close-overview": "overview-close",
+        // in niri's scrolling layout the width of a window is the width of its column
+        "switch-preset-window-width": "cycle-preset-widths",
+        "switch-preset-window-width-back": "cycle-preset-widths-reverse",
+        "set-window-fullscreen": "window-set-fullscreen",
+        "unset-window-fullscreen": "window-unset-fullscreen",
+        "set-windowed-fullscreen": "window-set-windowed-fullscreen",
+        "unset-windowed-fullscreen": "window-unset-windowed-fullscreen",
+        "set-window-maximized-to-edges": "window-set-maximized-to-edges",
+        "unset-window-maximized-to-edges": "window-unset-maximized-to-edges",
+        // with one output these do what the plain action does (niri: no output in that direction)
+        "focus-window-or-monitor-up": "focus-up",
+        "focus-window-or-monitor-down": "focus-down",
+        "focus-column-or-monitor-left": "focus-left",
+        "focus-column-or-monitor-right": "focus-right",
+        "move-column-left-or-to-monitor-left": "column-move-left",
+        "move-column-right-or-to-monitor-right": "column-move-right",
+    };
+
+    // the same actions with focus=false (the focus stays where it was, see Actions.columnMoveNoFocus)
+    const NO_FOCUS: Record<string, string> = {
+        "move-column-left": "column-move-left-no-focus",
+        "move-column-right": "column-move-right-no-focus",
+        "move-column-to-first": "column-move-start-no-focus",
+        "move-column-to-last": "column-move-end-no-focus",
+        "move-window-up": "window-move-up-no-focus",
+        "move-window-down": "window-move-down-no-focus",
+        "swap-window-left": "window-swap-left-no-focus",
+        "swap-window-right": "window-swap-right-no-focus",
     };
 
     const NUMBERED: Record<string, string> = {
@@ -83,6 +112,12 @@ namespace NiriImport {
         "focus-window-in-column": "focus-window-in-column-{}",
         "move-column-to-index": "column-move-to-column-{}",
     };
+
+    const NUMBERED_NO_FOCUS: Record<string, string> = {
+        "move-column-to-index": "column-move-to-column-no-focus-{}",
+    };
+    const NO_FOCUS_SLOTS = 9; // how many numbered no-focus actions Kiri has
+    const SIZE_SLOTS = 12; // how many column-width-set-N and window-height-set-N actions Kiri has
 
     const MODIFIERS: Record<string, string> = {
         mod: "Meta", super: "Meta", win: "Meta", ctrl: "Ctrl", control: "Ctrl", shift: "Shift", alt: "Alt",
@@ -101,16 +136,17 @@ namespace NiriImport {
 
     const has = (map: Record<string, string>, key: string) => Object.prototype.hasOwnProperty.call(map, key);
 
-    export function convertKey(niriKey: string): string|undefined {
+    // `mod` is what niri's Mod stands for (input { mod-key }): Kiri's name of that modifier, Meta (Super) by default
+    export function convertKey(niriKey: string, mod = "Meta"): string|undefined {
         const parts = niriKey.split("+");
         let key = parts.pop() as string;
         const mods = new Set<string>();
-        for (const mod of parts) {
-            const lower = mod.toLowerCase();
+        for (const modifier of parts) {
+            const lower = modifier.toLowerCase();
             if (!has(MODIFIERS, lower)) {
                 return undefined;
             }
-            mods.add(MODIFIERS[lower]);
+            mods.add(lower === "mod" ? mod : MODIFIERS[lower]);
         }
         if (/^F\d{1,2}$/i.test(key) || key.length === 1) {
             key = key.toUpperCase();
@@ -119,7 +155,7 @@ namespace NiriImport {
         } else {
             return undefined; // mouse wheel, XF86 keys etc.
         }
-        const sorted = MODIFIER_ORDER.filter(mod => mods.has(mod));
+        const sorted = MODIFIER_ORDER.filter(modifier => mods.has(modifier));
         return [...sorted, key].join("+");
     }
 
@@ -127,7 +163,7 @@ namespace NiriImport {
     // shortcut "...-named-N", 12 at most), focus=false, new workspaces, move-workspace-to-index.
     function desktopAction(command: Kdl.Node, names: string[]): string|undefined {
         const arg = command.args[0];
-        const nofocus = command.props["focus"] === "false" ? "-nofocus" : "";
+        const nofocus = command.props["focus"] === "false" ? "-no-focus" : "";
         const slot = (name: string) => {
             if (!names.includes(name) && names.length < 12) {
                 names.push(name);
@@ -152,58 +188,186 @@ namespace NiriImport {
         case "move-workspace-to-index":
             return arg !== undefined && /^\d+$/.test(arg) ? `move-desktop-to-index-${arg}` : undefined;
         case "move-column-to-workspace-down": case "move-column-to-workspace-up":
-            return nofocus === "" ? undefined : `column-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-nofocus`;
+            return nofocus === "" ? undefined : `column-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-no-focus`;
         case "move-window-to-workspace-down": case "move-window-to-workspace-up":
-            return nofocus === "" ? undefined : `window-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-nofocus`;
+            return nofocus === "" ? undefined : `window-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-no-focus`;
         case "move-column-to-new-workspace-below": case "move-column-to-new-workspace-above":
         case "move-window-to-new-workspace-below": case "move-window-to-new-workspace-above":
             // a workspace reference is not mapped
-            return arg !== undefined ? undefined : command.name.replace("-to-new-workspace-", "-to-new-desktop-") + nofocus;
+            return arg !== undefined ? undefined : `${command.name.startsWith("move-column") ? "column" : "window"}-move-to-new-desktop-${command.name.endsWith("below") ? "below" : "above"}${nofocus}`;
         }
         return undefined;
     }
 
-    function readBinds(nodes: Kdl.Node[]) {
+
+    // niri's mod-key names -> Kiri's modifier names
+    const MOD_KEYS: Record<string, string> = { super: "Meta", alt: "Alt", ctrl: "Ctrl", shift: "Shift" };
+
+    // The pointer triggers of niri's binds that Kiri's effect can take: the wheel and the mouse buttons.
+    // TouchpadScroll* is continuous in KWin (no ticks to count) and TabletStylusButton* has no KWin hook.
+    const POINTER_TRIGGERS = [
+        "WheelScrollDown", "WheelScrollUp", "WheelScrollLeft", "WheelScrollRight",
+        "MouseLeft", "MouseRight", "MouseMiddle", "MouseForward", "MouseBack",
+    ];
+
+    // "Mod+Ctrl+WheelScrollDown" -> "Meta+Ctrl+WheelScrollDown" (Kiri's pointerBinds setting names triggers like niri does)
+    export function convertPointerKey(niriKey: string, mod = "Meta"): string|undefined {
+        const parts = niriKey.split("+");
+        const last = (parts.pop() as string).toLowerCase();
+        const trigger = POINTER_TRIGGERS.find(name => name.toLowerCase() === last);
+        if (trigger === undefined) {
+            return undefined;
+        }
+        const keys = convertKey([...parts, "A"].join("+"), mod);
+        return keys === undefined ? undefined : keys.substring(0, keys.length - 1) + trigger;
+    }
+
+    // why a niri action has no Kiri action (a regex on the name, the reason that is told)
+    const UNMAPPED: [RegExp, string][] = [
+        [/^(spawn|spawn-sh)$/, "starts a program: a Plasma command shortcut (tools/niri2kiri.py --apply makes them)"],
+        [/^screenshot/, "screenshots are Spectacle's"],
+        [/^(quit|suspend|power-off-monitors|power-on-monitors|change-vt|toggle-touchpad|do-screen-transition)$/, "session and hardware actions are Plasma's"],
+        [/^switch-layout$/, "keyboard layouts are Plasma's"],
+        [/^toggle-keyboard-shortcuts-inhibit$/, "KWin has its own shortcut inhibit key"],
+        [/^(set-dynamic-cast|clear-dynamic-cast|stop-cast)/, "screencast targets are Plasma's"],
+        [/^(toggle-debug-tint|debug-toggle)/, "niri renderer debugging"],
+        [/monitor/, "no monitor concept in Kiri's layout (desktops are shared by every screen; screen-switch moves the grid)"],
+        [/^(move-workspace-to-index|set-workspace-name|unset-workspace-name|move-(window|column)-to-new-workspace)/, "workspace actions are not supported yet"],
+        [/^toggle-window-rule-opacity$/, "window rule opacity is not supported yet"],
+        [/^show-hotkey-overlay$/, "Kiri has no hotkey overlay"],
+        [/-by-id$|^focus-window$|^load-config-file$|^mru-/, "IPC and window switcher actions cannot be bound"],
+    ];
+
+    // undefined when the importer has no explicit reason for the action
+    export function unmappedReason(name: string, args: string[]): string|undefined {
+        if (/^(focus-workspace|move-(window|column)-to-workspace)$/.test(name) && args.length > 0 && !/^\d+$/.test(args[0])) {
+            return "workspaces by name are not supported yet";
+        }
+        const found = UNMAPPED.find(([regex]) => regex.test(name));
+        return found === undefined ? undefined : found[1];
+    }
+
+    function isFalse(value: string|undefined) {
+        return value === "false" || value === "#false";
+    }
+
+    // a bind that has `focus=false` (the property of the move actions)
+    function withoutFocus(command: Kdl.Node) {
+        return isFalse(command.props["focus"]);
+    }
+
+    function readBinds(nodes: Kdl.Node[], mod: string) {
         const binds: Record<string, string[]> = {};
+        const pointer: string[] = [];
         const skipped: string[] = [];
         const steps: Record<string, any> = {}; // set-column-width "+5%" gives the step of the width keys
+        const slots: Record<string, string[]> = { column: [], window: [] }; // the sizes the other set-column-width and set-window-height binds set
+        let hasBinds = false;
         const bindNames = declaredWorkspaces(nodes); // the names that binds refer to; declared workspaces come first
         for (const block of Kdl.find(nodes, "binds")) {
+            hasBinds = true;
             for (const bind of block.children) {
-                if (bind.children.length === 0) {
-                    continue;
-                }
-                const command = bind.children[0];
-                const args = command.args;
-                let action: string|undefined = desktopAction(command, bindNames);
-                if (action !== undefined) {
-                    // a workspace bind
-                } else if (has(NUMBERED, command.name) && args.length > 0 && /^\d+$/.test(args[0])) {
-                    action = NUMBERED[command.name].replace("{}", args[0]);
-                } else if ((command.name === "set-column-width" || command.name === "set-window-height") && args.length > 0 && /^[+-]\d+(\.\d+)?%$/.test(args[0])) {
-                    const kind = command.name === "set-column-width" ? "column-width" : "window-height";
-                    action = kind + (args[0].startsWith("-") ? "-decrease" : "-increase");
-                    const stepName = kind === "column-width" ? "columnWidthStep" : "windowHeightStep";
-                    if (steps[stepName] === undefined) {
-                        steps[stepName] = Math.round(parseFloat(args[0].substring(1)));
+                // `press { action }` is a plain bind; a `release { action }` needs the key release, which kglobalaccel does not give
+                const commands = bind.children.length > 0 && ["press", "release"].includes(bind.children[0].name) ?
+                    bind.children.flatMap(node => node.name === "press" ? node.children : [node]) :
+                    bind.children.slice(0, 1);
+                for (const command of commands) {
+                    const args = command.args;
+                    let action: string|undefined = desktopAction(command, bindNames);
+                    let reason: string|undefined;
+                    if (action !== undefined) {
+                        // a workspace bind
+                    } else if (has(NUMBERED, command.name) && args.length > 0 && /^\d+$/.test(args[0])) {
+                        const noFocus = withoutFocus(command);
+                        if (noFocus && (!has(NUMBERED_NO_FOCUS, command.name) || parseInt(args[0]) > NO_FOCUS_SLOTS)) {
+                            reason = `focus=false only for numbers up to ${NO_FOCUS_SLOTS}`;
+                        } else {
+                            action = (noFocus ? NUMBERED_NO_FOCUS : NUMBERED)[command.name].replace("{}", args[0]);
+                        }
+                    } else if (withoutFocus(command) && has(NO_FOCUS, command.name)) {
+                        action = NO_FOCUS[command.name];
+                    } else if (/^set-(column-width|window-width|window-height)$/.test(command.name) && args.length > 0 && SizeChange.parse(args[0]) !== undefined) {
+                        action = sizeAction(command.name, args[0].trim(), steps, slots);
+                        reason = action === undefined ? `more than ${SIZE_SLOTS} different sizes` : undefined;
+                    } else if (command.name === "set-column-display" && (args[0] === "tabbed" || args[0] === "normal")) {
+                        action = "column-display-" + args[0];
+                    } else if (command.name === "focus-window-previous") {
+                        action = focusPreviousAction(command.props["scope"], command.props["filter"]);
+                    } else if (has(ACTIONS, command.name)) {
+                        action = ACTIONS[command.name];
                     }
-                } else if (command.name === "set-column-display" && (args[0] === "tabbed" || args[0] === "normal")) {
-                    action = "column-display-" + args[0];
-                } else if (has(ACTIONS, command.name)) {
-                    action = ACTIONS[command.name];
+                    const description = `bind ${bind.name} ${[command.name, ...args].join(" ")}`;
+                    const key = convertKey(bind.name, mod);
+                    const pointerKey = key === undefined ? convertPointerKey(bind.name, mod) : undefined;
+                    if (command.name === "release") {
+                        skipped.push(`bind ${bind.name} release: release actions cannot be bound (kglobalaccel gets no key release)`);
+                    } else if (action === undefined) {
+                        skipped.push(`${description}: ${reason ?? unmappedReason(command.name, args) ?? "Kiri has no such action"}`);
+                    } else if (key !== undefined) {
+                        (binds[action] = binds[action] ?? []).push(key);
+                    } else if (pointerKey !== undefined) {
+                        const cooldown = parseInt(bind.props["cooldown-ms"] ?? "");
+                        pointer.push(`${pointerKey}=${action}${cooldown > 0 ? "@" + cooldown : ""}`);
+                    } else {
+                        skipped.push(`${description}: ${keyReason(bind.name)}`);
+                    }
                 }
-                const key = convertKey(bind.name);
-                if (action === undefined || key === undefined) {
-                    skipped.push(`bind ${bind.name} ${[command.name, ...args].join(" ")}`);
-                    continue;
-                }
-                (binds[action] = binds[action] ?? []).push(key);
             }
         }
         if (bindNames.length > 0) {
             steps["desktopBindNames"] = JSON.stringify(bindNames);
         }
-        return { binds, skipped, steps };
+        return { binds, pointer: hasBinds ? pointer.join(";") : undefined, skipped, steps, slots };
+    }
+
+    function keyReason(niriKey: string) {
+        const trigger = niriKey.split("+").pop() as string;
+        if (/^TouchpadScroll/.test(trigger)) {
+            return "touchpad scrolling gives KWin no ticks to bind";
+        }
+        if (/^TabletStylusButton/.test(trigger)) {
+            return "stylus buttons have no KWin hook";
+        }
+        if (/^(Mod|Super|Ctrl|Control|Shift|Alt|Win)$/i.test(trigger)) {
+            return "a modifier on its own cannot be bound";
+        }
+        if (/^XF86/i.test(trigger)) {
+            return "media and hardware keys are Plasma's (tools/niri2kiri.py --apply makes command shortcuts of the spawn ones)";
+        }
+        return "key or modifier Kiri does not know";
+    }
+
+    function focusPreviousAction(scope: string|undefined, filter: string|undefined) {
+        const parts = [scope === "workspace" || scope === "output" ? scope : "", filter === "app-id" ? "app" : ""].filter(part => part !== "");
+        return ["focus-window-previous", ...parts].join("-");
+    }
+
+    // The Kiri action for set-column-width, set-window-width and set-window-height: "+10%" keeps to the width and height
+    // step keys of the first such bind; any other size gets one of the numbered "set to" actions, with the size
+    // stored in the columnWidthSet / windowHeightSet setting.
+    function sizeAction(niriName: string, value: string, steps: Record<string, any>, slots: Record<string, string[]>) {
+        const kind = niriName === "set-window-height" ? "window" : "column";
+        const percentStep = /^[+-]\d+%$/.exec(value);
+        if (percentStep !== null) {
+            const stepName = kind === "column" ? "columnWidthStep" : "windowHeightStep";
+            const step = parseInt(value.substring(1));
+            if (steps[stepName] === undefined) {
+                steps[stepName] = step;
+            }
+            if (steps[stepName] === step) {
+                return (kind === "column" ? "column-width" : "window-height") + (value.startsWith("-") ? "-decrease" : "-increase");
+            }
+        }
+        const list = slots[kind];
+        let index = list.indexOf(value);
+        if (index < 0) {
+            if (list.length >= SIZE_SLOTS) {
+                return undefined;
+            }
+            list.push(value);
+            index = list.length - 1;
+        }
+        return (kind === "column" ? "column-width-set-" : "window-height-set-") + (index + 1);
     }
 
     // workspace "name" { ... } at the top level, in the order of the config
@@ -424,7 +588,7 @@ namespace NiriImport {
         }
         const unknown = Object.keys(node.props).filter(name => !["app-id", "title", "is-floating", "is-active", "is-focused"].includes(name));
         if (unknown.length > 0) {
-            warn(`window-rule matcher ${unknown.join(", ")} (a ${node.name} line that uses it is ignored)`);
+            warn(`window-rule/${node.name}: matcher ${unknown.join(", ")} is not supported, a line that uses it is ignored`);
             return undefined;
         }
         return entry;
@@ -507,7 +671,7 @@ namespace NiriImport {
                 out["gapsOuter" + name] = gap + (strut !== undefined ? number(strut.args) ?? 0 : 0);
             }
         } else if (L("struts") !== undefined) {
-            warn("struts without gaps ignored (Kiri's gaps default is 16, niri's too, so add 'gaps 16' to use them)");
+            warn("layout/struts: ignored without gaps (Kiri's gaps default is 16, niri's too, so add 'gaps 16' to use them)");
         }
 
         const center = L("center-focused-column");
@@ -620,6 +784,12 @@ namespace NiriImport {
             if (Kdl.child(block, "workspace-auto-back-and-forth")) {
                 out["desktopAutoBackAndForth"] = true;
             }
+            const follows = Kdl.child(block, "focus-follows-mouse");
+            if (follows !== undefined) {
+                out["focusFollowsMouse"] = true;
+                const maxScroll = parseFloat(follows.props["max-scroll-amount"] ?? "");
+                out["focusFollowsMouseMaxScroll"] = isNaN(maxScroll) ? 100 : Math.max(0, Math.round(maxScroll)); // the share of the screen the view may scroll for it; without the property there is no limit
+            }
         }
         const gestures = Kdl.find(nodes, "gestures");
         if (gestures.length > 0) {
@@ -633,7 +803,7 @@ namespace NiriImport {
                     }
                 }
             }
-            warn("gestures block (Kiri maps only hot-corners off; no other gesture options)");
+            warn("gestures: Kiri maps only hot-corners off, no other gesture options");
         }
         return out;
     }
@@ -652,6 +822,106 @@ namespace NiriImport {
         return JSON.stringify([...niriRules, ...base]);
     }
 
+    // What the importer reads, by path in the config (the blocks that hold options are looked into one level down).
+    // Everything else is reported as skipped, with the reason from SKIPPED_OPTIONS.
+    const MAPPED_OPTIONS = new Set([
+        "binds", "prefer-no-csd", "layout", "input", "gestures", "window-rule",
+        "layout/gaps", "layout/struts", "layout/center-focused-column", "layout/always-center-single-column",
+        "layout/preset-column-widths", "layout/preset-window-heights", "layout/default-column-width",
+        "layout/default-column-display", "layout/focus-ring", "layout/border", "layout/tab-indicator",
+        "input/warp-mouse-to-focus", "input/focus-follows-mouse", "input/mod-key", "gestures/hot-corners",
+        "window-rule/match", "window-rule/exclude", "window-rule/open-floating", "window-rule/open-fullscreen",
+        "window-rule/default-column-width", "window-rule/default-window-height", "window-rule/geometry-corner-radius",
+    ]);
+    const LOOKED_INTO = ["layout", "input", "gestures", "window-rule", "overview", "hotkey-overlay", "debug"];
+    const SKIPPED_OPTIONS: Record<string, string> = {
+        "include": "KWin scripts cannot read files (tools/niri2kiri.py follows includes)",
+        "output": "the display layout is Plasma's (Display settings)",
+        "spawn-at-startup": "programs start with Plasma's autostart",
+        "spawn-sh-at-startup": "programs start with Plasma's autostart",
+        "hotkey-overlay": "Kiri has no hotkey overlay",
+        "hotkey-overlay/skip-at-startup": "Kiri shows no hotkey overlay at startup",
+        "screenshot-path": "screenshots are Spectacle's",
+        "animations": "niri's animation options are not configurable yet",
+        "workspace": "named workspaces are not supported yet",
+        "layer-rule": "layer-shell surfaces (panels, wallpapers) are Plasma's",
+        "debug": "niri debug options",
+        "environment": "environment variables belong to Plasma (~/.config/plasma-workspace/env)",
+        "cursor": "the cursor theme is Plasma's",
+        "clipboard": "the clipboard is Klipper's",
+        "xwayland-satellite": "KWin runs XWayland itself",
+        "switch-events": "KWin scripts get no switch events",
+        "recent-windows": "Alt+Tab is KWin's Task Switcher",
+        "config-notification": "KWin scripts have no config reload notice",
+        "input/keyboard": "Plasma's Keyboard settings (tools/niri2kiri.py --input writes them)",
+        "input/touchpad": "Plasma's Touchpad settings (tools/niri2kiri.py --input writes them)",
+        "input/mouse": "Plasma's Mouse settings",
+        "input/trackpoint": "Plasma's Mouse settings",
+        "input/trackball": "Plasma's Mouse settings",
+        "input/touch": "Plasma's Touchscreen settings",
+        "input/tablet": "Plasma's Drawing Tablet settings",
+        "input/mod-key-nested": "only used when niri runs inside another window",
+        "input/workspace-auto-back-and-forth": "not supported yet",
+        "layout/shadow": "window shadows are not drawn yet",
+        "layout/background-color": "not supported yet",
+        "layout/insert-hint": "the insert hint has one fixed colour",
+        "overview/zoom": "not configurable yet",
+        "overview/backdrop-color": "not configurable yet",
+        "overview/workspace-shadow": "not configurable yet",
+        "window-rule/clip-to-geometry": "not supported yet",
+    };
+
+    // the paths of the options in a config that the importer has to account for: the top-level nodes, and one level down
+    // in the blocks that hold options
+    export function optionPaths(nodes: Kdl.Node[]): string[] {
+        const paths: string[] = [];
+        for (const node of nodes) {
+            if (node.name === "binds") {
+                continue;
+            }
+            if (LOOKED_INTO.includes(node.name) && !has(SKIPPED_OPTIONS, node.name)) {
+                node.children.forEach(child => paths.push(`${node.name}/${child.name}`));
+            } else {
+                paths.push(node.name);
+            }
+        }
+        return paths.filter((path, i) => paths.indexOf(path) === i);
+    }
+
+    export function isMappedOption(path: string) {
+        return MAPPED_OPTIONS.has(path);
+    }
+
+    // why an option is not mapped, if the importer has a reason for it
+    export function skippedOptionReason(path: string): string|undefined {
+        return has(SKIPPED_OPTIONS, path) ? SKIPPED_OPTIONS[path] : undefined;
+    }
+
+    function reportUnmapped(nodes: Kdl.Node[], warn: (msg: string) => void) {
+        for (const path of optionPaths(nodes)) {
+            if (!MAPPED_OPTIONS.has(path)) {
+                warn(`${path}: ${skippedOptionReason(path) ?? "not supported by Kiri"}`);
+            }
+        }
+    }
+
+    // what niri's Mod stands for: input { mod-key "Alt" }, Super by default
+    function modKey(nodes: Kdl.Node[], warn: (msg: string) => void): string {
+        let mod = "Meta";
+        for (const block of Kdl.find(nodes, "input")) {
+            const node = Kdl.child(block, "mod-key");
+            if (node !== undefined) {
+                const name = (node.args[0] ?? "Super").toLowerCase();
+                if (has(MOD_KEYS, name)) {
+                    mod = MOD_KEYS[name];
+                } else {
+                    warn(`input/mod-key ${node.args[0]}: Kiri cannot bind that modifier, Mod stays Super`);
+                }
+            }
+        }
+        return mod;
+    }
+
     export function parse(text: string, existingWindowRules?: string): Result {
         const skipped: string[] = [];
         const warn = (msg: string) => skipped.push(msg);
@@ -661,9 +931,20 @@ namespace NiriImport {
         } catch (error: any) {
             return { settings: {}, shortcutKeys: {}, skipped: ["could not read the niri config: " + error] };
         }
-        const bound = readBinds(nodes);
+        const bound = readBinds(nodes, modKey(nodes, warn));
         skipped.push(...bound.skipped);
         const settings = Object.assign(readSettings(nodes, warn), bound.steps);
+        reportUnmapped(nodes, warn);
+        if (bound.pointer !== undefined) {
+            // niri has only the binds of the config: the wheel binds Kiri has by default go when the config has none
+            settings["pointerBinds"] = bound.pointer;
+        }
+        if (bound.slots["column"].length > 0) {
+            settings["columnWidthSet"] = bound.slots["column"].join(", ");
+        }
+        if (bound.slots["window"].length > 0) {
+            settings["windowHeightSet"] = bound.slots["window"].join(", ");
+        }
         const rules = windowRules(nodes, warn);
         if (rules.length > 0) {
             settings["windowRules"] = mergeRules(rules, existingWindowRules);
