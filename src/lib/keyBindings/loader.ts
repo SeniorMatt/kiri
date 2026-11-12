@@ -111,7 +111,7 @@ const NO_REPEAT = new Set([
     "window-close", "overview", "window-toggle-floating", "window-toggle-fullscreen", "window-toggle-windowed-fullscreen", "window-move-to-floating",
     "window-move-to-tiling", "column-toggle-tabbed", "column-display-normal", "column-display-tabbed",
     "column-width-maximize", "column-width-expand", "window-maximize-to-edges", "window-switch-focus-floating-tiling",
-    "desktop-previous-used", "screen-switch", "overview-open", "overview-close",
+    "desktop-previous-used", "screen-switch", "overview-open", "overview-close", "show-hotkey-overlay",
 ]);
 
 // Actions that had no default keys in earlier versions (kglobalacceld stored them as "no key" and never applies a new default)

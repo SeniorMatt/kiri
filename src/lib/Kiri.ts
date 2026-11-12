@@ -12,12 +12,13 @@ function loadConfig(): Config {
     return config;
 }
 
-// Every appearance setting (corners, focus ring, border, shadow, insert hint, tab indicator, backdrops) as the script sees it,
+// Every appearance setting (corners, focus ring, border, shadow, insert hint, tab indicator, backdrops) and the wheel and
+// mouse button binds as the script sees them,
 // niri import included, as JSON for the compiled effect. The effect reads kwinrc by itself until the first call.
 function decorationsConfig(config: Config) {
     const out: Record<string, any> = {};
     for (const [name, value] of Object.entries(config)) {
-        if (/^(cornerRadius|focusRing|border|shadow|insertHint|tabIndicator|fullscreenBackdropColor|backgroundColor)/.test(name)) {
+        if (/^(cornerRadius|focusRing|border|shadow|insertHint|tabIndicator|fullscreenBackdropColor|backgroundColor|pointerBinds)/.test(name)) {
             out[name] = value;
         }
     }

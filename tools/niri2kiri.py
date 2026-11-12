@@ -93,6 +93,7 @@ ACTIONS = {
     "focus-window-previous": "focus-window-previous",
     "open-overview": "overview-open",
     "close-overview": "overview-close",
+    "show-hotkey-overlay": "show-hotkey-overlay",
     # in niri's scrolling layout the width of a window is the width of its column
     "switch-preset-window-width": "cycle-preset-widths",
     "switch-preset-window-width-back": "cycle-preset-widths-reverse",
@@ -198,7 +199,6 @@ UNMAPPED = [
     (r"monitor", "no monitor concept in Kiri's layout (desktops are shared by every screen; screen-switch moves the grid)"),
     (r"^(move-workspace-to-index|set-workspace-name|unset-workspace-name|move-(window|column)-to-new-workspace)", "workspace actions are not supported yet"),
     (r"^toggle-window-rule-opacity$", "window rule opacity is not supported yet"),
-    (r"^show-hotkey-overlay$", "Kiri has no hotkey overlay"),
     (r"-by-id$|^focus-window$|^load-config-file$|^mru-", "IPC and window switcher actions cannot be bound"),
 ]
 
@@ -755,8 +755,7 @@ SKIPPED_OPTIONS = {
     "output": "the display layout is Plasma's (Display settings)",
     "spawn-at-startup": "programs start with Plasma's autostart",
     "spawn-sh-at-startup": "programs start with Plasma's autostart",
-    "hotkey-overlay": "Kiri has no hotkey overlay",
-    "hotkey-overlay/skip-at-startup": "Kiri shows no hotkey overlay at startup",
+    "hotkey-overlay": "Kiri shows no hotkey overlay at startup",
     "screenshot-path": "screenshots are Spectacle's",
     "animations": "niri's animation options are not configurable yet",
     "workspace": "named workspaces are not supported yet",

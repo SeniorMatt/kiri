@@ -693,6 +693,20 @@ Item {
         urgency: Notification.HighUrgency
     }
 
+    // niri's show-hotkey-overlay
+    Notification {
+        id: notificationHotkeys
+        componentName: "plasma_workspace"
+        eventId: "notification"
+        title: "Important Hotkeys"
+        urgency: Notification.NormalUrgency
+    }
+
+    function showHotkeys(text) {
+        notificationHotkeys.text = text;
+        notificationHotkeys.sendEvent();
+    }
+
     Notification {
         id: notificationInvalidPresetWidths
         componentName: "plasma_workspace"

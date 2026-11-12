@@ -26,11 +26,13 @@ class World {
     private currentDesktop: KwinDesktop|null = null;
     private overview!: Overview;
     public previousDesktop: KwinDesktop|null = null; // niri's focus-workspace-previous
+    private readonly shortcutKeys: Record<string, string[]>;
 
     // `keyBindings` and `layout` are given when Kiri reloads its settings: the shortcuts stay registered
     // and the windows are put back into the columns they were in.
     constructor(config: Config, keyBindings: KeyBindings | null = null, layout: World.Layout | null = null) {
         setCursorWarpConfig(config);
+        this.shortcutKeys = config.shortcutKeys;
         const focusPasser = new FocusPassing.Passer();
         this.focusPasser = focusPasser;
         this.workspaceSignalManager = initWorkspaceSignalHandlers(this, focusPasser);
@@ -622,6 +624,13 @@ class World {
     public toggleOverview() {
         if (!this.overview.toggle()) {
             kglobalaccel.call("/component/kwin", "org.kde.kglobalaccel.Component", "invokeShortcut", ["s"], ["Overview"], () => {});
+        }
+    }
+
+    // niri's show-hotkey-overlay: a notification with the important hotkeys (a QML window would need the effect's help)
+    public showHotkeyOverlay() {
+        if (typeof qmlBase !== "undefined") {
+            (qmlBase as any).showHotkeys(getHotkeyOverlayText(this.shortcutKeys));
         }
     }
 

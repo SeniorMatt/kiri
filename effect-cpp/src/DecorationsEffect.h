@@ -106,6 +106,7 @@ struct Settings
     Gradient insertHint;
     QColor fullscreenBackdrop = QColor(Qt::black);
     QColor background; // invalid: the wallpaper stays
+    QString pointerBinds; // Kiri's `pointerBinds` setting: the wheel and mouse button binds
 };
 
 // a tabbed column as Kiri reports it: its windows in tab order and the shown one
@@ -147,7 +148,7 @@ public:
     bool blocksDirectScanout() const override;
 
 public Q_SLOTS:
-    // debug: fire wheel bind number i (0..11, in registration order) as if KWin had matched it
+    // debug: fire pointer bind number i (in the order of the pointerBinds setting) as if KWin had matched it
     Q_SCRIPTABLE void debugWheel(int i);
     // Kiri's tabbed columns as JSON: [{"windows": ["{uuid}", ...], "active": 0}, ...]
     Q_SCRIPTABLE void setTabGroups(const QString &json);
@@ -190,8 +191,8 @@ private:
     void applyOverride(Look &look, const QVariantMap &rule) const;
     const Look &lookOf(KWin::EffectWindow *w) const;
     void updateReach();
-    void registerWheelShortcuts();
-    void wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection direction, const QString &shortcut, int cooldownMs);
+    void registerPointerBinds();
+    void bind(Qt::KeyboardModifiers modifiers, const QString &trigger, const QString &shortcut, int cooldownMs);
     bool decorated(KWin::EffectWindow *w) const;
     double radiusFor(KWin::EffectWindow *w) const;
     double expandedProgress(KWin::EffectWindow *w) const;
@@ -278,7 +279,8 @@ private:
     // the shaders get their first real draw (the driver's final compile) a few seconds after load, into a tiny texture
     bool m_warmed = false;
     void warmShaders();
-    std::vector<std::unique_ptr<QAction>> m_wheelActions;
+    std::vector<std::unique_ptr<QAction>> m_wheelActions; // the wheel and mouse button binds
+    bool m_pointerBindsRegistered = false;
 };
 
 } // namespace KiriDecorations

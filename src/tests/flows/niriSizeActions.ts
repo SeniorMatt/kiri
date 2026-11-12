@@ -214,3 +214,22 @@ tests.register("niri focus-window-previous scope and filter", 10, () => {
     qtMock.fireShortcut("focus-window-previous-workspace-app");
     Assert.equal(workspaceMock.activeWindow, b, { message: "the last window of the same application on this desktop" });
 });
+
+tests.register("niri show-hotkey-overlay lists the keys now in use", 1, () => {
+    const config = getDefaultConfig();
+    config.shortcutKeys = { "window-close": ["Alt+C"], "show-hotkey-overlay": ["Meta+Shift+/"] };
+    const { qtMock, workspaceMock, world } = init(config);
+    const originalQmlBase = qmlBase;
+    let text = "";
+    qmlBase = { showHotkeys: (shown: string) => { text = shown; } } as any;
+    try {
+        qtMock.fireShortcut("show-hotkey-overlay");
+    } finally {
+        qmlBase = originalQmlBase;
+    }
+    const lines = text.split("\n");
+    Assert.assert(lines.includes("Meta+Shift+/: Show Important Hotkeys"), { message: "the key of the action itself" });
+    Assert.assert(lines.includes("Alt+C: Close Focused Window"), { message: "a key that was set" });
+    Assert.assert(lines.includes("Meta+H / Meta+Left: Focus Column to the Left"), { message: "the default keys" });
+    Assert.assert(!lines.some(line => line.startsWith(": ")), { message: "an action without keys is left out" });
+});

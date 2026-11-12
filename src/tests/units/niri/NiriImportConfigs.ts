@@ -66,7 +66,7 @@ tests.register("NiriImport accounts for every bind and option of real configs", 
         // tools/niri2kiri.py comes to the same result
         let json: any = undefined;
         try {
-            const out = require("child_process").execFileSync("python3", ["-I", "tools/niri2kiri.py", path, "--json"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+            const out = require("child_process").execFileSync("python3", ["-I", "tools/niri2kiri.py", path, "--json"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], env: Object.assign({}, process.env, { PYTHONDONTWRITEBYTECODE: "1" }) });
             json = JSON.parse(out);
         } catch (error: any) {
             console.log("python3 is not usable here, skipped the tools/niri2kiri.py comparison:", String(error).substring(0, 100));

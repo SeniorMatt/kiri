@@ -30,6 +30,7 @@
 #include <QJsonObject>
 #include <QRegularExpression>
 #include <QLoggingCategory>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QVector2D>
 #include <QVector3D>
@@ -544,7 +545,6 @@ Effect::Effect()
     }
 
     loadSettings();
-    registerWheelShortcuts();
     if (!QDBusConnection::sessionBus().registerObject(QStringLiteral("/KiriDecorations"), this, QDBusConnection::ExportScriptableSlots)) {
         qCWarning(KIRI_DECO) << "could not register the debug D-Bus object";
     }
@@ -657,15 +657,27 @@ Effect::~Effect()
     QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/KiriDecorations"));
 }
 
-// Mouse wheel navigation like niri's binds. KWin scripts can't bind the wheel, so this effect does and asks
-// Kiri's own shortcuts to do the work through kglobalaccel. Every bind has its own cooldown like niri's
-// `cooldown-ms` (150 ms on the workspace binds in niri's default config, none on the horizontal ones).
-void Effect::wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection direction, const QString &shortcut, int cooldownMs)
+// Mouse wheel and mouse button binds like niri's (Mod+WheelScrollDown, Mod+MouseMiddle). KWin scripts can't bind them,
+// so this effect does and asks Kiri's own shortcuts to do the work through kglobalaccel. Every bind has its own
+// cooldown like niri's `cooldown-ms` (150 ms on the workspace binds in niri's default config, none on the others).
+void Effect::bind(Qt::KeyboardModifiers modifiers, const QString &trigger, const QString &shortcut, int cooldownMs)
 {
+    static const QHash<QString, KWin::PointerAxisDirection> axes = {
+        {QStringLiteral("WheelScrollDown"), KWin::PointerAxisDown}, {QStringLiteral("WheelScrollUp"), KWin::PointerAxisUp},
+        {QStringLiteral("WheelScrollLeft"), KWin::PointerAxisLeft}, {QStringLiteral("WheelScrollRight"), KWin::PointerAxisRight},
+    };
+    static const QHash<QString, Qt::MouseButton> buttons = {
+        {QStringLiteral("MouseLeft"), Qt::LeftButton}, {QStringLiteral("MouseRight"), Qt::RightButton}, {QStringLiteral("MouseMiddle"), Qt::MiddleButton},
+        {QStringLiteral("MouseBack"), Qt::BackButton}, {QStringLiteral("MouseForward"), Qt::ForwardButton},
+    };
+    if (!axes.contains(trigger) && !buttons.contains(trigger)) {
+        qCWarning(KIRI_DECO) << "pointerBinds: unknown trigger" << trigger;
+        return;
+    }
     auto action = std::make_unique<QAction>();
     auto cooldown = std::make_shared<QElapsedTimer>();
     connect(action.get(), &QAction::triggered, this, [this, shortcut, cooldown, cooldownMs] {
-        qCDebug(KIRI_DECO) << "wheel" << shortcut << m_settings.kiriEnabled;
+        qCDebug(KIRI_DECO) << "pointer bind" << shortcut << m_settings.kiriEnabled;
         if (!m_settings.kiriEnabled || (cooldownMs > 0 && cooldown->isValid() && cooldown->elapsed() < cooldownMs)) {
             return;
         }
@@ -682,7 +694,11 @@ void Effect::wheel(Qt::KeyboardModifiers modifiers, KWin::PointerAxisDirection d
         });
         qCDebug(KIRI_DECO) << "invoked" << shortcut;
     });
-    KWin::effects->registerAxisShortcut(modifiers, direction, action.get());
+    if (axes.contains(trigger)) {
+        KWin::effects->registerAxisShortcut(modifiers, axes.value(trigger), action.get());
+    } else {
+        KWin::effects->registerPointerShortcut(modifiers, buttons.value(trigger), action.get());
+    }
     m_wheelActions.push_back(std::move(action));
 }
 
@@ -693,24 +709,47 @@ void Effect::debugWheel(int i)
     }
 }
 
-void Effect::registerWheelShortcuts()
+// The binds are the `pointerBinds` setting: "Meta+Ctrl+WheelScrollDown=column-move-to-next-desktop@150;..."
+// (<modifiers>+<trigger>=<Kiri shortcut>[@<cooldown ms>], separated by ; or new lines). KWin drops a shortcut when
+// its QAction is destroyed, so a changed setting just starts over.
+void Effect::registerPointerBinds()
 {
-    const Qt::KeyboardModifiers meta = Qt::MetaModifier;
-    const Qt::KeyboardModifiers metaCtrl = Qt::MetaModifier | Qt::ControlModifier;
-    const Qt::KeyboardModifiers metaShift = Qt::MetaModifier | Qt::ShiftModifier;
-    const Qt::KeyboardModifiers metaCtrlShift = Qt::MetaModifier | Qt::ControlModifier | Qt::ShiftModifier;
-    wheel(meta, KWin::PointerAxisDown, QStringLiteral("desktop-next"), 150);
-    wheel(meta, KWin::PointerAxisUp, QStringLiteral("desktop-previous"), 150);
-    wheel(metaCtrl, KWin::PointerAxisDown, QStringLiteral("column-move-to-next-desktop"), 150);
-    wheel(metaCtrl, KWin::PointerAxisUp, QStringLiteral("column-move-to-previous-desktop"), 150);
-    wheel(meta, KWin::PointerAxisRight, QStringLiteral("focus-right"), 0);
-    wheel(meta, KWin::PointerAxisLeft, QStringLiteral("focus-left"), 0);
-    wheel(metaCtrl, KWin::PointerAxisRight, QStringLiteral("column-move-right"), 0);
-    wheel(metaCtrl, KWin::PointerAxisLeft, QStringLiteral("column-move-left"), 0);
-    wheel(metaShift, KWin::PointerAxisDown, QStringLiteral("focus-right"), 0);
-    wheel(metaShift, KWin::PointerAxisUp, QStringLiteral("focus-left"), 0);
-    wheel(metaCtrlShift, KWin::PointerAxisDown, QStringLiteral("column-move-right"), 0);
-    wheel(metaCtrlShift, KWin::PointerAxisUp, QStringLiteral("column-move-left"), 0);
+    m_wheelActions.clear();
+    for (const QString &entry : m_settings.pointerBinds.split(QRegularExpression(QStringLiteral("[;\n]")), Qt::SkipEmptyParts)) {
+        const int equals = entry.indexOf(QLatin1Char('='));
+        if (equals < 0) {
+            continue;
+        }
+        QStringList keys = entry.left(equals).trimmed().split(QLatin1Char('+'));
+        QString shortcut = entry.mid(equals + 1).trimmed();
+        int cooldown = 0;
+        if (shortcut.contains(QLatin1Char('@'))) {
+            cooldown = shortcut.section(QLatin1Char('@'), 1).toInt();
+            shortcut = shortcut.section(QLatin1Char('@'), 0, 0);
+        }
+        const QString trigger = keys.takeLast().trimmed();
+        Qt::KeyboardModifiers modifiers;
+        bool valid = !shortcut.isEmpty();
+        for (const QString &key : std::as_const(keys)) {
+            if (key == QLatin1String("Meta")) {
+                modifiers |= Qt::MetaModifier;
+            } else if (key == QLatin1String("Ctrl")) {
+                modifiers |= Qt::ControlModifier;
+            } else if (key == QLatin1String("Alt")) {
+                modifiers |= Qt::AltModifier;
+            } else if (key == QLatin1String("Shift")) {
+                modifiers |= Qt::ShiftModifier;
+            } else {
+                valid = false;
+            }
+        }
+        if (valid) {
+            bind(modifiers, trigger, shortcut, cooldown);
+        } else {
+            qCWarning(KIRI_DECO) << "pointerBinds: cannot read" << entry;
+        }
+    }
+    m_pointerBindsRegistered = true;
 }
 
 bool Effect::supported()
@@ -840,6 +879,14 @@ Settings Effect::parseSettings(const QVariantMap &m, bool kiriEnabled) const
     if (parseColor(str(m, "backgroundColor"), background)) {
         s.background = background;
     }
+    // the default is niri's default config's wheel binds (keep in step with `pointerBinds` in src/lib/config/definition.ts)
+    s.pointerBinds = str(m, "pointerBinds", QStringLiteral(
+        "Meta+WheelScrollDown=desktop-next@150;Meta+WheelScrollUp=desktop-previous@150;"
+        "Meta+Ctrl+WheelScrollDown=column-move-to-next-desktop@150;Meta+Ctrl+WheelScrollUp=column-move-to-previous-desktop@150;"
+        "Meta+WheelScrollRight=focus-right;Meta+WheelScrollLeft=focus-left;"
+        "Meta+Ctrl+WheelScrollRight=column-move-right;Meta+Ctrl+WheelScrollLeft=column-move-left;"
+        "Meta+Shift+WheelScrollDown=focus-right;Meta+Shift+WheelScrollUp=focus-left;"
+        "Meta+Ctrl+Shift+WheelScrollDown=column-move-right;Meta+Ctrl+Shift+WheelScrollUp=column-move-left"));
     return s;
 }
 
@@ -855,7 +902,12 @@ void Effect::loadSettings()
             map.insert(key, kiri.readEntry(key, QString()));
         }
     }
+    const QString oldBinds = m_settings.pointerBinds;
+    const bool oldEnabled = m_settings.kiriEnabled;
     m_settings = parseSettings(map, enabled);
+    if (!m_pointerBindsRegistered || m_settings.pointerBinds != oldBinds || enabled != oldEnabled) {
+        registerPointerBinds();
+    }
     // the looks of the windows with overrides follow the global one
     m_looks.clear();
     for (auto it = m_overrides.constBegin(); it != m_overrides.constEnd(); ++it) {
