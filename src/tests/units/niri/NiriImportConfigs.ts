@@ -83,6 +83,13 @@ tests.register("NiriImport accounts for every bind and option of real configs", 
             Assert.equal(sorted(json.shortcutKeys), sorted(result.shortcutKeys), { message: where + "keys of tools/niri2kiri.py" });
             const withoutInclude = (lines: string[]) => lines.filter(line => !line.startsWith("include")).sort();
             Assert.equalArrays(withoutInclude(json.skipped), withoutInclude(result.skipped), { message: where + "skipped lines of tools/niri2kiri.py" });
+
+            // and tells what it skipped on stderr (the spawn binds are made into Plasma shortcuts by --apply, not skipped there)
+            const run = require("child_process").spawnSync("python3", ["-I", "tools/niri2kiri.py", path, "--settings"], { encoding: "utf8", env: Object.assign({}, process.env, { PYTHONDONTWRITEBYTECODE: "1" }) });
+            const told = new Set((run.stderr as string).split("\n"));
+            for (const line of json.skipped) {
+                Assert.assert(line.includes(": starts a program") || told.has("# skipped: " + line), { message: where + "tools/niri2kiri.py tells on stderr: " + line });
+            }
         }
     }
 

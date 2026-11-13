@@ -717,6 +717,7 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         {
             name: "show-hotkey-overlay",
             description: "Show the important hotkeys",
+            defaultKeys: ["Meta+Shift+/"],
             action: () => world.showHotkeyOverlay(),
         },
         {

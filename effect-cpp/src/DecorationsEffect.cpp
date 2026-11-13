@@ -715,6 +715,10 @@ void Effect::debugWheel(int i)
 void Effect::registerPointerBinds()
 {
     m_wheelActions.clear();
+    m_pointerBindsRegistered = true;
+    if (!m_settings.kiriEnabled) {
+        return; // a bind that nothing answers must not take the wheel and the buttons from other applications
+    }
     for (const QString &entry : m_settings.pointerBinds.split(QRegularExpression(QStringLiteral("[;\n]")), Qt::SkipEmptyParts)) {
         const int equals = entry.indexOf(QLatin1Char('='));
         if (equals < 0) {
@@ -749,7 +753,6 @@ void Effect::registerPointerBinds()
             qCWarning(KIRI_DECO) << "pointerBinds: cannot read" << entry;
         }
     }
-    m_pointerBindsRegistered = true;
 }
 
 bool Effect::supported()

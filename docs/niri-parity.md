@@ -62,8 +62,8 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | focus-window-top/bottom, down-or-top, up-or-bottom | | scrolling.rs | done | `focus-window-top` etc. | nirActions |
 | focus-window-in-column N | 1-based, clamps | scrolling.rs 1618 | done | `focus-window-in-column-{}` | nirActions |
 | focus-window-or-workspace-up/down | window, else workspace | layout/mod.rs | done | `focus-window-or-desktop-up/down` | nirActions |
-| focus-window-previous (scope, filter props) | go to the previously focused window (MRU) | niri.rs `focus_window_previous`; ui/mru.rs | partial | `focus-window-previous`; no `scope`/`filter` | nirActions |
-| focus-window-or-monitor-up/down, focus-column-or-monitor-left/right | window/column, else monitor | layout/mod.rs | partial | no monitor concept in Kiri's layout; on one output they equal plain focus; import skips them | - |
+| focus-window-previous (scope, filter props) | go to the previously focused window (MRU) | niri.rs `focus_window_previous`; ui/mru.rs | done | `focus-window-previous` and the `scope`/`filter` variants `focus-window-previous-{workspace,output,app,workspace-app,output-app}` (ClientManager.findPreviousFocused); the import picks the variant | nirActions, niriSizeActions |
+| focus-window-or-monitor-up/down, focus-column-or-monitor-left/right | window/column, else monitor | layout/mod.rs | done | one output only: the import maps them to `focus-up/down`, `focus-left/right` (niri does exactly that when no output lies in that direction); other monitors do not exist for Kiri (see focus-monitor) | NiriImport |
 | focus-floating, focus-tiling, switch-focus-between-floating-and-tiling | layer focus | layout/workspace.rs | done | `focus-floating`, `focus-tiling`, `window-switch-focus-floating-tiling` | floatingKeys, leaveUntiled |
 | focus-workspace-down/up, N, previous | | monitor.rs | done | `desktop-next/previous`, `desktop-{}`, `desktop-previous-used`; DesktopManager.ts, DynamicDesktops.ts `clampIndex` | keyBindings, dynamicDesktops |
 | focus-workspace "name" | by workspace name | layout/mod.rs `find_workspace_by_name` | done | `desktop-named-N` (the Nth name of `desktopBindNames`, which the importer fills); DynamicDesktops.ts `findByName` | workspaces |
@@ -74,12 +74,12 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 
 | Item | niri behaviour | niri source | Status | Kiri | Test |
 |---|---|---|---|---|---|
-| move-column-left/right, to-first/last, to-index | keeps the column in view; `focus=false` property | scrolling.rs | partial | `column-move-*`, `column-move-to-column-{}`; no `focus=false` | layout, nirActions |
-| move-window-up/down | inside the column; `focus` property | scrolling.rs | partial | `window-move-up/down`; no `focus=false` | layout |
+| move-column-left/right, to-first/last, to-index | keeps the column in view; `focus=false` property | scrolling.rs | done | `column-move-*` and `column-move-to-column-{}` keep niri's focus; `focus=false` is `column-move-{left,right,start,end}-no-focus` and `column-move-to-column-no-focus-{}` (Actions.columnMoveNoFocus: the column that took the place gets the focus); the import maps `focus=false` | layout, nirActions, niriSizeActions, NiriImport |
+| move-window-up/down | inside the column; `focus` property | scrolling.rs | done | `window-move-up/down`; `focus=false` is `window-move-{up,down}-no-focus` (Actions.windowMoveVerticalNoFocus); `swap-window-left/right focus=false` is `window-swap-{left,right}-no-focus` | layout, niriSizeActions, NiriImport |
 | move-window-down-or-to-workspace-down, up | | layout/mod.rs | done | `window-move-down-or-to-desktop-down` etc. | nirActions |
 | consume-or-expel-window-left/right, consume-window-into-column, expel-window-from-column | | scrolling.rs | done | `window-consume-or-expel-*`, `window-consume-into-column`, `window-expel-from-column` | layout |
 | swap-window-left/right | swap with the neighbour column's window | scrolling.rs | done | `window-swap-left/right` | nirActions |
-| move-column-left-or-to-monitor-left, right | move, else to monitor | layout/mod.rs | partial | on one output these equal move-column-left/right; not mapped by import | - |
+| move-column-left-or-to-monitor-left, right | move, else to monitor | layout/mod.rs | done | one output only: the import maps them to `column-move-left/right`, which is what niri does with no output in that direction | NiriImport |
 | move-column-to-workspace-down/up/N | follows the column unless `focus=false` | layout/mod.rs | done | `column-move-to-*desktop*`; `focus=false`: `column-move-to-next/previous-desktop-nofocus`, `column-move-to-desktop-nofocus-N` | columnMoveToDesktop, followWindowToDesktop, workspaces |
 | move-window-to-workspace-down/up/N | same for a window | layout/mod.rs | done | `window-move-to-*desktop*`; `focus=false`: `window-move-to-next/previous-desktop-nofocus`, `window-move-to-desktop-nofocus-N` | followWindowToDesktop, workspaces |
 | move-column-to-workspace "name", move-window-to-workspace "name" | | layout/mod.rs | done | `column-move-to-desktop-named-N`, `window-move-to-desktop-named-N` (see focus-workspace "name"); `focus=false` with a name is not mapped | workspaces |
@@ -95,32 +95,32 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | Item | niri behaviour | niri source | Status | Kiri | Test |
 |---|---|---|---|---|---|
 | switch-preset-column-width, -back | next preset wider than now, wraps | scrolling.rs `toggle_width` 4991 | done | `cycle-preset-widths`, `-reverse`; PresetWidths.ts | presetWidths |
-| switch-preset-window-width, -back | per window width inside a column | scrolling.rs 2691 | missing | no per-window width | - |
+| switch-preset-window-width, -back | the column width cycles through the presets, measured at that window | scrolling.rs 2691 | done | in niri's scrolling layout a window's width is its column's (`toggle_window_width` calls the column's `toggle_width`), so the actions are `cycle-preset-widths(-reverse)`; the import maps both names | presetWidths, NiriImport |
 | switch-preset-window-height, -back | | scrolling.rs 5198 | done | `window-height-cycle-presets(-reverse)` | windowHeights |
 | reset-window-height | back to auto | scrolling.rs | done | `window-height-reset` | windowHeights |
 | maximize-column | toggle full width (proportion 1.0), restores | scrolling.rs `toggle_full_width` 5042 | done | `column-width-maximize` | maximizeToggles |
 | maximize-window-to-edges | toggle maximize to work-area edges | scrolling.rs 2961 | done | `window-maximize-to-edges` | maximizeToggles |
 | expand-column-to-available-width | | scrolling.rs 2833 | done | `column-width-expand` | behaviorOptions |
 | set-column-width "+10%" / "-10%" | proportion step of the working area | scrolling.rs 5054 | done | `column-width-increase/decrease`, step `columnWidthStep` | nirActions, columnWidthView |
-| set-column-width "50%" / "800" (absolute) | set exactly | scrolling.rs 5054 | missing | import skips; needs a bind with an argument (one action per value, or a settings list) | - |
-| set-window-width (absolute or relative) | per window | scrolling.rs | missing | | - |
+| set-column-width "50%" / "800" (absolute) | set exactly | scrolling.rs 5054 | done | `column-width-set-{}`: entry N of the new setting `columnWidthSet` ("50%, 800, +100, -5%", niri's SizeChange syntax, px or %, set or change); tiled and floating windows; the import fills the setting and binds the slot (12 slots) | niriSizeActions, NiriImport |
+| set-window-width (absolute or relative) | per window | scrolling.rs | done | same as set-column-width: niri's scrolling layout sets the column's width (`Scrolling::set_window_width` calls `Column::set_column_width`); the import maps it to the same slots | niriSizeActions, NiriImport |
 | set-window-height "+-10%" | | scrolling.rs 5104 | done | `window-height-increase/decrease` | nirActions |
-| set-window-height "50%" / "400" (absolute) | | scrolling.rs 5104 | missing | as set-column-width | - |
+| set-window-height "50%" / "400" (absolute) |  | scrolling.rs 5104 | done | `window-height-set-{}`: entry N of the setting `windowHeightSet`, same syntax; tiled and floating windows; the import fills it (12 slots) | niriSizeActions, NiriImport |
 | toggle-column-tabbed-display, set-column-display normal/tabbed | | scrolling.rs 2208 | done | `column-toggle-tabbed`, `column-display-normal/tabbed` | tabbed, nirActions |
 | center-column, center-window | centre the column (floating: centre the window) | scrolling.rs 2247; workspace.rs 1199 | done | `grid-scroll-focused`; floating via windowRules | centerFocused, windowRules |
 | center-visible-columns | centre the group of visible columns | scrolling.rs 2284 | done | `column-center-visible` | centerFocused |
 | fullscreen-window (toggle) | | layout/mod.rs; scrolling.rs 2930 | done | `window-toggle-fullscreen` | fullScreenToggle |
-| set-window-fullscreen, unset-window-fullscreen | explicit, not toggling | binds.rs 296-301 | missing | trivial wrappers over the toggle | - |
+| set-window-fullscreen, unset-window-fullscreen | explicit, not toggling | binds.rs 296-301 | done | `window-set-fullscreen`, `window-unset-fullscreen` (a windowed full-screen window becomes real on set; unset ends windowed full-screen too, like niri's `set_fullscreen`) | niriSizeActions, NiriImport |
 | toggle-windowed-fullscreen | app thinks full-screen, window keeps its tile | wiki Fullscreen-and-Maximize | done | `window-toggle-windowed-fullscreen` | windowedFullScreen |
-| set/unset-windowed-fullscreen, set/unset-window-maximized-to-edges | explicit | binds.rs 302-313 | missing | trivial wrappers | - |
+| set/unset-windowed-fullscreen, set/unset-window-maximized-to-edges | explicit | binds.rs 302-313 | done | `window-set-windowed-fullscreen`, `window-unset-windowed-fullscreen`, `window-set-maximized-to-edges`, `window-unset-maximized-to-edges` | niriSizeActions, NiriImport |
 | toggle-window-floating, move-window-to-floating, move-window-to-tiling | | layout/mod.rs | done | `window-toggle-floating`, `window-move-to-floating/tiling` | floatingKeys |
-| move-floating-window -x -y (relative or absolute) | position a floating window | binds.rs `MoveFloatingWindowById` | missing | arrow keys move by 50 px only (`window-move-*` on floating); no absolute move | floatingKeys |
+| move-floating-window -x -y (relative or absolute) | position a floating window | binds.rs `MoveFloatingWindowById` | n/a | `MoveFloatingWindowById` is `knuffel(skip)`: only `niri msg action move-floating-window` (IPC) has it, a config bind cannot; the arrow keys move floating windows by 50 px | floatingKeys |
 | close-window | | | done | `window-close` | closePick |
-| toggle-overview, open-overview, close-overview | | layout/mod.rs 4758 | partial | `overview` toggles only; import maps open-overview to the toggle | overview |
+| toggle-overview, open-overview, close-overview |  | layout/mod.rs 4758 | done | `overview` toggles, `overview-open` and `overview-close` do nothing when the overview is already in that state | overview, niriSizeActions |
 | toggle-window-rule-opacity | flips the rule's opacity | binds.rs | missing | no opacity rule | - |
 | set-dynamic-cast-window/monitor, clear-dynamic-cast-target, stop-cast | screencast target | binds.rs | n/a | Plasma screencasts through KWin/xdg-portal | - |
 | switch-layout | keyboard layout | binds.rs | n/a | Plasma keyboard KCM | - |
-| show-hotkey-overlay | list of binds | binds.rs; ui/hotkey_overlay.rs | missing | feasible as a QML overlay listing Kiri's keys | - |
+| show-hotkey-overlay | list of binds | binds.rs; ui/hotkey_overlay.rs | partial | `show-hotkey-overlay`: a notification ("Important Hotkeys") with the keys the important actions have now (Kiri's settings, an imported niri config, else the defaults); keys set only on Plasma's Shortcuts page are not seen; not a QML overlay | niriSizeActions |
 | spawn, spawn-sh, spawn-at-startup | run commands | binds.rs, misc.rs | n/a | Plasma custom shortcuts and autostart | - |
 | screenshot, screenshot-screen, screenshot-window, screenshot-path | | binds.rs, misc.rs | n/a | Spectacle | - |
 | quit, suspend, power-off/on-monitors, change-vt, toggle-touchpad, do-screen-transition | session and hardware | binds.rs | n/a | Plasma | - |
@@ -134,14 +134,14 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | Item | niri behaviour | niri source | Status | Kiri | Test |
 |---|---|---|---|---|---|
 | Key triggers with Mod/Super/Ctrl/Shift/Alt | | binds.rs `Trigger` | done | kglobalaccel via KGlobalAccelBridge.qml; keySequence.ts; import convertKey | keyBindings, units/niri/NiriImport |
-| `Mod` = Super (mod-key / mod-key-nested) | configurable | input.rs `ModKey` | partial | fixed to Meta; import maps Mod/Super/Win to Meta | - |
-| Mouse-wheel triggers WheelScroll up/down/left/right with `cooldown-ms` | binds | binds.rs `Trigger` | partial | the 12 default-config wheel binds are hard-coded in FX src/ `registerWheelShortcuts` (cooldowns 150/0 like niri); not rebindable, import skips wheel keys | - (debugWheel hook only) |
-| Mouse-button triggers (MouseLeft, ...), TouchpadScroll*, TabletStylusButton* | binds | binds.rs | missing | `registerPointerShortcut` is available to effects; stylus n/a | - |
-| `repeat=false`, `allow-when-locked`, `allow-inhibiting`, `hotkey-overlay-title`, `cooldown-ms` | bind properties | binds.rs 209-233 | partial | held keys: move keys repeat, toggles do not (done by Kiri per action); no per-bind properties | floatingKeys ("A held key repeats move keys but not toggles") |
+| `Mod` = Super (mod-key / mod-key-nested) | configurable | input.rs `ModKey` | done | the import reads `input { mod-key }` (Super, Alt, Ctrl, Shift; the ISO_Level shifts have no Qt modifier and are reported) and makes `Mod` that modifier in the keys it writes; Kiri's own default keys stay on Meta; `mod-key-nested` is only for nested niri | NiriImportConfigs |
+| Mouse-wheel triggers WheelScroll up/down/left/right with `cooldown-ms` | binds | binds.rs `Trigger` | done | the setting `pointerBinds` ("Meta+WheelScrollDown=desktop-next@150;...", default: niri's default config's twelve binds); the effect registers them (DecorationsEffect.cpp `registerPointerBinds`, re-registered when the setting changes), `cooldown-ms` is the `@ms`; the import writes the setting from the wheel binds (none in the config: none left, like niri); checked in a nested KWin with injected wheel events | NiriImportConfigs (import); nested KWin (effect) |
+| Mouse-button triggers (MouseLeft, ...), TouchpadScroll*, TabletStylusButton* | binds | binds.rs | partial | MouseLeft/Right/Middle/Back/Forward with modifiers work like the wheel binds (`registerPointerShortcut`; `pointerBinds`; imported); TouchpadScroll* has no KWin hook (`registerAxisShortcut` gives neither the source nor ticks, so it cannot tell a touchpad from a wheel), TabletStylusButton* has none either | NiriImportConfigs; nested KWin |
+| `repeat=false`, `allow-when-locked`, `allow-inhibiting`, `hotkey-overlay-title`, `cooldown-ms` | bind properties | binds.rs 209-233 | partial | keys repeat per action (the NO_REPEAT list: close, toggles, overview), not per bind; `cooldown-ms` works on wheel and mouse button binds (`@ms` in `pointerBinds`, imported) but not on keys; `allow-when-locked`, `allow-inhibiting`, `hotkey-overlay-title` are not read (the import ignores them: they change nothing Kiri can do) | floatingKeys ("A held key repeats move keys but not toggles") |
 | `Mod release { toggle-overview }` | action on release | binds.rs `BoundAction::Release` | impossible | kglobalaccel cannot bind a bare modifier or a release; Plasma uses it for the launcher | - |
-| Press and Release actions | | binds.rs | impossible | same | - |
+| Press and Release actions |  | binds.rs | impossible | same; a `press { action }` block is imported as a plain bind, a `release` one is reported as skipped | - |
 | niri `include` | split config | wiki Configuration:-Include | impossible | KWin scripts cannot read files; use `tools/niri2kiri.py`, which reads the file and writes kwinrc | - |
-| Import: paste a config.kdl into settings | n/a for niri | | done | niri/import.ts, niri/kdl.ts, tools/niri2kiri.py | units/niri/NiriImport |
+| Import: paste a config.kdl into settings | n/a for niri |  | done | niri/import.ts, niri/kdl.ts, tools/niri2kiri.py (the same result: `--json` prints it, the test compares both); every bind and option of a config is mapped or reported on stderr as `<path>: <reason>` (`SKIPPED_OPTIONS`, `UNMAPPED` in both importers) | units/niri/NiriImport, NiriImportConfigs (the owner's config and niri's default config) |
 
 ## 3. Scrolling, animation, input behaviour
 
