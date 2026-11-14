@@ -163,8 +163,8 @@ tests.register("Column move to desktop: random histories keep the view right on 
                 }
                 case 10:
                     describeBefore = describe();
-                    trace.push("column-move-to-desktop-nofocus-" + k);
-                    qtMock.fireShortcut("column-move-to-desktop-nofocus-" + k);
+                    trace.push("column-move-to-desktop-no-focus-" + k);
+                    qtMock.fireShortcut("column-move-to-desktop-no-focus-" + k);
                     move = true;
                     break;
                 default:
@@ -237,7 +237,7 @@ tests.register("Column move to desktop with focus=false into an empty desktop: t
     const [d1, d2] = workspaceMock.desktops;
     const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
     workspaceMock.activeWindow = b;
-    qtMock.fireShortcut("column-move-to-next-desktop-nofocus");
+    qtMock.fireShortcut("column-move-to-next-desktop-no-focus");
     Assert.equal(workspaceMock.currentDesktop, d1);
     workspaceMock.currentDesktop = d2;
     const frame = b.getActualFrameGeometry();

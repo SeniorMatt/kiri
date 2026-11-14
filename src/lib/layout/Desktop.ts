@@ -206,6 +206,11 @@ class Desktop {
         return this.tilingArea.width + this.config.marginLeft + this.config.marginRight;
     }
 
+    // the left edge of the working area (niri's working area: the tiling area plus the outer gaps)
+    public getWorkingLeft() {
+        return this.tilingArea.x - this.config.marginLeft;
+    }
+
     public getCurrentVisibleRange() {
         return this.getVisibleRange(this.scrollX);
     }

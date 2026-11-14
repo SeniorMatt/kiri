@@ -86,3 +86,28 @@ tests.register("Windows that KWin pulls back to the screen edge are put back at 
         Assert.equalRects(client.getActualFrameGeometry(), slots[i], { message: "window " + i + " should be back in its slot" });
     });
 });
+
+tests.register("A window that snaps to its own height is not pulled in from beyond the right edge", 1, () => {
+    const config = getDefaultConfig();
+    const { qtMock, workspaceMock } = init(config);
+    // KWin keeps 100 px of a window on the screen when the window commits an answer to a configure, and a CSD
+    // terminal commits a height other than the asked one every time: its slot must still be where the layout puts it
+    const wide = () => new MockQmlRect(0, 0, tilingArea.width - 20, 200);
+    const terminal = new MockKwinClient(wide());
+    terminal.slowClient = true; // the commit comes later, outside of Kiri's own assignment
+    terminal.heightStep = 37;
+    terminal.keepsVisible = true;
+    const others = workspaceMock.createClientsWithFrames(wide(), wide());
+    workspaceMock.createWindows(terminal);
+    const expectedX = () => {
+        const previous = others[1].getActualFrameGeometry();
+        return previous.x + previous.width + config.gapsInnerHorizontal;
+    };
+    for (const key of ["focus-start", "focus-end", "focus-start", "focus-right", "focus-start"]) {
+        qtMock.fireShortcut(key);
+        terminal.commitRequestedGeometry();
+        terminal.commitRequestedGeometry();
+        Assert.equal(terminal.getActualFrameGeometry().x, expectedX(), { message: "after " + key });
+    }
+    Assert.assert(terminal.getActualFrameGeometry().x >= screen.width, { message: "the window is meant to be off screen" });
+});

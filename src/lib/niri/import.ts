@@ -117,7 +117,7 @@ namespace NiriImport {
     const NUMBERED_NO_FOCUS: Record<string, string> = {
         "move-column-to-index": "column-move-to-column-no-focus-{}",
     };
-    const NO_FOCUS_SLOTS = 9; // how many numbered no-focus actions Kiri has
+    const NO_FOCUS_SLOTS = 12; // how many numbered no-focus actions Kiri has
     const SIZE_SLOTS = 12; // how many column-width-set-N and window-height-set-N actions Kiri has
 
     const MODIFIERS: Record<string, string> = {
@@ -164,7 +164,7 @@ namespace NiriImport {
     // shortcut "...-named-N", 12 at most), focus=false, new workspaces, move-workspace-to-index.
     function desktopAction(command: Kdl.Node, names: string[]): string|undefined {
         const arg = command.args[0];
-        const nofocus = command.props["focus"] === "false" ? "-no-focus" : "";
+        const noFocusSuffix = command.props["focus"] === "false" ? "-no-focus" : "";
         const slot = (name: string) => {
             if (!names.includes(name) && names.length < 12) {
                 names.push(name);
@@ -178,9 +178,9 @@ namespace NiriImport {
                 return undefined;
             }
             if (/^\d+$/.test(arg)) {
-                return command.name === "focus-workspace" ? undefined : `${kind}${nofocus}-${arg}`;
+                return command.name === "focus-workspace" ? undefined : `${kind}${noFocusSuffix}-${arg}`;
             }
-            return nofocus !== "" || slot(arg) < 1 ? undefined : `${kind}-named-${slot(arg)}`;
+            return noFocusSuffix !== "" || slot(arg) < 1 ? undefined : `${kind}-named-${slot(arg)}`;
         }
         case "set-workspace-name":
             return arg === undefined || slot(arg) < 1 ? undefined : `set-desktop-name-${slot(arg)}`;
@@ -189,13 +189,13 @@ namespace NiriImport {
         case "move-workspace-to-index":
             return arg !== undefined && /^\d+$/.test(arg) ? `move-desktop-to-index-${arg}` : undefined;
         case "move-column-to-workspace-down": case "move-column-to-workspace-up":
-            return nofocus === "" ? undefined : `column-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-no-focus`;
+            return noFocusSuffix === "" ? undefined : `column-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-no-focus`;
         case "move-window-to-workspace-down": case "move-window-to-workspace-up":
-            return nofocus === "" ? undefined : `window-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-no-focus`;
+            return noFocusSuffix === "" ? undefined : `window-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-no-focus`;
         case "move-column-to-new-workspace-below": case "move-column-to-new-workspace-above":
         case "move-window-to-new-workspace-below": case "move-window-to-new-workspace-above":
             // a workspace reference is not mapped
-            return arg !== undefined ? undefined : `${command.name.startsWith("move-column") ? "column" : "window"}-move-to-new-desktop-${command.name.endsWith("below") ? "below" : "above"}${nofocus}`;
+            return arg !== undefined ? undefined : `${command.name.startsWith("move-column") ? "column" : "window"}-move-to-new-desktop-${command.name.endsWith("below") ? "below" : "above"}${noFocusSuffix}`;
         }
         return undefined;
     }
@@ -233,16 +233,13 @@ namespace NiriImport {
         [/^(set-dynamic-cast|clear-dynamic-cast|stop-cast)/, "screencast targets are Plasma's"],
         [/^(toggle-debug-tint|debug-toggle)/, "niri renderer debugging"],
         [/monitor/, "no monitor concept in Kiri's layout (desktops are shared by every screen; screen-switch moves the grid)"],
-        [/^(move-workspace-to-index|set-workspace-name|unset-workspace-name|move-(window|column)-to-new-workspace)/, "workspace actions are not supported yet"],
+        [/^(focus-workspace|move-(window|column)-to-workspace)$/, "this workspace reference is not mapped (a name with focus=false, or more than 12 names)"],
         [/^toggle-window-rule-opacity$/, "window rule opacity is not supported yet"],
         [/-by-id$|^focus-window$|^load-config-file$|^mru-/, "IPC and window switcher actions cannot be bound"],
     ];
 
     // undefined when the importer has no explicit reason for the action
     export function unmappedReason(name: string, args: string[]): string|undefined {
-        if (/^(focus-workspace|move-(window|column)-to-workspace)$/.test(name) && args.length > 0 && !/^\d+$/.test(args[0])) {
-            return "workspaces by name are not supported yet";
-        }
         const found = UNMAPPED.find(([regex]) => regex.test(name));
         return found === undefined ? undefined : found[1];
     }
@@ -792,18 +789,68 @@ namespace NiriImport {
             }
         }
         const gestures = Kdl.find(nodes, "gestures");
-        if (gestures.length > 0) {
-            // niri: `off` disables the corners; naming other corners without top-left turns the top-left one off
-            for (const block of gestures) {
-                const corners = Kdl.child(block, "hot-corners");
-                if (corners !== undefined) {
-                    const others = ["top-right", "bottom-left", "bottom-right"].some(name => Kdl.child(corners, name) !== undefined);
-                    if (Kdl.child(corners, "off") !== undefined || (others && Kdl.child(corners, "top-left") === undefined)) {
-                        out["hotCorner"] = false;
-                    }
+        // niri: `off` disables the corners; with none of the four named the top-left one is the default, and naming
+        // other corners without top-left leaves only those (the last gestures / hot-corners block wins, as in niri)
+        for (const block of gestures) {
+            const corners = Kdl.child(block, "hot-corners");
+            if (corners !== undefined) {
+                out["hotCorner"] = Kdl.child(corners, "off") === undefined;
+                const named = ["top-left", "top-right", "bottom-left", "bottom-right"].map(name => Kdl.child(corners, name) !== undefined);
+                const none = !named.some(x => x);
+                out["hotCornerTopLeft"] = none || named[0];
+                out["hotCornerTopRight"] = named[1];
+                out["hotCornerBottomLeft"] = named[2];
+                out["hotCornerBottomRight"] = named[3];
+            }
+            for (const [name, prefix, size] of [["dnd-edge-view-scroll", "dndEdgeViewScroll", "trigger-width"], ["dnd-edge-workspace-switch", "dndEdgeWorkspaceSwitch", "trigger-height"]]) {
+                const node = Kdl.child(block, name);
+                if (node === undefined) {
+                    continue;
+                }
+                const sizeValue = Kdl.child(node, size);
+                if (sizeValue !== undefined && !isNaN(parseFloat(sizeValue.args[0]))) {
+                    out[prefix + (size === "trigger-width" ? "TriggerWidth" : "TriggerHeight")] = parseFloat(sizeValue.args[0]);
+                }
+                const delay = Kdl.child(node, "delay-ms");
+                if (delay !== undefined && !isNaN(parseFloat(delay.args[0]))) {
+                    out[prefix + "Delay"] = Math.round(parseFloat(delay.args[0]));
+                }
+                const speed = Kdl.child(node, "max-speed");
+                if (speed !== undefined && !isNaN(parseFloat(speed.args[0]))) {
+                    out[prefix + "MaxSpeed"] = parseFloat(speed.args[0]);
                 }
             }
-            warn("gestures: Kiri maps only hot-corners off, no other gesture options");
+        }
+        for (const block of Kdl.find(nodes, "overview")) {
+            const zoom = Kdl.child(block, "zoom");
+            if (zoom !== undefined && !isNaN(parseFloat(zoom.args[0]))) {
+                out["overviewZoom"] = Math.max(0, Math.min(1, parseFloat(zoom.args[0])));
+            }
+            colorSetting(Kdl.child(block, "backdrop-color"), "overviewBackdropColor", out, warn);
+            const shadow = Kdl.child(block, "workspace-shadow");
+            if (shadow !== undefined) {
+                if (Kdl.child(shadow, "off")) {
+                    out["overviewShadowEnabled"] = false;
+                }
+                if (Kdl.child(shadow, "on")) {
+                    out["overviewShadowEnabled"] = true;
+                }
+                const offset = Kdl.child(shadow, "offset");
+                if (offset !== undefined) {
+                    for (const [axis, key] of [["x", "overviewShadowOffsetX"], ["y", "overviewShadowOffsetY"]]) {
+                        if (offset.props[axis] !== undefined && !isNaN(parseFloat(offset.props[axis]))) {
+                            out[key] = parseFloat(offset.props[axis]);
+                        }
+                    }
+                }
+                for (const [name, key] of [["softness", "overviewShadowSoftness"], ["spread", "overviewShadowSpread"]]) {
+                    const value = Kdl.child(shadow, name);
+                    if (value !== undefined && value.args.length > 0 && !isNaN(parseFloat(value.args[0]))) {
+                        out[key] = parseFloat(value.args[0]);
+                    }
+                }
+                colorSetting(Kdl.child(shadow, "color"), "overviewShadowColor", out, warn);
+            }
         }
         return out;
     }
@@ -825,12 +872,12 @@ namespace NiriImport {
     // What the importer reads, by path in the config (the blocks that hold options are looked into one level down).
     // Everything else is reported as skipped, with the reason from SKIPPED_OPTIONS.
     const MAPPED_OPTIONS = new Set([
-        "binds", "prefer-no-csd", "layout", "input", "gestures", "window-rule",
+        "binds", "prefer-no-csd", "layout", "input", "gestures", "window-rule", "workspace",
         "layout/gaps", "layout/struts", "layout/center-focused-column", "layout/always-center-single-column",
         "layout/preset-column-widths", "layout/preset-window-heights", "layout/default-column-width",
         "layout/default-column-display", "layout/focus-ring", "layout/border", "layout/tab-indicator", "layout/shadow",
-        "layout/insert-hint", "layout/fullscreen-backdrop-color", "layout/background-color",
-        "input/warp-mouse-to-focus", "input/focus-follows-mouse", "input/mod-key", "gestures/hot-corners",
+        "layout/insert-hint", "layout/fullscreen-backdrop-color", "layout/background-color", "layout/empty-workspace-above-first",
+        "input/warp-mouse-to-focus", "input/focus-follows-mouse", "input/mod-key", "input/workspace-auto-back-and-forth", "gestures/hot-corners",
         "window-rule/match", "window-rule/exclude", "window-rule/open-floating", "window-rule/open-fullscreen",
         "window-rule/default-column-width", "window-rule/default-window-height", "window-rule/geometry-corner-radius",
     ]);
@@ -843,7 +890,6 @@ namespace NiriImport {
         "hotkey-overlay": "Kiri shows no hotkey overlay at startup",
         "screenshot-path": "screenshots are Spectacle's",
         "animations": "niri's animation options are not configurable yet",
-        "workspace": "named workspaces are not supported yet",
         "layer-rule": "layer-shell surfaces (panels, wallpapers) are Plasma's",
         "debug": "niri debug options",
         "environment": "environment variables belong to Plasma (~/.config/plasma-workspace/env)",
@@ -861,7 +907,6 @@ namespace NiriImport {
         "input/touch": "Plasma's Touchscreen settings",
         "input/tablet": "Plasma's Drawing Tablet settings",
         "input/mod-key-nested": "only used when niri runs inside another window",
-        "input/workspace-auto-back-and-forth": "not supported yet",
         "overview/zoom": "not configurable yet",
         "overview/backdrop-color": "not configurable yet",
         "overview/workspace-shadow": "not configurable yet",

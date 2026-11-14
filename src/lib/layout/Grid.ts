@@ -172,6 +172,15 @@ class Grid {
         return this.lastFocusedColumn;
     }
 
+    // niri's focus-column-left/right-under-mouse on a workspace that is not the active one: only its active column
+    // changes (the window gets the focus when the desktop is switched to)
+    public setActiveColumn(column: Column) {
+        if (column.grid === this && column !== this.lastFocusedColumn) {
+            this.previousFocusedColumn = this.lastFocusedColumn;
+            this.lastFocusedColumn = column;
+        }
+    }
+
     // the column that had focus before the current one, if it still exists
     public getPreviousFocusedColumn() {
         if (this.previousFocusedColumn === null || !this.hasColumn(this.previousFocusedColumn)) {

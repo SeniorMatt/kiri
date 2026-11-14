@@ -25,7 +25,7 @@ FocusScope {
     property QtObject currentDesktop: KWinComponents.SceneView.currentDesktop
 
     // niri constants
-    readonly property color backdropColor: Qt.rgba(0.15, 0.15, 0.15, 1)
+    readonly property color backdropColor: effect.backdropColor
     readonly property color hintColor: Qt.rgba(127 / 255, 200 / 255, 255 / 255, 128 / 255)
     readonly property color ringColor: "#7fc8ff"
     readonly property real moveThreshold: 256 // layout px of pointer travel (scaled by the zoom)
@@ -281,6 +281,7 @@ FocusScope {
             }
         }
     }
+    property bool dragFloating: false
     property real dragX: 0 // pointer position, root coordinates
     property real dragY: 0
     property var hint: null // { di, rect }
@@ -336,12 +337,14 @@ FocusScope {
             Kirigami.ShadowedRectangle {
                 anchors.fill: parent
                 color: "black"
-                // niri workspace-shadow: offset 0/10, softness 40, spread 10, #00000050, normalised to 1080 px
+                visible: root.effect.shadowOn
+                // niri workspace-shadow (softness, spread, offset, color), normalised to 1080 px
                 // sized for the open zoom: resizing the shadow every frame of the zoom rebuilds its geometry, the fade
                 // with the progress is enough
-                shadow.size: 50 * (root.height / 1080) * root.effect.zoom
-                shadow.yOffset: 10 * (root.height / 1080) * root.effect.zoom
-                shadow.color: Qt.rgba(0, 0, 0, 0x50 / 255 * root.pc)
+                shadow.size: Math.max(0, root.effect.shadowSoftness + root.effect.shadowSpread) * (root.height / 1080) * root.effect.zoom
+                shadow.xOffset: root.effect.shadowOffsetX * (root.height / 1080) * root.effect.zoom
+                shadow.yOffset: root.effect.shadowOffsetY * (root.height / 1080) * root.effect.zoom
+                shadow.color: Qt.rgba(root.effect.shadowColor.r, root.effect.shadowColor.g, root.effect.shadowColor.b, root.effect.shadowColor.a * root.pc)
             }
             KWinComponents.DesktopBackground {
                 anchors.fill: parent
@@ -497,6 +500,7 @@ FocusScope {
                     tile.settleAnim = false;
                     if (root.dragWid === "" && dist >= thr) {
                         root.dragWid = tile.wid;
+                        root.dragFloating = tile.floating;
                     }
                     // rubber band before the window leaves the grid (niri), then it follows the pointer
                     const f = thr === 0 ? 1 : 0.5 + 0.5 * Math.min(1, dist / thr);
@@ -554,6 +558,88 @@ FocusScope {
         }
     }
 
+    // niri gestures { dnd-edge-view-scroll, dnd-edge-workspace-switch }: while a window is dragged, the pointer near the
+    // left/right edge scrolls the view of the desktop under it, near the top/bottom edge the desktops move (monitor.rs
+    // dnd_scroll_gesture_scroll, scrolling.rs dnd_scroll_gesture_scroll)
+    Timer {
+        id: dndEdge
+        interval: 16
+        repeat: true
+        running: root.dragWid !== ""
+        property real last: 0
+        property real viewSince: 0
+        property real wsSince: 0
+        onRunningChanged: {
+            last = Date.now();
+            viewSince = 0;
+            wsSince = 0;
+            if (!running) {
+                root.effect.dndEdgeEnd();
+            }
+        }
+        onTriggered: {
+            const t = Date.now();
+            const dt = (t - last) / 1000;
+            last = t;
+            const o = root.effect.dnd;
+            const speed = 1 / root.zm;
+            let moved = false;
+            // desktops, at the top/bottom of the screen, inside the strip of desktops
+            {
+                const h = root.height;
+                const strip = root.wsW;
+                const x = root.dragX - root.x0;
+                const y = Math.max(0, Math.min(h, root.dragY));
+                const trig = Math.max(0, Math.min(o.wsHeight, h / 2));
+                let d = 0;
+                if (x < 0 || x >= strip) {
+                    d = 0;
+                } else if (y < trig) {
+                    d = -(trig - y);
+                } else if (h - y < trig) {
+                    d = trig - (h - y);
+                }
+                d = trig < 0.01 ? 0 : d / trig * speed;
+                if (d === 0) {
+                    wsSince = 0;
+                } else {
+                    if (wsSince === 0) {
+                        wsSince = t;
+                    }
+                    moved = true;
+                    if (t - wsSince >= o.wsDelay) {
+                        root.effect.dndEdgeWorkspace(d * dt * o.wsSpeed / 1500);
+                    }
+                }
+            }
+            // columns, at the left/right edge, only for a tiled window
+            const di = root.desktopAt(root.dragY);
+            if (!root.dragFloating && di >= 0) {
+                const w = root.width;
+                const x = Math.max(0, Math.min(w, root.dragX));
+                const trig = Math.max(0, Math.min(o.viewWidth, w / 2));
+                let d = 0;
+                if (x < trig) {
+                    d = -(trig - x);
+                } else if (w - x < trig) {
+                    d = trig - (w - x);
+                }
+                d = trig < 0.01 ? 0 : d / trig * speed;
+                if (d === 0) {
+                    viewSince = 0;
+                } else {
+                    if (viewSince === 0) {
+                        viewSince = t;
+                    }
+                    if (t - viewSince >= o.viewDelay) {
+                        root.effect.scrollView(root.lay.desktops[di].id, d * dt * o.viewSpeed);
+                        root.updateHint();
+                    }
+                }
+            }
+        }
+    }
+
     // niri's insert hint
     Rectangle {
         visible: root.hint !== null && root.hint.rect !== null
@@ -604,28 +690,50 @@ FocusScope {
 
     // ---- input ----
     property real wheelY: 0
+    property real wheelX: 0
+    property real wheelLast: 0
+    // niri (input/mod.rs on_pointer_axis, should_handle_in_overview): the mouse wheel steps the desktops (one tick per
+    // notch, 50 ms cooldown), Shift+wheel and the horizontal wheel focus the column left/right under the pointer;
+    // touchpad scrolling is the overview scroll swipe (see OverviewEffect::touchpadScroll). Other modifiers: nothing.
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: event => {
-            const d = event.pixelDelta.x !== 0 || event.pixelDelta.y !== 0
-                ? Qt.point(event.pixelDelta.x, event.pixelDelta.y)
-                : Qt.point(event.angleDelta.x / 120 * 60, event.angleDelta.y / 120 * 60);
             const inv = event.inverted ? -1 : 1;
-            if (Math.abs(d.x) > Math.abs(d.y)) {
-                // horizontal scrolling moves the view of the desktop in the middle, like the 3-finger gesture
-                const i = Math.round(root.effect.wsIndex);
-                if (i >= 0 && i < root.lay.desktops.length) {
-                    root.effect.scrollView(root.lay.desktops[i].id, -inv * d.x / root.zm);
+            const mods = event.modifiers & ~Qt.KeypadModifier;
+            const under = root.desktopAt(point.position.y);
+            const underId = under >= 0 ? root.lay.desktops[under].id : "";
+            if (event.pixelDelta.x !== 0 || event.pixelDelta.y !== 0) {
+                if (mods === Qt.NoModifier && underId !== "") {
+                    root.effect.touchpadScroll(-inv * event.pixelDelta.x * root.width / 1200, -inv * event.pixelDelta.y, underId);
                 }
                 return;
             }
-            root.wheelY += -inv * d.y;
-            // one desktop per mouse notch (60 here), or per 100 px of touchpad
-            const step = event.pixelDelta.y !== 0 ? 100 : 60;
-            while (Math.abs(root.wheelY) >= step) {
+            if (mods !== Qt.NoModifier && mods !== Qt.ShiftModifier) {
+                return;
+            }
+            // Shift turns the vertical wheel into columns; some stacks swap the axes themselves
+            let vertical = -inv * event.angleDelta.y, horizontal = inv * event.angleDelta.x;
+            if (mods === Qt.ShiftModifier) {
+                horizontal = vertical !== 0 ? vertical : -horizontal;
+                vertical = 0;
+            }
+            root.wheelY += vertical;
+            root.wheelX += horizontal;
+            while (Math.abs(root.wheelY) >= 120) {
                 const dir = root.wheelY > 0 ? 1 : -1;
-                root.wheelY -= dir * step;
-                root.effect.stepDesktop(dir);
+                root.wheelY -= dir * 120;
+                const t = Date.now();
+                if (t - root.wheelLast >= 50) {
+                    root.wheelLast = t;
+                    root.effect.stepDesktop(dir);
+                }
+            }
+            while (Math.abs(root.wheelX) >= 120) {
+                const dir = root.wheelX > 0 ? 1 : -1;
+                root.wheelX -= dir * 120;
+                if (underId !== "") {
+                    root.effect.focusColumn(underId, dir);
+                }
             }
         }
     }
@@ -660,11 +768,18 @@ FocusScope {
         } else if (event.key === Qt.Key_O && (event.modifiers & Qt.MetaModifier)) {
             root.effect.requestClose();
             event.accepted = true;
-        } else if (event.key === Qt.Key_Up) {
-            root.effect.stepDesktop(-1);
+        } else if (event.key === Qt.Key_Left && (event.modifiers & ~Qt.KeypadModifier) === Qt.NoModifier) {
+            // niri hardcoded overview binds: Left/Right focus a column, Up/Down a window or the desktop above/below
+            root.effect.invokeKiriAction("focus-left");
             event.accepted = true;
-        } else if (event.key === Qt.Key_Down) {
-            root.effect.stepDesktop(1);
+        } else if (event.key === Qt.Key_Right && (event.modifiers & ~Qt.KeypadModifier) === Qt.NoModifier) {
+            root.effect.invokeKiriAction("focus-right");
+            event.accepted = true;
+        } else if (event.key === Qt.Key_Up && (event.modifiers & ~Qt.KeypadModifier) === Qt.NoModifier) {
+            root.effect.invokeKiriAction("focus-window-or-desktop-up");
+            event.accepted = true;
+        } else if (event.key === Qt.Key_Down && (event.modifiers & ~Qt.KeypadModifier) === Qt.NoModifier) {
+            root.effect.invokeKiriAction("focus-window-or-desktop-down");
             event.accepted = true;
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             const a = root.lay.active;

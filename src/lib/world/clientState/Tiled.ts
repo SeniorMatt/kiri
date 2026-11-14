@@ -280,17 +280,22 @@ namespace ClientState {
                         fullScreenDelayer.run(); // the full-screen flag follows
                         return;
                     }
-                    const placed = kwinClient.move ? null : client.getMovedByKwinFrom(newGeometry);
-                    if (placed !== null) {
-                        // only the position changed, to a place that is not Kiri's: put the window back, the rest of the
-                        // layout is fine (and the rate limit below must not leave the other windows of the burst misplaced)
+                    const moved = kwinClient.move ? null : client.getMovedByKwinFrom(newGeometry, oldGeometry);
+                    if (moved !== null) {
+                        // the position is not Kiri's: put the window back (the rest of the layout is fine if only the
+                        // position changed, and the rate limit below must not leave the other windows of a burst misplaced)
                         if (Clients.isOnVirtualDesktop(kwinClient, Workspace.currentDesktop)) {
-                            client.place(placed.x, placed.y, placed.width, placed.height);
+                            client.place(moved.rect.x, moved.rect.y, moved.rect.width, moved.rect.height);
                         } else {
                             // not shown now (KWin does this to the desktop it leaves): the next arrange puts it back
                             window.column.grid.desktop.onLayoutChanged();
+                            return;
                         }
-                    } else if (externalFrameGeometryChangedRateLimiter.acquire()) {
+                    }
+                    if (moved !== null && moved.onlyMoved) {
+                        return;
+                    }
+                    if (externalFrameGeometryChangedRateLimiter.acquire()) {
                         world.do(() => window.onFrameGeometryChanged());
                     } else {
                         relayoutDelayer.run();

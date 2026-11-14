@@ -581,33 +581,15 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.do((clientManager, desktopManager) => world.dynamicDesktops.moveCurrent(desktopManager, -1)),
         },
         {
-            name: "column-move-to-next-desktop-nofocus",
-            description: "Move column to the next desktop, the focus stays here (niri's focus=false)",
-            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.columnMoveToNextDesktop(cm, dm, window, column, grid, false)),
-        },
-        {
-            name: "column-move-to-previous-desktop-nofocus",
-            description: "Move column to the previous desktop, the focus stays here (niri's focus=false)",
-            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.columnMoveToPreviousDesktop(cm, dm, window, column, grid, false)),
-        },
-        {
-            name: "window-move-to-next-desktop-nofocus",
-            description: "Move window to the next desktop, the focus stays here (niri's focus=false)",
-            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.windowMoveToNextDesktop(cm, dm, window, column, grid, false)),
-        },
-        {
-            name: "window-move-to-previous-desktop-nofocus",
-            description: "Move window to the previous desktop, the focus stays here (niri's focus=false)",
-            action: () => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.windowMoveToPreviousDesktop(cm, dm, window, column, grid, false)),
-        },
-        {
             name: "column-move-to-new-desktop-below",
             description: "Move column to a new desktop below this one",
+            defaultKeys: ["Meta+Ctrl+Shift+PgDown", "Meta+Ctrl+Shift+U"],
             action: () => world.doIfTiledFocused(actions.columnMoveToNewDesktop.partial(true, true)),
         },
         {
             name: "column-move-to-new-desktop-above",
             description: "Move column to a new desktop above this one",
+            defaultKeys: ["Meta+Ctrl+Shift+PgUp", "Meta+Ctrl+Shift+I"],
             action: () => world.doIfTiledFocused(actions.columnMoveToNewDesktop.partial(false, true)),
         },
         {
@@ -621,23 +603,23 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.doIfTiledFocused(actions.windowMoveToNewDesktop.partial(false, true)),
         },
         {
-            name: "column-move-to-new-desktop-below-nofocus",
-            description: "Move column to a new desktop below this one, the focus stays here",
+            name: "column-move-to-new-desktop-below-no-focus",
+            description: "Desktop: move column to new below, stay on this one",
             action: () => world.doIfTiledFocused(actions.columnMoveToNewDesktop.partial(true, false)),
         },
         {
-            name: "column-move-to-new-desktop-above-nofocus",
-            description: "Move column to a new desktop above this one, the focus stays here",
+            name: "column-move-to-new-desktop-above-no-focus",
+            description: "Desktop: move column to new above, stay on this one",
             action: () => world.doIfTiledFocused(actions.columnMoveToNewDesktop.partial(false, false)),
         },
         {
-            name: "window-move-to-new-desktop-below-nofocus",
-            description: "Move window to a new desktop below this one, the focus stays here",
+            name: "window-move-to-new-desktop-below-no-focus",
+            description: "Desktop: move window to new below, stay on this one",
             action: () => world.doIfTiledFocused(actions.windowMoveToNewDesktop.partial(true, false)),
         },
         {
-            name: "window-move-to-new-desktop-above-nofocus",
-            description: "Move window to a new desktop above this one, the focus stays here",
+            name: "window-move-to-new-desktop-above-no-focus",
+            description: "Desktop: move window to new above, stay on this one",
             action: () => world.doIfTiledFocused(actions.windowMoveToNewDesktop.partial(false, false)),
         },
         {
@@ -864,35 +846,22 @@ function getNumKeyBindings(world: World, actions: Actions): NumKeyBinding[] {
         {
             name: "column-move-to-column-no-focus-{}",
             description: "Move: column to position {}, keep the focus in place",
-            count: 9,
             action: (i: number) => world.doIfTiledFocused(actions.columnMoveNoFocus.partial(i)),
         },
         {
             name: "column-move-to-desktop-no-focus-{}",
             description: "Desktop: move column to {}, stay on this one",
-            count: 9,
             action: (i: number) => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.columnMoveToDesktop(i, cm, dm, window, column, grid, false)),
         },
         {
             name: "window-move-to-desktop-no-focus-{}",
             description: "Desktop: move window to {}, stay on this one",
-            count: 9,
             action: (i: number) => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.windowMoveToDesktop(i, cm, dm, window, column, grid, false)),
         },
         {
             name: "tail-move-to-desktop-{}",
             description: "Desktop: move this and later columns to {}",
             action: (i: number) => world.doIfTiledFocused(actions.tailMoveToDesktop.partial(i)),
-        },
-        {
-            name: "column-move-to-desktop-nofocus-{}",
-            description: "Move column to desktop {}, the focus stays here (niri's focus=false)",
-            action: (i: number) => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.columnMoveToDesktop(i, cm, dm, window, column, grid, false)),
-        },
-        {
-            name: "window-move-to-desktop-nofocus-{}",
-            description: "Move window to desktop {}, the focus stays here (niri's focus=false)",
-            action: (i: number) => world.doIfTiledFocused((cm, dm, window, column, grid) => actions.windowMoveToDesktop(i, cm, dm, window, column, grid, false)),
         },
         {
             name: "move-desktop-to-index-{}",

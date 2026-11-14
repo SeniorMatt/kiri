@@ -212,8 +212,36 @@ tests.register("NiriImport hot corners", 1, () => {
     const off = NiriImport.parse(`gestures { hot-corners { off; } }`);
     Assert.equal(off.settings["hotCorner"], false);
     const other = NiriImport.parse(`gestures { hot-corners { bottom-right; } }`);
-    Assert.equal(other.settings["hotCorner"], false);
-    const both = NiriImport.parse(`gestures { hot-corners { top-left; bottom-right; } }`);
-    Assert.equal(both.settings["hotCorner"], undefined);
+    Assert.equal(other.settings["hotCorner"], true);
+    Assert.equal(other.settings["hotCornerTopLeft"], false);
+    Assert.equal(other.settings["hotCornerBottomRight"], true);
+    Assert.equal(other.settings["hotCornerTopRight"], false);
+    const both = NiriImport.parse(`gestures { hot-corners { top-left; bottom-right; top-right; bottom-left; } }`);
+    Assert.equal(both.settings["hotCornerTopLeft"], true);
+    Assert.equal(both.settings["hotCornerTopRight"], true);
+    Assert.equal(both.settings["hotCornerBottomLeft"], true);
+    Assert.equal(both.settings["hotCornerBottomRight"], true);
+    const empty = NiriImport.parse(`gestures { hot-corners { } }`);
+    Assert.equal(empty.settings["hotCornerTopLeft"], true);
     Assert.equal(NiriImport.parse(`layout { gaps 8; }`).settings["hotCorner"], undefined);
+});
+
+tests.register("NiriImport overview and dnd edge options", 1, () => {
+    const r = NiriImport.parse(`
+        overview { zoom 0.35; backdrop-color "#112233"; workspace-shadow { off; offset x=2 y=-4.5; softness 20; spread 3; color "#ff000080"; } }
+        gestures { dnd-edge-view-scroll { trigger-width 40; delay-ms 200; max-speed 900; } dnd-edge-workspace-switch { trigger-height 70; } }`);
+    const s = r.settings;
+    Assert.equal(s["overviewZoom"], 0.35);
+    Assert.equal(s["overviewBackdropColor"], "#112233");
+    Assert.equal(s["overviewShadowEnabled"], false);
+    Assert.equal(s["overviewShadowOffsetX"], 2);
+    Assert.equal(s["overviewShadowOffsetY"], -4.5);
+    Assert.equal(s["overviewShadowSoftness"], 20);
+    Assert.equal(s["overviewShadowSpread"], 3);
+    Assert.equal(s["overviewShadowColor"], "#ff000080");
+    Assert.equal(s["dndEdgeViewScrollTriggerWidth"], 40);
+    Assert.equal(s["dndEdgeViewScrollDelay"], 200);
+    Assert.equal(s["dndEdgeViewScrollMaxSpeed"], 900);
+    Assert.equal(s["dndEdgeWorkspaceSwitchTriggerHeight"], 70);
+    Assert.equal(s["dndEdgeWorkspaceSwitchDelay"], undefined);
 });

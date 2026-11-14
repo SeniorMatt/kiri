@@ -144,14 +144,14 @@ tests.register("focus=false: the column or window goes, the focus stays", 3, () 
         const [d1, d2] = workspaceMock.desktops;
         const [a, b] = workspaceMock.createClients(2);
         workspaceMock.activeWindow = b;
-        qtMock.fireShortcut(`${kind}-move-to-next-desktop-nofocus`);
+        qtMock.fireShortcut(`${kind}-move-to-next-desktop-no-focus`);
         Assert.equal(workspaceMock.currentDesktop, d1, { message: "the view stays" });
         Assert.equalArrays(b.desktops, [d2]);
         Assert.equal(workspaceMock.activeWindow, a, { message: "the next column has the focus" });
         Assert.assert(b.getActualFrameGeometry().width > 0);
 
         workspaceMock.activeWindow = a;
-        qtMock.fireShortcut(`${kind}-move-to-desktop-nofocus-2`);
+        qtMock.fireShortcut(`${kind}-move-to-desktop-no-focus-2`);
         Assert.equalArrays(a.desktops, [d2]);
         Assert.equal(workspaceMock.currentDesktop, d1);
         // both are on desktop 2 now, side by side, in the order they came
@@ -188,7 +188,7 @@ tests.register("move to a new desktop below and above", 3, () => {
             workspaceMock.activeWindow = a;
             const [c] = workspaceMock.createClients(1);
             workspaceMock.activeWindow = c;
-            qtMock.fireShortcut(`window-move-to-new-desktop-${below ? "below" : "above"}-nofocus`);
+            qtMock.fireShortcut(`window-move-to-new-desktop-${below ? "below" : "above"}-no-focus`);
             Assert.equal(workspaceMock.currentDesktop, d1);
             Assert.assert(!c.desktops.includes(d1), { message: "the window left this desktop" });
             Assert.equal(workspaceMock.activeWindow, a, { message: "the focus stays" });
@@ -308,15 +308,15 @@ tests.register("niri import: workspace binds, named workspaces and options", 1, 
     Assert.equalArrays(keys["desktop-named-2"], ["Meta+2"]);
     Assert.equalArrays(keys["desktop-3"], ["Meta+3"]);
     Assert.equalArrays(keys["column-move-to-desktop-named-1"], ["Meta+Shift+1"]);
-    Assert.equalArrays(keys["column-move-to-desktop-nofocus-3"], ["Meta+Shift+3"]);
+    Assert.equalArrays(keys["column-move-to-desktop-no-focus-3"], ["Meta+Shift+3"]);
     Assert.equalArrays(keys["window-move-to-desktop-named-3"], ["Meta+Ctrl+W"]);
     Assert.equalArrays(keys["set-desktop-name-4"], ["Meta+N"]);
     Assert.equalArrays(keys["unset-desktop-name"], ["Meta+Shift+N"]);
-    Assert.equalArrays(keys["column-move-to-next-desktop-nofocus"], ["Meta+Ctrl+U"]);
-    Assert.equalArrays(keys["window-move-to-previous-desktop-nofocus"], ["Meta+Ctrl+I"]);
+    Assert.equalArrays(keys["column-move-to-next-desktop-no-focus"], ["Meta+Ctrl+U"]);
+    Assert.equalArrays(keys["window-move-to-previous-desktop-no-focus"], ["Meta+Ctrl+I"]);
     Assert.equalArrays(keys["move-desktop-to-index-2"], ["Meta+Y"]);
     Assert.equalArrays(keys["column-move-to-new-desktop-below"], ["Meta+B"]);
-    Assert.equalArrays(keys["window-move-to-new-desktop-above-nofocus"], ["Meta+A"]);
+    Assert.equalArrays(keys["window-move-to-new-desktop-above-no-focus"], ["Meta+A"]);
     Assert.equalArrays(keys["desktop-next"], ["Meta+U"]);
     Assert.assert(result.skipped.some(line => line.includes("move-column-to-new-workspace-below chat")), { message: "a workspace reference is skipped" });
     // every shortcut name that is bound exists

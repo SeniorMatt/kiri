@@ -157,6 +157,96 @@ const configDef = [
         default: true,
     },
     {
+        name: "hotCornerTopLeft",
+        type: "Bool",
+        default: true,
+    },
+    {
+        name: "hotCornerTopRight",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "hotCornerBottomLeft",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "hotCornerBottomRight",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "overviewZoom",
+        type: "Double",
+        default: 0.5,
+    },
+    {
+        name: "overviewBackdropColor",
+        type: "String",
+        default: "#262626",
+    },
+    {
+        name: "overviewShadowEnabled",
+        type: "Bool",
+        default: true,
+    },
+    {
+        name: "overviewShadowOffsetX",
+        type: "Double",
+        default: 0,
+    },
+    {
+        name: "overviewShadowOffsetY",
+        type: "Double",
+        default: 10,
+    },
+    {
+        name: "overviewShadowSoftness",
+        type: "Double",
+        default: 40,
+    },
+    {
+        name: "overviewShadowSpread",
+        type: "Double",
+        default: 10,
+    },
+    {
+        name: "overviewShadowColor",
+        type: "String",
+        default: "#00000050",
+    },
+    {
+        name: "dndEdgeViewScrollTriggerWidth",
+        type: "Double",
+        default: 30,
+    },
+    {
+        name: "dndEdgeViewScrollDelay",
+        type: "UInt",
+        default: 100,
+    },
+    {
+        name: "dndEdgeViewScrollMaxSpeed",
+        type: "Double",
+        default: 1500,
+    },
+    {
+        name: "dndEdgeWorkspaceSwitchTriggerHeight",
+        type: "Double",
+        default: 50,
+    },
+    {
+        name: "dndEdgeWorkspaceSwitchDelay",
+        type: "UInt",
+        default: 100,
+    },
+    {
+        name: "dndEdgeWorkspaceSwitchMaxSpeed",
+        type: "Double",
+        default: 1500,
+    },
+    {
         name: "tabbedColumnsByDefault",
         type: "Bool",
         default: false,

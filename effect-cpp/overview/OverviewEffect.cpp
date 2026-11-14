@@ -17,6 +17,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLoggingCategory>
+#include <QRegularExpression>
+#include <algorithm>
 #include <QTimer>
 #include <QUrl>
 
@@ -87,25 +89,71 @@ OverviewEffect::OverviewEffect()
 // desktops needs it) and a full-screen window on the output covers it (niri: render_above_top_layer). It is a pointer
 // check, not KWin's screen edge, which has an activation delay and a pushback, and would clash with Plasma's own corner.
 // The toggle goes through Kiri's "overview" shortcut so that the script supplies the layout, like Meta+O does.
+// "#RRGGBB" or "#RRGGBBAA" (Kiri's settings) -> QColor; `fallback` when it does not parse
+static QColor kiriColor(const QString &text, const QColor &fallback)
+{
+    static const QRegularExpression re(QStringLiteral("^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$"));
+    const auto m = re.match(text.trimmed());
+    if (!m.hasMatch()) {
+        return fallback;
+    }
+    QColor c(QLatin1Char('#') + m.captured(1));
+    if (!m.captured(2).isEmpty()) {
+        c.setAlpha(m.captured(2).toInt(nullptr, 16));
+    }
+    return c;
+}
+
 void OverviewEffect::loadHotCorner()
 {
     auto config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
     config->reparseConfiguration();
-    m_hotCorner = config->group(QStringLiteral("Plugins")).readEntry("kiriEnabled", false)
-        && config->group(QStringLiteral("Script-kiri")).readEntry("hotCorner", true);
+    const KConfigGroup kiri = config->group(QStringLiteral("Script-kiri"));
+    m_hotCorner = config->group(QStringLiteral("Plugins")).readEntry("kiriEnabled", false) && kiri.readEntry("hotCorner", true);
+    m_corners[0] = kiri.readEntry("hotCornerTopLeft", true);
+    m_corners[1] = kiri.readEntry("hotCornerTopRight", false);
+    m_corners[2] = kiri.readEntry("hotCornerBottomLeft", false);
+    m_corners[3] = kiri.readEntry("hotCornerBottomRight", false);
     if (!m_hotCorner) {
         m_insideCorner = false;
     }
+    // niri's overview options; the zoom is applied from the next opening, not while it is up
+    const qreal zoom = std::clamp(kiri.readEntry("overviewZoom", 0.5), 0.0, 1.0);
+    m_backdrop = kiriColor(kiri.readEntry("overviewBackdropColor", QStringLiteral("#262626")), QColor(0x26, 0x26, 0x26));
+    m_shadowOn = kiri.readEntry("overviewShadowEnabled", true);
+    m_shadowSoftness = kiri.readEntry("overviewShadowSoftness", 40.0);
+    m_shadowSpread = kiri.readEntry("overviewShadowSpread", 10.0);
+    m_shadowOffsetX = kiri.readEntry("overviewShadowOffsetX", 0.0);
+    m_shadowOffsetY = kiri.readEntry("overviewShadowOffsetY", 10.0);
+    m_shadowColor = kiriColor(kiri.readEntry("overviewShadowColor", QStringLiteral("#00000050")), QColor(0, 0, 0, 0x50));
+    m_dnd = {
+        {QStringLiteral("viewWidth"), kiri.readEntry("dndEdgeViewScrollTriggerWidth", 30.0)},
+        {QStringLiteral("viewDelay"), kiri.readEntry("dndEdgeViewScrollDelay", 100)},
+        {QStringLiteral("viewSpeed"), kiri.readEntry("dndEdgeViewScrollMaxSpeed", 1500.0)},
+        {QStringLiteral("wsHeight"), kiri.readEntry("dndEdgeWorkspaceSwitchTriggerHeight", 50.0)},
+        {QStringLiteral("wsDelay"), kiri.readEntry("dndEdgeWorkspaceSwitchDelay", 100)},
+        {QStringLiteral("wsSpeed"), kiri.readEntry("dndEdgeWorkspaceSwitchMaxSpeed", 1500.0)},
+    };
+    m_zoomConfig = zoom;
+    if (!isRunning()) {
+        m_zoom = zoom;
+    }
+    Q_EMIT optionsChanged();
 }
 
 bool OverviewEffect::inHotCorner(const QPointF &pos) const
 {
     for (LogicalOutput *output : effects->screens()) {
         const RectF g = output->geometry();
-        if (pos.x() >= g.x() && pos.x() < g.x() + 1 && pos.y() >= g.y() && pos.y() < g.y() + 1) {
+        // niri (Niri::is_inside_hot_corner): the 1x1 logical pixel at each enabled corner of the output
+        const QPointF corners[4] = {g.topLeft(), QPointF(g.right() - 1, g.top()), QPointF(g.left(), g.bottom() - 1), QPointF(g.right() - 1, g.bottom() - 1)};
+        for (int i = 0; i < 4; i++) {
+            if (!m_corners[i] || pos.x() < corners[i].x() || pos.x() >= corners[i].x() + 1 || pos.y() < corners[i].y() || pos.y() >= corners[i].y() + 1) {
+                continue;
+            }
             if (!isRunning()) {
                 for (EffectWindow *w : effects->stackingOrder()) {
-                    if (w->isFullScreen() && w->isOnCurrentDesktop() && !w->isMinimized() && w->screen() == output && w->frameGeometry().contains(g.topLeft() + QPointF(1, 1))) {
+                    if (w->isFullScreen() && w->isOnCurrentDesktop() && !w->isMinimized() && w->screen() == output && w->frameGeometry().contains(corners[i] + QPointF(0.5, 0.5))) {
                         return false;
                     }
                 }
@@ -126,13 +174,18 @@ void OverviewEffect::pointerMoved(const QPointF &pos, const QPointF &, Qt::Mouse
     if (!inside || was || effects->isScreenLocked()) {
         return;
     }
+    invokeKiriAction(QStringLiteral("overview"));
+}
+
+void OverviewEffect::invokeKiriAction(const QString &action)
+{
     QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/component/kiri"),
                                                           QStringLiteral("org.kde.kglobalaccel.Component"), QStringLiteral("invokeShortcut"));
-    message << QStringLiteral("overview");
+    message << action;
     auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message), this);
-    connect(watcher, &QDBusPendingCallWatcher::finished, watcher, [](QDBusPendingCallWatcher *w) {
+    connect(watcher, &QDBusPendingCallWatcher::finished, watcher, [action](QDBusPendingCallWatcher *w) {
         if (w->isError()) {
-            qCWarning(KIRI_OVERVIEW) << "hot corner: invoking the overview shortcut failed:" << w->error().message();
+            qCWarning(KIRI_OVERVIEW) << "invoking the Kiri shortcut" << action << "failed:" << w->error().message();
         }
         w->deleteLater();
     });
@@ -454,6 +507,10 @@ bool OverviewEffect::acquire()
     if (isRunning()) {
         return true;
     }
+    if (m_zoom != m_zoomConfig) {
+        m_zoom = m_zoomConfig; // the warm-up scene may have been built with an older value; the bindings follow
+        Q_EMIT optionsChanged();
+    }
     // The property change tells the effects that animate (kiri_motion, kiri_desktop_switch) to say where their
     // pictures are right now (they listen for it, see their eventFilter); the zoom starts from there instead of from the end positions, so nothing jumps.
     effects->setProperty("kiriOverviewOpening", true);
@@ -740,6 +797,109 @@ void OverviewEffect::requestClose()
         return;
     }
     close();
+}
+
+void OverviewEffect::focusColumn(const QString &desktopId, int direction)
+{
+    queue(jsonString({{"t", "focuscol"}, {"d", desktopId}, {"dir", direction}}));
+}
+
+// niri's overview_scroll_swipe_gesture + workspace_switch_gesture_* / view_offset_gesture_* for a touchpad: the first
+// event of a scroll decides the direction (vertical when dy != 0); a vertical scroll drags the desktops (rubber band
+// past the ends, momentum on release), a horizontal one scrolls the view of the desktop under the pointer. A scroll
+// ends when the fingers lift, which Qt reports as a pause in the events.
+void OverviewEffect::touchpadScroll(qreal right, qreal down, const QString &desktopId)
+{
+    if (!m_open || m_desktopCount < 1) {
+        return;
+    }
+    if (!m_swipeOn) {
+        m_swipeOn = true;
+        m_swipeVertical = down != 0;
+        m_swipeTracker = NiriSwipe::SwipeTracker();
+        m_swipeStart = m_wsIndex;
+        m_swipeDesktop = desktopId;
+        m_wsAnimating = false;
+        m_wsTarget = m_wsIndex;
+        m_swipeEnd.setSingleShot(true);
+        m_swipeEnd.setInterval(120);
+        disconnect(&m_swipeEnd, nullptr, this, nullptr);
+        connect(&m_swipeEnd, &QTimer::timeout, this, &OverviewEffect::endTouchpadScroll);
+    }
+    m_swipeEnd.start();
+    if (m_swipeVertical) {
+        // monitor.rs workspace_switch_gesture_update: the zoom reduces the effect somewhat
+        const double zoom = m_zoom;
+        const double scale = (zoom - 1.0) / 2.5 + 1.0;
+        m_swipeTracker.push(down / scale, now());
+        NiriSwipe::RubberBand band = NiriSwipe::WorkspaceGesture::Band;
+        band.limit /= zoom;
+        m_wsIndex = band.clamp(0, std::max(0, m_desktopCount - 1), m_swipeStart + m_swipeTracker.pos() / NiriSwipe::WorkspaceGesture::Movement);
+        m_wsTarget = m_wsIndex;
+        Q_EMIT wsIndexChanged();
+        effects->addRepaintFull();
+    } else {
+        scrollView(m_swipeDesktop, right);
+    }
+}
+
+void OverviewEffect::endTouchpadScroll()
+{
+    if (!m_swipeOn) {
+        return;
+    }
+    m_swipeOn = false;
+    if (!m_swipeVertical) {
+        return;
+    }
+    // monitor.rs workspace_switch_gesture_end
+    m_swipeTracker.push(0.0, now());
+    const double zoom = m_zoom;
+    NiriSwipe::RubberBand band = NiriSwipe::WorkspaceGesture::Band;
+    band.limit /= zoom;
+    const double movement = NiriSwipe::WorkspaceGesture::Movement;
+    const double hi = std::max(0, m_desktopCount - 1);
+    double velocity = m_swipeTracker.velocity() / movement;
+    const double currentPos = m_swipeTracker.pos() / movement;
+    const double end = std::clamp(m_swipeStart + m_swipeTracker.projectedEndPos() / movement, 0.0, hi);
+    velocity *= band.clampDerivative(0, hi, m_swipeStart + currentPos);
+    const int target = int(std::lround(end));
+    m_wsTarget = target;
+    m_wsSpring = makeSpring(m_wsIndex, target, velocity, 1000);
+    m_wsStart = m_anim;
+    m_wsAnimating = true;
+    queue(jsonString({{"t", "goto"}, {"i", target}}));
+    m_pendingCurrent = target;
+    m_pendingUntil = now() + 600;
+    effects->addRepaintFull();
+}
+
+// niri dnd_scroll_gesture_scroll of the monitor: the desktops follow the drag at the top/bottom edge; the gesture
+// ends (snaps to the nearest desktop, animated) with dndEdgeEnd
+void OverviewEffect::dndEdgeWorkspace(qreal delta)
+{
+    if (m_desktopCount < 1) {
+        return;
+    }
+    m_wsAnimating = false;
+    m_wsIndex = std::clamp(m_wsIndex + delta, 0.0, double(m_desktopCount - 1));
+    m_wsTarget = m_wsIndex;
+    m_dndWs = true;
+    Q_EMIT wsIndexChanged();
+    effects->addRepaintFull();
+}
+
+void OverviewEffect::dndEdgeEnd()
+{
+    if (!m_dndWs) {
+        return;
+    }
+    m_dndWs = false;
+    const int target = int(std::lround(m_wsIndex));
+    startWorkspace(target);
+    queue(jsonString({{"t", "goto"}, {"i", target}}));
+    m_pendingCurrent = target;
+    m_pendingUntil = now() + 600;
 }
 
 } // namespace KWin

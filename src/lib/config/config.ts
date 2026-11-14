@@ -13,6 +13,9 @@ interface Config {
     offScreenOpacity: number;
     untileOnDrag: boolean;
     dropToTile: boolean;
+    dndEdgeViewScrollTriggerWidth: number;
+    dndEdgeViewScrollDelay: number;
+    dndEdgeViewScrollMaxSpeed: number;
     cursorFollowsFocus: boolean;
     focusFollowsMouse: boolean;
     focusFollowsMouseMaxScroll: number;

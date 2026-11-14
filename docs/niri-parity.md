@@ -80,10 +80,10 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | consume-or-expel-window-left/right, consume-window-into-column, expel-window-from-column | | scrolling.rs | done | `window-consume-or-expel-*`, `window-consume-into-column`, `window-expel-from-column` | layout |
 | swap-window-left/right | swap with the neighbour column's window | scrolling.rs | done | `window-swap-left/right` | nirActions |
 | move-column-left-or-to-monitor-left, right | move, else to monitor | layout/mod.rs | done | one output only: the import maps them to `column-move-left/right`, which is what niri does with no output in that direction | NiriImport |
-| move-column-to-workspace-down/up/N | follows the column unless `focus=false` | layout/mod.rs | done | `column-move-to-*desktop*`; `focus=false`: `column-move-to-next/previous-desktop-nofocus`, `column-move-to-desktop-nofocus-N` | columnMoveToDesktop, followWindowToDesktop, workspaces |
-| move-window-to-workspace-down/up/N | same for a window | layout/mod.rs | done | `window-move-to-*desktop*`; `focus=false`: `window-move-to-next/previous-desktop-nofocus`, `window-move-to-desktop-nofocus-N` | followWindowToDesktop, workspaces |
+| move-column-to-workspace-down/up/N | follows the column unless `focus=false` | layout/mod.rs | done | `column-move-to-*desktop*`; `focus=false`: `column-move-to-next/previous-desktop-no-focus`, `column-move-to-desktop-no-focus-N` | columnMoveToDesktop, followWindowToDesktop, workspaces |
+| move-window-to-workspace-down/up/N | same for a window | layout/mod.rs | done | `window-move-to-*desktop*`; `focus=false`: `window-move-to-next/previous-desktop-no-focus`, `window-move-to-desktop-no-focus-N` | followWindowToDesktop, workspaces |
 | move-column-to-workspace "name", move-window-to-workspace "name" | | layout/mod.rs | done | `column-move-to-desktop-named-N`, `window-move-to-desktop-named-N` (see focus-workspace "name"); `focus=false` with a name is not mapped | workspaces |
-| move-window-to-new-workspace-below/above, move-column-to-new-workspace-below/above | new workspace next to the current one | layout/mod.rs | done | `window/column-move-to-new-desktop-below/above` (+ `-nofocus`); the empty desktop at the bottom/top is reused like `add_or_reuse_empty_workspace_at`; a workspace reference argument is not mapped | workspaces |
+| move-window-to-new-workspace-below/above, move-column-to-new-workspace-below/above | new workspace next to the current one | layout/mod.rs | done | `window/column-move-to-new-desktop-below/above` (+ `-no-focus`); the empty desktop at the bottom/top is reused like `add_or_reuse_empty_workspace_at`; a workspace reference argument is not mapped | workspaces |
 | move-window/column-to-monitor-* | | layout/mod.rs | n/a | see focus-monitor | - |
 | move-workspace-down/up | reorder workspaces | monitor.rs `move_workspace_down` 1257 | done | `desktop-move-down/up` emulated by replacing the neighbour desktop (DynamicDesktops.moveCurrent: columns, view and focus move along, named stays named, previous desktop follows); KWin cannot reorder | dynamicDesktops, workspaces |
 | move-workspace-to-index N | | monitor.rs | done | `move-desktop-to-index-N`, the same emulation repeated | workspaces |
@@ -207,20 +207,20 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | Item | niri behaviour | niri source | Status | Kiri | Test |
 |---|---|---|---|---|---|
 | Overview: workspaces stacked, zoom 0.5, gap 0.1*height, active centred | | monitor.rs `set_overview_progress` 1393; misc.rs `Overview` | done | FX overview/ + QML overview/qml/Main.qml | overview |
-| `overview { zoom }` | 0..1 | misc.rs | missing | `Zoom` constant in OverviewEffect.h | - |
-| `overview { backdrop-color }` | default #262626 | misc.rs | missing | constant in Main.qml | - |
-| `overview { workspace-shadow }` (off, offset, softness, spread, color) | default 0/10, 40, 10, #00000050 | appearance.rs 393 | partial | drawn with the defaults (Main.qml 337-345); no options | - |
+| `overview { zoom }` | 0..1 | misc.rs | done | `overviewZoom` (kwinrc Script-kiri), read by FX overview/ (`m_zoom`, applied at the next opening) | NiriImport overview and dnd edge options |
+| `overview { backdrop-color }` | default #262626 | misc.rs | done | `overviewBackdropColor`; Main.qml `backdropColor` | NiriImport overview and dnd edge options |
+| `overview { workspace-shadow }` (off, offset, softness, spread, color) | default 0/10, 40, 10, #00000050 | appearance.rs 393 | done | `overviewShadow{Enabled,OffsetX,OffsetY,Softness,Spread,Color}`; Main.qml ShadowedRectangle | NiriImport overview and dnd edge options |
 | Click a window: activate and close overview | | layout/mod.rs; input/mod.rs | done | Main.qml | overview |
 | Click a workspace: go to it | | | done | Main.qml | overview |
-| Wheel scrolls workspaces without Mod; right-drag scrolls the view | | wiki Overview | done | Main.qml WheelHandler | overview |
-| Two-finger touchpad scroll like the 3-finger gestures | | wiki Overview | missing | wheel only | - |
+| Wheel scrolls workspaces without Mod; right-drag scrolls the view | | wiki Overview | done | plain wheel: one desktop per notch, 50 ms cooldown; Shift+wheel and the horizontal wheel: focus column left/right of the desktop under the pointer (`focuscol` event); right-drag scrolls the view (Main.qml WheelHandler) | - |
+| Two-finger touchpad scroll like the 3-finger gestures | | wiki Overview | done | `OverviewEffect::touchpadScroll`: vertical drags the desktops (rubber band, momentum like workspace_switch_gesture_end), horizontal scrolls the view of the desktop under the pointer; the end of a scroll is a 120 ms pause (no ScrollEnd from Qt). Not verified with a real touchpad | - |
 | Drag a window: rubber band, 256 px, insert hint, drop in column / new column / other workspace / floating | | layout/mod.rs 4027-4254 | done | Main.qml, Overview.ts, ClientManager.ts | overview |
 | Drop a window onto the space between workspaces: new workspace | | layout/mod.rs `InsertWorkspace` | partial | needs dynamic desktops: not done (old doc: "no new desktop by dropping between desktops") | - |
-| DnD edge workspace switch (`dnd-edge-workspace-switch`: trigger-height 50, delay-ms 100, max-speed 1500) | | gestures.rs; layout/mod.rs `dnd_update` 4517 | missing | | - |
-| DnD edge view scroll (`dnd-edge-view-scroll`: trigger-width 30, delay-ms 100, max-speed 1500) | | gestures.rs; scrolling.rs 3204 | missing | | - |
+| DnD edge workspace switch (`dnd-edge-workspace-switch`: trigger-height 50, delay-ms 100, max-speed 1500) | | gestures.rs; layout/mod.rs `dnd_update` 4517 | done | `dndEdgeWorkspaceSwitch{TriggerHeight,Delay,MaxSpeed}`; Main.qml Timer `dndEdge` + `dndEdgeWorkspace`/`dndEdgeEnd`, overview drags only (niri: only when the overview is open) | - |
+| DnD edge view scroll (`dnd-edge-view-scroll`: trigger-width 30, delay-ms 100, max-speed 1500) | | gestures.rs; scrolling.rs 3204 | done | `dndEdgeViewScroll{TriggerWidth,Delay,MaxSpeed}`; DndEdgeScroll.ts for a window dragged on the strip, Main.qml `dndEdge` for a drag in the overview. A drag from another application (a real DnD) is not seen by KWin scripts: not done | DndEdgeScroll zone |
 | DnD hold to activate (a window, a workspace) | | wiki Gestures | missing | | - |
-| Hot corners | top-left default; `off`, `top-left/right`, `bottom-left/right`; toggles overview, works while dragging | gestures.rs `HotCorners`; input/mod.rs 3081 | partial | only the top-left, on/off (`hotCorner`); FX overview/ `inHotCorner`; also during DnD: no | NiriImport (hot corners) |
-| Keys while the overview is open (all binds keep working) | | wiki Overview | partial | only Up/Down, Enter, Esc, Meta+O and the search; the others do not reach Kiri | - |
+| Hot corners | top-left default; `off`, `top-left/right`, `bottom-left/right`; toggles overview, works while dragging | gestures.rs `HotCorners`; input/mod.rs 3081 | done | `hotCorner` (all off) + `hotCornerTopLeft/TopRight/BottomLeft/BottomRight`, importer sets them like niri (none named = top-left); FX overview/ `inHotCorner`; works while dragging in the overview | NiriImport hot corners |
+| Keys while the overview is open (all binds keep working) | | wiki Overview | done | Left/Right/Up/Down run focus-left/right, focus-window-or-desktop-up/down; Enter/Escape/Meta+O close; other binds are kglobalaccel shortcuts and keep working | - |
 | Floating windows in the overview | | | done | Main.qml | overview |
 | Layer rules: place-within-backdrop; top/overlay layers stay above | | layer_rule.rs | n/a | Plasma panels and wallpaper are KWin-managed | - |
 | No cursor warp / focus follows mouse while the overview is up | | | done | | overview |

@@ -198,6 +198,33 @@ class Overview {
             this.world.do(() => desktop.setScroll(event.x, false));
             return true;
         }
+        case "focuscol": {
+            // niri's focus-column-left/right-under-mouse (wheel in the overview): the active column of the desktop
+            // under the pointer, not necessarily the current one
+            const kwinDesktop = Workspace.desktops.find(d => d.id === event.d);
+            const desktop = kwinDesktop === undefined ? undefined : this.desktopManager.getDesktopInCurrentActivity(kwinDesktop);
+            if (kwinDesktop === undefined || desktop === undefined) {
+                return false;
+            }
+            const grid = desktop.grid;
+            const column = grid.getLastFocusedColumn();
+            if (column === null) {
+                return false;
+            }
+            const target = event.dir < 0 ? grid.getLeftColumn(column) : grid.getRightColumn(column);
+            if (target === null) {
+                return true;
+            }
+            this.world.do(() => {
+                if (kwinDesktop === Workspace.currentDesktop) {
+                    target.getWindowToFocus().focus();
+                } else {
+                    grid.setActiveColumn(target);
+                    desktop.scrollToColumn(target, true, column);
+                }
+            });
+            return true;
+        }
         case "drop": {
             const kwinClient = this.clientManager.findClientById(event.w);
             const kwinDesktop = Workspace.desktops.find(d => d.id === event.d);

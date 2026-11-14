@@ -244,6 +244,11 @@ class MockKwinClient {
 
     private committing = false;
 
+    // a client that commits a height other than the asked one (a terminal that snaps to whole cells)
+    public heightStep: number | null = null;
+    // like KWin, which keeps 100 px of a window on the screen whenever it commits an answer to a configure
+    public keepsVisible = false;
+
     // every geometry the script assigned (KWin's own changes are not in it)
     public assignedGeometries: MockQmlRect[] = [];
     private kwinChange = false;
@@ -275,6 +280,17 @@ class MockKwinClient {
             return;
         }
         const oldFrameGeometry = this._frameGeometry;
+        if (!byKwin && (this.heightStep !== null || this.keepsVisible)) {
+            const resized = Math.round(frameGeometry.width) !== Math.round(oldFrameGeometry.width) || Math.round(frameGeometry.height) !== Math.round(oldFrameGeometry.height);
+            if (resized) {
+                const height = this.heightStep === null ? frameGeometry.height : Math.floor(frameGeometry.height / this.heightStep) * this.heightStep;
+                let x = frameGeometry.x;
+                if (this.keepsVisible) {
+                    x = Math.max(100 - frameGeometry.width, Math.min(screen.width - 100, x));
+                }
+                frameGeometry = new MockQmlRect(x, frameGeometry.y, frameGeometry.width, height);
+            }
+        }
         this._frameGeometry = new MockQmlRect(
             frameGeometry.x,
             frameGeometry.y,

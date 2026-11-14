@@ -11,15 +11,18 @@
 #pragma once
 
 #include "NiriAnim.h"
+#include "NiriSwipe.h"
 #include "effect/effectwindow.h"
 #include "effect/quickeffect.h"
 
 #include <KConfigWatcher>
+#include <QColor>
 #include <QElapsedTimer>
 #include <QHash>
 #include <memory>
 #include <unordered_map>
 #include <QStringList>
+#include <QTimer>
 #include <QVariantMap>
 
 namespace KWin
@@ -36,7 +39,17 @@ class OverviewEffect : public QuickSceneEffect
     Q_PROPERTY(qreal wsIndex READ wsIndex NOTIFY wsIndexChanged)
     // desktop id -> horizontal view offset being shown (springs to the layout's scroll)
     Q_PROPERTY(QVariantMap viewOffsets READ viewOffsets NOTIFY viewOffsetsChanged)
-    Q_PROPERTY(qreal zoom READ zoom CONSTANT)
+    // niri's overview { zoom; backdrop-color; workspace-shadow } from the Kiri settings
+    Q_PROPERTY(qreal zoom READ zoom NOTIFY optionsChanged)
+    // niri gestures { dnd-edge-view-scroll; dnd-edge-workspace-switch }: viewWidth/viewDelay/viewSpeed, wsHeight/wsDelay/wsSpeed
+    Q_PROPERTY(QVariantMap dnd READ dnd NOTIFY optionsChanged)
+    Q_PROPERTY(QColor backdropColor READ backdropColor NOTIFY optionsChanged)
+    Q_PROPERTY(bool shadowOn READ shadowOn NOTIFY optionsChanged)
+    Q_PROPERTY(qreal shadowSoftness READ shadowSoftness NOTIFY optionsChanged)
+    Q_PROPERTY(qreal shadowSpread READ shadowSpread NOTIFY optionsChanged)
+    Q_PROPERTY(qreal shadowOffsetX READ shadowOffsetX NOTIFY optionsChanged)
+    Q_PROPERTY(qreal shadowOffsetY READ shadowOffsetY NOTIFY optionsChanged)
+    Q_PROPERTY(QColor shadowColor READ shadowColor NOTIFY optionsChanged)
     Q_PROPERTY(bool closing READ isClosing NOTIFY closingChanged)
     // the invisible first build of the scene (see warm())
     Q_PROPERTY(bool warming READ isWarming NOTIFY warmingChanged)
@@ -52,7 +65,15 @@ public:
     qreal progress() const { return m_progress; }
     qreal wsIndex() const { return m_wsIndex; }
     QVariantMap viewOffsets() const { return m_viewOffsets; }
-    qreal zoom() const { return Zoom; }
+    qreal zoom() const { return m_zoom; }
+    QVariantMap dnd() const { return m_dnd; }
+    QColor backdropColor() const { return m_backdrop; }
+    bool shadowOn() const { return m_shadowOn; }
+    qreal shadowSoftness() const { return m_shadowSoftness; }
+    qreal shadowSpread() const { return m_shadowSpread; }
+    qreal shadowOffsetX() const { return m_shadowOffsetX; }
+    qreal shadowOffsetY() const { return m_shadowOffsetY; }
+    QColor shadowColor() const { return m_shadowColor; }
     bool isClosing() const { return !m_open; }
     bool isWarming() const { return m_warm; }
     QVariantMap startRects() const { return m_startRects; }
@@ -60,11 +81,10 @@ public:
 
     void prePaintScreen(ScreenPrePaintData &data) override;
     bool blocksDirectScanout() const override;
+    void reconfigure(ReconfigureFlags) override { loadHotCorner(); }
     void postPaintScreen() override;
     int requestedEffectChainPosition() const override { return 70; }
 
-    // niri: overview { zoom 0.5 }
-    static constexpr qreal Zoom = 0.5;
 
 public Q_SLOTS:
     // ---- from the Kiri script (D-Bus), every argument a JSON string
@@ -89,6 +109,16 @@ public Q_SLOTS:
     void stepDesktop(int direction);
     void scrollView(const QString &desktopId, qreal delta);
     void requestClose();
+    // niri focus-column-left/right-under-mouse (wheel, Shift+wheel in the overview)
+    void focusColumn(const QString &desktopId, int direction);
+    // niri overview_scroll_swipe_gesture: two-finger touchpad scroll. `down` is towards the next desktop, `right`
+    // scrolls the view of `desktopId` (the one under the pointer) in layout px
+    void touchpadScroll(qreal right, qreal down, const QString &desktopId);
+    // runs a Kiri action by name (the keys niri hardcodes in the overview: Left/Right/Up/Down)
+    void invokeKiriAction(const QString &action);
+    // niri dnd-edge-workspace-switch: moves the desktops by `delta` indices while a window is dragged at the top/bottom edge
+    void dndEdgeWorkspace(qreal delta);
+    void dndEdgeEnd();
 
 Q_SIGNALS:
     void layoutChanged();
@@ -99,6 +129,7 @@ Q_SIGNALS:
     void warmingChanged();
     void startRectsChanged();
     void searchTextChanged();
+    void optionsChanged();
 
 private:
     struct Scroll
@@ -114,6 +145,23 @@ private:
     void run(bool on);
     void loadHotCorner();
     bool inHotCorner(const QPointF &pos) const;
+    QVariantMap m_dnd;
+    bool m_dndWs = false;
+    // niri overview_scroll_swipe_gesture (two-finger touchpad scroll in the overview)
+    bool m_swipeOn = false;
+    bool m_swipeVertical = false;
+    double m_swipeStart = 0;
+    QString m_swipeDesktop;
+    NiriSwipe::SwipeTracker m_swipeTracker;
+    QTimer m_swipeEnd;
+    void endTouchpadScroll();
+    qreal m_zoom = 0.5, m_zoomConfig = 0.5;
+    QColor m_backdrop = QColor(0x26, 0x26, 0x26);
+    bool m_shadowOn = true;
+    qreal m_shadowSoftness = 40, m_shadowSpread = 10, m_shadowOffsetX = 0, m_shadowOffsetY = 10;
+    QColor m_shadowColor = QColor(0, 0, 0, 0x50);
+    // niri's hot-corners: top-left, top-right, bottom-left, bottom-right
+    bool m_corners[4] = {true, false, false, false};
     void pointerMoved(const QPointF &pos, const QPointF &, Qt::MouseButtons buttons, Qt::MouseButtons, Qt::KeyboardModifiers, Qt::KeyboardModifiers);
     KConfigWatcher::Ptr m_watcher;
     bool m_hotCorner = true;

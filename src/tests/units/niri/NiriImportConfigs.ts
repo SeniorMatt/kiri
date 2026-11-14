@@ -152,7 +152,7 @@ tests.register("NiriImport: size binds, focus=false, mod-key, pointer binds, foc
             Mod+I { move-column-to-workspace 2 focus=false; }
             Mod+U { move-window-to-workspace 3 focus=false; }
             Mod+Y { move-column-to-index 4 focus=false; }
-            Mod+Shift+Y { move-column-to-workspace 11 focus=false; }
+            Mod+Shift+Y { move-column-to-index 13 focus=false; }
             Mod+J { focus-window-or-monitor-down; }
             Mod+K { focus-window-or-monitor-up; }
             Mod+H { focus-column-or-monitor-left; }
@@ -222,7 +222,7 @@ tests.register("NiriImport: size binds, focus=false, mod-key, pointer binds, foc
     Assert.equal(keys["focus-window-previous-output"].join(), "Ctrl+Alt+Shift+Tab");
     Assert.equal(result.settings["pointerBinds"], "Alt+WheelScrollUp=desktop-previous@200;Alt+WheelScrollLeft=focus-left;Alt+MouseLeft=window-toggle-floating;MouseMiddle=window-close");
     const skipped = result.skipped.join("\n");
-    Assert.assert(skipped.includes("bind Mod+Shift+Y move-column-to-workspace 11: focus=false only for numbers up to 9"));
+    Assert.assert(skipped.includes("bind Mod+Shift+Y move-column-to-index 13: focus=false only for numbers up to 12"));
     Assert.assert(skipped.includes("bind Mod+TouchpadScrollUp focus-workspace-up: touchpad scrolling gives KWin no ticks to bind"));
     Assert.assert(skipped.includes("bind Mod+TabletStylusButton1 close-window: stylus buttons have no KWin hook"));
     Assert.assert(skipped.includes("bind Mod+XF86AudioMute close-window: media and hardware keys are Plasma's"));

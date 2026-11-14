@@ -556,7 +556,16 @@ class ClientManager {
         const manager = new SignalManager();
         const update = () => this.world.do(() => this.updateInsertHint(kwinClient));
         manager.connect(kwinClient.frameGeometryChanged, update);
+        // niri dnd-edge-view-scroll: the columns scroll while the pointer is held at the left or right edge
+        const edgeScroll = new DndEdgeScroll(
+            this.config,
+            () => Workspace.cursorPos,
+            () => this.desktopManager.getDesktopForClient(kwinClient),
+            () => this.world.do(() => this.updateInsertHint(kwinClient)),
+        );
+        edgeScroll.start();
         manager.connect(kwinClient.interactiveMoveResizeFinished, () => {
+            edgeScroll.stop();
             manager.destroy();
             if (!fadedByEffect) {
                 kwinClient.opacity = opacityBefore;
@@ -1268,6 +1277,9 @@ namespace ClientManager {
         defaultColumnWidth: string;
         gapsInnerHorizontal: number;
         dropToTile: boolean;
+        dndEdgeViewScrollTriggerWidth: number;
+        dndEdgeViewScrollDelay: number;
+        dndEdgeViewScrollMaxSpeed: number;
     }
 }
 

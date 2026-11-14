@@ -121,10 +121,6 @@ NO_FOCUS = {
     "move-window-down": "window-move-down-no-focus",
     "swap-window-left": "window-swap-left-no-focus",
     "swap-window-right": "window-swap-right-no-focus",
-    "move-column-to-workspace-down": "column-move-to-next-desktop-no-focus",
-    "move-column-to-workspace-up": "column-move-to-previous-desktop-no-focus",
-    "move-window-to-workspace-down": "window-move-to-next-desktop-no-focus",
-    "move-window-to-workspace-up": "window-move-to-previous-desktop-no-focus",
 }
 NUMBERED = {
     "focus-workspace": "desktop-{}",
@@ -135,11 +131,9 @@ NUMBERED = {
     "move-column-to-index": "column-move-to-column-{}",
 }
 NUMBERED_NO_FOCUS = {
-    "move-column-to-workspace": "column-move-to-desktop-no-focus-{}",
-    "move-window-to-workspace": "window-move-to-desktop-no-focus-{}",
     "move-column-to-index": "column-move-to-column-no-focus-{}",
 }
-NO_FOCUS_SLOTS = 9  # how many numbered no-focus actions Kiri has
+NO_FOCUS_SLOTS = 12  # how many numbered no-focus actions Kiri has
 SIZE_SLOTS = 12  # how many column-width-set-N and window-height-set-N actions Kiri has
 MODIFIERS = {"mod": "Meta", "super": "Meta", "win": "Meta", "ctrl": "Ctrl", "control": "Ctrl", "shift": "Shift", "alt": "Alt"}
 KEYS = {
@@ -197,15 +191,13 @@ UNMAPPED = [
     (r"^(set-dynamic-cast|clear-dynamic-cast|stop-cast)", "screencast targets are Plasma's"),
     (r"^(toggle-debug-tint|debug-toggle)", "niri renderer debugging"),
     (r"monitor", "no monitor concept in Kiri's layout (desktops are shared by every screen; screen-switch moves the grid)"),
-    (r"^(move-workspace-to-index|set-workspace-name|unset-workspace-name|move-(window|column)-to-new-workspace)", "workspace actions are not supported yet"),
+    (r"^(focus-workspace|move-(window|column)-to-workspace)$", "this workspace reference is not mapped (a name with focus=false, or more than 12 names)"),
     (r"^toggle-window-rule-opacity$", "window rule opacity is not supported yet"),
     (r"-by-id$|^focus-window$|^load-config-file$|^mru-", "IPC and window switcher actions cannot be bound"),
 ]
 
 
 def unmapped_reason(name, args):
-    if re.fullmatch(r"focus-workspace|move-(window|column)-to-workspace", name) and args and not re.fullmatch(r"\d+", args[0]):
-        return "workspaces by name are not supported yet"
     return next((reason for regex, reason in UNMAPPED if re.search(regex, name)), "Kiri has no such action")
 
 
@@ -348,7 +340,7 @@ def desktop_action(name, args, props, names):
     """Workspace binds that need more than a name lookup: a workspace by name (the Nth name of the bind list is the
     shortcut "...-named-N", 12 at most), focus=false, new workspaces, move-workspace-to-index."""
     arg = args[0] if args else None
-    nofocus = "-no-focus" if props.get("focus") == "false" else ""
+    no_focus_suffix = "-no-focus" if props.get("focus") == "false" else ""
 
     def slot(workspace):
         if workspace not in names and len(names) < 12:
@@ -360,8 +352,8 @@ def desktop_action(name, args, props, names):
         if arg is None:
             return None
         if arg.isdigit():
-            return None if name == "focus-workspace" else f"{kind}{nofocus}-{arg}"
-        return None if nofocus or not slot(arg) else f"{kind}-named-{slot(arg)}"
+            return None if name == "focus-workspace" else f"{kind}{no_focus_suffix}-{arg}"
+        return None if no_focus_suffix or not slot(arg) else f"{kind}-named-{slot(arg)}"
     if name == "set-workspace-name":
         return f"set-desktop-name-{slot(arg)}" if arg is not None and slot(arg) else None
     if name == "unset-workspace-name":
@@ -369,13 +361,13 @@ def desktop_action(name, args, props, names):
     if name == "move-workspace-to-index":
         return f"move-desktop-to-index-{arg}" if arg is not None and arg.isdigit() else None
     if name in ("move-column-to-workspace-down", "move-column-to-workspace-up"):
-        return f"column-move-to-{'next' if name.endswith('down') else 'previous'}-desktop-no-focus" if nofocus else None
+        return f"column-move-to-{'next' if name.endswith('down') else 'previous'}-desktop-no-focus" if no_focus_suffix else None
     if name in ("move-window-to-workspace-down", "move-window-to-workspace-up"):
-        return f"window-move-to-{'next' if name.endswith('down') else 'previous'}-desktop-no-focus" if nofocus else None
+        return f"window-move-to-{'next' if name.endswith('down') else 'previous'}-desktop-no-focus" if no_focus_suffix else None
     if name in ("move-column-to-new-workspace-below", "move-column-to-new-workspace-above",
                 "move-window-to-new-workspace-below", "move-window-to-new-workspace-above"):
         # a workspace reference is not mapped
-        return None if arg is not None else f"{'column' if name.startswith('move-column') else 'window'}-move-to-new-desktop-{'below' if name.endswith('below') else 'above'}{nofocus}"
+        return None if arg is not None else f"{'column' if name.startswith('move-column') else 'window'}-move-to-new-desktop-{'below' if name.endswith('below') else 'above'}{no_focus_suffix}"
     return None
 
 
@@ -413,7 +405,9 @@ def focus_previous_action(scope, filt):
 def read_binds(path, mod="Meta", nodes=None):
     """-> binds {action: [keys]}, skipped [text], steps {setting: value}, pointer "k=action@ms;..." or None, slots {kind: [sizes]}"""
     binds, skipped, steps, pointer, slots, has_binds = {}, [], {}, [], {"column": [], "window": []}, False
-    for blk in find(nodes if nodes is not None else parse_kdl(path), "binds"):
+    nodes = nodes if nodes is not None else parse_kdl(path)
+    bind_names = declared_workspaces(nodes)  # the names that binds refer to; declared workspaces come first
+    for blk in find(nodes, "binds"):
         has_binds = True
         for key, _, bind_props, cmds in blk[3]:
             # `press { action }` is a plain bind; a `release { action }` needs the key release, which kglobalaccel does not give
@@ -424,7 +418,10 @@ def read_binds(path, mod="Meta", nodes=None):
             for cmd in cmds:
                 name, args, props = cmd[0], cmd[1], cmd[2]
                 action = reason = None
-                if name in NUMBERED and args and args[0].isdigit():
+                action = desktop_action(name, args, props, bind_names)
+                if action is not None:
+                    pass  # a workspace bind
+                elif name in NUMBERED and args and args[0].isdigit():
                     no_focus = is_false(props.get("focus"))
                     if no_focus and (name not in NUMBERED_NO_FOCUS or int(args[0]) > NO_FOCUS_SLOTS):
                         reason = f"focus=false only for numbers up to {NO_FOCUS_SLOTS}"
@@ -456,6 +453,8 @@ def read_binds(path, mod="Meta", nodes=None):
                     pointer.append(f"{pointer_key}={action}" + (f"@{cooldown}" if cooldown > 0 else ""))
                 else:
                     skipped.append(f"{description}: {key_reason(key)}")
+    if bind_names:
+        steps["desktopBindNames"] = json.dumps(bind_names, separators=(",", ":"))
     return binds, skipped, steps, (";".join(pointer) if has_binds else None), slots
 
 
@@ -741,12 +740,12 @@ def window_rules(nodes, warn):
 # What the importer reads, by path in the config (the blocks that hold options are looked into one level down).
 # Everything else is reported as skipped, with the reason from SKIPPED_OPTIONS.
 MAPPED_OPTIONS = {
-    "binds", "prefer-no-csd", "layout", "input", "gestures", "window-rule",
+    "binds", "prefer-no-csd", "layout", "input", "gestures", "window-rule", "workspace",
     "layout/gaps", "layout/struts", "layout/center-focused-column", "layout/always-center-single-column",
     "layout/preset-column-widths", "layout/preset-window-heights", "layout/default-column-width",
     "layout/default-column-display", "layout/focus-ring", "layout/border", "layout/tab-indicator", "layout/shadow",
-    "layout/insert-hint", "layout/fullscreen-backdrop-color", "layout/background-color",
-    "input/warp-mouse-to-focus", "input/focus-follows-mouse", "input/mod-key", "gestures/hot-corners",
+    "layout/insert-hint", "layout/fullscreen-backdrop-color", "layout/background-color", "layout/empty-workspace-above-first",
+    "input/warp-mouse-to-focus", "input/focus-follows-mouse", "input/mod-key", "input/workspace-auto-back-and-forth", "gestures/hot-corners",
     "window-rule/match", "window-rule/exclude", "window-rule/open-floating", "window-rule/open-fullscreen",
     "window-rule/default-column-width", "window-rule/default-window-height", "window-rule/geometry-corner-radius",
 }
@@ -759,7 +758,6 @@ SKIPPED_OPTIONS = {
     "hotkey-overlay": "Kiri shows no hotkey overlay at startup",
     "screenshot-path": "screenshots are Spectacle's",
     "animations": "niri's animation options are not configurable yet",
-    "workspace": "named workspaces are not supported yet",
     "layer-rule": "layer-shell surfaces (panels, wallpapers) are Plasma's",
     "debug": "niri debug options",
     "environment": "environment variables belong to Plasma (~/.config/plasma-workspace/env)",
@@ -777,7 +775,6 @@ SKIPPED_OPTIONS = {
     "input/touch": "Plasma's Touchscreen settings",
     "input/tablet": "Plasma's Drawing Tablet settings",
     "input/mod-key-nested": "only used when niri runs inside another window",
-    "input/workspace-auto-back-and-forth": "not supported yet",
     "overview/zoom": "not configurable yet",
     "overview/backdrop-color": "not configurable yet",
     "overview/workspace-shadow": "not configurable yet",
@@ -931,7 +928,7 @@ def read_settings_inner(nodes, warn):
         out["emptyDesktopAboveFirst"] = True
     declared = declared_workspaces(nodes)
     if declared:
-        out["namedDesktops"] = json.dumps(declared)
+        out["namedDesktops"] = json.dumps(declared, separators=(",", ":"))
         if any(node[3] for node in find(nodes, "workspace")):
             warn("workspace blocks: open-on-output and layout are not mapped (the names are)")
     for blk in find(nodes, "input"):
@@ -944,17 +941,53 @@ def read_settings_inner(nodes, warn):
             out["focusFollowsMouse"] = True
             m = re.match(r"\d+(\.\d+)?", follows[2].get("max-scroll-amount", ""))
             # the share of the screen the view may scroll for it; without the property there is no limit
-            out["focusFollowsMouseMaxScroll"] = max(0, round(float(m.group()))) if m else 100
-    gestures = find(nodes, "gestures")
-    if gestures:
-        # niri: `off` disables the corners; naming other corners without top-left turns the top-left one off
-        for blk in gestures:
-            corners = child(blk, "hot-corners")
-            if corners:
-                others = any(child(corners, c) for c in ("top-right", "bottom-left", "bottom-right"))
-                if child(corners, "off") or (others and not child(corners, "top-left")):
-                    out["hotCorner"] = False
-        warn("gestures: Kiri maps only hot-corners off, no other gesture options")
+            out["focusFollowsMouseMaxScroll"] = max(0, js_round(float(m.group()))) if m else 100
+    for blk in find(nodes, "gestures"):
+        corners = child(blk, "hot-corners")
+        if corners:
+            out["hotCorner"] = child(corners, "off") is None
+            named = [child(corners, n) is not None for n in ("top-left", "top-right", "bottom-left", "bottom-right")]
+            out["hotCornerTopLeft"] = not any(named) or named[0]
+            out["hotCornerTopRight"], out["hotCornerBottomLeft"], out["hotCornerBottomRight"] = named[1:]
+        for name, prefix, size, size_key in (("dnd-edge-view-scroll", "dndEdgeViewScroll", "trigger-width", "TriggerWidth"),
+                                             ("dnd-edge-workspace-switch", "dndEdgeWorkspaceSwitch", "trigger-height", "TriggerHeight")):
+            node = child(blk, name)
+            for niri, key in ((size, prefix + size_key), ("delay-ms", prefix + "Delay"), ("max-speed", prefix + "MaxSpeed")):
+                value = child(node, niri)
+                if value and value[1]:
+                    try:
+                        out[key] = js_round(float(value[1][0])) if niri == "delay-ms" else float(value[1][0])
+                    except ValueError:
+                        pass
+    for blk in find(nodes, "overview"):
+        zoom = child(blk, "zoom")
+        if zoom and zoom[1]:
+            try:
+                out["overviewZoom"] = max(0.0, min(1.0, float(zoom[1][0])))
+            except ValueError:
+                pass
+        color_setting(child(blk, "backdrop-color"), "overviewBackdropColor", out, warn)
+        shadow = child(blk, "workspace-shadow")
+        if shadow:
+            if child(shadow, "off"):
+                out["overviewShadowEnabled"] = False
+            if child(shadow, "on"):
+                out["overviewShadowEnabled"] = True
+            offset = child(shadow, "offset")
+            if offset:
+                for axis, key in (("x", "overviewShadowOffsetX"), ("y", "overviewShadowOffsetY")):
+                    try:
+                        out[key] = float(offset[2][axis])
+                    except (KeyError, ValueError):
+                        pass
+            for name, key in (("softness", "overviewShadowSoftness"), ("spread", "overviewShadowSpread")):
+                n = child(shadow, name)
+                if n and n[1]:
+                    try:
+                        out[key] = float(n[1][0])
+                    except ValueError:
+                        pass
+            color_setting(child(shadow, "color"), "overviewShadowColor", out, warn)
 
     rules = window_rules(nodes, warn)
     if rules:

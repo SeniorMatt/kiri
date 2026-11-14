@@ -18,6 +18,7 @@ class ClientWrapper {
     private lastPlacementTime = 0;
     private parked = false; // see park
     private awaitingCommit = false; // a size was requested and the client has not committed anything since
+    private answeredSizeRequest = false; // the last frame change came after Kiri had asked for a size
     private static readonly maxConfigureWaitMs = 100;
 
     constructor(
@@ -229,15 +230,27 @@ class ClientWrapper {
         return this.maximizedMode;
     }
 
-    // Where Kiri last put the window, if KWin moved it somewhere else without changing its size, e.g. KWin pulls
-    // windows that are far off screen back to the screen edge when the desktop changes; null in every other case
-    public getMovedByKwinFrom(newGeometry: QmlRect): QmlRect | null {
+    // Where Kiri last put the window, if KWin moved it somewhere else, e.g. KWin pulls windows that are far off screen
+    // back to the screen edge when the desktop changes; null in every other case. `rect` has the window's own size.
+    // `onlyMoved` is false when the window has a size that Kiri did not ask for and the layout has not seen yet.
+    // KWin keeps 100 px of a window on the screen whenever the window commits an answer to a configure, so a window
+    // that answers with another size than it was given (a terminal that snaps to whole cells) is pulled in, and
+    // the layout asking for the size again only makes it commit and be pulled again: the window goes back to its
+    // slot with the size it has.
+    public getMovedByKwinFrom(newGeometry: QmlRect, oldGeometry: QmlRect): { rect: QmlRect, onlyMoved: boolean } | null {
         const placed = this.lastPlacement;
-        if (placed === null || placed.width !== newGeometry.width || placed.height !== newGeometry.height ||
-            (placed.x === newGeometry.x && placed.y === newGeometry.y)) {
+        if (placed === null || (placed.x === newGeometry.x && placed.y === newGeometry.y)) {
             return null;
         }
-        return placed;
+        const keptSize = placed.width === newGeometry.width && placed.height === newGeometry.height;
+        const sameSize = oldGeometry.width === newGeometry.width && oldGeometry.height === newGeometry.height;
+        if (!keptSize && !sameSize && !this.answeredSizeRequest) {
+            return null; // the client moved and resized itself
+        }
+        return {
+            rect: Qt.rect(placed.x, placed.y, newGeometry.width, newGeometry.height),
+            onlyMoved: keptSize || sameSize,
+        };
     }
 
     public isManipulatingGeometry(newGeometry: QmlRect | null) {
@@ -319,6 +332,7 @@ class ClientWrapper {
         });
 
         manager.connect(client.kwinClient.frameGeometryChanged, () => {
+            client.answeredSizeRequest = client.awaitingCommit;
             client.awaitingCommit = false;
         });
         manager.connect(client.kwinClient.maximizedAboutToChange, (maximizedMode: MaximizedMode) => {
