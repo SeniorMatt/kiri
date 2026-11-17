@@ -246,11 +246,13 @@ def tokenize(text):
             m = re.compile(r'r(#*)"').match(text, i)
             if m:
                 end = text.find('"' + m.group(1), m.end())
+                if end < 0:
+                    end = n  # unterminated: the rest of the file is the string
                 toks.append(("q", text[m.end():end])); i = end + 1 + len(m.group(1))
             elif c == '"':
                 j, out = i + 1, ""
-                while text[j] != '"':
-                    if text[j] == "\\":
+                while j < n and text[j] != '"':
+                    if text[j] == "\\" and j + 1 < n:
                         j += 1
                         out += {"n": "\n", "t": "\t"}.get(text[j], text[j])
                     else:
@@ -301,14 +303,21 @@ def parse_nodes(toks, pos=0):
     return nodes, pos
 
 
-def parse_kdl(path):
+def parse_kdl(path, depth=0):
     path = Path(path).expanduser()
     nodes = []
-    for node in parse_nodes(tokenize(path.read_text()))[0]:
+    try:
+        parsed = parse_nodes(tokenize(path.read_text(errors="replace")))[0]
+    except (IndexError, ValueError, RecursionError):
+        print("# skipped: could not read", path, "(malformed KDL)", file=sys.stderr)
+        return []
+    for node in parsed:
         if node[0] == "include" and node[1]:
             included = (path.parent / Path(node[1][0]).expanduser())
-            if included.exists():
-                nodes += parse_kdl(included)
+            if depth > 8:
+                print("# skipped: include", node[1][0], "(nested too deeply)", file=sys.stderr)
+            elif included.is_file():
+                nodes += parse_kdl(included, depth + 1)
             else:
                 print("# skipped: include", node[1][0], "(not found)", file=sys.stderr)
             continue
@@ -584,10 +593,13 @@ def gradient_string(node, warn):
 def one_size(kind, args):
     """proportion 0.5 -> '50%', fixed 800 -> '800px'"""
     try:
+        value = float(args[0])
+        if not math.isfinite(value) or value <= 0:
+            return None  # niri refuses these too; "inf%" or "0px" would collapse the columns
         if kind == "proportion":
-            return f"{float(args[0]) * 100:.3f}".rstrip("0").rstrip(".") + "%"
+            return f"{value * 100:.3f}".rstrip("0").rstrip(".") + "%"
         if kind == "fixed":
-            return f"{int(float(args[0]))}px"
+            return f"{int(value)}px"
     except (IndexError, ValueError):
         pass
     return None
@@ -601,11 +613,15 @@ def sizes(node):
     return ", ".join(filter(None, (one_size(n[0], n[1]) for n in node[3])))
 
 
+MAX_PIXELS = 10000  # a number from the config is a size in pixels: infinity or 1e300 would put every window off the screen
+
+
 def number(args):
     try:
-        return int(float(args[0]))
+        value = float(args[0])
     except (IndexError, ValueError):
         return None
+    return max(-MAX_PIXELS, min(MAX_PIXELS, int(value))) if math.isfinite(value) else None
 
 
 def color_setting(node, key, out, warn):
@@ -840,6 +856,14 @@ def read_settings(path, warn):
     for line in skipped:
         if not is_spawn_line(line):
             warn(line)
+    for key, value in list(settings.items()):  # whatever number got through: finite and a sane size
+        if isinstance(value, float) and not isinstance(value, bool):
+            if math.isfinite(value):
+                settings[key] = max(-MAX_PIXELS, min(MAX_PIXELS, value))
+            else:
+                del settings[key]
+        elif isinstance(value, int) and not isinstance(value, bool):
+            settings[key] = max(-MAX_PIXELS, min(MAX_PIXELS, value))
     return settings
 
 
@@ -949,10 +973,10 @@ def read_settings_inner(nodes, warn):
             named = [child(corners, n) is not None for n in ("top-left", "top-right", "bottom-left", "bottom-right")]
             out["hotCornerTopLeft"] = not any(named) or named[0]
             out["hotCornerTopRight"], out["hotCornerBottomLeft"], out["hotCornerBottomRight"] = named[1:]
-        for name, prefix, size, size_key in (("dnd-edge-view-scroll", "dndEdgeViewScroll", "trigger-width", "TriggerWidth"),
+        for name, prefix, trigger, size_key in (("dnd-edge-view-scroll", "dndEdgeViewScroll", "trigger-width", "TriggerWidth"),
                                              ("dnd-edge-workspace-switch", "dndEdgeWorkspaceSwitch", "trigger-height", "TriggerHeight")):
             node = child(blk, name)
-            for niri, key in ((size, prefix + size_key), ("delay-ms", prefix + "Delay"), ("max-speed", prefix + "MaxSpeed")):
+            for niri, key in ((trigger, prefix + size_key), ("delay-ms", prefix + "Delay"), ("max-speed", prefix + "MaxSpeed")):
                 value = child(node, niri)
                 if value and value[1]:
                     try:

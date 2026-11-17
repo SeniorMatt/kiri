@@ -20,41 +20,96 @@ build=true
 SUDO=sudo
 [ "$(id -u)" = 0 ] && SUDO=
 
+# qdbus is called qdbus6 (Arch, Kubuntu), qdbus-qt6 (Fedora, openSUSE) or lives only in Qt's own bin dir
+qdbus=
+for c in qdbus6 qdbus-qt6 qdbus; do
+    command -v "$c" >/dev/null 2>&1 && { qdbus=$c; break; }
+done
+if [ -z "$qdbus" ]; then
+    for c in /usr/lib*/qt6/bin/qdbus* /usr/lib/*/qt6/bin/qdbus*; do
+        [ -x "$c" ] && { qdbus=$c; break; }
+    done
+fi
+qdbus6() { if [ -n "$qdbus" ]; then "$qdbus" "$@"; else return 127; fi; }
+
+# where Qt (and so KWin) looks for plugins: /usr/lib/qt6/plugins, /usr/lib64/qt6/plugins, /usr/lib/x86_64-linux-gnu/qt6/plugins ...
+plugindir=
+for c in qtpaths6 qtpaths-qt6 qmake6 qmake-qt6 qtpaths qmake; do
+    command -v "$c" >/dev/null 2>&1 || continue
+    plugindir=$("$c" --query QT_INSTALL_PLUGINS 2>/dev/null || "$c" -query QT_INSTALL_PLUGINS 2>/dev/null) || plugindir=
+    [ -d "$plugindir" ] && break
+    plugindir=
+done
+if [ -z "$plugindir" ]; then
+    for c in /usr/lib*/qt6/plugins /usr/lib/*/qt6/plugins; do
+        [ -d "$c/kwin" ] && { plugindir=$c; break; }
+    done
+fi
+effectdir=$plugindir/kwin/effects/plugins
+
+# which package manager line installs the build dependencies
+distro=
+[ -r /etc/os-release ] && distro=$(. /etc/os-release; echo "$ID $ID_LIKE")
+dep_hint() {
+    case " $distro " in
+        *" arch "*|*" cachyos "*|*" manjaro "*|*" endeavouros "*)
+            echo "sudo pacman -S --needed base-devel cmake extra-cmake-modules kwin libepoxy qt6-base qt6-tools kconfig kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers" ;;
+        *" fedora "*|*" rhel "*)
+            echo "sudo dnf install cmake gcc-c++ make extra-cmake-modules kwin-devel kdecoration-devel kf6-kconfig-devel kf6-kcoreaddons-devel libepoxy-devel qt6-qtbase-devel qt6-qttools kf6-kpackage" ;;
+        *" suse "*|*" opensuse "*|*" opensuse-tumbleweed "*)
+            echo "sudo zypper install cmake gcc-c++ make kwin6-devel kdecoration-devel extra-cmake-modules kf6-kconfig-devel kf6-kcoreaddons-devel libepoxy-devel qt6-base-devel qt6-tools kf6-kpackage-devel" ;;
+        *" debian "*|*" ubuntu "*|*" neon "*)
+            echo "sudo apt install build-essential cmake extra-cmake-modules kwin-dev libkdecorations3-dev libkf6config-dev libkf6coreaddons-dev libepoxy-dev qt6-base-dev qt6-tools-dev-tools qt6-base-private-dev kf6-kpackage-bin" ;;
+        *) echo "install cmake, a C++ compiler, extra-cmake-modules, the KWin and KDecoration development packages, KF6 Config and CoreAddons, libepoxy and Qt6 base development files" ;;
+    esac
+}
+
 # ---- the compiled effects ----------------------------------------------------------------------------
 compiled=false
 if $build && [ -d "$cpp" ]; then
-    missing=false
-    command -v cmake >/dev/null 2>&1 || missing=true
-    command -v g++ >/dev/null 2>&1 || missing=true
-    [ -d /usr/share/ECM ] || missing=true
-    [ -f /usr/include/kwin/effect/effecthandler.h ] || missing=true
-    [ -f /usr/include/epoxy/gl.h ] || missing=true
-    if $missing; then
+    missing=
+    command -v cmake >/dev/null 2>&1 || missing="$missing cmake"
+    command -v g++ >/dev/null 2>&1 || command -v c++ >/dev/null 2>&1 || missing="$missing a-C++-compiler"
+    [ -d /usr/share/ECM ] || missing="$missing extra-cmake-modules"
+    [ -f /usr/include/kwin/effect/effecthandler.h ] || missing="$missing kwin-headers"
+    [ -f /usr/include/epoxy/gl.h ] || missing="$missing libepoxy"
+    [ -n "$plugindir" ] || missing="$missing qtpaths6/qmake6"
+    if [ -n "$missing" ]; then
         if command -v pacman >/dev/null 2>&1; then
             echo "Installing build tools and KWin headers (sudo pacman -S --needed) ..."
-            $SUDO pacman -S --needed --noconfirm base-devel cmake extra-cmake-modules kwin libepoxy qt6-base kconfig kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers
+            $SUDO pacman -S --needed --noconfirm base-devel cmake extra-cmake-modules kwin libepoxy qt6-base qt6-tools kconfig kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers
+            # qt6-tools brings qtpaths6
+            for c in qtpaths6 qmake6; do
+                command -v $c >/dev/null 2>&1 && [ -z "$plugindir" ] && plugindir=$($c --query QT_INSTALL_PLUGINS 2>/dev/null || $c -query QT_INSTALL_PLUGINS)
+            done
+            effectdir=$plugindir/kwin/effects/plugins
         else
-            echo "Missing cmake, a C++ compiler, extra-cmake-modules or the KWin headers; skipping the compiled effects." >&2
+            echo "Missing:$missing. Skipping the compiled effects; to build them, run" >&2
+            echo "    $(dep_hint)" >&2
+            echo "and then ./install.sh again." >&2
+            build=false
         fi
     fi
+fi
+if $build && [ -d "$cpp" ]; then
     builddir=${XDG_CACHE_HOME:-$HOME/.cache}/kiri-build
     rm -rf "$builddir"
     mkdir -p "$builddir"
-    if cmake -S "$cpp" -B "$builddir" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr >"$builddir/log.txt" 2>&1 &&
+    if cmake -S "$cpp" -B "$builddir" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DKDE_INSTALL_QTPLUGINDIR="$plugindir" >"$builddir/log.txt" 2>&1 &&
         cmake --build "$builddir" -j "$(nproc)" >>"$builddir/log.txt" 2>&1; then
         # let KWin let go of the old plugins before replacing the files
         for e in kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
             qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
         done
         # remove first: a new file instead of overwriting one KWin may have mapped
-        for f in $(find /usr/lib/qt6/plugins/kwin/effects/plugins -name 'kiri_*.so' 2>/dev/null); do
+        for f in $(find "$effectdir" -name 'kiri_*.so' 2>/dev/null); do
             $SUDO rm -f "$f"
         done
         $SUDO cmake --install "$builddir" >>"$builddir/log.txt" 2>&1
         compiled=true
         echo "Built and installed the compiled effects (kiri_decorations, kiri_desktop_switch, kiri_motion, kiri_swipe, kiri_overview)."
     else
-        echo "Building the compiled effects failed, see $builddir/log.txt. Kiri still works without them." >&2
+        echo "Building the compiled effects failed ($(grep -m1 -i 'error' "$builddir/log.txt" | cut -c1-150)), see $builddir/log.txt. Kiri still works without them." >&2
     fi
 fi
 

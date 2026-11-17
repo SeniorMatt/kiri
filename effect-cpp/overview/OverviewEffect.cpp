@@ -351,6 +351,13 @@ bool OverviewEffect::tick()
     if (m_closedZoom && !more && !m_open && !m_gesture && !m_warm) {
         // closed, and the desktops sit where they are on the real screen (the view offsets and the desktop spring have
         // arrived: handing back earlier would show them jumping): hand the screen back
+        // Let KWin hide the windows of the other desktops first, a frame while the scene still covers the screen: when the
+        // references go in the same frame that takes the scene away, that frame paints those windows at their own place,
+        // on top of the current desktop (a window of desktop 2 flashing on empty desktop 1 after rapid Meta+O)
+        if (!m_visibleRefs.empty()) {
+            m_visibleRefs.clear();
+            return true;
+        }
         m_closedZoom = false;
         run(false);
         // the real windows come back on a screen the scene covered: repaint all of it now and once more after this
@@ -396,10 +403,26 @@ void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
         }
         m_lastFrame = t;
         m_moving = tick();
+        static const bool trace = qEnvironmentVariableIsSet("KIRI_OVERVIEW_TRACE");
+        if (trace) {
+            qCInfo(KIRI_OVERVIEW).nospace() << "TRACE frame running=" << isRunning() << " open=" << m_open << " closedZoom=" << m_closedZoom << " progress=" << m_progress
+                                            << " ws=" << m_wsIndex << "->" << m_wsTarget << " layoutCurrent=" << m_layoutCurrent << " pending=" << m_pendingCurrent;
+        }
     } else {
         m_moving = false;
     }
     QuickSceneEffect::prePaintScreen(data);
+}
+
+// diagnostics (KIRI_OVERVIEW_TRACE=1): a window that is not on the current desktop is about to be painted by KWin itself
+void OverviewEffect::prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data)
+{
+    static const bool trace = qEnvironmentVariableIsSet("KIRI_OVERVIEW_TRACE");
+    if (trace && w->isNormalWindow() && !w->isOnCurrentDesktop()) {
+        qCInfo(KIRI_OVERVIEW).nospace() << "TRACE other-desktop window painted: " << w->caption() << " running=" << isRunning() << " open=" << m_open
+                                        << " closedZoom=" << m_closedZoom << " progress=" << m_progress << " ws=" << m_wsIndex << " refs=" << m_visibleRefs.size();
+    }
+    QuickSceneEffect::prePaintWindow(view, w, data);
 }
 
 // The next frame is asked for once this one is painted. Asked for in prePaintScreen, the repaint belongs to the

@@ -83,6 +83,7 @@ public:
     bool blocksDirectScanout() const override;
     void reconfigure(ReconfigureFlags) override { loadHotCorner(); }
     void postPaintScreen() override;
+    void prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data) override;
     int requestedEffectChainPosition() const override { return 70; }
 
 

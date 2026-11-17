@@ -37,7 +37,24 @@ SUDO=sudo
 [ "$(id -u)" = 0 ] && SUDO=
 config=${XDG_CONFIG_HOME:-$HOME/.config}
 data=${XDG_DATA_HOME:-$HOME/.local/share}
-q() { qdbus6 "$@" >/dev/null 2>&1 || true; }
+qdbus=
+for c in qdbus6 qdbus-qt6 qdbus; do
+    command -v "$c" >/dev/null 2>&1 && { qdbus=$c; break; }
+done
+if [ -z "$qdbus" ]; then
+    for c in /usr/lib*/qt6/bin/qdbus* /usr/lib/*/qt6/bin/qdbus*; do
+        [ -x "$c" ] && { qdbus=$c; break; }
+    done
+fi
+# where Qt (and so KWin) looks for plugins (differs per distro)
+plugindir=
+for c in qtpaths6 qtpaths-qt6 qmake6 qmake-qt6 qtpaths qmake; do
+    command -v "$c" >/dev/null 2>&1 || continue
+    plugindir=$("$c" --query QT_INSTALL_PLUGINS 2>/dev/null || "$c" -query QT_INSTALL_PLUGINS 2>/dev/null) || plugindir=
+    [ -d "$plugindir" ] && break
+    plugindir=
+done
+q() { "${qdbus:-false}" "$@" >/dev/null 2>&1 || true; }
 w() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" "$3"; }
 d() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" --delete; }
 
@@ -114,7 +131,8 @@ command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 --noincremental >/dev/
 # ---- files -----------------------------------------------------------------------------------------------
 kpackagetool6 --type=KWin/Script --remove kiri >/dev/null 2>&1 || true
 kpackagetool6 --type=KWin/Effect --remove kiri_animations >/dev/null 2>&1 || true
-plugins=$(find /usr/lib/qt6/plugins/kwin/effects/plugins -name 'kiri_*.so' 2>/dev/null || true)
+# the plugin dir of the Qt tools, plus the usual ones in case the dev tools are gone
+plugins=$(find "$plugindir/kwin/effects/plugins" /usr/lib/qt6/plugins/kwin/effects/plugins /usr/lib64/qt6/plugins/kwin/effects/plugins /usr/lib/*/qt6/plugins/kwin/effects/plugins -name 'kiri_*.so' 2>/dev/null | sort -u || true)
 if [ -n "$plugins" ]; then
     echo "Removing the compiled effects (sudo rm):"
     echo "$plugins"

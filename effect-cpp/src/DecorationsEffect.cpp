@@ -1461,6 +1461,7 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
         m_cornerShader->setUniform("windowSize", QVector2D(frame.width(), frame.height()));
         m_cornerShader->setUniform("windowExpandedSize", QVector2D(expanded.width(), expanded.height()));
         m_cornerShader->setUniform("windowTopLeft", QVector2D(frame.x() - expanded.x(), frame.y() - expanded.y()));
+        m_cornerShader->setUniform("outlineWidth", float(std::ceil(scale)));
         KWin::ShaderManager::instance()->popShader();
     } else {
         unredirect(w);

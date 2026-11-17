@@ -17,7 +17,17 @@ for arg in "$@"; do
     esac
 done
 
-KWIN="qdbus6 org.kde.KWin"
+QDBUS=
+for c in qdbus6 qdbus-qt6 qdbus; do
+    command -v "$c" >/dev/null 2>&1 && { QDBUS=$c; break; }
+done
+if [ -z "$QDBUS" ]; then
+    for c in /usr/lib*/qt6/bin/qdbus* /usr/lib/*/qt6/bin/qdbus*; do
+        [ -x "$c" ] && { QDBUS=$c; break; }
+    done
+fi
+[ -n "$QDBUS" ] || { echo "kiri-mode: qdbus6 (qdbus-qt6) not found" >&2; exit 1; }
+KWIN="$QDBUS org.kde.KWin"
 KIRI_EFFECTS="kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview kiri_animations"
 # Plasma effects Kiri replaces, with whether Plasma has them on by default
 PLASMA_EFFECTS="slide:true overview:true kwin4_effect_geometry_change:true fade:false scale:true glide:false maximize:true"
@@ -201,7 +211,7 @@ effects_plasma() {
 
 show() { # text
     $osd || return 0
-    qdbus6 org.kde.plasmashell /org/kde/osdService org.kde.osdService.showText kiri "$1" >/dev/null 2>&1 ||
+    $QDBUS org.kde.plasmashell /org/kde/osdService org.kde.osdService.showText kiri "$1" >/dev/null 2>&1 ||
         notify-send -i kiri -t 2000 "$1" >/dev/null 2>&1 || true
 }
 

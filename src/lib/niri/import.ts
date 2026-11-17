@@ -460,8 +460,8 @@ namespace NiriImport {
     // proportion 0.5 -> "50%", fixed 800 -> "800px"
     function oneSize(node: Kdl.Node): string|undefined {
         const value = parseFloat(node.args[0]);
-        if (isNaN(value)) {
-            return undefined;
+        if (!isFinite(value) || value <= 0) {
+            return undefined; // niri refuses these too; "Infinity%" or "0px" would collapse the columns
         }
         if (node.name === "proportion") {
             return parseFloat((value * 100).toFixed(3)) + "%";
@@ -483,9 +483,12 @@ namespace NiriImport {
         return node === undefined ? "" : node.children.map(oneSize).filter(s => s !== undefined).join(", ");
     }
 
+    // a number from the config is a size in pixels: infinity or 1e300 would put every window off the screen
+    const MAX_PIXELS = 10000;
+
     function number(args: string[]): number|undefined {
         const value = parseFloat(args[0]);
-        return isNaN(value) ? undefined : Math.trunc(value);
+        return isFinite(value) ? Math.max(-MAX_PIXELS, Math.min(MAX_PIXELS, Math.trunc(value))) : undefined;
     }
 
     function colorSetting(node: Kdl.Node|undefined, key: string, out: Record<string, any>, warn: (msg: string) => void) {
@@ -721,7 +724,7 @@ namespace NiriImport {
                 }
             }
             const length = Kdl.child(tab, "length");
-            if (length !== undefined && length.props["total-proportion"] !== undefined && !isNaN(parseFloat(length.props["total-proportion"]))) {
+            if (length !== undefined && length.props["total-proportion"] !== undefined && isFinite(parseFloat(length.props["total-proportion"]))) {
                 out["tabIndicatorLength"] = parseFloat(length.props["total-proportion"]);
             }
             const position = Kdl.child(tab, "position");
@@ -986,6 +989,15 @@ namespace NiriImport {
         }
         if (bound.slots["window"].length > 0) {
             settings["windowHeightSet"] = bound.slots["window"].join(", ");
+        }
+        for (const [key, value] of Object.entries(settings)) { // whatever number got through: finite and a sane size
+            if (typeof value === "number") {
+                if (isFinite(value)) {
+                    settings[key] = Math.max(-MAX_PIXELS, Math.min(MAX_PIXELS, value));
+                } else {
+                    delete settings[key];
+                }
+            }
         }
         const rules = windowRules(nodes, warn);
         if (rules.length > 0) {
