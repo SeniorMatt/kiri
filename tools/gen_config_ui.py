@@ -52,6 +52,8 @@ AUTO_TABS = [
 def F(key, tab, group, label, tip="", **o):
     return (key, tab, group, label, tip, o)
 
+FMT = " Format: off, or spring DAMPING STIFFNESS EPSILON (niri's spring: 1 800 0.0001), or CURVE MS with the curve one of linear, ease-out-quad, ease-out-cubic, ease-out-expo (ease-out-expo 150), or cubic-bezier MS X1 Y1 X2 Y2"
+
 FIELDS = [
     # Layout
     F("gapsInnerHorizontal", "Layout", "Gaps", "Between columns", "Horizontal gap between neighbouring columns", suffix="px", hi=999),
@@ -92,6 +94,16 @@ FIELDS = [
 
     # Animations
     F("closeRelayoutDelay", "Animations", "Closing windows", "Delay before the gap closes", "Wait this long before the other columns close the gap, so the closing animation can finish", suffix="ms", hi=5000, special="None"),
+
+    F("animationsOff", "Animations", "All animations", "", "Like niri's `off` in the animations block: every animation ends at once", label_text="Turn off all animations"),
+    F("animationsSlowdown", "Animations", "All animations", "Slow down by", "Like niri's `slowdown`: all animations take this many times as long. Below 1 they are faster. It comes on top of Plasma's animation speed", lo=0.0, hi=100.0, step=0.1, decimals=2, suffix="x"),
+    F("animWindowOpen", "Animations", "Windows", "Open", "niri's window-open (a new window scales up and fades in)."+FMT, placeholder="ease-out-expo 150"),
+    F("animWindowClose", "Animations", "Windows", "Close", "niri's window-close (a closing window shrinks and fades out)."+FMT, placeholder="ease-out-quad 150"),
+    F("animWindowMovement", "Animations", "Windows", "Movement", "niri's window-movement (windows that move to a new place; a move that only goes sideways uses the view movement below)."+FMT, placeholder="spring 1 800 0.0001"),
+    F("animWindowResize", "Animations", "Windows", "Resize", "niri's window-resize (the old contents cross-fade into the new ones)."+FMT, placeholder="spring 1 800 0.0001"),
+    F("animHorizontalViewMovement", "Animations", "View and desktops", "View movement", "niri's horizontal-view-movement (the columns scroll sideways, also where a touchpad swipe settles)."+FMT, placeholder="spring 1 800 0.0001"),
+    F("animWorkspaceSwitch", "Animations", "View and desktops", "Desktop switch", "niri's workspace-switch (also where the desktops settle after a swipe or drag)."+FMT, placeholder="spring 1 1000 0.0001"),
+    F("animOverviewOpenClose", "Animations", "View and desktops", "Overview", "niri's overview-open-close."+FMT, placeholder="spring 1 800 0.0001"),
 
     # Appearance
     F("hideTitlebars", "Appearance", "Windows", "", "Like niri: tiled windows lose their title bar and frame (the focus ring is the outline). They get them back when they float or Kiri stops", label_text="Hide title bars of tiled windows"),

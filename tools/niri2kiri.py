@@ -17,6 +17,7 @@ running Kiri picks up like its other settings: no new login needed. Without --ap
 kglobalshortcutsrc is printed (Kiri has to have run once for that). Things Kiri can't do are listed on stderr.
 """
 import colorsys
+from decimal import Decimal
 import json
 import math
 import os
@@ -753,6 +754,69 @@ def window_rules(nodes, warn):
     return rules
 
 
+# niri's animations: the setting of each is one text (src/lib/config/definition.ts, animWindowOpen and the others)
+ANIMATIONS = [
+    ("window-open", "animWindowOpen", "ease-out-expo 150"),
+    ("window-close", "animWindowClose", "ease-out-quad 150"),
+    ("window-movement", "animWindowMovement", "spring 1 800 0.0001"),
+    ("window-resize", "animWindowResize", "spring 1 800 0.0001"),
+    ("horizontal-view-movement", "animHorizontalViewMovement", "spring 1 800 0.0001"),
+    ("workspace-switch", "animWorkspaceSwitch", "spring 1 1000 0.0001"),
+    ("overview-open-close", "animOverviewOpenClose", "spring 1 800 0.0001"),
+]
+CURVES = ["linear", "ease-out-quad", "ease-out-cubic", "ease-out-expo"]
+
+
+def format_number(x):
+    """the way JavaScript's String(number) writes it (no exponent for the sizes that occur here)"""
+    text = format(Decimal(repr(float(x))), "f")
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def to_float(text):
+    """parseFloat of the TypeScript importer: the number a text starts with, or None"""
+    m = re.match(r"\s*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?", text or "")
+    return float(m.group()) if m else None
+
+
+def animation_text(node, fallback, path, warn):
+    """niri-config/src/animations.rs Animation::decode_node: `off`, a `spring`, or `duration-ms` and `curve` (the missing
+    one of the two from the animation's default easing, or 250 ms / ease-out-cubic when the default is a spring)"""
+    if child(node, "custom-shader") is not None:
+        warn(f"{path}/custom-shader: niri's custom shaders are GLSL for niri's renderer, not KWin's")
+    fallback_kind, *fallback_args = fallback.split(" ")
+    spring = child(node, "spring")
+    duration = child(node, "duration-ms")
+    curve = child(node, "curve")
+    if child(node, "off") is not None:
+        return "off"
+    if spring is not None:
+        spring_default = fallback_args if fallback_kind == "spring" else ["1", "800", "0.0001"]
+        values = []
+        for i, prop in enumerate(("damping-ratio", "stiffness", "epsilon")):
+            value = to_float(spring[2].get(prop, ""))
+            values.append(spring_default[i] if value is None else format_number(value))
+        return "spring " + " ".join(values)
+    if duration is None and curve is None:
+        return fallback
+    easing_default = ["ease-out-cubic", "250"] if fallback_kind == "spring" else [fallback_kind, *fallback_args]
+    curve_name, ms = easing_default[0], easing_default[1]
+    bezier = []
+    if duration is not None and duration[1] and to_float(duration[1][0]) is not None:
+        ms = format_number(to_float(duration[1][0]))
+    if curve is not None:
+        name = curve[1][0] if curve[1] else ""
+        points = [to_float(x) for x in curve[1][1:5]]
+        if name in CURVES:
+            curve_name = name
+        elif name == "cubic-bezier" and len(points) == 4 and None not in points:
+            curve_name = name
+            bezier = [format_number(x) for x in points]
+        else:
+            warn(f"{path}: unknown curve {name}, niri only has linear, ease-out-quad, ease-out-cubic, ease-out-expo and cubic-bezier with 4 numbers")
+    return " ".join([curve_name, ms, *bezier])
+
+
 # What the importer reads, by path in the config (the blocks that hold options are looked into one level down).
 # Everything else is reported as skipped, with the reason from SKIPPED_OPTIONS.
 MAPPED_OPTIONS = {
@@ -764,8 +828,11 @@ MAPPED_OPTIONS = {
     "input/warp-mouse-to-focus", "input/focus-follows-mouse", "input/mod-key", "input/workspace-auto-back-and-forth", "gestures/hot-corners",
     "window-rule/match", "window-rule/exclude", "window-rule/open-floating", "window-rule/open-fullscreen",
     "window-rule/default-column-width", "window-rule/default-window-height", "window-rule/geometry-corner-radius",
+    "animations/off", "animations/on", "animations/slowdown", "animations/window-open", "animations/window-close",
+    "animations/window-movement", "animations/window-resize", "animations/horizontal-view-movement",
+    "animations/workspace-switch", "animations/overview-open-close",
 }
-LOOKED_INTO = ["layout", "input", "gestures", "window-rule", "overview", "hotkey-overlay", "debug"]
+LOOKED_INTO = ["layout", "input", "gestures", "window-rule", "overview", "animations", "hotkey-overlay", "debug"]
 SKIPPED_OPTIONS = {
     "include": "KWin scripts cannot read files (tools/niri2kiri.py follows includes)",
     "output": "the display layout is Plasma's (Display settings)",
@@ -773,7 +840,6 @@ SKIPPED_OPTIONS = {
     "spawn-sh-at-startup": "programs start with Plasma's autostart",
     "hotkey-overlay": "Kiri shows no hotkey overlay at startup",
     "screenshot-path": "screenshots are Spectacle's",
-    "animations": "niri's animation options are not configurable yet",
     "layer-rule": "layer-shell surfaces (panels, wallpapers) are Plasma's",
     "debug": "niri debug options",
     "environment": "environment variables belong to Plasma (~/.config/plasma-workspace/env)",
@@ -795,6 +861,10 @@ SKIPPED_OPTIONS = {
     "overview/backdrop-color": "not configurable yet",
     "overview/workspace-shadow": "not configurable yet",
     "window-rule/clip-to-geometry": "not supported yet",
+    "animations/config-notification-open-close": "KWin scripts have no config reload notice to animate",
+    "animations/exit-confirmation-open-close": "Kiri has no exit confirmation dialog",
+    "animations/screenshot-ui-open": "the screenshot UI is Spectacle's",
+    "animations/recent-windows-close": "Alt+Tab is KWin's Task Switcher",
 }
 
 
@@ -983,6 +1053,20 @@ def read_settings_inner(nodes, warn):
                         out[key] = js_round(float(value[1][0])) if niri == "delay-ms" else float(value[1][0])
                     except ValueError:
                         pass
+    for blk in find(nodes, "animations"):
+        # niri: `off` of any block turns the animations off, `on` turns them on again; the last slowdown wins
+        if child(blk, "off") is not None:
+            out["animationsOff"] = True
+        if child(blk, "on") is not None:
+            out["animationsOff"] = False
+        slowdown = child(blk, "slowdown")
+        if slowdown and slowdown[1] and to_float(slowdown[1][0]) is not None:
+            out["animationsSlowdown"] = max(0.0, to_float(slowdown[1][0]))
+        # an animation node replaces the whole animation of the blocks before it
+        for name, key, fallback in ANIMATIONS:
+            node = child(blk, name)
+            if node is not None:
+                out[key] = animation_text(node, fallback, "animations/" + name, warn)
     for blk in find(nodes, "overview"):
         zoom = child(blk, "zoom")
         if zoom and zoom[1]:

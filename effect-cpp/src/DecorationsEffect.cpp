@@ -335,7 +335,7 @@ double Effect::expandedProgress(KWin::EffectWindow *w) const
     ExpandedState &s = m_expanded[w];
     const double t = m_frameTime;
     const double target = expanded ? 1.0 : 0.0;
-    const double factor = KWin::effects->animationTimeFactor();
+    const double factor = NiriAnim::timeFactor();
     const double speed = factor > 0 ? 1.0 / factor : 0;
     auto value = [&]() {
         if (speed <= 0) {
@@ -359,17 +359,16 @@ double Effect::tabProgress(const TabGroup &group) const
     if (it == m_tabOpen.constEnd()) {
         return 1.0;
     }
-    const double factor = KWin::effects->animationTimeFactor();
+    const double factor = NiriAnim::timeFactor();
     const double speed = factor > 0 ? 1.0 / factor : 0;
     const double t = (m_frameTime - it->first) * speed;
     if (speed <= 0) {
         return 1.0;
     }
     if (it->second) {
-        return std::max(0.0, NiriAnim::easeOutExpo(std::clamp(t / (NiriAnim::Defaults::openMs / 1000), 0.0, 1.0)));
+        return std::max(0.0, NiriAnim::openAnim().value(t));
     }
-    static const NiriAnim::Spring spring(0, 1, 0, NiriAnim::Defaults::moveDamping, NiriAnim::Defaults::moveStiffness, NiriAnim::Defaults::moveEpsilon);
-    return std::max(0.0, spring.value(t));
+    return std::max(0.0, 1.0 - NiriAnim::moveSpring().value(t)); // the move spring runs 1 -> 0
 }
 
 void Effect::prePaintScreen(KWin::ScreenPrePaintData &data)
@@ -468,7 +467,7 @@ void Effect::postPaintScreen()
     if (!m_warmed && std::chrono::steady_clock::now() - m_clockStart > std::chrono::seconds(6)) {
         warmShaders();
     }
-    const double factor = KWin::effects->animationTimeFactor();
+    const double factor = NiriAnim::timeFactor();
     const double speed = factor > 0 ? 1.0 / factor : 0;
     bool again = false;
     for (auto it = m_expanded.begin(); it != m_expanded.end();) {
@@ -505,7 +504,7 @@ void Effect::postPaintScreen()
         }
     }
     for (auto it = m_tabOpen.begin(); it != m_tabOpen.end();) {
-        const double length = it->second ? NiriAnim::Defaults::openMs / 1000 : NiriAnim::moveSpring().duration();
+        const double length = it->second ? NiriAnim::openAnim().duration() : NiriAnim::moveSpring().duration();
         if (speed <= 0 || (m_frameTime - it->first) * speed >= length) {
             it = m_tabOpen.erase(it);
             again = true; // one more frame with the finished indicator
@@ -910,6 +909,7 @@ Settings Effect::parseSettings(const QVariantMap &m, bool kiriEnabled) const
 
 void Effect::loadSettings()
 {
+    NiriAnim::load(); // niri's `animations` block
     auto config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
     config->reparseConfiguration();
     const bool enabled = config->group(QStringLiteral("Plugins")).readEntry("kiriEnabled", false);
@@ -1157,7 +1157,7 @@ double Effect::alphaOf(const QUuid &id) const
     if (it == m_alpha.constEnd()) {
         return 1.0;
     }
-    const double factor = KWin::effects->animationTimeFactor();
+    const double factor = NiriAnim::timeFactor();
     const double k = factor > 0 ? NiriAnim::moveSpring().value((m_frameTime - it->start) / factor) : 0.0;
     return it->to + (it->from - it->to) * k;
 }
@@ -1230,7 +1230,7 @@ void Effect::setTabGroups(const QString &json)
 QPointF Effect::parkedPosition(KWin::EffectWindow *w, const ParkAnim &anim) const
 {
     const QPointF target = anim.toReal ? w->frameGeometry().topLeft() : anim.to;
-    const double factor = KWin::effects->animationTimeFactor();
+    const double factor = NiriAnim::timeFactor();
     // niri's spring runs from 1 (at the start) to 0: the part of the way that is still to go
     const double k = factor > 0 ? NiriAnim::moveSpring().value((m_frameTime - anim.start) / factor) : 0.0;
     return target + (anim.from - target) * k;
@@ -1498,7 +1498,7 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
         data.setYTranslation(data.yTranslation() + visualIt->y() - w->frameGeometry().y());
         m_lastVisualOffset.insert(w->internalId(), QPointF(visualIt->x() - w->frameGeometry().x(), visualIt->y() - w->frameGeometry().y()));
     } else if (const auto releaseIt = m_releasing.constFind(w->internalId()); releaseIt != m_releasing.constEnd()) {
-        const double factor = KWin::effects->animationTimeFactor();
+        const double factor = NiriAnim::timeFactor();
         const double k = releaseIt->start < 0 ? 1.0 : (factor > 0 ? NiriAnim::moveSpring().value((m_frameTime - releaseIt->start) / factor) : 0);
         data.setXTranslation(data.xTranslation() + releaseIt->offset.x() * k);
         data.setYTranslation(data.yTranslation() + releaseIt->offset.y() * k);

@@ -58,6 +58,15 @@ interface Config {
     gestureSettleDuration: number;
     gestureDesktopSwitch: boolean;
     closeRelayoutDelay: number;
+    animationsOff: boolean;
+    animationsSlowdown: number;
+    animWindowOpen: string;
+    animWindowClose: string;
+    animWindowMovement: string;
+    animWindowResize: string;
+    animHorizontalViewMovement: string;
+    animWorkspaceSwitch: string;
+    animOverviewOpenClose: string;
     tiledKeepBelow: boolean;
     floatingKeepAbove: boolean;
     cornerRadius: number;

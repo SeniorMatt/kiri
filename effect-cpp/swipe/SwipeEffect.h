@@ -19,7 +19,7 @@
 #include "input.h"
 #include "../common/NiriSwipe.h"
 
-#include "../common/NiriAnim.h"
+#include "../common/AnimConfig.h"
 
 #include <QDBusConnection>
 #include <QHash>
@@ -42,6 +42,7 @@ public:
 
     static bool supported();
 
+    void reconfigure(ReconfigureFlags flags) override;
     bool isActive() const override;
     int requestedEffectChainPosition() const override;
     void prePaintScreen(ScreenPrePaintData &data) override;
@@ -92,7 +93,8 @@ private:
     double m_sEnd = 0.0;
     double m_since = 0.0; // start of the Held / Settle state
     double m_frameTime = 0.0;
-    NiriAnim::Spring m_spring;
+    NiriAnim::Anim m_spring;
+    KConfigWatcher::Ptr m_animWatch; // niri's `animations` block (kwinrc [Script-kiri])
     double m_springFrom = 0.0;
     double m_d0 = 0.0; // reported to the script with the first events
 

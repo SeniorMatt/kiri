@@ -824,6 +824,26 @@ namespace NiriImport {
                 }
             }
         }
+        for (const block of Kdl.find(nodes, "animations")) {
+            // niri: `off` of any block turns the animations off, `on` turns them on again; the last slowdown wins
+            if (Kdl.child(block, "off") !== undefined) {
+                out["animationsOff"] = true;
+            }
+            if (Kdl.child(block, "on") !== undefined) {
+                out["animationsOff"] = false;
+            }
+            const slowdown = Kdl.child(block, "slowdown");
+            if (slowdown !== undefined && !isNaN(parseFloat(slowdown.args[0]))) {
+                out["animationsSlowdown"] = Math.max(0, parseFloat(slowdown.args[0]));
+            }
+            // an animation node replaces the whole animation of the blocks before it
+            for (const [name, key, fallback] of ANIMATIONS) {
+                const node = Kdl.child(block, name);
+                if (node !== undefined) {
+                    out[key] = animationText(node, fallback, "animations/" + name, warn);
+                }
+            }
+        }
         for (const block of Kdl.find(nodes, "overview")) {
             const zoom = Kdl.child(block, "zoom");
             if (zoom !== undefined && !isNaN(parseFloat(zoom.args[0]))) {
@@ -872,6 +892,68 @@ namespace NiriImport {
         return JSON.stringify([...niriRules, ...base]);
     }
 
+    // niri's animations: the setting of each is one text (src/lib/config/definition.ts, animWindowOpen and the others)
+    const ANIMATIONS: [string, string, string][] = [
+        ["window-open", "animWindowOpen", "ease-out-expo 150"],
+        ["window-close", "animWindowClose", "ease-out-quad 150"],
+        ["window-movement", "animWindowMovement", "spring 1 800 0.0001"],
+        ["window-resize", "animWindowResize", "spring 1 800 0.0001"],
+        ["horizontal-view-movement", "animHorizontalViewMovement", "spring 1 800 0.0001"],
+        ["workspace-switch", "animWorkspaceSwitch", "spring 1 1000 0.0001"],
+        ["overview-open-close", "animOverviewOpenClose", "spring 1 800 0.0001"],
+    ];
+    const CURVES = ["linear", "ease-out-quad", "ease-out-cubic", "ease-out-expo"];
+
+    function formatNumber(x: number) {
+        return String(x);
+    }
+
+    // niri-config/src/animations.rs Animation::decode_node: `off`, a `spring`, or `duration-ms` and `curve` (the missing
+    // one of the two from the animation's default easing, or 250 ms / ease-out-cubic when the default is a spring)
+    function animationText(node: Kdl.Node, fallback: string, path: string, warn: (msg: string) => void): string {
+        if (Kdl.child(node, "custom-shader") !== undefined) {
+            warn(`${path}/custom-shader: niri's custom shaders are GLSL for niri's renderer, not KWin's`);
+        }
+        const [fallbackKind, ...fallbackArgs] = fallback.split(" ");
+        const spring = Kdl.child(node, "spring");
+        const duration = Kdl.child(node, "duration-ms");
+        const curve = Kdl.child(node, "curve");
+        if (Kdl.child(node, "off") !== undefined) {
+            return "off";
+        }
+        if (spring !== undefined) {
+            const springDefault = fallbackKind === "spring" ? fallbackArgs : ["1", "800", "0.0001"];
+            const values = [["damping-ratio", 0], ["stiffness", 1], ["epsilon", 2]].map(([prop, i]) => {
+                const value = parseFloat(spring.props[prop as string] ?? "");
+                return isNaN(value) ? springDefault[i as number] : formatNumber(value);
+            });
+            return "spring " + values.join(" ");
+        }
+        if (duration === undefined && curve === undefined) {
+            return fallback;
+        }
+        const easingDefault = fallbackKind === "spring" ? ["ease-out-cubic", "250"] : [fallbackKind, ...fallbackArgs];
+        let curveName = easingDefault[0];
+        let ms = easingDefault[1];
+        let bezier: string[] = [];
+        if (duration !== undefined && !isNaN(parseFloat(duration.args[0]))) {
+            ms = formatNumber(parseFloat(duration.args[0]));
+        }
+        if (curve !== undefined) {
+            const name = curve.args[0] ?? "";
+            const points = curve.args.slice(1, 5).map(x => parseFloat(x));
+            if (CURVES.includes(name)) {
+                curveName = name;
+            } else if (name === "cubic-bezier" && points.length === 4 && !points.some(x => isNaN(x))) {
+                curveName = name;
+                bezier = points.map(formatNumber);
+            } else {
+                warn(`${path}: unknown curve ${name}, niri only has linear, ease-out-quad, ease-out-cubic, ease-out-expo and cubic-bezier with 4 numbers`);
+            }
+        }
+        return [curveName, ms, ...bezier].join(" ");
+    }
+
     // What the importer reads, by path in the config (the blocks that hold options are looked into one level down).
     // Everything else is reported as skipped, with the reason from SKIPPED_OPTIONS.
     const MAPPED_OPTIONS = new Set([
@@ -883,8 +965,11 @@ namespace NiriImport {
         "input/warp-mouse-to-focus", "input/focus-follows-mouse", "input/mod-key", "input/workspace-auto-back-and-forth", "gestures/hot-corners",
         "window-rule/match", "window-rule/exclude", "window-rule/open-floating", "window-rule/open-fullscreen",
         "window-rule/default-column-width", "window-rule/default-window-height", "window-rule/geometry-corner-radius",
+        "animations/off", "animations/on", "animations/slowdown", "animations/window-open", "animations/window-close",
+        "animations/window-movement", "animations/window-resize", "animations/horizontal-view-movement",
+        "animations/workspace-switch", "animations/overview-open-close",
     ]);
-    const LOOKED_INTO = ["layout", "input", "gestures", "window-rule", "overview", "hotkey-overlay", "debug"];
+    const LOOKED_INTO = ["layout", "input", "gestures", "window-rule", "overview", "animations", "hotkey-overlay", "debug"];
     const SKIPPED_OPTIONS: Record<string, string> = {
         "include": "KWin scripts cannot read files (tools/niri2kiri.py follows includes)",
         "output": "the display layout is Plasma's (Display settings)",
@@ -892,7 +977,6 @@ namespace NiriImport {
         "spawn-sh-at-startup": "programs start with Plasma's autostart",
         "hotkey-overlay": "Kiri shows no hotkey overlay at startup",
         "screenshot-path": "screenshots are Spectacle's",
-        "animations": "niri's animation options are not configurable yet",
         "layer-rule": "layer-shell surfaces (panels, wallpapers) are Plasma's",
         "debug": "niri debug options",
         "environment": "environment variables belong to Plasma (~/.config/plasma-workspace/env)",
@@ -914,6 +998,10 @@ namespace NiriImport {
         "overview/backdrop-color": "not configurable yet",
         "overview/workspace-shadow": "not configurable yet",
         "window-rule/clip-to-geometry": "not supported yet",
+        "animations/config-notification-open-close": "KWin scripts have no config reload notice to animate",
+        "animations/exit-confirmation-open-close": "Kiri has no exit confirmation dialog",
+        "animations/screenshot-ui-open": "the screenshot UI is Spectacle's",
+        "animations/recent-windows-close": "Alt+Tab is KWin's Task Switcher",
     };
 
     // the paths of the options in a config that the importer has to account for: the top-level nodes, and one level down

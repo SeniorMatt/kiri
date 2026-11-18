@@ -85,6 +85,9 @@ DesktopSwitchEffect::DesktopSwitchEffect()
     connect(effects, &EffectsHandler::currentActivityChanged, this, [this]() {
         m_switchingActivity = false;
     });
+    m_animWatch = NiriAnim::watch(this, [this] {
+        reconfigure(ReconfigureAll);
+    });
 }
 
 DesktopSwitchEffect::~DesktopSwitchEffect()
@@ -106,6 +109,7 @@ bool DesktopSwitchEffect::supported()
 
 void DesktopSwitchEffect::reconfigure(ReconfigureFlags)
 {
+    NiriAnim::load();
     for (DesktopSwitchScreen &slideScreen : m_slideEffectScreens) {
         slideScreen.reconfigure();
     }
@@ -117,11 +121,14 @@ void DesktopSwitchEffect::reconfigure(ReconfigureFlags)
 
 void DesktopSwitchScreen::reconfigure()
 {
-    // niri's workspace-switch animation: spring, damping-ratio 1.0, stiffness 1000, epsilon 0.0001 (in workspaces,
-    // see setEpsilon below); the animation speed setting scales time
-    const qreal factor = std::max(effects->animationTimeFactor(), 0.01);
-    const qreal springConstant = 1000.0 / (factor * factor);
-    const qreal dampingRatio = 1.0;
+    // niri's workspace-switch animation: by default a spring, damping-ratio 1.0, stiffness 1000, epsilon 0.0001 (in
+    // workspaces, see setEpsilon below); the animation speed setting and niri's slowdown scale time. (An easing or `off`
+    // does not use these, startAnimation runs it on the closed-form path.)
+    const qreal factor = std::max(NiriAnim::timeFactor(), 0.01);
+    const NiriAnim::Spec &spec = NiriAnim::config().workspaceSwitch;
+    const bool spring = spec.kind == NiriAnim::Spec::Kind::Spring;
+    const qreal springConstant = (spring ? spec.stiffness : NiriAnim::Defaults::workspaceStiffness) / (factor * factor);
+    const qreal dampingRatio = spring ? spec.damping : NiriAnim::Defaults::workspaceDamping;
 
     m_motionX = SpringMotion(springConstant, dampingRatio);
     m_motionY = SpringMotion(springConstant, dampingRatio);
@@ -417,6 +424,22 @@ void DesktopSwitchScreen::startAnimation(const QPointF &oldPos, VirtualDesktop *
     m_endPos = effects->desktopGridCoords(current);
     if (rollOverDesktops()) {
         optimizePath();
+    }
+
+    // niri's workspace-switch as an easing or `off`: the closed-form path, which runs any of niri's animations (only
+    // along the rows: with desktops side by side the switch is instant)
+    const NiriAnim::Spec &spec = NiriAnim::config().workspaceSwitch;
+    if (spec.kind != NiriAnim::Spec::Kind::Spring || NiriAnim::timeFactor() <= 0) {
+        const bool along = m_startPos.x() == m_endPos.x();
+        const double factor = std::max(NiriAnim::timeFactor(), 0.01);
+        const bool instant = spec.kind == NiriAnim::Spec::Kind::Off || !along || NiriAnim::timeFactor() <= 0;
+        m_niriSpring = instant ? NiriAnim::Anim::off(m_endPos.y(), m_endPos.y()) : spec.make(m_startPos.y(), m_endPos.y(), 0, factor);
+        m_niriElapsed = 0.0;
+        m_niriX = m_endPos.x();
+        m_niriAnim = true;
+        m_clock.reset();
+        effects->addRepaint(m_screen->geometry());
+        return;
     }
 
     const QSize virtualSpaceSize = effects->virtualScreenSize();
@@ -823,10 +846,10 @@ void DesktopSwitchScreen::startNiriAnimation(double fromRow, int toRow, double v
     if (m_state == State::Inactive) {
         prepareSwitching();
     }
-    // the animation speed setting scales time, like in reconfigure()
-    const double factor = std::max<double>(effects->animationTimeFactor(), 0.01);
-    m_niriSpring = NiriAnim::Spring(fromRow, toRow, velocity / factor, NiriAnim::Defaults::workspaceDamping,
-                                    NiriAnim::Defaults::workspaceStiffness / (factor * factor), NiriAnim::Defaults::workspaceEpsilon);
+    // the animation speed setting and niri's slowdown scale time, like in reconfigure()
+    const double factor = std::max<double>(NiriAnim::timeFactor(), 0.01);
+    const NiriAnim::Spec &spec = NiriAnim::config().workspaceSwitch;
+    m_niriSpring = spec.kind == NiriAnim::Spec::Kind::Off || NiriAnim::timeFactor() <= 0 ? NiriAnim::Anim::off(toRow, toRow) : spec.make(fromRow, toRow, velocity, factor);
     m_niriElapsed = 0.0;
     m_niriX = effects->desktopGridCoords(effects->currentDesktop(m_screen)).x();
     m_niriAnim = true;

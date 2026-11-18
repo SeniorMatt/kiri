@@ -19,6 +19,7 @@
 #include "SpringMotion.h"
 #include "input_event_spy.h"
 #include "../common/NiriSwipe.h"
+#include "../common/AnimConfig.h"
 #include "effect/timeline.h"
 
 #include <QObject>
@@ -109,7 +110,7 @@ private:
     QPointF m_endPos;
 
     QPointF m_gesturePos;
-    NiriAnim::Spring m_niriSpring;
+    NiriAnim::Anim m_niriSpring;
     bool m_niriAnim = false;
     double m_niriElapsed = 0.0; // seconds
     double m_niriX = 0.0;
@@ -211,6 +212,7 @@ private:
     bool m_swipeNatural = false;
     NiriSwipe::WorkspaceGesture::Release m_swipeRelease{};
     bool m_swipeReleasePending = false;
+    KConfigWatcher::Ptr m_animWatch; // niri's `animations` block (kwinrc [Script-kiri])
     bool m_swipePointer = false; // the swipe is a Mod+middle drag, not fingers
 
 private:

@@ -20,7 +20,7 @@
 #include <QPointF>
 #include <QSizeF>
 
-#include "NiriAnim.h"
+#include "AnimConfig.h"
 
 namespace KiriMotion
 {
@@ -29,6 +29,7 @@ struct WindowState
 {
     // move: the window is painted at its real place plus from * spring(1 -> 0), per axis
     QPointF moveFrom;
+    bool viewMove = false; // a pure horizontal move: niri's horizontal-view-movement, not window-movement
     double moveStart = 0; // seconds on the effect's clock
     bool moving = false;
 
@@ -99,6 +100,7 @@ private:
     double m_frameTime = 0;
     bool m_capturing = false;
     double m_speed = 1;
+    KConfigWatcher::Ptr m_animWatch; // niri's `animations` block (kwinrc [Script-kiri])
     KWin::EffectWindow *m_resizedWindow = nullptr; // the window the user is resizing (or was, until windowDeleted)
     double m_userResizeEnd = -1; // when the last interactive resize ended
     bool resizeSettling(double t) const;

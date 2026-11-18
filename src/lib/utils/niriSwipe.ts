@@ -3,7 +3,7 @@
 // the view's left edge in the strip of columns, where a column at screen x = p has view position col_x - p.
 
 // critically damped or not: niri's closed-form damped spring, value only depends on the time since the start
-class NiriSpring {
+class NiriSpring implements NiriAnimation {
     private readonly damping: number;
     private readonly stiffness: number;
     private readonly epsilon: number;
@@ -85,9 +85,108 @@ class NiriSpring {
     }
 }
 
-// horizontal-view-movement: spring, damping-ratio 1.0, stiffness 800, epsilon 0.0001
-function niriViewSpring(from: number, to: number, velocity: number) {
-    return new NiriSpring(from, to, velocity, 1, 800, 0.0001);
+// what the view settles with: niri's horizontal-view-movement, a spring or an easing (or nothing when it is off)
+interface NiriAnimation {
+    readonly duration: number; // seconds
+    value(t: number): number;
+}
+
+// niri's easing curves (niri-config Curve, src/animation/{mod,bezier}.rs)
+function niriCurve(name: string, points: number[]): (x: number) => number {
+    const point = (t: number, a: number, b: number) => {
+        const omt = 1 - t;
+        return 3 * omt * omt * t * a + 3 * omt * t * t * b + t * t * t;
+    };
+    switch (name) {
+    case "ease-out-quad":
+        return x => 1 - (1 - x) * (1 - x);
+    case "ease-out-cubic":
+        return x => 1 - Math.pow(1 - x, 3);
+    case "ease-out-expo":
+        return x => 1 - Math.pow(2, -10 * x);
+    case "cubic-bezier":
+        return x => {
+            if (x <= 2.220446049250313e-16) {
+                return 0;
+            }
+            if (1 - 2.220446049250313e-16 <= x) {
+                return 1;
+            }
+            let lo = 0;
+            let hi = 1;
+            for (let i = 0; i <= 30; i++) {
+                const guess = (lo + hi) / 2;
+                if (x < point(guess, points[0], points[2])) {
+                    hi = guess;
+                } else {
+                    lo = guess;
+                }
+            }
+            return point((lo + hi) / 2, points[1], points[3]);
+        };
+    }
+    return x => x;
+}
+
+class NiriEasing implements NiriAnimation {
+    public readonly duration: number;
+    private readonly curve: (x: number) => number;
+
+    constructor(private readonly from: number, private readonly to: number, ms: number, curve: string, points: number[]) {
+        this.duration = Math.max(ms, 0) / 1000;
+        this.curve = niriCurve(curve, points);
+    }
+
+    public value(t: number) {
+        if (t <= 0) {
+            return this.from;
+        }
+        if (t >= this.duration) {
+            return this.to;
+        }
+        return this.curve(t / this.duration) * (this.to - this.from) + this.from;
+    }
+}
+
+// the animation of one setting text ("off", "spring 1 800 0.0001", "ease-out-expo 150", "cubic-bezier 150 0.05 0.7 0.1 1";
+// src/lib/config/definition.ts, animWindowOpen and the others). `timeFactor` stretches time like niri's slowdown does:
+// a spring gets 1 / factor^2 of its stiffness and the velocity shrinks with it, an easing lasts factor times as long.
+// Text that is not understood leaves `fallback`.
+function niriAnimation(text: string, fallback: string, from: number, to: number, velocity: number, timeFactor = 1): NiriAnimation {
+    const parse = (value: string) => {
+        const words = value.trim().split(/\s+/);
+        return { kind: words[0], numbers: words.slice(1).map(word => parseFloat(word)) };
+    };
+    let spec = parse(text);
+    const known = (s: { kind: string, numbers: number[] }) => {
+        const valid = s.numbers.every(n => !isNaN(n));
+        return valid && (s.kind === "off" || (s.kind === "spring" && s.numbers.length === 3) ||
+            (s.kind === "cubic-bezier" && s.numbers.length === 5) ||
+            (["linear", "ease-out-quad", "ease-out-cubic", "ease-out-expo"].includes(s.kind) && s.numbers.length === 1));
+    };
+    if (!known(spec)) {
+        spec = parse(fallback);
+    }
+    const n = spec.numbers;
+    if (spec.kind === "off") {
+        return new NiriEasing(to, to, 0, "linear", []);
+    }
+    if (spec.kind === "spring") {
+        // niri's limits: damping-ratio 0.1 to 10, stiffness at least 1, epsilon 0.00001 to 0.1
+        return new NiriSpring(from, to, velocity / timeFactor, clamp(n[0], 0.1, 10), Math.max(n[1], 1) / (timeFactor * timeFactor), clamp(n[2], 0.00001, 0.1));
+    }
+    if (spec.kind === "cubic-bezier") {
+        return new NiriEasing(from, to, n[0] * timeFactor, spec.kind, [clamp(n[1], 0, 1), n[2], clamp(n[3], 0, 1), n[4]]);
+    }
+    return new NiriEasing(from, to, n[0] * timeFactor, spec.kind, []);
+}
+
+// horizontal-view-movement (a spring 1.0 / 800 / 0.0001 by default), slowed down or turned off by the animations block
+function niriViewAnimation(config: { animHorizontalViewMovement: string, animationsOff: boolean, animationsSlowdown: number }, from: number, to: number, velocity: number): NiriAnimation {
+    if (config.animationsOff) {
+        return niriAnimation("off", "off", from, to, velocity);
+    }
+    return niriAnimation(config.animHorizontalViewMovement, "spring 1 800 0.0001", from, to, velocity, Math.max(config.animationsSlowdown, 0.001));
 }
 
 namespace NiriSnap {

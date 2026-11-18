@@ -14,7 +14,7 @@ class World {
     private gestureDesktop: Desktop|null = null;
     private gestureRawId: number|undefined = undefined;
     private gestureVisualId: number|undefined = undefined;
-    private gestureAnimation: { from: number, to: number, start: number, spring: NiriSpring|null, visual?: boolean } | null = null;
+    private gestureAnimation: { from: number, to: number, start: number, spring: NiriAnimation|null, visual?: boolean } | null = null;
     private readonly gestureSettleDuration: number;
     private readonly gestureDesktopSwitch: boolean;
     private readonly closeRelayoutDelayer: Delayer;
@@ -30,8 +30,11 @@ class World {
 
     // `keyBindings` and `layout` are given when Kiri reloads its settings: the shortcuts stay registered
     // and the windows are put back into the columns they were in.
+    private readonly viewAnimationConfig: { animHorizontalViewMovement: string, animationsOff: boolean, animationsSlowdown: number };
+
     constructor(config: Config, keyBindings: KeyBindings | null = null, layout: World.Layout | null = null) {
         setCursorWarpConfig(config);
+        this.viewAnimationConfig = config;
         this.shortcutKeys = config.shortcutKeys;
         const focusPasser = new FocusPassing.Passer();
         this.focusPasser = focusPasser;
@@ -711,7 +714,7 @@ class World {
             // niri moves the focus when the fingers are lifted, not when the settle ends
             this.gestureFocusTarget(desktop);
         }
-        this.gestureAnimation = { from: from, to: to, start: Date.now(), spring: raw !== null ? niriViewSpring(from, to, raw.velocity) : null, visual: visual };
+        this.gestureAnimation = { from: from, to: to, start: Date.now(), spring: raw !== null ? niriViewAnimation(this.viewAnimationConfig, from, to, raw.velocity) : null, visual: visual };
         this.gestureAnimationTimer.start();
     }
 

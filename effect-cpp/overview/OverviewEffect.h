@@ -10,7 +10,7 @@
 */
 #pragma once
 
-#include "NiriAnim.h"
+#include "AnimConfig.h"
 #include "NiriSwipe.h"
 #include "effect/effectwindow.h"
 #include "effect/quickeffect.h"
@@ -135,7 +135,7 @@ Q_SIGNALS:
 private:
     struct Scroll
     {
-        NiriAnim::Spring spring;
+        NiriAnim::Anim spring;
         qint64 start = 0; // ms
         bool animating = false;
         double target = 0;
@@ -190,13 +190,13 @@ private:
     bool m_gesture = false;
 
     double m_progress = 0;
-    NiriAnim::Spring m_progressSpring;
+    NiriAnim::Anim m_progressSpring;
     qint64 m_progressStart = 0;
     bool m_progressAnimating = false;
 
     double m_wsIndex = 0;
     double m_wsTarget = 0;
-    NiriAnim::Spring m_wsSpring;
+    NiriAnim::Anim m_wsSpring;
     qint64 m_wsStart = 0;
     bool m_wsAnimating = false;
     int m_desktopCount = 0;

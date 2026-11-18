@@ -68,6 +68,7 @@ private:
 SwipeEffect::SwipeEffect()
 {
     QDBusConnection::sessionBus().registerObject(QStringLiteral("/KiriSwipe"), this, QDBusConnection::ExportScriptableSlots);
+    m_animWatch = NiriAnim::watch(this);
     input()->installInputEventSpy(this);
     m_filter = std::make_unique<PointerFilter>(this);
     input()->installInputEventFilter(m_filter.get());
@@ -86,6 +87,11 @@ SwipeEffect::~SwipeEffect()
     input()->uninstallInputEventSpy(this);
     input()->uninstallInputEventFilter(m_filter.get());
     QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/KiriSwipe"));
+}
+
+void SwipeEffect::reconfigure(ReconfigureFlags)
+{
+    NiriAnim::load(); // niri's `animations` block
 }
 
 bool SwipeEffect::supported()
@@ -385,7 +391,12 @@ bool SwipeEffect::command(const QString &json)
             m_sEnd = shift();
         }
         qCDebug(KIRI_SWIPE) << "release" << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-        m_spring = NiriAnim::Spring(from, to, o.value(QStringLiteral("v")).toDouble(), 1.0, 800.0, 0.0001);
+        // niri's horizontal-view-movement (a spring 1.0 / 800 / 0.0001 by default), slowed down or off like niri's clock says
+        const double scale = NiriAnim::config().timeScale();
+        m_spring = NiriAnim::config().horizontalViewMovement.make(from, to, o.value(QStringLiteral("v")).toDouble(), scale > 0 ? 1.0 / scale : 1.0);
+        if (scale <= 0) {
+            m_spring = NiriAnim::Anim::off(to, to);
+        }
         m_springFrom = from;
         m_since = m_frameTime = nowSeconds();
         m_visual = Visual::Settle;

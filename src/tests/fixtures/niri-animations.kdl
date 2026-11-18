@@ -1,0 +1,47 @@
+// niri's animations block in all its forms: tools/niri2kiri.py and src/lib/niri/import.ts must read it the same way
+animations {
+    slowdown 2.5
+    workspace-switch {
+        spring damping-ratio=0.8 stiffness=900 epsilon=0.00005
+    }
+    window-open {
+        duration-ms 300
+    }
+    window-close {
+        duration-ms 120
+        curve "cubic-bezier" 0.05 0.7 0.1 1
+    }
+    horizontal-view-movement {
+        duration-ms 250
+    }
+    window-movement {
+        off
+    }
+    window-resize {
+        curve "linear"
+        duration-ms 180
+        custom-shader "// glsl"
+    }
+    config-notification-open-close {
+        spring damping-ratio=0.6 stiffness=1000 epsilon=0.001
+    }
+    exit-confirmation-open-close {
+        off
+    }
+    screenshot-ui-open {
+        duration-ms 200
+        curve "ease-out-quad"
+    }
+    recent-windows-close {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.001
+    }
+    overview-open-close {
+        spring damping-ratio=1.0 stiffness=700 epsilon=0.0001
+    }
+}
+animations {
+    off
+    window-close {
+        curve "ease-out-cubic"
+    }
+}

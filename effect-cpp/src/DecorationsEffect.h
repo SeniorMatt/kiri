@@ -24,7 +24,7 @@
 #include <KConfigWatcher>
 #include <chrono>
 
-#include "NiriAnim.h"
+#include "AnimConfig.h"
 
 #include <memory>
 

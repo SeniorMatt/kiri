@@ -29,11 +29,19 @@ namespace KWin
 
 namespace
 {
-// niri animations.overview-open-close: spring 1.0 / 800 / 0.0001; workspace-switch 1.0 / 1000 / 0.0001;
-// horizontal-view-movement 1.0 / 800 / 0.0001
-NiriAnim::Spring makeSpring(double from, double to, double velocity, double stiffness)
+// niri's animations: overview-open-close (the progress), workspace-switch (the desktops), horizontal-view-movement
+// (the view of a desktop); the defaults are springs 1.0 / 800, 1.0 / 1000 and 1.0 / 800, all with epsilon 0.0001
+NiriAnim::Anim makeProgress(double from, double to, double velocity)
 {
-    return NiriAnim::Spring(from, to, velocity, 1.0, stiffness, 0.0001);
+    return NiriAnim::config().overviewOpenClose.make(from, to, velocity);
+}
+NiriAnim::Anim makeWorkspace(double from, double to, double velocity)
+{
+    return NiriAnim::config().workspaceSwitch.make(from, to, velocity);
+}
+NiriAnim::Anim makeView(double from, double to, double velocity)
+{
+    return NiriAnim::config().horizontalViewMovement.make(from, to, velocity);
 }
 
 QString jsonString(const QJsonObject &object)
@@ -59,10 +67,12 @@ OverviewEffect::OverviewEffect()
         m_visibleRefs.erase(w);
     });
     loadHotCorner();
+    NiriAnim::load();
     m_watcher = KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("kwinrc")));
     connect(m_watcher.data(), &KConfigWatcher::configChanged, this, [this](const KConfigGroup &group) {
         if (group.name() == QLatin1String("Script-kiri") || group.name() == QLatin1String("Plugins")) {
             loadHotCorner();
+            NiriAnim::load();
         }
     });
     connect(effects, &EffectsHandler::mouseChanged, this, &OverviewEffect::pointerMoved);
@@ -242,7 +252,7 @@ double OverviewEffect::progressVelocity() const
 
 void OverviewEffect::startProgress(double to, double velocity)
 {
-    m_progressSpring = makeSpring(m_progress, to, velocity, 800);
+    m_progressSpring = makeProgress(m_progress, to, velocity);
     m_progressStart = m_anim;
     m_progressAnimating = true;
     effects->addRepaintFull();
@@ -251,7 +261,7 @@ void OverviewEffect::startProgress(double to, double velocity)
 void OverviewEffect::startWorkspace(double to)
 {
     m_wsTarget = to;
-    m_wsSpring = makeSpring(m_wsIndex, to, 0, 1000);
+    m_wsSpring = makeWorkspace(m_wsIndex, to, 0);
     m_wsStart = m_anim;
     m_wsAnimating = true;
     effects->addRepaintFull();
@@ -261,7 +271,7 @@ void OverviewEffect::startWorkspace(double to)
 // ("instant" jumps to the end)
 double OverviewEffect::seconds(qint64 start) const
 {
-    const double factor = effects->animationTimeFactor();
+    const double factor = NiriAnim::timeFactor();
     const double speed = factor > 0 ? 1.0 / factor : 1e6;
     return (m_anim - start) / 1000.0 * speed;
 }
@@ -323,7 +333,7 @@ bool OverviewEffect::tick()
     for (auto it = m_scrolls.begin(); it != m_scrolls.end(); ++it) {
         Scroll &sc = it.value();
         if (!sc.animating && t >= sc.localUntil && std::abs(sc.shown - sc.target) > 0.5) {
-            sc.spring = makeSpring(sc.shown, sc.target, 0, 800);
+            sc.spring = makeView(sc.shown, sc.target, 0);
             sc.start = m_anim;
             sc.animating = true;
         }
@@ -481,7 +491,7 @@ void OverviewEffect::applyLayout(const QString &layout)
         } else if (std::abs(scroll - it->target) > 0.5) {
             it->target = scroll;
             if (t >= it->localUntil) {
-                it->spring = makeSpring(it->shown, scroll, 0, 800);
+                it->spring = makeView(it->shown, scroll, 0);
                 it->start = m_anim;
                 it->animating = true;
             }
@@ -888,7 +898,7 @@ void OverviewEffect::endTouchpadScroll()
     velocity *= band.clampDerivative(0, hi, m_swipeStart + currentPos);
     const int target = int(std::lround(end));
     m_wsTarget = target;
-    m_wsSpring = makeSpring(m_wsIndex, target, velocity, 1000);
+    m_wsSpring = makeWorkspace(m_wsIndex, target, velocity);
     m_wsStart = m_anim;
     m_wsAnimating = true;
     queue(jsonString({{"t", "goto"}, {"i", target}}));

@@ -44,6 +44,11 @@ static bool overviewUp()
 
 Effect::Effect()
 {
+    m_animWatch = NiriAnim::watch(this, [this] {
+        qCDebug(KIRI_MOTION) << "animations settings changed";
+        reconfigure(ReconfigureAll);
+        KWin::effects->addRepaintFull();
+    });
     reconfigure(ReconfigureAll);
     connect(KWin::effects, &KWin::EffectsHandler::windowAdded, this, &Effect::onAdded);
     connect(KWin::effects, &KWin::EffectsHandler::windowClosed, this, &Effect::onClosed);
@@ -84,8 +89,9 @@ bool Effect::supported()
 
 void Effect::reconfigure(ReconfigureFlags)
 {
-    // the global animation speed setting scales niri's times; "instant" turns the animations off
-    const double factor = KWin::effects->animationTimeFactor();
+    // the global animation speed setting and niri's slowdown scale niri's times; "instant" and `off` turn the animations off
+    NiriAnim::load(); // KWin calls this when kwinrc changes (and on `qdbus org.kde.KWin /KWin reconfigure`)
+    const double factor = NiriAnim::timeFactor();
     m_speed = factor > 0 ? 1.0 / factor : 0;
     qCDebug(KIRI_MOTION) << "animation time factor" << factor;
 }
@@ -269,7 +275,7 @@ void Effect::onAdded(KWin::EffectWindow *w)
         KWin::effects->addRepaintFull(); // the old picture goes at once
         return;
     }
-    if (m_speed <= 0 || !animatable(w) || !w->isVisible() || KWin::effects->activeFullScreenEffect()) {
+    if (m_speed <= 0 || NiriAnim::openAnim().isOff() || !animatable(w) || !w->isVisible() || KWin::effects->activeFullScreenEffect()) {
         return;
     }
     if (w->data(KWin::WindowAddedGrabRole).value<void *>()) {
@@ -291,7 +297,7 @@ void Effect::onClosed(KWin::EffectWindow *w)
     WindowState &s = *it;
     // a window that was opening is just closed
     s.openStart = -1;
-    if (m_speed <= 0 || !animatable(w) || !w->isVisible() || w->skipsCloseAnimation() || KWin::effects->activeFullScreenEffect()
+    if (m_speed <= 0 || NiriAnim::closeAnim().isOff() || !animatable(w) || !w->isVisible() || w->skipsCloseAnimation() || KWin::effects->activeFullScreenEffect()
         || w->data(KWin::WindowClosedGrabRole).value<void *>()) {
         stopWindow(w, s);
         s.itemEffect.reset();
@@ -319,7 +325,7 @@ QPointF Effect::moveOffset(const WindowState &s, double t) const
     if (!s.moving) {
         return QPointF();
     }
-    const double k = NiriAnim::moveSpring().value((t - s.moveStart) * m_speed);
+    const double k = (s.viewMove ? NiriAnim::viewMoveSpring() : NiriAnim::moveSpring()).value((t - s.moveStart) * m_speed);
     return s.moveFrom * k;
 }
 
@@ -393,8 +399,14 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
 
     // move: niri's animate_move_from: the new offset is the jump of the layout position plus what is left of the old offset
     const QPointF newOffset = old.topLeft() - frame.topLeft() + offset;
-    if (std::fabs(newOffset.x()) >= 0.5 || std::fabs(newOffset.y()) >= 0.5) {
+    // a move that is only horizontal and keeps the size is the view moving (or a column shifting with it): niri's
+    // horizontal-view-movement; any other is window-movement. The windows of a layout change that only slides columns
+    // cannot be told from a scroll here, so they use the first one too.
+    const bool horizontalOnly = std::fabs(old.y() - frame.y()) < 0.5 && old.size() == frame.size();
+    const NiriAnim::Anim &moveAnim = horizontalOnly ? NiriAnim::viewMoveSpring() : NiriAnim::moveSpring();
+    if ((std::fabs(newOffset.x()) >= 0.5 || std::fabs(newOffset.y()) >= 0.5) && !moveAnim.isOff()) {
         s.moving = true;
+        s.viewMove = horizontalOnly;
         s.moveFrom = newOffset;
         s.moveStart = t;
     } else {
@@ -409,7 +421,7 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
             unredirect(w);
             s.snapshot = false;
         }
-    } else if (change > ResizeThreshold) {
+    } else if (change > ResizeThreshold && !NiriAnim::resizeSpring().isOff()) {
         if (!s.snapshot) {
             takeSnapshot(w, s); // no request was seen: this is as good as it gets (the new buffer may already be in)
         }
@@ -473,13 +485,14 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
     // window-close: scale ((1 - progress) / 5 + 0.8) around the centre and fade out, 150 ms ease-out-quad
     double zoom = 1;
     if (s.closeStart >= 0) {
-        const double p = NiriAnim::easeOutQuad(std::clamp((t - s.closeStart) * m_speed / (NiriAnim::Defaults::closeMs / 1000), 0.0, 1.0));
+        const double passed = (t - s.closeStart) * m_speed;
+        const double p = std::clamp(NiriAnim::closeAnim().clampedValue(passed), 0.0, 1.0); // niri: clamped_progress
         opacity = 1 - p;
         zoom = std::max((1 - p) / 5 + 0.8, 0.0);
     } else if (s.openStart >= 0) {
-        const double p = NiriAnim::easeOutExpo(std::clamp((t - s.openStart) * m_speed / (NiriAnim::Defaults::openMs / 1000), 0.0, 1.0));
-        opacity = std::clamp(p, 0.0, 1.0);
-        zoom = std::max(p / 2 + 0.5, 0.0);
+        const double passed = (t - s.openStart) * m_speed;
+        opacity = std::clamp(NiriAnim::openAnim().clampedValue(passed), 0.0, 1.0);
+        zoom = std::max(NiriAnim::openAnim().value(passed) / 2 + 0.5, 0.0);
     }
     if (zoom != 1) {
         x += width * (1 - zoom) / 2;
@@ -507,7 +520,7 @@ void Effect::postPaintScreen()
     for (auto it = m_windows.begin(); it != m_windows.end();) {
         WindowState &s = *it;
         KWin::EffectWindow *w = it.key();
-        if (s.moving && (t - s.moveStart) * m_speed >= NiriAnim::moveSpring().duration()) {
+        if (s.moving && (t - s.moveStart) * m_speed >= (s.viewMove ? NiriAnim::viewMoveSpring() : NiriAnim::moveSpring()).duration()) {
             s.moving = false;
             again = true; // one more frame with the window exactly in place
         }
@@ -526,7 +539,7 @@ void Effect::postPaintScreen()
             s.snapshot = false;
             again = true;
         }
-        if (s.openStart >= 0 && (t - s.openStart) * m_speed >= NiriAnim::Defaults::openMs / 1000) {
+        if (s.openStart >= 0 && (t - s.openStart) * m_speed >= NiriAnim::openAnim().duration()) {
             s.openStart = -1;
             if (s.closeStart < 0) {
                 s.itemEffect.reset();
@@ -534,7 +547,7 @@ void Effect::postPaintScreen()
             w->setData(KWin::WindowAddedGrabRole, QVariant());
             again = true;
         }
-        if (s.closeStart >= 0 && (t - s.closeStart) * m_speed >= NiriAnim::Defaults::closeMs / 1000) {
+        if (s.closeStart >= 0 && (t - s.closeStart) * m_speed >= NiriAnim::closeAnim().duration()) {
             s.closeStart = -1;
             s.itemEffect.reset();
             w->setData(KWin::WindowClosedGrabRole, QVariant());

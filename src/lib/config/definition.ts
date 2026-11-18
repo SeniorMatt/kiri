@@ -449,6 +449,54 @@ const configDef = [
         type: "UInt",
         default: 0,
     },
+    // niri's `animations` block. Every animation is one text: "off", "spring <damping-ratio> <stiffness> <epsilon>",
+    // "<linear|ease-out-quad|ease-out-cubic|ease-out-expo> <duration-ms>" or "cubic-bezier <duration-ms> <x1> <y1> <x2> <y2>".
+    // The compiled effects read them from kwinrc ([Script-kiri]); defaults are niri's.
+    {
+        name: "animationsOff",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "animationsSlowdown",
+        type: "Double",
+        default: 1.0,
+    },
+    {
+        name: "animWindowOpen",
+        type: "String",
+        default: "ease-out-expo 150",
+    },
+    {
+        name: "animWindowClose",
+        type: "String",
+        default: "ease-out-quad 150",
+    },
+    {
+        name: "animWindowMovement",
+        type: "String",
+        default: "spring 1 800 0.0001",
+    },
+    {
+        name: "animWindowResize",
+        type: "String",
+        default: "spring 1 800 0.0001",
+    },
+    {
+        name: "animHorizontalViewMovement",
+        type: "String",
+        default: "spring 1 800 0.0001",
+    },
+    {
+        name: "animWorkspaceSwitch",
+        type: "String",
+        default: "spring 1 1000 0.0001",
+    },
+    {
+        name: "animOverviewOpenClose",
+        type: "String",
+        default: "spring 1 800 0.0001",
+    },
     {
         name: "tiledKeepBelow",
         type: "Bool",
