@@ -47,13 +47,15 @@ if [ -z "$qdbus" ]; then
     done
 fi
 # where Qt (and so KWin) looks for plugins (differs per distro)
-plugindir=
-for c in qtpaths6 qtpaths-qt6 qmake6 qmake-qt6 qtpaths qmake; do
-    command -v "$c" >/dev/null 2>&1 || continue
-    plugindir=$("$c" --query QT_INSTALL_PLUGINS 2>/dev/null || "$c" -query QT_INSTALL_PLUGINS 2>/dev/null) || plugindir=
-    [ -d "$plugindir" ] && break
-    plugindir=
-done
+qt_plugins() {
+    for c in qtpaths6 qtpaths-qt6 qmake6 qmake-qt6 qtpaths qmake; do
+        command -v "$c" >/dev/null 2>&1 || continue
+        d=$("$c" -query QT_INSTALL_PLUGINS 2>/dev/null) || d=
+        [ -d "$d" ] || d=$("$c" --query QT_INSTALL_PLUGINS 2>/dev/null) || d=
+        [ -d "$d" ] && { echo "$d"; return; }
+    done
+}
+plugindir=$(qt_plugins)
 q() { "${qdbus:-false}" "$@" >/dev/null 2>&1 || true; }
 w() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" "$3"; }
 d() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" --delete; }

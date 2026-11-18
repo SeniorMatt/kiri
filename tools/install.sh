@@ -30,16 +30,18 @@ if [ -z "$qdbus" ]; then
         [ -x "$c" ] && { qdbus=$c; break; }
     done
 fi
-qdbus6() { if [ -n "$qdbus" ]; then "$qdbus" "$@"; else return 127; fi; }
+qd() { if [ -n "$qdbus" ]; then "$qdbus" "$@"; else return 127; fi; }
 
 # where Qt (and so KWin) looks for plugins: /usr/lib/qt6/plugins, /usr/lib64/qt6/plugins, /usr/lib/x86_64-linux-gnu/qt6/plugins ...
-plugindir=
-for c in qtpaths6 qtpaths-qt6 qmake6 qmake-qt6 qtpaths qmake; do
-    command -v "$c" >/dev/null 2>&1 || continue
-    plugindir=$("$c" --query QT_INSTALL_PLUGINS 2>/dev/null || "$c" -query QT_INSTALL_PLUGINS 2>/dev/null) || plugindir=
-    [ -d "$plugindir" ] && break
-    plugindir=
-done
+qt_plugins() {
+    for c in qtpaths6 qtpaths-qt6 qmake6 qmake-qt6 qtpaths qmake; do
+        command -v "$c" >/dev/null 2>&1 || continue
+        d=$("$c" -query QT_INSTALL_PLUGINS 2>/dev/null) || d=
+        [ -d "$d" ] || d=$("$c" --query QT_INSTALL_PLUGINS 2>/dev/null) || d=
+        [ -d "$d" ] && { echo "$d"; return; }
+    done
+}
+plugindir=$(qt_plugins)
 if [ -z "$plugindir" ]; then
     for c in /usr/lib*/qt6/plugins /usr/lib/*/qt6/plugins; do
         [ -d "$c/kwin" ] && { plugindir=$c; break; }
@@ -55,14 +57,24 @@ dep_hint() {
         *" arch "*|*" cachyos "*|*" manjaro "*|*" endeavouros "*)
             echo "sudo pacman -S --needed base-devel cmake extra-cmake-modules kwin libepoxy qt6-base qt6-tools kconfig kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers" ;;
         *" fedora "*|*" rhel "*)
-            echo "sudo dnf install cmake gcc-c++ make extra-cmake-modules kwin-devel kdecoration-devel kf6-kconfig-devel kf6-kcoreaddons-devel libepoxy-devel qt6-qtbase-devel qt6-qttools kf6-kpackage" ;;
+            echo "sudo dnf install cmake gcc-c++ make extra-cmake-modules kwin-devel kdecoration-devel kf6-kconfig-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel qt6-qtbase-devel qt6-qttools kf6-kpackage" ;;
         *" suse "*|*" opensuse "*|*" opensuse-tumbleweed "*)
-            echo "sudo zypper install cmake gcc-c++ make kwin6-devel kdecoration-devel extra-cmake-modules kf6-kconfig-devel kf6-kcoreaddons-devel libepoxy-devel qt6-base-devel qt6-tools kf6-kpackage-devel" ;;
+            echo "sudo zypper install cmake gcc-c++ make kf6-extra-cmake-modules kwin6-devel kdecoration6-devel kf6-kconfig-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel qt6-base-devel qt6-declarative-devel kf6-kwindowsystem-devel qt6-tools-qdbus kf6-kpackage kwin6" ;;
         *" debian "*|*" ubuntu "*|*" neon "*)
-            echo "sudo apt install build-essential cmake extra-cmake-modules kwin-dev libkdecorations3-dev libkf6config-dev libkf6coreaddons-dev libepoxy-dev qt6-base-dev qt6-tools-dev-tools qt6-base-private-dev kf6-kpackage-bin" ;;
+            echo "sudo apt install build-essential cmake extra-cmake-modules kwin-dev libkdecorations3-dev libkf6config-dev libkf6coreaddons-dev libepoxy-dev libdrm-dev pkgconf qt6-base-dev kpackagetool6 qdbus-qt6" ;;
         *) echo "install cmake, a C++ compiler, extra-cmake-modules, the KWin and KDecoration development packages, KF6 Config and CoreAddons, libepoxy and Qt6 base development files" ;;
     esac
 }
+
+# the effects use KWin 6.8 API (6.7.90 is the 6.8 beta); an older KWin keeps the script and the script effect
+kwinver=
+for c in /usr/lib*/cmake/KWin/KWinConfigVersion.cmake /usr/lib/*/cmake/KWin/KWinConfigVersion.cmake; do
+    [ -f "$c" ] && { kwinver=$(sed -n 's/^set(PACKAGE_VERSION "\(.*\)")/\1/p' "$c" | head -1); break; }
+done
+if [ -n "$kwinver" ] && [ "$(printf '%s\n6.7.90\n' "$kwinver" | sort -V | head -1)" != 6.7.90 ]; then
+    echo "KWin $kwinver is older than 6.7.90 (Plasma 6.8): skipping the compiled effects; Kiri draws its rings itself." >&2
+    build=false
+fi
 
 # ---- the compiled effects ----------------------------------------------------------------------------
 compiled=false
@@ -78,10 +90,7 @@ if $build && [ -d "$cpp" ]; then
         if command -v pacman >/dev/null 2>&1; then
             echo "Installing build tools and KWin headers (sudo pacman -S --needed) ..."
             $SUDO pacman -S --needed --noconfirm base-devel cmake extra-cmake-modules kwin libepoxy qt6-base qt6-tools kconfig kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers
-            # qt6-tools brings qtpaths6
-            for c in qtpaths6 qmake6; do
-                command -v $c >/dev/null 2>&1 && [ -z "$plugindir" ] && plugindir=$($c --query QT_INSTALL_PLUGINS 2>/dev/null || $c -query QT_INSTALL_PLUGINS)
-            done
+            plugindir=$(qt_plugins)
             effectdir=$plugindir/kwin/effects/plugins
         else
             echo "Missing:$missing. Skipping the compiled effects; to build them, run" >&2
@@ -99,7 +108,7 @@ if $build && [ -d "$cpp" ]; then
         cmake --build "$builddir" -j "$(nproc)" >>"$builddir/log.txt" 2>&1; then
         # let KWin let go of the old plugins before replacing the files
         for e in kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
-            qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
+            qd org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
         done
         # remove first: a new file instead of overwriting one KWin may have mapped
         for f in $(find "$effectdir" -name 'kiri_*.so' 2>/dev/null); do
@@ -201,13 +210,13 @@ command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 --noincremental >/dev/
 
 # ---- start in Kiri mode (settings and effects switch at runtime where KWin allows it) ----------------------------
 applied=false
-if qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1; then
+if qd org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1; then
     applied=true
     for e in kiri_animations kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview; do
-        qdbus6 org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
+        qd org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
     done
     # a new version of the script: stop the running one, kiri-mode starts it again
-    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript kiri >/dev/null 2>&1 || true
+    qd org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript kiri >/dev/null 2>&1 || true
     "$bin/kiri-mode" kiri || true
 else
     w Plugins kiriEnabled true
@@ -235,13 +244,13 @@ if $applied; then
     exit 0
 fi
 echo "Done. Log out and log back in to finish."
-if [ -r /dev/tty ]; then
+if [ -r /dev/tty ] && (: </dev/tty) 2>/dev/null; then
     printf 'Log out now? [y/N] '
     read -r answer </dev/tty || answer=
     case $answer in
         [yY]*)
-            qdbus6 org.kde.Shutdown /Shutdown org.kde.Shutdown.logout >/dev/null 2>&1 ||
-                qdbus6 org.kde.ksmserver /KSMServer org.kde.KSMServerInterface.logout 0 0 0 >/dev/null 2>&1 ||
+            qd org.kde.Shutdown /Shutdown org.kde.Shutdown.logout >/dev/null 2>&1 ||
+                qd org.kde.ksmserver /KSMServer org.kde.KSMServerInterface.logout 0 0 0 >/dev/null 2>&1 ||
                 echo "Couldn't log out automatically; please log out yourself." >&2
             ;;
     esac

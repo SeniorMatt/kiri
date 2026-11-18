@@ -18,9 +18,14 @@ Already on niri? `./niri2kiri.py ~/.config/niri/config.kdl --apply`
 
 ## Dependencies
 
-KDE Plasma 6.8 or newer. `install.sh` builds the effects against your KWin, so it needs cmake, extra-cmake-modules,
-a C++ compiler, libepoxy and the KWin, Qt 6 and KF6 development headers. On Arch it installs them itself.
-Run it again after KWin updates.
+KDE Plasma 6.8 or newer (KWin 6.7.90+; Kubuntu 24.04 and 26.10 are too old). `install.sh` builds the effects against
+your KWin and installs the packages itself on Arch and CachyOS; elsewhere it prints the line to run:
+
+- Fedora: `sudo dnf install cmake gcc-c++ make extra-cmake-modules kwin-devel kdecoration-devel kf6-kconfig-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel qt6-qtbase-devel qt6-qttools kf6-kpackage`
+- openSUSE: `sudo zypper install cmake gcc-c++ make kf6-extra-cmake-modules kwin6-devel kdecoration6-devel kf6-kconfig-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel qt6-base-devel qt6-declarative-devel kf6-kwindowsystem-devel qt6-tools-qdbus kf6-kpackage kwin6`
+- KDE neon: `sudo apt install build-essential cmake extra-cmake-modules kwin-dev libkdecorations3-dev libkf6config-dev libkf6coreaddons-dev libepoxy-dev libdrm-dev pkgconf qt6-base-dev kpackagetool6 qdbus-qt6`
+
+Run `install.sh` again after KWin updates.
 
 ## Limitations
 
