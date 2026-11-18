@@ -13,6 +13,7 @@
 
 // own
 #include "DesktopSwitchEffect.h"
+#include "../common/PointerGrab.h"
 #include "core/output.h"
 #include "core/renderviewport.h"
 #include "effect/effecthandler.h"
@@ -846,6 +847,7 @@ void DesktopSwitchEffect::swipeGestureBegin(PointerSwipeGestureBeginEvent *event
         swipeApplyRelease(); // the previous swipe was released a moment ago
     }
     m_swipeCumulative = QPointF();
+    m_swipePointer = false;
     const TouchpadConfig config = TouchpadConfig::read();
     m_swipeNatural = config.natural;
     const bool column = effects->desktopGridWidth() == 1 && effects->desktopGridHeight() > 1;
@@ -883,6 +885,63 @@ void DesktopSwitchEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *eve
     // niri: fingers down is the next workspace, and the delta is inverted with natural scrolling (fingers up)
     const double idx = m_swipeGesture.update(m_swipeNatural ? -uy : uy, ms);
     swipeUpdateScreen(idx);
+}
+
+// ---- niri's Mod+middle drag (SpatialMovementGrab): the vertical part, see ../common/PointerGrab.h
+
+void DesktopSwitchEffect::pointerButton(PointerButtonEvent *event)
+{
+    if (event->button != Qt::MiddleButton) {
+        return;
+    }
+    if (event->state == PointerButtonState::Pressed) {
+        if (m_swipePointer || !PointerGrab::mayStart(event->modifiers)) {
+            return;
+        }
+        if (m_swipeReleasePending) {
+            swipeApplyRelease();
+        }
+        const bool column = effects->desktopGridWidth() == 1 && effects->desktopGridHeight() > 1;
+        m_swipeCumulative = QPointF();
+        m_swipeNatural = false;
+        m_swipePointer = true;
+        m_swipePhase = column ? SwipePhase::Pending : SwipePhase::Idle;
+    } else if (m_swipePointer && event->buttons == Qt::NoButton) {
+        m_swipePointer = false;
+        swipeFinish(event->timestamp);
+    }
+}
+
+void DesktopSwitchEffect::pointerMotion(PointerMotionEvent *event)
+{
+    if (!m_swipePointer || m_swipePhase == SwipePhase::Idle || m_swipePhase == SwipePhase::Other) {
+        return;
+    }
+    const double ms = event->timestamp.count() / 1000.0;
+    const QPointF delta = event->delta;
+    if (m_swipePhase == SwipePhase::Pending) {
+        m_swipeCumulative += delta;
+        if (m_swipeCumulative.x() * m_swipeCumulative.x() + m_swipeCumulative.y() * m_swipeCumulative.y() < PointerGrab::AxisLockDistance * PointerGrab::AxisLockDistance) {
+            return;
+        }
+        if (std::abs(m_swipeCumulative.x()) > std::abs(m_swipeCumulative.y())) {
+            m_swipePhase = SwipePhase::Other; // the view scroll is kiri_swipe's
+            return;
+        }
+        m_swipePhase = SwipePhase::Vertical;
+        LogicalOutput *output = effects->activeScreen();
+        const int row = effects->desktopGridCoords(effects->currentDesktop(output)).y();
+        double current = row;
+        if (DesktopSwitchScreen *screen = getDesktopSwitchScreen(output); screen && screen->isActive()) {
+            current = screen->visualPosition().y();
+        }
+        m_swipeCenter = row;
+        m_swipeGesture.begin(row, current, effects->desktopGridHeight(), output->geometry().height());
+        // niri passes the travel since the press, negated: dragging down shows the desktop above
+        swipeUpdateScreen(m_swipeGesture.update(-m_swipeCumulative.y(), ms));
+        return;
+    }
+    swipeUpdateScreen(m_swipeGesture.update(-delta.y(), ms));
 }
 
 void DesktopSwitchEffect::swipeUpdateScreen(double row)

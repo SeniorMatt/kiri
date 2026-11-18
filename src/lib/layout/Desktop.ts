@@ -12,6 +12,7 @@ class Desktop {
     private gestureRight = true;
     // raw-swipe mode (compiled effect kiri_swipe): finger travel in units, like niri's SwipeTracker
     private gestureRaw = false;
+    private gestureRawPointer = false; // a Mod+middle drag of the pointer: 1:1 in pixels, niri's non-touchpad view gesture
     private gestureRawPos = 0;
     private gestureTargetColumn: Column|null = null;
     private gestureRawHistory: { delta: number, time: number }[] = [];
@@ -259,7 +260,7 @@ class Desktop {
 
     // niri's view_offset_gesture_update for a touchpad: the view moves working_width / 1200 per unit of finger
     // travel, with no cap, and follows the fingers past the ends
-    public gestureRawUpdate(delta: number, time: number, startOffset = 0) {
+    public gestureRawUpdate(delta: number, time: number, startOffset = 0, pointer = false) {
         if (!this.config.gestureScroll) {
             return;
         }
@@ -267,6 +268,7 @@ class Desktop {
             // the view starts where it is painted: the compiled effect may still show a settle that the layout is ahead of
             this.gestureScrollXInitial = this.scrollX + startOffset;
             this.gestureRaw = true;
+            this.gestureRawPointer = pointer;
             this.gestureTargetColumn = null;
             this.gestureRawPos = 0;
             this.gestureRawHistory = [];
@@ -293,6 +295,9 @@ class Desktop {
 
     // scroll pixels per unit of finger travel, signed by the invert setting
     private getRawScale() {
+        if (this.gestureRawPointer) {
+            return 1; // niri: norm_factor 1 for the pointer, the delta is in pixels
+        }
         return (this.config.gestureScrollInvert ? -1 : 1) * this.getWorkingWidth() / Desktop.RAW_WORKING_AREA_MOVEMENT;
     }
 

@@ -558,7 +558,7 @@ class World {
     // Raw swipe from the compiled effect kiri_swipe (the JSON of its poll()): the uncapped finger travel of a
     // 3-finger horizontal swipe, with timestamps. KWin's own progress (capped at 200 units) is ignored then.
     public gestureRaw(json: string) {
-        let swipe: { id?: number, phase: string, end: boolean, ev: number[][], f?: number, d0?: number };
+        let swipe: { id?: number, phase: string, end: boolean, ev: number[][], f?: number, d0?: number, ptr?: boolean };
         try {
             swipe = JSON.parse(json);
         } catch (error: any) {
@@ -591,7 +591,7 @@ class World {
                 if (currentDesktop !== undefined) {
                     this.gestureDesktop = currentDesktop;
                     for (const event of swipe.ev) {
-                        currentDesktop.gestureRawUpdate(event[1], event[0], swipe.d0 === undefined ? 0 : swipe.d0);
+                        currentDesktop.gestureRawUpdate(event[1], event[0], swipe.d0 === undefined ? 0 : swipe.d0, swipe.ptr === true);
                     }
                     if (this.gestureVisualId !== swipe.id && currentDesktop.isRawGesture()) {
                         this.gestureVisualId = swipe.id;
@@ -618,6 +618,18 @@ class World {
         this.gestureAnimationDone();
         // focusing the column the old swipe chose must not scroll the view away from the fingers
         this.do(() => desktop.setScroll(x, true));
+    }
+
+    // niri's Mod+middle drag scrolls the view: kiri_swipe tells the script to start asking for the pointer's travel
+    public startPointerViewScroll() {
+        if (typeof qmlBase !== "undefined") {
+            (qmlBase as any).startSwipePoll();
+        }
+    }
+
+    // niri's move grab: the other mouse button while a window is dragged toggles floating
+    public toggleDragFloating() {
+        this.do((clientManager, desktopManager) => clientManager.toggleDragFloating());
     }
 
     // niri's toggle-overview: the compiled effect draws it, without the effect Plasma's own Overview opens

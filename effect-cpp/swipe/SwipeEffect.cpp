@@ -7,10 +7,13 @@
 #include "input_event.h"
 #include "../common/NiriSwipe.h"
 #include "../common/TouchpadConfig.h"
+#include "../common/PointerGrab.h"
 
 #include <effect/effecthandler.h>
 #include <effect/effectwindow.h>
 
+#include <QDBusMessage>
+#include <QDBusPendingCall>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -44,10 +47,30 @@ static QString plainId(const QString &id)
     return s.toLower();
 }
 
+// the middle button of a drag does not reach the windows or KWin's own window actions (Meta+middle raises and lowers)
+class SwipeEffect::PointerFilter : public InputEventFilter
+{
+public:
+    explicit PointerFilter(SwipeEffect *effect)
+        : InputEventFilter(InputFilterOrder::Effects)
+        , m_effect(effect)
+    {
+    }
+    bool pointerButton(PointerButtonEvent *event) override
+    {
+        return m_effect->consumesPointerButton(event);
+    }
+
+private:
+    SwipeEffect *m_effect;
+};
+
 SwipeEffect::SwipeEffect()
 {
     QDBusConnection::sessionBus().registerObject(QStringLiteral("/KiriSwipe"), this, QDBusConnection::ExportScriptableSlots);
     input()->installInputEventSpy(this);
+    m_filter = std::make_unique<PointerFilter>(this);
+    input()->installInputEventFilter(m_filter.get());
     // m_g0 is keyed by window pointer and lockVisual() calls scrolls() on its keys: a deleted window must go
     connect(effects, &EffectsHandler::windowDeleted, this, [this](EffectWindow *w) {
         m_g0.remove(w);
@@ -61,6 +84,7 @@ SwipeEffect::~SwipeEffect()
         effects->addRepaintFull();
     }
     input()->uninstallInputEventSpy(this);
+    input()->uninstallInputEventFilter(m_filter.get());
     QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/KiriSwipe"));
 }
 
@@ -73,6 +97,7 @@ void SwipeEffect::swipeGestureBegin(PointerSwipeGestureBeginEvent *event)
 {
     m_queue.clear();
     m_ended = false;
+    m_pointerSwipe = false;
     m_cumulative = QPointF();
     const TouchpadConfig config = TouchpadConfig::read();
     m_natural = config.natural;
@@ -118,6 +143,87 @@ void SwipeEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event)
     }
 }
 
+// niri's SpatialMovementGrab for the view: Mod+middle button, then the pointer's travel. Below 8 px nothing happens (the
+// press is not a click either); then a horizontal drag scrolls the view 1:1 with the pointer (the view moves the other
+// way, as the content follows the pointer), a vertical one is the workspace switch (kiri_desktop_switch).
+void SwipeEffect::pointerButton(PointerButtonEvent *event)
+{
+    if (event->button != Qt::MiddleButton) {
+        return;
+    }
+    if (event->state == PointerButtonState::Pressed) {
+        if (m_pointer || !PointerGrab::mayStart(event->modifiers)) {
+            return;
+        }
+        m_queue.clear();
+        m_ended = false;
+        m_cumulative = QPointF();
+        m_natural = false;
+        m_fingers = 3;
+        m_pointer = true;
+        m_pointerSwipe = true;
+        m_consume = true;
+        m_phase = Phase::Pending;
+        m_id++;
+    } else if (m_pointer && event->buttons == Qt::NoButton) {
+        m_pointer = false;
+        if (m_phase == Phase::Horizontal) {
+            finish(event->timestamp);
+        } else {
+            m_phase = Phase::Idle; // never got to 8 px, or went vertical (the workspace switch is kiri_desktop_switch's)
+        }
+    }
+}
+
+void SwipeEffect::pointerMotion(PointerMotionEvent *event)
+{
+    if (!m_pointer) {
+        return;
+    }
+    const QPointF delta = event->delta;
+    if (m_phase == Phase::Pending) {
+        m_cumulative += delta;
+        if (m_cumulative.x() * m_cumulative.x() + m_cumulative.y() * m_cumulative.y() >= PointerGrab::AxisLockDistance * PointerGrab::AxisLockDistance) {
+            m_phase = std::abs(m_cumulative.x()) > std::abs(m_cumulative.y()) ? Phase::Horizontal : Phase::Vertical;
+            if (m_phase == Phase::Horizontal) {
+                lockVisual();
+                // the script is not polling for a pointer: wake it (it starts the poll timer)
+                QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/component/kiri"),
+                                                                      QStringLiteral("org.kde.kglobalaccel.Component"), QStringLiteral("invokeShortcut"));
+                message << QStringLiteral("view-scroll-pointer");
+                QDBusConnection::sessionBus().asyncCall(message);
+            }
+            // niri sends the whole travel since the press to the gesture (-c.x), not just this event's delta
+            if (m_phase == Phase::Horizontal) {
+                const double dx = -m_cumulative.x();
+                m_queue.append({event->timestamp.count() / 1000.0, dx});
+                m_pos += dx;
+            }
+            return;
+        }
+        return;
+    }
+    if (m_phase == Phase::Horizontal) {
+        const double dx = -delta.x();
+        m_queue.append({event->timestamp.count() / 1000.0, dx});
+        m_pos += dx;
+        if (m_visual == Visual::Drag) {
+            effects->addRepaintFull();
+        }
+    }
+}
+
+bool SwipeEffect::consumesPointerButton(PointerButtonEvent *event)
+{
+    if (event->button != Qt::MiddleButton || !m_consume) {
+        return false;
+    }
+    if (event->state == PointerButtonState::Released) {
+        m_consume = false;
+    }
+    return true;
+}
+
 void SwipeEffect::finish(std::chrono::microseconds time)
 {
     if (m_phase == Phase::Idle) {
@@ -149,12 +255,13 @@ void SwipeEffect::swipeGestureCancelled(PointerSwipeGestureCancelEvent *event)
 QString SwipeEffect::poll()
 {
     static const char phases[] = {'i', 'p', 'h', 'v'};
-    QString out = QStringLiteral("{\"id\":%1,\"f\":%4,\"phase\":\"%2\",\"end\":%3,\"d0\":%5,\"ev\":[")
+    QString out = QStringLiteral("{\"id\":%1,\"f\":%4,\"phase\":\"%2\",\"end\":%3,\"d0\":%5,\"ptr\":%6,\"ev\":[")
                       .arg(m_id)
                       .arg(QLatin1Char(phases[static_cast<int>(m_phase)]))
                       .arg(m_ended ? QStringLiteral("true") : QStringLiteral("false"))
                       .arg(m_fingers)
-                      .arg(m_d0, 0, 'f', 3);
+                      .arg(m_d0, 0, 'f', 3)
+                      .arg(m_pointerSwipe ? QStringLiteral("true") : QStringLiteral("false"));
     for (int i = 0; i < m_queue.size(); i++) {
         out += QStringLiteral("%1[%2,%3]").arg(i ? QStringLiteral(",") : QString()).arg(m_queue[i].ms, 0, 'f', 3).arg(m_queue[i].dx, 0, 'f', 4);
     }

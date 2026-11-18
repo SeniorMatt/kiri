@@ -130,12 +130,17 @@ class MockWorkspace {
         };
     }
 
-    public moveWindow(window: MockKwinClient, ...deltas: QmlPoint[]) {
+    // a step is a pointer move, or a function that runs between two moves (the other mouse button, for example)
+    public moveWindow(window: MockKwinClient, ...deltas: (QmlPoint | (() => void))[]) {
         const frame = window.getFrameGeometryCopy();
         window.move = true;
         window.interactiveMoveResizeStarted.fire();
 
         for (const delta of deltas) {
+            if (typeof delta === "function") {
+                delta();
+                continue;
+            }
             if (delta.x !== 0) {
                 frame.x += delta.x;
             }

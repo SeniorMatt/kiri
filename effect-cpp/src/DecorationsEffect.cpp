@@ -621,6 +621,15 @@ Effect::Effect()
         });
     };
     connect(KWin::effects, &KWin::EffectsHandler::mouseChanged, this, [this](const QPointF &pos, const QPointF &, Qt::MouseButtons buttons, Qt::MouseButtons oldButtons, Qt::KeyboardModifiers, Qt::KeyboardModifiers) {
+        // niri's move grab: the right button toggles floating while a window is dragged with the left one
+        if ((buttons & Qt::RightButton) && !(oldButtons & Qt::RightButton) && (buttons & Qt::LeftButton) && m_settings.kiriEnabled) {
+            for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
+                if (w->isUserMove()) {
+                    invokeShortcut(QStringLiteral("window-drag-toggle-floating"));
+                    break;
+                }
+            }
+        }
         if ((buttons & Qt::LeftButton) && !(oldButtons & Qt::LeftButton)) {
             if (!m_park.isEmpty()) {
                 clickOnParked(pos);
@@ -657,6 +666,22 @@ Effect::~Effect()
     QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/KiriDecorations"));
 }
 
+// asks Kiri's own shortcut of that name to run (the script has no other way to hear from this effect)
+void Effect::invokeShortcut(const QString &shortcut)
+{
+    QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/component/kiri"),
+                                                          QStringLiteral("org.kde.kglobalaccel.Component"), QStringLiteral("invokeShortcut"));
+    message << shortcut;
+    auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, watcher, [shortcut](QDBusPendingCallWatcher *w) {
+        if (w->isError()) {
+            qCWarning(KIRI_DECO) << "invoking" << shortcut << "failed:" << w->error().message();
+        }
+        w->deleteLater();
+    });
+    qCDebug(KIRI_DECO) << "invoked" << shortcut;
+}
+
 // Mouse wheel and mouse button binds like niri's (Mod+WheelScrollDown, Mod+MouseMiddle). KWin scripts can't bind them,
 // so this effect does and asks Kiri's own shortcuts to do the work through kglobalaccel. Every bind has its own
 // cooldown like niri's `cooldown-ms` (150 ms on the workspace binds in niri's default config, none on the others).
@@ -682,17 +707,7 @@ void Effect::bind(Qt::KeyboardModifiers modifiers, const QString &trigger, const
             return;
         }
         cooldown->start();
-        QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/component/kiri"),
-                                                              QStringLiteral("org.kde.kglobalaccel.Component"), QStringLiteral("invokeShortcut"));
-        message << shortcut;
-        auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message), this);
-        connect(watcher, &QDBusPendingCallWatcher::finished, watcher, [shortcut](QDBusPendingCallWatcher *w) {
-            if (w->isError()) {
-                qCWarning(KIRI_DECO) << "invoking" << shortcut << "failed:" << w->error().message();
-            }
-            w->deleteLater();
-        });
-        qCDebug(KIRI_DECO) << "invoked" << shortcut;
+        invokeShortcut(shortcut);
     });
     if (axes.contains(trigger)) {
         KWin::effects->registerAxisShortcut(modifiers, axes.value(trigger), action.get());

@@ -107,8 +107,11 @@ public:
         double velocity; // workspaces per second
     };
 
-    void begin(int centerIdx, double currentIdx, int count)
+    // `movement`: the delta that is one workspace. A touchpad swipe uses the constant; a pointer drag (niri: not
+    // is_touchpad) the height of a workspace
+    void begin(int centerIdx, double currentIdx, int count, double movement = Movement)
     {
+        m_movement = movement;
         m_tracker = SwipeTracker();
         m_center = centerIdx;
         m_start = currentIdx;
@@ -119,16 +122,16 @@ public:
     double update(double delta, double timeMs)
     {
         m_tracker.push(delta, timeMs);
-        m_current = Band.clamp(min(), max(), m_start + m_tracker.pos() / Movement);
+        m_current = Band.clamp(min(), max(), m_start + m_tracker.pos() / m_movement);
         return m_current;
     }
     double current() const { return m_current; }
     Release end(double timeMs)
     {
         m_tracker.push(0.0, timeMs);
-        double velocity = m_tracker.velocity() / Movement;
-        const double currentPos = m_tracker.pos() / Movement;
-        const double pos = m_tracker.projectedEndPos() / Movement;
+        double velocity = m_tracker.velocity() / m_movement;
+        const double currentPos = m_tracker.pos() / m_movement;
+        const double pos = m_tracker.projectedEndPos() / m_movement;
         const double idx = std::clamp(m_start + pos, min(), max());
         velocity *= Band.clampDerivative(min(), max(), m_start + currentPos);
         return {int(std::lround(idx)), m_current, velocity};
@@ -138,6 +141,7 @@ private:
     double min() const { return std::max(m_center - 1, 0); }
     double max() const { return std::min(m_center + 1, m_count - 1); }
     SwipeTracker m_tracker;
+    double m_movement = Movement;
     int m_center = 0;
     double m_start = 0.0;
     double m_current = 0.0;

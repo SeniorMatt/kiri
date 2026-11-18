@@ -40,6 +40,8 @@ class ClientManager {
     private focusStamps = new Map<KwinClient, number>(); // for focus-window-previous
     private focusCounter = 0;
     private readonly floatingFrames = new Map<KwinClient, { x: number, y: number, width: number, height: number }>();
+    private drag: ClientManager.Drag | null = null; // the window that is being dragged out of the grid, or a floating one
+    private dragPending: { client: ClientWrapper, start: () => void } | null = null; // a tiled window within the first 256 px
     private readonly windowRuleEnforcer: WindowRuleEnforcer;
     private closedSlot: ClosedSlot|null = null;
     private readonly remapTimer: Delayer;
@@ -518,17 +520,49 @@ class ClientManager {
     public static readonly dragStartDistance = 256;
     public static readonly dragOpacity = 0.75;
 
-    public floatForDrag(client: ClientWrapper) {
-        this.floatDragged(client);
+    // `floating` is niri's move_.is_floating: a window dragged as a floating one stays opaque, shows no insert hint and
+    // is dropped as a floating window. The other mouse button during the drag toggles it (toggleDragFloating).
+    public floatForDrag(client: ClientWrapper, floating = false) {
+        this.floatDragged(client, floating);
     }
 
-    public floatDragged(client: ClientWrapper) {
-        const kwinClient = client.kwinClient;
-        const opacityBefore = kwinClient.opacity;
-        const fadedByEffect = canParkWindows(); // kiri_decorations fades the dragged window with niri's movement spring
-        if (!fadedByEffect) {
-            kwinClient.opacity = ClientManager.dragOpacity; // niri's INTERACTIVE_MOVE_ALPHA
+    // a tiled window that has not yet travelled 256 px: `start` takes it out of the grid right away (niri's
+    // toggle-floating while the move grab is still recognizing the gesture)
+    public setDragPending(client: ClientWrapper, start: (() => void) | null) {
+        this.dragPending = start === null ? null : { client: client, start: start };
+    }
+
+    // niri's move grab: the other mouse button toggles floating while a window is dragged (input/move_grab.rs
+    // on_toggle_floating, layout toggle_window_floating while interactive_move is Moving)
+    public toggleDragFloating() {
+        const pending = this.dragPending;
+        if (pending !== null) {
+            if (this.config.untileOnDrag) {
+                pending.start();
+            }
+            return;
         }
+        const drag = this.drag;
+        if (drag === null || !this.config.dropToTile || !this.config.untileOnDrag) {
+            return;
+        }
+        if (drag.floating && !Clients.canTileEver(drag.client.kwinClient)) {
+            return;
+        }
+        drag.floating = !drag.floating;
+        drag.apply();
+    }
+
+    // a window that is floating when its drag starts is dragged as a floating one (niri: is_floating)
+    public floatingDragStarted(client: ClientWrapper) {
+        if (this.drag !== null || !this.config.dropToTile) {
+            return;
+        }
+        this.startDrag(client, true);
+    }
+
+    public floatDragged(client: ClientWrapper, floating = false) {
+        const kwinClient = client.kwinClient;
         setVisualPosition(String(kwinClient.internalId), null); // the rubber band is over
         setInsertHint(null, String(kwinClient.internalId));
         // no limitHeight: the dragged window keeps the size it had in the grid, like niri's moving tile
@@ -541,42 +575,93 @@ class ClientManager {
                 client.keepTitlebarHidden = false;
             }
         }
-        if (!this.config.dropToTile) {
-            const done = new SignalManager();
-            done.connect(kwinClient.interactiveMoveResizeFinished, () => {
-                done.destroy();
+        this.startDrag(client, floating);
+    }
+
+    // the drag session of a window that is Floating now: the insert hint, the edge scroll and the drop
+    private startDrag(client: ClientWrapper, floating: boolean) {
+        const kwinClient = client.kwinClient;
+        const opacityBefore = kwinClient.opacity;
+        const fadedByEffect = canParkWindows(); // kiri_decorations fades the dragged window with niri's movement spring
+        const id = String(kwinClient.internalId);
+        const manager = new SignalManager();
+        let edgeScroll: DndEdgeScroll | null = null;
+        const drag: ClientManager.Drag = { client: client, floating: floating, apply: () => {} };
+        const update = () => this.world.do(() => this.updateInsertHint(kwinClient));
+        const stopEdgeScroll = () => {
+            edgeScroll?.stop();
+            edgeScroll = null;
+        };
+        drag.apply = () => {
+            if (drag.floating) {
+                // niri: back to opaque, no hint, the view is unlocked, the window gets its floating size back
+                stopEdgeScroll();
                 setInsertHint(null);
                 if (!fadedByEffect) {
                     kwinClient.opacity = opacityBefore;
                 }
-                client.restoreTitlebar();
-            });
-            return;
+                this.restoreFloatingSize(client);
+                return;
+            }
+            if (!fadedByEffect) {
+                kwinClient.opacity = ClientManager.dragOpacity; // niri's INTERACTIVE_MOVE_ALPHA
+            }
+            if (edgeScroll === null && this.config.dropToTile) {
+                // niri dnd-edge-view-scroll: the columns scroll while the pointer is held at the left or right edge
+                edgeScroll = new DndEdgeScroll(
+                    this.config,
+                    () => Workspace.cursorPos,
+                    () => this.desktopManager.getDesktopForClient(kwinClient),
+                    update,
+                );
+                edgeScroll.start();
+            }
+            setInsertHint(null, id); // the effect fades the window to niri's moving alpha
+            if (this.config.dropToTile) {
+                update();
+            }
+        };
+        this.drag = drag;
+        if (!floating) {
+            drag.apply();
         }
-        const manager = new SignalManager();
-        const update = () => this.world.do(() => this.updateInsertHint(kwinClient));
-        manager.connect(kwinClient.frameGeometryChanged, update);
-        // niri dnd-edge-view-scroll: the columns scroll while the pointer is held at the left or right edge
-        const edgeScroll = new DndEdgeScroll(
-            this.config,
-            () => Workspace.cursorPos,
-            () => this.desktopManager.getDesktopForClient(kwinClient),
-            () => this.world.do(() => this.updateInsertHint(kwinClient)),
-        );
-        edgeScroll.start();
+        manager.connect(kwinClient.frameGeometryChanged, () => {
+            if (this.config.dropToTile && !drag.floating) {
+                update();
+            }
+        });
         manager.connect(kwinClient.interactiveMoveResizeFinished, () => {
-            edgeScroll.stop();
+            stopEdgeScroll();
             manager.destroy();
+            if (this.drag === drag) {
+                this.drag = null;
+            }
             if (!fadedByEffect) {
                 kwinClient.opacity = opacityBefore;
             }
             setInsertHint(null);
-            this.world.do(() => this.dropTile(kwinClient));
+            if (this.config.dropToTile && !drag.floating) {
+                this.world.do(() => this.dropTile(kwinClient));
+            }
             if (!(client.stateManager.getState() instanceof ClientState.Tiled)) {
                 client.restoreTitlebar(); // dropped as a floating window
             }
         });
-        update();
+    }
+
+    // niri remembers the size a window had as a floating one and asks for it when the dragged tile goes floating
+    private restoreFloatingSize(client: ClientWrapper) {
+        const kwinClient = client.kwinClient;
+        const saved = this.floatingFrames.get(kwinClient);
+        if (saved === undefined) {
+            return;
+        }
+        const frame = kwinClient.frameGeometry;
+        const cursor = Workspace.cursorPos;
+        // the pointer keeps its place within the window (niri: pointer_ratio_within_window)
+        const ratioX = frame.width > 0 ? (cursor.x - frame.x) / frame.width : 0.5;
+        const ratioY = frame.height > 0 ? (cursor.y - frame.y) / frame.height : 0.5;
+        client.place(Math.round(cursor.x - ratioX * saved.width), Math.round(cursor.y - ratioY * saved.height), saved.width, saved.height);
     }
 
     // niri's scrolling insert_position: the closest gap between columns, or between the windows of the column
@@ -1271,7 +1356,14 @@ class ClientManager {
 }
 
 namespace ClientManager {
+    export interface Drag {
+        client: ClientWrapper;
+        floating: boolean; // niri's move_.is_floating
+        apply: () => void; // puts the window into the mode `floating` says
+    }
+
     export interface Config {
+        untileOnDrag: boolean;
         floatingKeepAbove: boolean;
         cursorFollowsFocus: boolean;
         defaultColumnWidth: string;

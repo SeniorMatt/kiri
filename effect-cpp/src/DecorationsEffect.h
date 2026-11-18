@@ -192,6 +192,7 @@ private:
     const Look &lookOf(KWin::EffectWindow *w) const;
     void updateReach();
     void registerPointerBinds();
+    void invokeShortcut(const QString &shortcut);
     void bind(Qt::KeyboardModifiers modifiers, const QString &trigger, const QString &shortcut, int cooldownMs);
     bool decorated(KWin::EffectWindow *w) const;
     double radiusFor(KWin::EffectWindow *w) const;

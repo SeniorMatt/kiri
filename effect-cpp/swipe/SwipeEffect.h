@@ -16,6 +16,7 @@
 
 #include "effect/effect.h"
 #include "input_event_spy.h"
+#include "input.h"
 #include "../common/NiriSwipe.h"
 
 #include "../common/NiriAnim.h"
@@ -25,6 +26,7 @@
 #include <QList>
 #include <QSet>
 #include <chrono>
+#include <memory>
 #include <QPointF>
 #include <QString>
 
@@ -51,6 +53,11 @@ public:
     void swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event) override;
     void swipeGestureEnd(PointerSwipeGestureEndEvent *event) override;
     void swipeGestureCancelled(PointerSwipeGestureCancelEvent *event) override;
+
+    // niri's Mod+middle drag (see ../common/PointerGrab.h): a horizontal drag scrolls the view like the 3-finger swipe, 1:1
+    void pointerButton(PointerButtonEvent *event) override;
+    void pointerMotion(PointerMotionEvent *event) override;
+    bool consumesPointerButton(PointerButtonEvent *event);
 
 public Q_SLOTS:
     // {"id":<swipe number>,"f":<fingers>,"phase":"i|p|h|v","end":<bool>,"ev":[[ms, dx or dy], ...]}; drains the queue.
@@ -88,6 +95,12 @@ private:
     NiriAnim::Spring m_spring;
     double m_springFrom = 0.0;
     double m_d0 = 0.0; // reported to the script with the first events
+
+    bool m_pointer = false;  // the swipe is a Mod+middle drag of the pointer, not fingers on the touchpad
+    bool m_pointerSwipe = false; // the swipe that poll() reports is one
+    bool m_consume = false;  // the middle button's press went to the drag, so its release does too
+    class PointerFilter;
+    std::unique_ptr<PointerFilter> m_filter;
 
     Phase m_phase = Phase::Idle;
     int m_fingers = 3;

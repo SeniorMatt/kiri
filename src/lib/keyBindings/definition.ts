@@ -12,6 +12,18 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.do(actions.windowToggleFloating),
         },
         {
+            // niri's move grab: the other mouse button toggles floating while a window is dragged (kiri_decorations sends it)
+            name: "window-drag-toggle-floating",
+            description: "Window: toggle floating while dragging (sent by the right mouse button)",
+            action: () => world.toggleDragFloating(),
+        },
+        {
+            // niri's Mod+middle drag (kiri_swipe sends it when the drag goes horizontal; the script then asks for the travel)
+            name: "view-scroll-pointer",
+            description: "Scroll: start the pointer drag of the view (sent by the middle mouse button)",
+            action: () => world.startPointerViewScroll(),
+        },
+        {
             name: "window-switch-focus-floating-tiling",
             description: "Focus: switch between floating and tiled",
             defaultKeys: ["Meta+Shift+V"],

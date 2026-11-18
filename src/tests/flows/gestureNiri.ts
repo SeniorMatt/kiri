@@ -357,3 +357,26 @@ tests.register("Gesture: switching desktops never wraps around", 1, () => {
     world.gestureSwitchDesktop(-1);
     Assert.equal(workspaceMock.currentDesktop, workspaceMock.desktops[0], { message: "previous at the first desktop stays" });
 });
+
+// niri's Mod+middle drag (spatial_movement_grab.rs): the view follows the pointer 1:1 in pixels (is_touchpad false, no
+// norm factor), unlike a touchpad swipe that moves working_width / 1200 per unit
+tests.register("Gesture pointer drag: the view moves 1:1 with the pointer (niri)", 1, () => {
+    const config = getDefaultConfig();
+    config.gestureScroll = true;
+    config.gestureSettleDuration = 0;
+    config.gestureScrollInvert = true; // a touchpad setting: the pointer ignores it
+    const { qtMock, workspaceMock, world } = init(config, { width: 1600, height: 900 });
+    const [client0, client1, client2] = workspaceMock.createClientsWithWidths(800, 800, 800);
+    workspaceMock.activeWindow = client0;
+    const desktop = (world as any).desktopManager.getCurrentDesktop() as Desktop;
+    const x0 = desktop.getScrollX();
+
+    // the effect queues -dx of the pointer: dragging 120 px to the left is +120
+    world.gestureRaw(JSON.stringify({ id: 1, f: 3, phase: "h", end: false, ptr: true, ev: [[0, 100], [16, 20]] }));
+    Assert.equal(desktop.getScrollX() - x0, 120, { message: "120 px of pointer travel are 120 px of view" });
+    Assert.equal(desktop.getRawVisual().scale, 1, { message: "the effect paints it with scale 1" });
+
+    world.gestureRaw(JSON.stringify({ id: 1, f: 3, phase: "h", end: true, ptr: true, ev: [[32, 0]] }));
+    world.gestureRaw(JSON.stringify({ id: 2, f: 3, phase: "h", end: false, ev: [[0, 100]] })); // a touchpad swipe after it
+    Assert.assert(desktop.getRawVisual().scale !== 1, { message: "a touchpad swipe scales by the working width again" });
+});

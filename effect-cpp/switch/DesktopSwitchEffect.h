@@ -171,6 +171,9 @@ public:
     void swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event) override;
     void swipeGestureEnd(PointerSwipeGestureEndEvent *event) override;
     void swipeGestureCancelled(PointerSwipeGestureCancelEvent *event) override;
+    // niri's Mod+middle drag: a vertical one drags the desktops with the pointer (a desktop is one screen height of travel)
+    void pointerButton(PointerButtonEvent *event) override;
+    void pointerMotion(PointerMotionEvent *event) override;
 
     int horizontalGap() const;
     int verticalGap() const;
@@ -208,6 +211,7 @@ private:
     bool m_swipeNatural = false;
     NiriSwipe::WorkspaceGesture::Release m_swipeRelease{};
     bool m_swipeReleasePending = false;
+    bool m_swipePointer = false; // the swipe is a Mod+middle drag, not fingers
 
 private:
     int m_hGap;

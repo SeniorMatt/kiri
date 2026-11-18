@@ -138,6 +138,15 @@ namespace ClientState {
                         dragStart = { x: Workspace.cursorPos.x, y: Workspace.cursorPos.y };
                         dragHome = { x: kwinClient.frameGeometry.x, y: kwinClient.frameGeometry.y };
                         dragLimit = ClientManager.dragStartDistance;
+                        // the other mouse button takes it out of the grid at once, as a floating window (niri's move grab)
+                        world.do((clientManager, desktopManager) => clientManager.setDragPending(client, () => {
+                            if (dragStart !== null) {
+                                dragStart = null;
+                                moving = false;
+                                clientManager.setDragPending(client, null);
+                                clientManager.floatForDrag(client, true);
+                            }
+                        }));
                     }
                     moving = true;
                     return;
@@ -177,6 +186,9 @@ namespace ClientState {
             });
 
             manager.connect(kwinClient.interactiveMoveResizeFinished, () => {
+                if (dragStart !== null) {
+                    world.do((clientManager, desktopManager) => clientManager.setDragPending(client, null));
+                }
                 dragStart = null;
                 setVisualPosition(String(kwinClient.internalId), null);
                 if (moving) {
@@ -210,6 +222,7 @@ namespace ClientState {
                         dragStart = null;
                         moving = false;
                         world.do((clientManager, desktopManager) => {
+                            clientManager.setDragPending(client, null);
                             clientManager.floatForDrag(client);
                         });
                     } else {

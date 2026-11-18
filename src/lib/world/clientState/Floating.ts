@@ -21,7 +21,7 @@ namespace ClientState {
                     world.do((clientManager, desktopManager) => clientManager.tileClientIfPossible(kwinClient));
                 });
             }
-            this.signalManager = Floating.initSignalManager(world, kwinClient, tileAfterFullScreen, this.recoverDelayer);
+            this.signalManager = Floating.initSignalManager(world, this.client, kwinClient, tileAfterFullScreen, this.recoverDelayer);
         }
 
         public destroy(passFocus: FocusPassing.Type) {
@@ -46,7 +46,7 @@ namespace ClientState {
             );
         }
 
-        private static initSignalManager(world: World, kwinClient: KwinClient, tileAfterFullScreen: boolean, recoverDelayer: Delayer | null) {
+        private static initSignalManager(world: World, client: ClientWrapper, kwinClient: KwinClient, tileAfterFullScreen: boolean, recoverDelayer: Delayer | null) {
             const manager = new SignalManager();
 
             if (recoverDelayer !== null) {
@@ -63,6 +63,13 @@ namespace ClientState {
                     });
                 });
             }
+
+            // niri: a floating window is dragged as a floating one; the other mouse button turns it into a tiled drag
+            manager.connect(kwinClient.interactiveMoveResizeStarted, () => {
+                if (kwinClient.move) {
+                    world.do((clientManager, desktopManager) => clientManager.floatingDragStarted(client));
+                }
+            });
 
             manager.connect(kwinClient.tileChanged, () => {
                 // on X11, this fires after `frameGeometryChanged`
