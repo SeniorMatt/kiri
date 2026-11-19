@@ -158,6 +158,8 @@ class MockWorkspace {
         window.interactiveMoveResizeFinished.fire();
     }
 
+    private static pressClock = 0;
+
     public resizeWindow(window: MockKwinClient, edgeResize: boolean, leftEdge: boolean, topEdge: boolean, ...deltas: QmlSize[]) {
         const frame = window.getFrameGeometryCopy();
         if (edgeResize) {
@@ -172,7 +174,15 @@ class MockWorkspace {
             );
         }
         window.resize = true;
-        window.interactiveMoveResizeStarted.fire();
+        // a press that soon after another is niri's double resize-click: every resize here is a press of its own
+        const now = Date.now;
+        MockWorkspace.pressClock += 1000;
+        Date.now = () => now() + MockWorkspace.pressClock;
+        try {
+            window.interactiveMoveResizeStarted.fire();
+        } finally {
+            Date.now = now;
+        }
 
         for (const delta of deltas) {
             // like KWin, an interactive resize stops at the window's minimum size (and never goes below 1 px)

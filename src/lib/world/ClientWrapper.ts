@@ -17,6 +17,7 @@ class ClientWrapper {
     public hadSlot = false; // the layout has placed it at a slot of its column (not full-screen or maximized)
     private lastPlacementTime = 0;
     private parked = false; // see park
+    public userResizeIgnored = false; // KWin's interactive resize runs but the layout does not follow it (a double resize-click)
     private awaitingCommit = false; // a size was requested and the client has not committed anything since
     private answeredSizeRequest = false; // the last frame change came after Kiri had asked for a size
     private static readonly maxConfigureWaitMs = 100;
@@ -52,7 +53,7 @@ class ClientWrapper {
     // (otherwise a slow client builds up a queue of sizes and keeps changing size long after the pointer stopped)
     public place(x: number, y: number, width: number, height: number, throttle = false) {
         this.manipulatingGeometry.do(() => {
-            if (this.kwinClient.resize) {
+            if (this.kwinClient.resize && !this.userResizeIgnored) {
                 // The window is being manually resized: KWin recomputes its geometry from the pointer at every
                 // step, so moving it would fight with the user. Only tell the effect where to paint it.
                 // The view only ever moves sideways, and the window below the pointer should stay where KWin has it

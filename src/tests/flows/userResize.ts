@@ -315,3 +315,98 @@ tests.register("Closing a window in the middle of a resize ends the resize", 10,
     workspaceMock.removeWindow(b);
     Assert.assert(!resizing(), { message: "the window is gone, so is its resize" });
 });
+
+// niri's double resize-click (input/mod.rs): pressing the resize button again on the same edge within 400 ms does not
+// resize, it toggles the column's full width (left or right edge) or resets the window's height (top or bottom edge)
+tests.register("Double resize-click on an edge", 3, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock } = init(config);
+    const [, top, bottom] = workspaceMock.createClientsWithWidths(300, 300, 200);
+    qtMock.fireShortcut("window-move-left");
+    workspaceMock.activeWindow = top;
+    let now = 5000;
+    const realNow = Date.now;
+    Date.now = () => now;
+    try {
+        const press = (client: MockKwinClient, fx: number, fy: number) => {
+            const f = client.getFrameGeometryCopy();
+            workspaceMock.cursorPos = new MockQmlPoint(f.x + f.width * fx, f.y + f.height * fy);
+            client.resize = true;
+            client.interactiveMoveResizeStarted.fire();
+        };
+        const release = (client: MockKwinClient) => {
+            client.resize = false;
+            client.interactiveMoveResizeFinished.fire();
+        };
+
+        // right edge: the first press resizes as usual, the second one toggles the full width
+        const start = top.getFrameGeometryCopy();
+        press(top, 0.95, 0.5);
+        release(top);
+        now += 200;
+        press(top, 0.9, 0.5);
+        release(top);
+        Assert.equal(top.getActualFrameGeometry().width, tilingArea.width, { message: "the column has the full width" });
+        Assert.equal(bottom.getActualFrameGeometry().width, tilingArea.width, { message: "the whole column has it" });
+        // a double click again restores the width
+        now += 1000;
+        press(top, 0.95, 0.5);
+        release(top);
+        now += 100;
+        press(top, 0.95, 0.5);
+        release(top);
+        Assert.equal(top.getActualFrameGeometry().width, start.width, { message: "the old width is back" });
+
+        // too slow, or another edge: no double click (niri still does not start a resize for a second press so soon)
+        now += 1000;
+        press(top, 0.95, 0.5);
+        release(top);
+        now += 500;
+        press(top, 0.95, 0.5);
+        release(top);
+        Assert.equal(top.getActualFrameGeometry().width, start.width, { message: "500 ms apart is no double click" });
+        now += 100;
+        press(top, 0.05, 0.5); // the left edge after a right one
+        release(top);
+        Assert.equal(top.getActualFrameGeometry().width, start.width, { message: "another edge is no double click" });
+
+        // a triple click: the third press resizes again (a resize is started, so the layout follows the pointer)
+        now += 1000;
+        press(top, 0.95, 0.5);
+        release(top);
+        now += 100;
+        press(top, 0.95, 0.5);
+        release(top);
+        now += 100;
+        press(top, 0.95, 0.5);
+        const stepped = new MockQmlRect(start.x, start.y, 250, start.height);
+        top.interactiveMoveResizeStepped.fire(stepped);
+        top.frameGeometry = stepped;
+        release(top);
+        Assert.equal(top.getActualFrameGeometry().width, 250, { message: "the third press resizes" });
+
+        // the bottom edge: the height of the window is reset to auto
+        now += 1000;
+        const t0 = top.getFrameGeometryCopy();
+        workspaceMock.cursorPos = new MockQmlPoint(t0.x + t0.width / 2, t0.y + t0.height - 5);
+        top.resize = true;
+        top.interactiveMoveResizeStarted.fire();
+        const taller = new MockQmlRect(t0.x, t0.y, t0.width, t0.height + 60);
+        top.interactiveMoveResizeStepped.fire(taller);
+        top.frameGeometry = taller;
+        release(top);
+        const h = top.getActualFrameGeometry().height;
+        Assert.equal(h, t0.height + 60, { message: "the window is taller" });
+        now += 1000;
+        press(top, 0.5, 0.95);
+        release(top);
+        now += 100;
+        press(top, 0.5, 0.95);
+        release(top);
+        Assert.equal(top.getActualFrameGeometry().height, bottom.getActualFrameGeometry().height, { message: "equal heights again" });
+        Assert.equal(top.getActualFrameGeometry().width, 250, { message: "the height reset left the width alone" });
+    } finally {
+        Date.now = realNow;
+    }
+});

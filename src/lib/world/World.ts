@@ -5,6 +5,7 @@ class World {
     private readonly workspaceSignalManager: SignalManager;
     private readonly focusPasser: FocusPassing.Passer;
     private readonly keyBindings: KeyBindings;
+    private readonly actions: Actions;
     private keyBindingsReleased = false;
     private readonly screenResizedDelayer: Delayer;
     private readonly gestureEndDelayer: Delayer;
@@ -86,6 +87,7 @@ class World {
             columnWidthChanges: SizeChange.parseList(config.columnWidthSet),
             windowHeightChanges: SizeChange.parseList(config.windowHeightSet),
         };
+        this.actions = new Actions(actionsConfig);
         if (keyBindings === null) {
             this.keyBindings = new KeyBindings(this, actionsConfig, config.shortcutKeys);
         } else {
@@ -386,6 +388,22 @@ class World {
             }
         }
         flushCursorWarp();
+    }
+
+    // niri's double resize-click on an edge: the column's full width is toggled (left or right edge), the window's
+    // height is reset to auto (top or bottom edge); the window takes the focus first
+    public doResizeEdgeDoubleClick(window: Window, horizontal: boolean, vertical: boolean) {
+        this.do((clientManager, desktopManager) => {
+            window.client.focus();
+            const column = window.column;
+            const grid = column.grid;
+            if (horizontal) {
+                this.actions.columnWidthMaximize(clientManager, desktopManager, window, column, grid);
+            }
+            if (vertical) {
+                this.actions.windowHeightReset(clientManager, desktopManager, window, column, grid);
+            }
+        });
     }
 
     public do(f: (clientManager: ClientManager, desktopManager: DesktopManager) => void) {

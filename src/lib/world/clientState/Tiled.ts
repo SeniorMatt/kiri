@@ -66,6 +66,7 @@ namespace ClientState {
             this.relayoutDelayer.destroy();
             this.maximizedDelayer.destroy();
             this.fullScreenDelayer.destroy();
+            this.window.client.userResizeIgnored = false;
             if (this.userResize.grid !== null) {
                 // closed or floated in the middle of a resize: KWin's finished signal will not come
                 this.userResize.grid.onUserResizeFinished();
@@ -128,6 +129,8 @@ namespace ClientState {
             let resizeNeighbor: { column: Column, startWidth: number } | undefined;
             let resizeRequest: QmlRect | null = null; // the geometry the pointer asked for at the last step
             let resizeStepped = false; // KWin reports the pointer's steps; the committed geometry is then only used for the width
+            let lastResizeStart: { time: number, edges: number } | null = null; // for niri's double resize-click
+            let resizeIgnored = false; // a double resize-click: KWin still resizes the window by the pointer, the layout ignores it
             let dragStart: { x: number, y: number } | null = null;
             let dragLimit = 0;
             let dragHome = { x: 0, y: 0 };
@@ -153,6 +156,20 @@ namespace ClientState {
                 }
 
                 if (kwinClient.resize) {
+                    // niri's double resize-click: pressing on the same edge again within 400 ms toggles the full width
+                    // (a left or right edge) or resets the window height (a top or bottom edge) instead of resizing
+                    const edges = Tiled.resizeEdgesUnderCursor(kwinClient);
+                    const now = Date.now();
+                    const last = lastResizeStart;
+                    lastResizeStart = edges === 0 ? null : { time: now, edges: edges };
+                    if (edges !== 0 && last !== null && now - last.time <= Tiled.doubleClickTimeMs) {
+                        lastResizeStart = null; // niri: a triple click resizes again
+                        const common = edges & last.edges;
+                        client.userResizeIgnored = true;
+                        resizeIgnored = true;
+                        world.doResizeEdgeDoubleClick(window, (common & Tiled.edgesLeftRight) !== 0, (common & Tiled.edgesTopBottom) !== 0);
+                        return;
+                    }
                     resizing = true;
                     resizeRequest = roundQtRect(kwinClient.frameGeometry);
                     resizeStepped = false;
@@ -194,6 +211,11 @@ namespace ClientState {
                 if (moving) {
                     moving = false;
                     world.do(() => window.column.grid.desktop.onLayoutChanged()); // move the dragged window back to its position
+                }
+                if (resizeIgnored) {
+                    resizeIgnored = false;
+                    client.userResizeIgnored = false;
+                    world.do(() => window.column.grid.desktop.onLayoutChanged()); // put the window back where the layout has it
                 }
                 if (resizing) {
                     resizing = false;
@@ -254,6 +276,9 @@ namespace ClientState {
                 }
 
                 if (kwinClient.resize) {
+                    if (resizeIgnored) {
+                        return;
+                    }
                     world.do(() => {
                         if (newGeometry.width !== oldGeometry.width) {
                             window.column.onUserResizeWidth(
@@ -349,6 +374,30 @@ namespace ClientState {
             });
 
             return manager;
+        }
+
+        private static readonly doubleClickTimeMs = 400; // niri's DOUBLE_CLICK_TIME
+        private static readonly edgesLeftRight = 3;
+        private static readonly edgesTopBottom = 12;
+
+        // niri's resize_edges_under: the window is split in thirds, the pointer's third says which edges a resize takes
+        // (1 left, 2 right, 4 top, 8 bottom)
+        private static resizeEdgesUnderCursor(kwinClient: KwinClient) {
+            const frame = kwinClient.frameGeometry;
+            const x = Workspace.cursorPos.x - frame.x;
+            const y = Workspace.cursorPos.y - frame.y;
+            let edges = 0;
+            if (x < frame.width / 3) {
+                edges |= 1;
+            } else if (2 * frame.width / 3 < x) {
+                edges |= 2;
+            }
+            if (y < frame.height / 3) {
+                edges |= 4;
+            } else if (2 * frame.height / 3 < y) {
+                edges |= 8;
+            }
+            return edges;
         }
 
         private static getResizeNeighborColumn(window: Window) {

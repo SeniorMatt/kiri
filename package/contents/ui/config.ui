@@ -1932,92 +1932,79 @@ org\.kde\.dolphin=800px</string></property><property name="minimumSize"><size><w
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="8" column="0"><widget class="QLabel"><property name="text"><string>Toggle floating while dragging (sent by the right mouse button)</string></property></widget></item>
-<item row="8" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_drag_toggle_floating">
+<item row="8" column="0"><widget class="QLabel"><property name="text"><string>Toggle full-screen</string></property></widget></item>
+<item row="8" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_toggle_fullscreen">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="8" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_drag_toggle_floating">
+<item row="8" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_toggle_fullscreen">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="9" column="0"><widget class="QLabel"><property name="text"><string>Toggle full-screen</string></property></widget></item>
-<item row="9" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_toggle_fullscreen">
+<item row="9" column="0"><widget class="QLabel"><property name="text"><string>Toggle maximized to edges</string></property></widget></item>
+<item row="9" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_maximize_to_edges">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="9" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_toggle_fullscreen">
+<item row="9" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_maximize_to_edges">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="10" column="0"><widget class="QLabel"><property name="text"><string>Toggle maximized to edges</string></property></widget></item>
-<item row="10" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_maximize_to_edges">
+<item row="10" column="0"><widget class="QLabel"><property name="text"><string>Toggle windowed full-screen</string></property></widget></item>
+<item row="10" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_toggle_windowed_fullscreen">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="10" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_maximize_to_edges">
+<item row="10" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_toggle_windowed_fullscreen">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="11" column="0"><widget class="QLabel"><property name="text"><string>Toggle windowed full-screen</string></property></widget></item>
-<item row="11" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_toggle_windowed_fullscreen">
+<item row="11" column="0"><widget class="QLabel"><property name="text"><string>Unset full-screen (also windowed full-screen)</string></property></widget></item>
+<item row="11" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_unset_fullscreen">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="11" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_toggle_windowed_fullscreen">
+<item row="11" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_unset_fullscreen">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="12" column="0"><widget class="QLabel"><property name="text"><string>Unset full-screen (also windowed full-screen)</string></property></widget></item>
-<item row="12" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_unset_fullscreen">
+<item row="12" column="0"><widget class="QLabel"><property name="text"><string>Unset maximized to edges</string></property></widget></item>
+<item row="12" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_unset_maximized_to_edges">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="12" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_unset_fullscreen">
+<item row="12" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_unset_maximized_to_edges">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="13" column="0"><widget class="QLabel"><property name="text"><string>Unset maximized to edges</string></property></widget></item>
-<item row="13" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_unset_maximized_to_edges">
+<item row="13" column="0"><widget class="QLabel"><property name="text"><string>Unset windowed full-screen</string></property></widget></item>
+<item row="13" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_unset_windowed_fullscreen">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="13" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_unset_maximized_to_edges">
-<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
-<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
-<property name="kcfg_property"><cstring>keySequence</cstring></property>
-<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
-</widget></item>
-<item row="14" column="0"><widget class="QLabel"><property name="text"><string>Unset windowed full-screen</string></property></widget></item>
-<item row="14" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_window_unset_windowed_fullscreen">
-<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
-<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
-<property name="kcfg_property"><cstring>keySequence</cstring></property>
-<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
-</widget></item>
-<item row="14" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_unset_windowed_fullscreen">
+<item row="13" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_window_unset_windowed_fullscreen">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
@@ -2130,40 +2117,27 @@ org\.kde\.dolphin=800px</string></property><property name="minimumSize"><size><w
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="9" column="0"><widget class="QLabel"><property name="text"><string>Start the pointer drag of the view (sent by the middle mouse button)</string></property></widget></item>
-<item row="9" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_view_scroll_pointer">
+<item row="9" column="0"><widget class="QLabel"><property name="text"><string>To end</string></property></widget></item>
+<item row="9" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_grid_scroll_end">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="9" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_view_scroll_pointer">
+<item row="9" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_grid_scroll_end">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="10" column="0"><widget class="QLabel"><property name="text"><string>To end</string></property></widget></item>
-<item row="10" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_grid_scroll_end">
+<item row="10" column="0"><widget class="QLabel"><property name="text"><string>To start</string></property></widget></item>
+<item row="10" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_grid_scroll_start">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>
 <property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
 </widget></item>
-<item row="10" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_grid_scroll_end">
-<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
-<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
-<property name="kcfg_property"><cstring>keySequence</cstring></property>
-<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
-</widget></item>
-<item row="11" column="0"><widget class="QLabel"><property name="text"><string>To start</string></property></widget></item>
-<item row="11" column="1"><widget class="KKeySequenceWidget" name="kcfg_key1_grid_scroll_start">
-<property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
-<property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
-<property name="kcfg_property"><cstring>keySequence</cstring></property>
-<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>
-</widget></item>
-<item row="11" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_grid_scroll_start">
+<item row="10" column="2"><widget class="KKeySequenceWidget" name="kcfg_key2_grid_scroll_start">
 <property name="multiKeyShortcutsAllowed"><bool>false</bool></property>
 <property name="checkForConflictsAgainst"><set>KKeySequenceWidget::None</set></property>
 <property name="kcfg_property"><cstring>keySequence</cstring></property>

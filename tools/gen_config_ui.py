@@ -236,7 +236,8 @@ def read_config_def():
 def read_key_bindings():
     """[(name, description)] in file order; numbered ones keep their "{}" """
     src = open(KEYS_DEF, encoding="utf-8").read()
-    return [(m.group(1), m.group(2)) for m in re.finditer(r'name:\s*"([\w{}-]+)",\s*description:\s*"([^"]*)"', src)] + \
+    # "Kiri internal: ..." are triggers that the effects send to the script; they have no place on the page
+    return [(m.group(1), m.group(2)) for m in re.finditer(r'name:\s*"([\w{}-]+)",\s*description:\s*"([^"]*)"', src) if not m.group(2).startswith("Kiri internal")] + \
            [(m.group(1), m.group(2)) for m in re.finditer(r'name:\s*"([\w{}-]+)",\s*defaultModifiers:[^\n]*\n\s*description:\s*"([^"]*)"', src)]
 
 # ---------------------------------------------------------------- XML helpers
