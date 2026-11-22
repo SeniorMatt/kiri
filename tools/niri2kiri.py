@@ -413,7 +413,7 @@ def focus_previous_action(scope, filt):
 
 
 def read_binds(path, mod="Meta", nodes=None):
-    """-> binds {action: [keys]}, skipped [text], steps {setting: value}, pointer "k=action@ms;..." or None, slots {kind: [sizes]}"""
+    """-> binds {action: [keys]}, skipped [text], steps {setting: value}, pointer "k=action@ms" lines or None, slots {kind: [sizes]}"""
     binds, skipped, steps, pointer, slots, has_binds = {}, [], {}, [], {"column": [], "window": []}, False
     nodes = nodes if nodes is not None else parse_kdl(path)
     bind_names = declared_workspaces(nodes)  # the names that binds refer to; declared workspaces come first
@@ -465,7 +465,7 @@ def read_binds(path, mod="Meta", nodes=None):
                     skipped.append(f"{description}: {key_reason(key)}")
     if bind_names:
         steps["desktopBindNames"] = json.dumps(bind_names, separators=(",", ":"))
-    return binds, skipped, steps, (";".join(pointer) if has_binds else None), slots
+    return binds, skipped, steps, ("\n".join(pointer) if has_binds else None), slots
 
 
 def key_fields(binds):
@@ -744,10 +744,12 @@ def state_colors(node, out, warn, what):
 
 
 def float_of(value):
+    """a number of a window rule as a finite, sane one (infinity or 1e300 would put windows off the screen)"""
     try:
-        return float(value)
+        value = float(value)
     except (TypeError, ValueError):
         return None
+    return max(-MAX_PIXELS, min(MAX_PIXELS, value)) if math.isfinite(value) else None
 
 
 def num(value):
@@ -1430,7 +1432,7 @@ def read_input(path, warn):
 def fmt(value):
     if isinstance(value, bool):
         return "true" if value else "false"
-    return str(value).replace("\\", "\\\\")
+    return str(value).replace("\\", "\\\\").replace("\n", "\\n")  # an ini value is one line
 
 
 def kwrite(file, group, key, value):

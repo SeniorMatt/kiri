@@ -38,7 +38,7 @@ inline bool middleIsBound(Qt::KeyboardModifier mod)
 {
     auto config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
     const QString binds = config->group(QStringLiteral("Script-kiri")).readEntry("pointerBinds", QString());
-    for (const QString &entry : binds.split(QRegularExpression(QStringLiteral("[;\n]")), Qt::SkipEmptyParts)) {
+    for (const QString &entry : binds.split(QRegularExpression(QStringLiteral("[;\r\n]")), Qt::SkipEmptyParts)) {
         const int equals = entry.indexOf(QLatin1Char('='));
         if (equals < 0) {
             continue;

@@ -216,16 +216,16 @@ tests.register("open-on-workspace puts the window on the desktop with that name 
     Assert.equal(ghost.desktops[0].name, "Desktop 1");
 });
 
-tests.register("open-on-workspace follows the workspace names of the niri config", 2, () => {
+tests.register("open-on-workspace finds a named desktop, the named one first", 3, () => {
     const config = getDefaultConfig();
-    config.niriConfigEnabled = true;
-    config.niriConfig = 'workspace "chat"\nworkspace "web"';
     config.windowRules = '[{ "appId": "web", "workspace": "web" }]';
     const { workspaceMock } = init(config);
+    workspaceMock.desktops[1].name = "web";
     const web = openWindow(createClassClient("web"));
     Assert.equal(web.desktops[0], workspaceMock.desktops[1]);
     const other = openWindow(createClassClient("other"));
     Assert.equal(other.desktops[0], workspaceMock.desktops[0]);
+    Assert.equal(workspaceMock.desktops.length, 2);
 });
 
 tests.register("default-column-display opens a new column tabbed", 3, () => {
@@ -441,7 +441,9 @@ tests.register("The look rules go to the effect per window", 7, () => {
     const rule = windowDecorations.get(id)!;
     Assert.equal(rule.cornerRadius, 12);
     Assert.equal(rule.shadow!.softness, 40);
-    Assert.equal(JSON.stringify(rule.border), JSON.stringify({ width: 6, activeColor: "#ff0000" }));
+    Assert.equal(rule.border!.width, 6);
+    Assert.equal(rule.border!.activeColor, "#ff0000");
+    Assert.equal(rule.border!.activeGradient, undefined);
     Assert.equal(rule.focusRing, undefined);
     Assert.equal(windowDecorations.get(String(plain.internalId)), undefined);
     round.caption = "Active window";

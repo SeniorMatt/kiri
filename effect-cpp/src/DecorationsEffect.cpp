@@ -723,7 +723,7 @@ void Effect::debugWheel(int i)
     }
 }
 
-// The binds are the `pointerBinds` setting: "Meta+Ctrl+WheelScrollDown=column-move-to-next-desktop@150;..."
+// The binds are the `pointerBinds` setting: one per line: "Meta+Ctrl+WheelScrollDown=column-move-to-next-desktop@150" (";" separates too)
 // (<modifiers>+<trigger>=<Kiri shortcut>[@<cooldown ms>], separated by ; or new lines). KWin drops a shortcut when
 // its QAction is destroyed, so a changed setting just starts over.
 void Effect::registerPointerBinds()
@@ -733,7 +733,7 @@ void Effect::registerPointerBinds()
     if (!m_settings.kiriEnabled) {
         return; // a bind that nothing answers must not take the wheel and the buttons from other applications
     }
-    for (const QString &entry : m_settings.pointerBinds.split(QRegularExpression(QStringLiteral("[;\n]")), Qt::SkipEmptyParts)) {
+    for (const QString &entry : m_settings.pointerBinds.split(QRegularExpression(QStringLiteral("[;\r\n]")), Qt::SkipEmptyParts)) {
         const int equals = entry.indexOf(QLatin1Char('='));
         if (equals < 0) {
             continue;
@@ -898,12 +898,18 @@ Settings Effect::parseSettings(const QVariantMap &m, bool kiriEnabled) const
     }
     // the default is niri's default config's wheel binds (keep in step with `pointerBinds` in src/lib/config/definition.ts)
     s.pointerBinds = str(m, "pointerBinds", QStringLiteral(
-        "Meta+WheelScrollDown=desktop-next@150;Meta+WheelScrollUp=desktop-previous@150;"
-        "Meta+Ctrl+WheelScrollDown=column-move-to-next-desktop@150;Meta+Ctrl+WheelScrollUp=column-move-to-previous-desktop@150;"
-        "Meta+WheelScrollRight=focus-right;Meta+WheelScrollLeft=focus-left;"
-        "Meta+Ctrl+WheelScrollRight=column-move-right;Meta+Ctrl+WheelScrollLeft=column-move-left;"
-        "Meta+Shift+WheelScrollDown=focus-right;Meta+Shift+WheelScrollUp=focus-left;"
-        "Meta+Ctrl+Shift+WheelScrollDown=column-move-right;Meta+Ctrl+Shift+WheelScrollUp=column-move-left"));
+        "Meta+WheelScrollDown=desktop-next@150\n"
+        "Meta+WheelScrollUp=desktop-previous@150\n"
+        "Meta+Ctrl+WheelScrollDown=column-move-to-next-desktop@150\n"
+        "Meta+Ctrl+WheelScrollUp=column-move-to-previous-desktop@150\n"
+        "Meta+WheelScrollRight=focus-right\n"
+        "Meta+WheelScrollLeft=focus-left\n"
+        "Meta+Ctrl+WheelScrollRight=column-move-right\n"
+        "Meta+Ctrl+WheelScrollLeft=column-move-left\n"
+        "Meta+Shift+WheelScrollDown=focus-right\n"
+        "Meta+Shift+WheelScrollUp=focus-left\n"
+        "Meta+Ctrl+Shift+WheelScrollDown=column-move-right\n"
+        "Meta+Ctrl+Shift+WheelScrollUp=column-move-left"));
     return s;
 }
 
@@ -1508,12 +1514,12 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
         data.multiplyOpacity(alphaOf(w->internalId()));
     }
     if (isActive() && !w->data(CaptureRole).toBool() && (w->isNormalWindow() || w->isDialog())) {
-        drawBackdrop(viewport, w, deviceRegion, data.opacity());
+        // under the window, where the window is painted now (other effects may be moving or scaling it)
+        const KWin::RectF f = w->frameGeometry();
+        const KWin::RectF painted(f.x() + data.xTranslation(), f.y() + data.yTranslation(), f.width() * data.xScale(), f.height() * data.yScale());
+        drawBackdrop(viewport, w, painted, deviceRegion, data.opacity());
         if (decorated(w) && lookOf(w).shadow.on) {
-            // under the window, where the window is painted now (other effects may be moving or scaling it)
-            const KWin::RectF f = w->frameGeometry();
-            drawShadow(viewport, w, KWin::RectF(f.x() + data.xTranslation(), f.y() + data.yTranslation(), f.width() * data.xScale(), f.height() * data.yScale()),
-                       deviceRegion, data.opacity() * (1.0 - expandedProgress(w)));
+            drawShadow(viewport, w, painted, deviceRegion, data.opacity() * (1.0 - expandedProgress(w)));
         }
     }
     if (!m_insertHint.isEmpty() && !m_hintWindow.isNull() && w->internalId() == m_hintWindow && isActive() && !w->data(CaptureRole).toBool()) {
@@ -1819,17 +1825,25 @@ void Effect::drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow
     KWin::ShaderManager::instance()->popShader();
 }
 
-// niri's fullscreen-backdrop-color: a solid rectangle behind a full-screen window, over its whole screen; it fades in with the
-// window's expand animation
-void Effect::drawBackdrop(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::Region &deviceRegion, double opacity)
+// niri's fullscreen-backdrop-color: a solid rectangle behind a full-screen window, the size of the window's own tile (niri's
+// tile.rs resizes it to the animated tile size and draws it at the tile's location), so the wallpaper and the other columns
+// stay visible when the view scrolls away from it. The tile of a full-screen window is screen-sized, with a window that
+// is smaller than the screen centred in it; it grows from the window's own rect with the expand animation and fades in
+void Effect::drawBackdrop(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &painted, const KWin::Region &deviceRegion, double opacity)
 {
     if (!w->isFullScreen() || !w->screen() || m_settings.fullscreenBackdrop.alphaF() <= 0) {
         return;
     }
     const double progress = expandedProgress(w);
-    if (progress > 0) {
-        fillRect(viewport, KWin::RectF(w->screen()->geometry()), m_settings.fullscreenBackdrop, deviceRegion, opacity * progress);
+    if (progress <= 0) {
+        return;
     }
+    const KWin::RectF screen(w->screen()->geometry());
+    const double tw = std::max(painted.width(), screen.width()), th = std::max(painted.height(), screen.height());
+    const KWin::RectF tile(painted.x() + painted.width() / 2 - tw / 2, painted.y() + painted.height() / 2 - th / 2, tw, th);
+    const auto mix = [progress](double a, double b) { return a + (b - a) * progress; };
+    const KWin::RectF rect(mix(painted.x(), tile.x()), mix(painted.y(), tile.y()), mix(painted.width(), tile.width()), mix(painted.height(), tile.height()));
+    fillRect(viewport, rect, m_settings.fullscreenBackdrop, deviceRegion, opacity * progress);
 }
 
 } // namespace KiriDecorations

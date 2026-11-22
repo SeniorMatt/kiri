@@ -29,7 +29,7 @@ tests.register("NiriImport accounts for every bind and option of real configs", 
         for (const keys of Object.values(result.shortcutKeys)) {
             keys.forEach(key => mappedKeys.add(key));
         }
-        const pointerEntries = ((result.settings["pointerBinds"] ?? "") as string).split(";").filter(entry => entry !== "");
+        const pointerEntries = ((result.settings["pointerBinds"] ?? "") as string).split("\n").filter(entry => entry !== "");
         let binds = 0;
         for (const block of Kdl.find(nodes, "binds")) {
             for (const bind of block.children) {
@@ -220,7 +220,7 @@ tests.register("NiriImport: size binds, focus=false, mod-key, pointer binds, foc
     Assert.equal(keys["focus-window-previous-workspace-app"].join(), "Alt+Shift+Tab");
     Assert.equal(keys["focus-window-previous-app"].join(), "Ctrl+Alt+Tab");
     Assert.equal(keys["focus-window-previous-output"].join(), "Ctrl+Alt+Shift+Tab");
-    Assert.equal(result.settings["pointerBinds"], "Alt+WheelScrollUp=desktop-previous@200;Alt+WheelScrollLeft=focus-left;Alt+MouseLeft=window-toggle-floating;MouseMiddle=window-close");
+    Assert.equal(result.settings["pointerBinds"], "Alt+WheelScrollUp=desktop-previous@200\nAlt+WheelScrollLeft=focus-left\nAlt+MouseLeft=window-toggle-floating\nMouseMiddle=window-close");
     const skipped = result.skipped.join("\n");
     Assert.assert(skipped.includes("bind Mod+Shift+Y move-column-to-index 13: focus=false only for numbers up to 12"));
     Assert.assert(skipped.includes("bind Mod+TouchpadScrollUp focus-workspace-up: touchpad scrolling gives KWin no ticks to bind"));

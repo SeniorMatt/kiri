@@ -135,7 +135,7 @@ tests.register("NiriImport", 1, () => {
         "desktop-move-down": ["Meta+Ctrl+Shift+PgDown"],
         "desktop-move-up": ["Meta+Ctrl+Shift+PgUp"],
     }));
-    Assert.equal(result.settings["pointerBinds"], "Meta+WheelScrollDown=desktop-next@150;Meta+Shift+MouseMiddle=window-close");
+    Assert.equal(result.settings["pointerBinds"], "Meta+WheelScrollDown=desktop-next@150\nMeta+Shift+MouseMiddle=window-close");
     Assert.equal(result.skipped.length, 2); // spawn, touchpad scroll
     Assert.assert(result.skipped.every(line => line.includes(": ")), { message: "each skipped line has a reason" });
 

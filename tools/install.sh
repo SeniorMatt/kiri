@@ -151,6 +151,11 @@ if [ "$(kreadconfig6 --file kwinrc --group Kiri-install --key dynamicDesktopsOff
     w Script-kiri dynamicDesktops false
     w Kiri-install dynamicDesktopsOff done
 fi
+# 1.0: the wheel and mouse button binds are one per line in the settings; a saved list from before is converted once
+binds=$(kreadconfig6 --file kwinrc --group Script-kiri --key pointerBinds)
+case "$binds" in
+    *\;*) w Script-kiri pointerBinds "$(printf '%s' "$binds" | tr ';' '\n' | sed 's/^ *//; s/ *$//; /^$/d')" ;;
+esac
 # ---- 0.10.6: the mode switch -----------------------------------------------------------------------------
 # Up to 0.10.5 install.sh wrote Kiri's choices into kwinrc: Plasma's effects off, the kiri_* effects on, the focus
 # policy, wrap-around and rows. Now kwinrc keeps the user's settings and Kiri mode applies its own at runtime

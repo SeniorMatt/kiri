@@ -314,7 +314,7 @@ namespace NiriImport {
         if (bindNames.length > 0) {
             steps["desktopBindNames"] = JSON.stringify(bindNames);
         }
-        return { binds, pointer: hasBinds ? pointer.join(";") : undefined, skipped, steps, slots };
+        return { binds, pointer: hasBinds ? pointer.join("\n") : undefined, skipped, steps, slots };
     }
 
     function keyReason(niriKey: string) {

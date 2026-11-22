@@ -46,7 +46,6 @@ class ClientManager {
     private closedSlot: ClosedSlot|null = null;
     private readonly remapTimer: Delayer;
     private startupTimer: Delayer|null = null;
-    private readonly workspaceNames: string[]; // the names of niri's named workspaces, in order
     private static readonly kwinPickMs = 150;
 
     constructor(
@@ -85,7 +84,6 @@ class ClientManager {
                 isUrgent: kwinClient => kwinClient.demandsAttention === true,
             },
             config.gapsInnerVertical);
-        this.workspaceNames = ClientManager.readWorkspaceNames(config);
     }
 
     // niri's at-startup matcher stops matching 60 s after the start: the rules are evaluated again then (the world calls
@@ -105,30 +103,6 @@ class ClientManager {
         }
         const window = this.findTiledWindow(kwinClient);
         return window === null || window.column.getWindowToFocus() === window;
-    }
-
-    // The names niri's config gives its workspaces (`workspace "name"` lines), for open-on-workspace when the desktops
-    // themselves carry other names: the n-th named workspace is the n-th desktop
-    private static readWorkspaceNames(config: Config): string[] {
-        if (!config.niriConfigEnabled || config.niriConfig.trim() === "") {
-            return [];
-        }
-        try {
-            return Kdl.find(Kdl.parse(config.niriConfig), "workspace").map(node => node.args[0]).filter(name => name !== undefined);
-        } catch (error: any) {
-            return [];
-        }
-    }
-
-    // niri's open-on-workspace: the desktop with this name, else the desktop at the place of this name in niri's config
-    private findDesktopByName(name: string): KwinDesktop|undefined {
-        const desktops = Workspace.desktops;
-        const named = desktops.find(desktop => desktop.name === name);
-        if (named !== undefined) {
-            return named;
-        }
-        const index = this.workspaceNames.indexOf(name);
-        return index >= 0 ? desktops[index] : undefined;
     }
 
     // niri's is-active: the window that is active on its desktop (the one that has the focus there, or got it last)
@@ -152,7 +126,7 @@ class ClientManager {
         const open = this.windowRuleEnforcer.resolve(kwinClient, true);
         let wantedDesktop: KwinDesktop|undefined;
         if (!existing && !kwinClient.dock && open.workspace !== undefined) {
-            wantedDesktop = this.findDesktopByName(open.workspace);
+            wantedDesktop = this.world.dynamicDesktops.findByName(open.workspace); // niri's find_workspace_by_name
             if (wantedDesktop !== undefined && !(kwinClient.desktops.length === 1 && kwinClient.desktops[0] === wantedDesktop)) {
                 kwinClient.desktops = [wantedDesktop];
             }

@@ -87,7 +87,7 @@ FIELDS = [
     F("focusFollowsMouseMaxScroll", "Focus & Mouse", "Focus", "Max scroll", "Like niri's max-scroll-amount: do not focus a window that needs more scrolling than this to be fully shown, in percent of the screen width", suffix="%", hi=100),
     F("cursorFollowsFocus", "Focus & Mouse", "Focus", "", "Move the mouse cursor to a window focused from the keyboard (niri: warp-mouse-to-focus)", label_text="Cursor follows keyboard focus"),
     F("skipSwitcher", "Focus & Mouse", "Focus", "", "Hide tiled windows from the window switcher", label_text="Hide tiled windows from Alt+Tab"),
-    F("pointerBinds", "Focus & Mouse", "Mouse wheel and buttons", "Binds", "Like niri's Mod+WheelScrollDown binds: entries <modifiers>+<trigger>=<Kiri action>[@<cooldown ms>] separated by semicolons. Triggers: WheelScrollUp/Down/Left/Right, MouseLeft/Right/Middle/Back/Forward. The action is a name from the Shortcuts list, like desktop-next", lines=5, above=True),
+    F("pointerBinds", "Focus & Mouse", "Mouse wheel and buttons", "", "One bind per line, like niri's Mod+WheelScrollDown binds: <modifiers>+<trigger>=<Kiri action>[@<cooldown ms>], for example Meta+WheelScrollDown=desktop-next@150. Triggers: WheelScrollUp/Down/Left/Right, MouseLeft/Right/Middle/Back/Forward. The action is a name from the Shortcuts list. Blank lines are ignored; a semicolon between binds works too", lines=8, above=True, fixed=True, placeholder="Meta+WheelScrollDown=desktop-next@150"),
     F("untileOnDrag", "Focus & Mouse", "Dragging windows", "", "Dragging a tiled window takes it out of the grid", label_text="Float a window when it is dragged"),
     F("dropToTile", "Focus & Mouse", "Dragging windows", "", "Like niri: a window dragged out of the grid goes back in at the gap closest to the cursor when you let go", label_text="Tile a window where it is dropped"),
     F("resizeNeighborColumn", "Focus & Mouse", "Dragging windows", "", "When dragging a column's edge, inversely resize the column on the other side", label_text="Resize the neighbouring column too"),
@@ -209,6 +209,7 @@ FIELDS = [
 
 # One-line hints shown at the top of a group: (tab, group) -> text. Keep them to a line or two, details go in tooltips.
 NOTES = {
+    ("Focus & Mouse", "Mouse wheel and buttons"): "One bind per line: Modifiers+Trigger=action@cooldown ms. Hover over the box for the triggers.",
     ("Window Rules", "Simple rules"): "One window class per line, regular expressions are allowed. Find a class with: qdbus6 org.kde.KWin /KWin org.kde.KWin.queryWindowInfo",
     ("Window Rules", "JSON rules"): "Rules like niri's window-rule, matching the app id and title. Hover over the box for the fields.",
     ("Advanced", "Import niri config"): "Kiri applies the pasted config on top of the other tabs. Hover over the box for what it reads.",
@@ -240,8 +241,8 @@ def read_key_bindings():
     """[(name, description)] in file order; numbered ones keep their "{}" """
     src = open(KEYS_DEF, encoding="utf-8").read()
     # "Kiri internal: ..." are triggers that the effects send to the script; they have no place on the page
-    return [(m.group(1), m.group(2)) for m in re.finditer(r'name:\s*"([\w{}-]+)",\s*description:\s*"([^"]*)"', src) if not m.group(2).startswith("Kiri internal")] + \
-           [(m.group(1), m.group(2)) for m in re.finditer(r'name:\s*"([\w{}-]+)",\s*defaultModifiers:[^\n]*\n\s*description:\s*"([^"]*)"', src)]
+    return [(m.group(1), m.group(2).replace('\\"', '"')) for m in re.finditer(r'name:\s*"([\w{}-]+)",\s*description:\s*"((?:[^"\\]|\\.)*)"', src) if not m.group(2).startswith("Kiri internal")] + \
+           [(m.group(1), m.group(2).replace('\\"', '"')) for m in re.finditer(r'name:\s*"([\w{}-]+)",\s*defaultModifiers:[^\n]*\n\s*description:\s*"((?:[^"\\]|\\.)*)"', src)]
 
 # ---------------------------------------------------------------- XML helpers
 
@@ -270,9 +271,11 @@ def humanize(name):
     words = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name).split()
     return " ".join([words[0].capitalize()] + [w.lower() for w in words[1:]])
 
+SPIN_WIDTH = 130  # px, every number field has the same width so they line up inside and across groups
+
 def spin(entry, o):
     suffix = o.get("suffix", guess_suffix(entry["name"]))
-    sp = sprop("suffix", " " + suffix) if suffix else ""
+    sp = (sprop("suffix", " " + suffix) if suffix else "") + prop("minimumSize", "<size><width>%d</width><height>0</height></size>" % SPIN_WIDTH)
     if entry["type"] == "Double":
         return (f'<widget class="QDoubleSpinBox" name="kcfg_{entry["name"]}">{prop("decimals", "<number>2</number>")}{sp}'
                 f'{prop("minimum", f"<double>{o.get('lo', 0.0)}</double>")}{prop("maximum", f"<double>{o.get('hi', 1000.0)}</double>")}'
@@ -308,9 +311,12 @@ def field_widget(entry, o, tooltip):
         return (f'<widget class="QPlainTextEdit" name="kcfg_{name}">{prop("tabChangesFocus", "<bool>true</bool>")}'
                 f'{prop("lineWrapMode", "<enum>QPlainTextEdit::NoWrap</enum>")}{mono}{t}{ph}'
                 f'{prop("minimumSize", f"<size><width>0</width><height>{px}</height></size>")}'
-                + (prop("maximumSize", f"<size><width>16777215</width><height>{px}</height></size>") if o["lines"] <= 6 else "") + '</widget>')
+                + (prop("maximumSize", f"<size><width>16777215</width><height>{px}</height></size>") if o["lines"] <= 6 or o.get("fixed") else "") + '</widget>')
     ph = sprop("placeholderText", o["placeholder"]) if o.get("placeholder") else ""
-    return f'<widget class="QLineEdit" name="kcfg_{name}">{t}{ph}{prop("clearButtonEnabled", "<bool>true</bool>")}</widget>'
+    width = ""
+    if re.search(r"Color$", name):  # a colour is a few characters: no full-width box (gradients are longer and keep it)
+        width = prop("maximumSize", "<size><width>260</width><height>16777215</height></size>")
+    return f'<widget class="QLineEdit" name="kcfg_{name}">{t}{ph}{prop("clearButtonEnabled", "<bool>true</bool>")}{width}</widget>'
 
 # one row of a form: (label, widget xml, tooltip, above)
 def group_xml(title, rows):
@@ -408,6 +414,9 @@ def keyfield(row, col, key):
             '<property name="kcfg_propertyNotify"><cstring>2keySequenceChanged(QKeySequence)</cstring></property>\n'
             '</widget></item>')
 
+def ordinal(i):
+    return f"{i}" + ("th" if 10 <= i % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(i % 10, "th"))
+
 def shortcut_rows():
     """{group: [(label, config key)]}, sorted like System Settings sorts them"""
     groups = {}
@@ -416,9 +425,10 @@ def shortcut_rows():
         if not sep:
             group, label = "Other", desc
         label = label[:1].upper() + label[1:]
+        label = label.replace("{}th", "{}")  # the ordinal is made per number below ("1th" is not English)
         if "{}" in name:
             for i in range(1, 10):
-                groups.setdefault(group, []).append((label.replace("{}", str(i)), name.replace("{}", str(i)).replace("-", "_"), label.replace("{}", "{") , i))
+                groups.setdefault(group, []).append((label.replace("{}", ordinal(i) if "{}th" in desc else str(i)), name.replace("{}", str(i)).replace("-", "_"), label.replace("{}", "{") , i))
         else:
             groups.setdefault(group, []).append((label, name.replace("-", "_"), label, 0))
     result = {}
@@ -437,7 +447,9 @@ def shortcuts_page():
         cells = [f'<item row="0" column="1"><widget class="QLabel"><property name="text"><string>Shortcut</string></property></widget></item>',
                  f'<item row="0" column="2"><widget class="QLabel"><property name="text"><string>Alternate</string></property></widget></item>']
         for r, (label, key) in enumerate(rows, 1):
-            cells.append(f'<item row="{r}" column="0"><widget class="QLabel"><property name="text"><string>{escape(label)}</string></property></widget></item>')
+            label, paren, hint = label.partition(" (")  # "(niri's move-workspace-to-index)" is a tooltip, not part of the label
+            cells.append(f'<item row="{r}" column="0"><widget class="QLabel"><property name="text"><string>{escape(label)}</string></property>'
+                         + (tip(hint.rstrip(")")) if paren else "") + '</widget></item>')
             cells += [keyfield(r, 1, key), keyfield(r, 2, key)]
         pages.append(
             f'<widget class="QWidget" name="page_shortcuts_{index}"><layout class="QVBoxLayout">{prop("margin", "<number>0</number>")}'

@@ -408,16 +408,24 @@ const configDef = [
         default: "",
     },
     {
-        // the wheel and mouse button binds of the compiled effect: "Meta+WheelScrollDown=desktop-next@150;...", each
-        // "<modifiers>+<trigger>=<Kiri action>[@<cooldown ms>]" like niri's binds (the default is niri's default wheel binds)
+        // the wheel and mouse button binds of the compiled effect, one per line (";" works too, older configs have it):
+        // "Meta+WheelScrollDown=desktop-next@150", each "<modifiers>+<trigger>=<Kiri action>[@<cooldown ms>]" like niri's binds (the default is niri's default wheel binds)
         name: "pointerBinds",
         type: "String",
-        default: "Meta+WheelScrollDown=desktop-next@150;Meta+WheelScrollUp=desktop-previous@150;" +
-            "Meta+Ctrl+WheelScrollDown=column-move-to-next-desktop@150;Meta+Ctrl+WheelScrollUp=column-move-to-previous-desktop@150;" +
-            "Meta+WheelScrollRight=focus-right;Meta+WheelScrollLeft=focus-left;" +
-            "Meta+Ctrl+WheelScrollRight=column-move-right;Meta+Ctrl+WheelScrollLeft=column-move-left;" +
-            "Meta+Shift+WheelScrollDown=focus-right;Meta+Shift+WheelScrollUp=focus-left;" +
-            "Meta+Ctrl+Shift+WheelScrollDown=column-move-right;Meta+Ctrl+Shift+WheelScrollUp=column-move-left",
+        default: [
+            "Meta+WheelScrollDown=desktop-next@150",
+            "Meta+WheelScrollUp=desktop-previous@150",
+            "Meta+Ctrl+WheelScrollDown=column-move-to-next-desktop@150",
+            "Meta+Ctrl+WheelScrollUp=column-move-to-previous-desktop@150",
+            "Meta+WheelScrollRight=focus-right",
+            "Meta+WheelScrollLeft=focus-left",
+            "Meta+Ctrl+WheelScrollRight=column-move-right",
+            "Meta+Ctrl+WheelScrollLeft=column-move-left",
+            "Meta+Shift+WheelScrollDown=focus-right",
+            "Meta+Shift+WheelScrollUp=focus-left",
+            "Meta+Ctrl+Shift+WheelScrollDown=column-move-right",
+            "Meta+Ctrl+Shift+WheelScrollUp=column-move-left",
+        ].join("\n"),
     },
     {
         name: "gestureScroll",
