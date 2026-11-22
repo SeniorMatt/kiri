@@ -45,6 +45,8 @@ class ClientManager {
     private readonly windowRuleEnforcer: WindowRuleEnforcer;
     private closedSlot: ClosedSlot|null = null;
     private readonly remapTimer: Delayer;
+    private startupTimer: Delayer|null = null;
+    private readonly workspaceNames: string[]; // the names of niri's named workspaces, in order
     private static readonly kwinPickMs = 150;
 
     constructor(
@@ -79,8 +81,54 @@ class ClientManager {
                 isFloating: kwinClient => this.isFloating(kwinClient),
                 isFocused: kwinClient => Workspace.activeWindow === kwinClient,
                 isActive: kwinClient => this.isActiveWindow(kwinClient),
+                isActiveInColumn: kwinClient => this.isActiveInColumn(kwinClient),
+                isUrgent: kwinClient => kwinClient.demandsAttention === true,
             },
             config.gapsInnerVertical);
+        this.workspaceNames = ClientManager.readWorkspaceNames(config);
+    }
+
+    // niri's at-startup matcher stops matching 60 s after the start: the rules are evaluated again then (the world calls
+    // this once it is built)
+    public armStartupTimer() {
+        const startupLeft = WindowRuleEnforcer.startupRemainingMs();
+        if (this.startupTimer === null && this.windowRuleEnforcer.hasStartupRules() && startupLeft > 0) {
+            this.startupTimer = new Delayer(startupLeft + 50, () => this.world.do(() => this.refreshRules()));
+            this.startupTimer.run();
+        }
+    }
+
+    // niri's is-active-in-column: the window its column gives the focus to (a floating window is always the active one)
+    private isActiveInColumn(kwinClient: KwinClient) {
+        if (this.isFloating(kwinClient)) {
+            return true;
+        }
+        const window = this.findTiledWindow(kwinClient);
+        return window === null || window.column.getWindowToFocus() === window;
+    }
+
+    // The names niri's config gives its workspaces (`workspace "name"` lines), for open-on-workspace when the desktops
+    // themselves carry other names: the n-th named workspace is the n-th desktop
+    private static readWorkspaceNames(config: Config): string[] {
+        if (!config.niriConfigEnabled || config.niriConfig.trim() === "") {
+            return [];
+        }
+        try {
+            return Kdl.find(Kdl.parse(config.niriConfig), "workspace").map(node => node.args[0]).filter(name => name !== undefined);
+        } catch (error: any) {
+            return [];
+        }
+    }
+
+    // niri's open-on-workspace: the desktop with this name, else the desktop at the place of this name in niri's config
+    private findDesktopByName(name: string): KwinDesktop|undefined {
+        const desktops = Workspace.desktops;
+        const named = desktops.find(desktop => desktop.name === name);
+        if (named !== undefined) {
+            return named;
+        }
+        const index = this.workspaceNames.indexOf(name);
+        return index >= 0 ? desktops[index] : undefined;
     }
 
     // niri's is-active: the window that is active on its desktop (the one that has the focus there, or got it last)
@@ -100,9 +148,19 @@ class ClientManager {
         }
         console.assert(!this.hasClient(kwinClient));
 
+        // niri's rules of a window that opens (it is not focused, not floating, ... yet)
+        const open = this.windowRuleEnforcer.resolve(kwinClient, true);
+        let wantedDesktop: KwinDesktop|undefined;
+        if (!existing && !kwinClient.dock && open.workspace !== undefined) {
+            wantedDesktop = this.findDesktopByName(open.workspace);
+            if (wantedDesktop !== undefined && !(kwinClient.desktops.length === 1 && kwinClient.desktops[0] === wantedDesktop)) {
+                kwinClient.desktops = [wantedDesktop];
+            }
+        }
         const slot = this.takeClosedSlot(kwinClient);
         let constructState: (client: ClientWrapper) => ClientState.State;
         let desktop: Desktop | undefined;
+        let widthBeforeMaximize: number | undefined;
         if (kwinClient.dock) {
             constructState = () => new ClientState.Docked(this.world, kwinClient);
         } else if (existing && this.restoredFloating.has(String(kwinClient.internalId))) {
@@ -110,7 +168,7 @@ class ClientManager {
             constructState = (client: ClientWrapper) => new ClientState.Floating(this.world, client, this.config, false);
         } else if (
             Clients.canTileEver(kwinClient) &&
-            this.windowRuleEnforcer.shouldTile(kwinClient) &&
+            this.windowRuleEnforcer.shouldTile(kwinClient, open) &&
             (desktop = this.desktopManager.getDesktopForClient(kwinClient)) !== undefined
         ) {
             Clients.makeTileable(kwinClient);
@@ -119,15 +177,26 @@ class ClientManager {
                 if (slot !== null) {
                     client.preferredWidth = slot.preferredWidth;
                 } else if (!existing) {
-                    const width = this.windowRuleEnforcer.getColumnWidth(kwinClient, desktop!.tilingArea.width);
-                    if (width !== null) {
+                    const width = this.windowRuleEnforcer.getColumnWidth(kwinClient, desktop!.tilingArea.width, open);
+                    if (open.maximized === true) {
+                        // niri's open-maximized: the column opens at the full width, the width it would have is what
+                        // maximize-column goes back to
+                        widthBeforeMaximize = width ?? client.preferredWidth;
+                        client.preferredWidth = desktop!.tilingArea.width;
+                    } else if (width !== null) {
                         client.preferredWidth = width;
                     }
                 }
                 const state = new ClientState.Tiled(this.world, client, desktop!.grid, slot !== null && slot.grid === desktop!.grid ? slot.placement : undefined);
+                if (widthBeforeMaximize !== undefined) {
+                    state.window.column.widthBeforeMaximize = widthBeforeMaximize;
+                }
+                if (!existing && open.columnDisplay !== undefined && state.window.column.getWindowCount() === 1) {
+                    state.window.column.setTabbed(open.columnDisplay === "tabbed"); // niri's default-column-display
+                }
                 if (!existing) {
                     // niri's default-window-height
-                    const height = this.windowRuleEnforcer.getWindowHeight(kwinClient, desktop!.tilingArea.height);
+                    const height = this.windowRuleEnforcer.getWindowHeight(kwinClient, desktop!.tilingArea.height, open);
                     if (height !== null) {
                         state.window.column.setFixedHeight(state.window, height, null);
                     }
@@ -140,11 +209,16 @@ class ClientManager {
                 resourceClass: kwinClient.resourceClass,
                 pid: kwinClient.pid,
                 fullScreen: kwinClient.fullScreen,
-                reason: this.windowRuleEnforcer.whyNotTiled(kwinClient) || (desktop === undefined ? "no tiled desktop for it" : "unknown"),
+                reason: this.windowRuleEnforcer.whyNotTiled(kwinClient, open) || (desktop === undefined ? "no tiled desktop for it" : "unknown"),
             }));
             constructState = (client: ClientWrapper) => new ClientState.Floating(this.world, client, this.config, false, true);
         }
 
+        const stateOfRules = constructState;
+        constructState = (client: ClientWrapper) => {
+            client.ruleLimits = ClientManager.limitsOf(open); // before the layout looks at the window's limits
+            return stateOfRules(client);
+        };
         const client = new ClientWrapper(
             kwinClient,
             constructState,
@@ -168,8 +242,9 @@ class ClientManager {
             queryX11Window(kwinClient, x11 => { client.x11 = x11; });
         }
 
+        this.applyContinuousRules(client, this.windowRuleEnforcer.resolve(kwinClient));
         if (!existing) {
-            this.applyOpenRules(client);
+            this.applyOpenRules(client, open, wantedDesktop);
             if (!Clients.isShellUi(kwinClient)) {
                 // niri warps the cursor to a newly opened window that it activates (warp-mouse-to-focus)
                 KiriFocus.mark(kwinClient);
@@ -186,30 +261,142 @@ class ClientManager {
         }
     }
 
-    // niri's open-fullscreen, and the size and the centering of a new window that a float rule (open-floating) matches
-    private applyOpenRules(client: ClientWrapper) {
+    // niri's open-fullscreen, open-maximized-to-edges, open-focused, default-floating-position, and the size and the
+    // centering of a new window that a float rule (open-floating) matches
+    private applyOpenRules(client: ClientWrapper, open: ResolvedRules, wantedDesktop: KwinDesktop|undefined) {
         const kwinClient = client.kwinClient;
         const state = client.stateManager.getState();
         if (state instanceof ClientState.Floating && !Clients.placesItself(kwinClient)) {
             const area = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, Clients.getKwinDesktopApprox(kwinClient));
-            const size = this.windowRuleEnforcer.getFloatingSize(kwinClient, area);
-            if (size !== null) {
+            const size = this.windowRuleEnforcer.getFloatingSize(kwinClient, area, open);
+            const limits = client.ruleLimits;
+            const limited = limits.minWidth > 0 || limits.minHeight > 0 || limits.maxWidth > 0 || limits.maxHeight > 0;
+            if (size !== null || open.floatingPosition !== undefined || limited) {
                 const frame = kwinClient.frameGeometry;
-                const min = kwinClient.minSize;
-                const max = kwinClient.maxSize;
                 const fit = (value: number, minimum: number, maximum: number) => {
                     value = Math.max(1, Math.round(value));
                     return Math.max(maximum > 0 ? Math.min(value, Math.floor(maximum)) : value, Math.ceil(minimum));
                 };
-                const width = size.width === undefined ? frame.width.round() : fit(size.width, min.width, max.width);
-                const height = size.height === undefined ? frame.height.round() : fit(size.height, min.height, max.height);
-                const { x, y } = ClientManager.centerInArea(area, width, height);
-                client.place(x, y, width, height);
+                const width = fit(size?.width ?? frame.width.round(), client.getMinWidth(), client.getMaxWidth());
+                const height = fit(size?.height ?? frame.height.round(), client.getMinHeight(), client.getMaxHeight());
+                let place: { x: number, y: number };
+                if (open.floatingPosition !== undefined) {
+                    place = ClientManager.floatingPositionIn(area, open.floatingPosition, width, height);
+                } else if (size !== null) {
+                    place = ClientManager.centerInArea(area, width, height);
+                } else {
+                    place = { x: frame.x.round(), y: frame.y.round() };
+                }
+                client.place(place.x, place.y, width, height);
             }
         }
-        if (state instanceof ClientState.Tiled && this.windowRuleEnforcer.shouldOpenFullScreen(kwinClient)) {
-            client.setFullScreen(true);
+        if (state instanceof ClientState.Tiled) {
+            if (open.fullscreen === true) {
+                client.setFullScreen(true);
+            } else if (open.fullscreen === false && kwinClient.fullScreen) {
+                client.setFullScreen(false); // open-fullscreen false: the window's own request to open full-screen is refused
+            } else if (open.maximizedToEdges === true) {
+                client.setMaximize(true, true);
+            }
         }
+        this.applyOpenFocus(kwinClient, open, wantedDesktop);
+    }
+
+    // niri's open-focused: false keeps the focus where it was. A window that opens on a desktop other than the current
+    // one does not take the focus either, unless open-focused is true.
+    private applyOpenFocus(kwinClient: KwinClient, open: ResolvedRules, wantedDesktop: KwinDesktop|undefined) {
+        if (kwinClient.dock) {
+            return;
+        }
+        const elsewhere = wantedDesktop !== undefined && wantedDesktop !== Workspace.currentDesktop;
+        if (open.focused === true) {
+            if (Workspace.activeWindow !== kwinClient) {
+                KiriFocus.mark(kwinClient);
+                activateWindow(kwinClient, "open-focused");
+            }
+        } else if (open.focused === false || elsewhere) {
+            // KWin activated the window before the script knew it: the focus goes back to the window that had it
+            const previous = kwinClient === this.lastFocusedClient ? this.focusedBefore : this.lastFocusedClient;
+            if (previous !== null && previous !== kwinClient && this.clientMap.has(previous) && !previous.minimized &&
+                Clients.isOnVirtualDesktop(previous, Workspace.currentDesktop) && Workspace.activeWindow === kwinClient) {
+                KiriFocus.mark(previous);
+                activateWindow(previous, "open-focused false");
+            }
+        }
+    }
+
+    // niri's default-floating-position: x and y from the corner or edge `relativeTo` (stored_or_default_tile_pos)
+    public static floatingPositionIn(area: QmlRect, position: FloatingPositionRule, width: number, height: number) {
+        const relativeTo = position.relativeTo ?? "top-left";
+        let x = position.x;
+        let y = position.y;
+        if (relativeTo === "top-right" || relativeTo === "bottom-right" || relativeTo === "right") {
+            x = area.width - width - x;
+        }
+        if (relativeTo === "bottom-left" || relativeTo === "bottom-right" || relativeTo === "bottom") {
+            y = area.height - height - y;
+        }
+        if (relativeTo === "top" || relativeTo === "bottom") {
+            x += area.width / 2 - width / 2;
+        }
+        if (relativeTo === "left" || relativeTo === "right") {
+            y += area.height / 2 - height / 2;
+        }
+        return { x: Math.round(area.x + x), y: Math.round(area.y + y) };
+    }
+
+    private static limitsOf(rules: ResolvedRules) {
+        return {
+            minWidth: rules.minWidth ?? 0,
+            minHeight: rules.minHeight ?? 0,
+            maxWidth: rules.maxWidth ?? 0,
+            maxHeight: rules.maxHeight ?? 0,
+        };
+    }
+
+    public hasDynamicRules() {
+        return this.windowRuleEnforcer.hasDynamicRules();
+    }
+
+    // niri's recompute_window_rules: the rules that apply all the time (limits, opacity, the look) are worked out again
+    // for one window, or for all of them, and applied when they changed
+    public refreshRules(kwinClient?: KwinClient) {
+        if (kwinClient !== undefined) {
+            const client = this.clientMap.get(kwinClient);
+            if (client !== undefined) {
+                this.applyContinuousRules(client, this.windowRuleEnforcer.resolve(kwinClient));
+            }
+            return;
+        }
+        for (const [key, client] of this.clientMap) {
+            this.applyContinuousRules(client, this.windowRuleEnforcer.resolve(key));
+        }
+    }
+
+    private applyContinuousRules(client: ClientWrapper, rules: ResolvedRules) {
+        const limits = ClientManager.limitsOf(rules);
+        const opacity = rules.opacity ?? null;
+        const key = JSON.stringify([limits, opacity, rules.style]);
+        if (key === client.rulesKey) {
+            return;
+        }
+        client.rulesKey = key;
+        const limitsChanged = JSON.stringify(limits) !== JSON.stringify(client.ruleLimits);
+        client.ruleLimits = limits;
+        client.setRuleOpacity(opacity);
+        setWindowDecorations(String(client.kwinClient.internalId), rules.style); // the effect takes the rule's fields over the global look
+        if (limitsChanged) {
+            const window = this.findTiledWindow(client.kwinClient);
+            if (window !== null) {
+                window.column.setWidth(window.column.getWidth(), false, true); // the width may be outside the new limits
+                window.column.resizeWindows();
+            }
+        }
+    }
+
+    // niri's toggle-window-rule-opacity for the focused window
+    public toggleRuleOpacity(kwinClient: KwinClient) {
+        this.clientMap.get(kwinClient)?.toggleRuleOpacity();
     }
 
     // niri's center_preferring_top_left_in_area: centered, but a window larger than the area keeps its top-left corner
@@ -1351,6 +1538,7 @@ class ClientManager {
 
     public destroy() {
         this.remapTimer.destroy();
+        this.startupTimer?.destroy();
         this.removeAllClients();
     }
 }

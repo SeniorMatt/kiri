@@ -184,8 +184,11 @@ FIELDS = [
     F("floatClasses", "Window Rules", "Simple rules", "Always float", "Window classes that are never tiled. One per line, regular expressions are allowed", lines=4, above=True, placeholder="calc\nmpv"),
     F("tileClasses", "Window Rules", "Simple rules", "Always tile", "Window classes that are always tiled, even if Kiri would float them. One per line", lines=4, above=True, placeholder="kfind"),
     F("columnWidthRules", "Window Rules", "Simple rules", "Column width", "One class=width per line, like firefox=66.667%", lines=4, above=True, placeholder="firefox=66.667%\norg\\.kde\\.dolphin=800px"),
-    F("windowRules", "Window Rules", "JSON rules", "Rules", "A JSON array of rule objects, applied together with the simple rules. Fields: class, caption (regexes), tile (true/false), width. "
-      "Example: {\"class\": \"steam\", \"caption\": \"Friends List\", \"tile\": false}", lines=12, above=True),
+    F("windowRules", "Window Rules", "JSON rules", "Rules", "A JSON array of rule objects like niri's window-rule, applied together with the simple rules; the last rule that sets a property wins. "
+      "Match: class, caption (regexes for the whole string), appId, title (niri's regexes, matching anywhere), isFloating, isActive, isFocused, isActiveInColumn, isUrgent, atStartup; "
+      "exclude: a list of such matches. Properties: tile (false = open-floating), width, height, fullscreen, maximized, maximizedToEdges, focused, workspace, columnDisplay, "
+      "floatingPosition {x, y, relativeTo}, minWidth, minHeight, maxWidth, maxHeight, opacity, and the looks focusRing, border, shadow, tabIndicator, cornerRadius, clipToGeometry. "
+      "Example: {\"appId\": \"^steam$\", \"title\": \"Friends List\", \"tile\": false}", lines=12, above=True),
 
     # Advanced
     F("tiledKeepBelow", "Advanced", "Stacking order", "Tiled windows", "Sets \"Keep Below\" on tiled windows so floating ones stay on top", radio=True, label_text="Keep below"),
@@ -200,14 +203,14 @@ FIELDS = [
     F("niriConfigEnabled", "Advanced", "Import niri config", "", "When off, the pasted text is kept but not used", label_text="Use this niri config"),
     F("niriConfig", "Advanced", "Import niri config", "", "Paste your niri config.kdl (usually ~/.config/niri/config.kdl). Kiri reads it every time the settings change and applies it on top of the other tabs, "
       "so the values it sets win. It sets: key binds (keys typed in the Shortcuts tab still win), gaps and struts, center-focused-column, always-center-single-column, preset widths and heights, "
-      "default column width and display, focus ring, border, tab indicator, warp-mouse-to-focus, and window rules with open-floating or default-column-width. "
+      "default column width and display, focus ring, border, tab indicator, warp-mouse-to-focus, and window rules (every matcher and property of niri's window-rule that KWin can do). "
       "Everything else is ignored; lines Kiri can't use are listed in the KWin log.", lines=14, above=True, placeholder="layout {\n    gaps 16\n}\nbinds {\n    Mod+H { focus-column-left; }\n}"),
 ]
 
 # One-line hints shown at the top of a group: (tab, group) -> text. Keep them to a line or two, details go in tooltips.
 NOTES = {
     ("Window Rules", "Simple rules"): "One window class per line, regular expressions are allowed. Find a class with: qdbus6 org.kde.KWin /KWin org.kde.KWin.queryWindowInfo",
-    ("Window Rules", "JSON rules"): "For rules that also match the window title. Hover over the box for the fields.",
+    ("Window Rules", "JSON rules"): "Rules like niri's window-rule, matching the app id and title. Hover over the box for the fields.",
     ("Advanced", "Import niri config"): "Kiri applies the pasted config on top of the other tabs. Hover over the box for what it reads.",
 }
 

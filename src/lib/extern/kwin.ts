@@ -107,6 +107,7 @@ interface KwinClient {
     readonly minimizedChanged: QSignal<[]>;
     readonly maximizedAboutToChange: QSignal<[MaximizedMode]>;
     readonly captionChanged: QSignal<[]>;
+    readonly windowClassChanged?: QSignal<[]>;
     readonly tileChanged: QSignal<[]>;
     readonly interactiveMoveResizeStarted: QSignal<[]>;
     readonly interactiveMoveResizeStepped: QSignal<[geometry: QmlRect]>; // the geometry the pointer asks for, before the client has committed it

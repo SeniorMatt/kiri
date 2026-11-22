@@ -30,6 +30,8 @@ function init(config: Config, screenSize: { width: number, height: number } = { 
     gapV = config.gapsInnerVertical;
     runLog = [];
 
+    windowDecorations.clear(); // the per-window looks of an earlier test's windows
+    lastWindowDecorationsJson = "{}";
     setOverviewPolling(false); // a test that left the overview open must not change the next one
     const qtMock = new MockQt();
     const workspaceMock = new MockWorkspace();

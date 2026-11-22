@@ -410,3 +410,99 @@ tests.register("Double resize-click on an edge", 3, () => {
         Date.now = realNow;
     }
 });
+
+// The windows of a column stay aligned while one of them is resized: they all start at the column's edge, whatever the
+// view does meanwhile (niri's tile_offsets: a tile is at the column's x, a narrower one on the left, or on the right while
+// the left edge is dragged), and what the pointer asks for beyond what the column can give is not given to the window.
+tests.register("Resize keeps the windows of a column aligned", 6, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = true; // the view moves while the column grows
+    const { qtMock, workspaceMock } = init(config);
+    const [, top, bottom] = workspaceMock.createClientsWithWidths(300, 300, 300);
+    qtMock.fireShortcut("window-move-left");
+    workspaceMock.activeWindow = bottom;
+    const start = bottom.getFrameGeometryCopy();
+    const topStart = top.getFrameGeometryCopy();
+    Assert.equal(start.x, topStart.x);
+
+    const realNow = Date.now;
+    let now = 100000;
+    Date.now = () => now;
+    const dragEdge = (leftEdge: boolean) => {
+        now += 1000; // not a double click
+        workspaceMock.cursorPos = new MockQmlPoint(leftEdge ? start.x : rectRight(start), start.y + start.height / 2);
+        bottom.resize = true;
+        bottom.interactiveMoveResizeStarted.fire();
+    };
+    const step = (leftEdge: boolean, grow: number) => {
+        const requested = leftEdge ?
+            new MockQmlRect(start.x - grow, start.y, start.width + grow, start.height) :
+            new MockQmlRect(start.x, start.y, start.width + grow, start.height);
+        bottom.interactiveMoveResizeStepped.fire(requested);
+        bottom.frameGeometry = requested;
+        const t = top.getActualFrameGeometry();
+        const b = bottom.getActualFrameGeometry();
+        // where the dragged window is painted: KWin owns its frame, Kiri tells the effect where the layout has it
+        const painted = visualPositions.get(String(bottom.internalId));
+        const bx = painted !== undefined ? painted[0] : b.x;
+        Assert.equal(t.width, b.width, { message: "the windows of the column are as wide as each other" });
+        if (!leftEdge) {
+            Assert.equal(t.x, bx, { message: "and start at the same place" });
+        } else {
+            Assert.equal(rectRight(t), bx + b.width, { message: "and end at the same place when the left edge is dragged" });
+        }
+    };
+
+    dragEdge(false);
+    step(false, 20);
+    step(false, 60);
+    step(false, 100);
+    bottom.resize = false;
+    bottom.interactiveMoveResizeFinished.fire();
+    Assert.equal(top.getActualFrameGeometry().x, bottom.getActualFrameGeometry().x);
+
+    const b1 = bottom.getFrameGeometryCopy();
+    start.x = b1.x;
+    start.width = b1.width;
+    dragEdge(true);
+    step(true, 20);
+    step(true, 50);
+    bottom.resize = false;
+    bottom.interactiveMoveResizeFinished.fire();
+    Assert.equal(rectRight(top.getActualFrameGeometry()), rectRight(bottom.getActualFrameGeometry()));
+    Date.now = realNow;
+});
+
+// niri's column heights: the dragged window gets the height under the pointer but never more than what is left after the
+// minimum heights of the others; KWin lets the dragged window go on growing over them, so its frame is held at what fits
+tests.register("Resize by the top edge stops at the height of the others' minimum", 3, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock } = init(config);
+    const [, top, bottom] = workspaceMock.createClientsWithWidths(300, 300, 300);
+    qtMock.fireShortcut("window-move-left");
+    workspaceMock.activeWindow = bottom;
+    top.minSize = new MockQmlSize(100, 100);
+    const topStart = top.getFrameGeometryCopy();
+    const start = bottom.getFrameGeometryCopy();
+    workspaceMock.cursorPos = new MockQmlPoint(start.x + start.width / 2, start.y + 5);
+    bottom.resize = true;
+    bottom.interactiveMoveResizeStarted.fire();
+    const grab = (up: number) => {
+        const requested = new MockQmlRect(start.x, start.y - up, start.width, start.height + up);
+        bottom.frameGeometry = requested; // KWin moves the window with the pointer, then tells the step
+        bottom.interactiveMoveResizeStepped.fire(requested);
+    };
+    grab(40);
+    Assert.equal(top.getActualFrameGeometry().height, topStart.height - 40);
+    grab(10000); // the pointer is far above the window
+    const t = top.getActualFrameGeometry();
+    const b = bottom.getActualFrameGeometry();
+    Assert.equal(t.height, 100, { message: "the window above keeps its minimum height" });
+    Assert.equal(b.y, t.y + t.height + gapV, { message: "the dragged window starts right below it, without overlap" });
+    Assert.equal(rectBottom(b), tilingArea.y + tilingArea.height);
+    bottom.resize = false;
+    bottom.interactiveMoveResizeFinished.fire();
+    Assert.equal(top.getActualFrameGeometry().height, 100);
+    Assert.rect(bottom.getActualFrameGeometry(), start.x, t.y + t.height + gapV, start.width, tilingArea.y + tilingArea.height - (t.y + t.height + gapV));
+});

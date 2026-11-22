@@ -93,6 +93,7 @@ ACTIONS = {
     "focus-tiling": "focus-tiling",
     "focus-window-previous": "focus-window-previous",
     "open-overview": "overview-open",
+    "toggle-window-rule-opacity": "window-toggle-rule-opacity",
     "close-overview": "overview-close",
     "show-hotkey-overlay": "show-hotkey-overlay",
     # in niri's scrolling layout the width of a window is the width of its column
@@ -193,7 +194,6 @@ UNMAPPED = [
     (r"^(toggle-debug-tint|debug-toggle)", "niri renderer debugging"),
     (r"monitor", "no monitor concept in Kiri's layout (desktops are shared by every screen; screen-switch moves the grid)"),
     (r"^(focus-workspace|move-(window|column)-to-workspace)$", "this workspace reference is not mapped (a name with focus=false, or more than 12 names)"),
-    (r"^toggle-window-rule-opacity$", "window rule opacity is not supported yet"),
     (r"-by-id$|^focus-window$|^load-config-file$|^mru-", "IPC and window switcher actions cannot be bound"),
 ]
 
@@ -683,15 +683,6 @@ def shadow_settings(node, out, warn):
     color_setting(child(node, "inactive-color"), "shadowInactiveColor", out, warn)
 
 
-def anchored(regex):
-    """niri regexes match anywhere in the string; Kiri's match the whole string."""
-    if regex.endswith("$") and not regex.endswith("\\$"):
-        regex = regex[:-1]
-    else:
-        regex += ".*"
-    return regex[1:] if regex.startswith("^") else ".*" + regex
-
-
 def default_rules():
     """Kiri's built-in windowRules, so ours are added to them instead of replacing them."""
     src = Path(__file__).resolve().parent.parent / "src/lib/config/definition.ts"
@@ -702,11 +693,16 @@ def default_rules():
         return None
 
 
-KNOWN_MATCHERS = {"app-id": "class", "title": "caption", "is-floating": "isFloating", "is-active": "isActive", "is-focused": "isFocused"}
+KNOWN_MATCHERS = {
+    "app-id": "appId", "title": "title", "is-floating": "isFloating", "is-active": "isActive", "is-focused": "isFocused",
+    "is-active-in-column": "isActiveInColumn", "is-urgent": "isUrgent", "is-window-cast-target": "isWindowCastTarget",
+    "at-startup": "atStartup",
+}
 
 
 def match_of(node, warn):
-    """One match or exclude line as a Kiri matcher; None when it uses a matcher Kiri has no data for."""
+    """One match or exclude line as a Kiri matcher; None when it uses a matcher Kiri does not know. The regexes are
+    kept as niri has them: Kiri's appId and title match anywhere in the string, with Rust's regex syntax."""
     props = node[2]
     unknown = [k for k in props if k not in KNOWN_MATCHERS]
     if unknown:
@@ -715,43 +711,176 @@ def match_of(node, warn):
     entry = {}
     for niri, kiri in KNOWN_MATCHERS.items():
         if niri in props:
-            if kiri in ("class", "caption"):
+            if kiri in ("appId", "title"):
                 if props[niri]:
-                    entry[kiri] = anchored(props[niri])
+                    entry[kiri] = props[niri]
             else:
                 entry[kiri] = props[niri] == "true"
     return entry
 
 
+def flag(node):
+    return None if node is None else node[1][:1] != ["false"]
+
+
+def color_of(node, warn, what):
+    if not node or not node[1]:
+        return None
+    color = parse_color(node[1][0])
+    if color is None:
+        warn(f"window-rule/{what}: colour {node[1][0]!r} not understood")
+    return color
+
+
+def state_colors(node, out, warn, what):
+    """the colour and the gradient of each state of a rule's focus-ring, border or tab-indicator, in the format of the settings"""
+    for state in ("active", "inactive", "urgent"):
+        color = color_of(child(node, state + "-color"), warn, f"{what} {state}")
+        if color:
+            out[state + "Color"] = color
+        gradient = gradient_string(child(node, state + "-gradient"), warn)
+        if gradient:
+            out[state + "Gradient"] = gradient
+
+
+def float_of(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def num(value):
+    """an int where the value is whole, like JSON.stringify of a JavaScript number"""
+    return int(value) if float(value).is_integer() else value
+
+
+def ring_rule(node, warn):
+    out = {}
+    if child(node, "off"):
+        out["enabled"] = False
+    elif child(node, "on"):
+        out["enabled"] = True
+    if child(node, "width") and number(child(node, "width")[1]) is not None:
+        out["width"] = number(child(node, "width")[1])
+    state_colors(node, out, warn, node[0])
+    return out or None
+
+
+def shadow_rule(node, warn):
+    out = {}
+    if child(node, "off"):
+        out["enabled"] = False
+    elif child(node, "on"):
+        out["enabled"] = True
+    for name in ("softness", "spread"):
+        c = child(node, name)
+        value = float_of(c[1][0]) if c and c[1] else None
+        if value is not None:
+            out[name] = num(value)
+    offset = child(node, "offset")
+    if offset:
+        for prop, key in (("x", "offsetX"), ("y", "offsetY")):
+            value = float_of(offset[2].get(prop))
+            if value is not None:
+                out[key] = num(value)
+    behind = flag(child(node, "draw-behind-window"))
+    if behind is not None:
+        out["drawBehindWindow"] = behind
+    color = color_of(child(node, "color"), warn, "shadow")
+    if color:
+        out["color"] = color
+    inactive = color_of(child(node, "inactive-color"), warn, "shadow inactive")
+    if inactive:
+        out["inactiveColor"] = inactive
+    return out or None
+
+
+def tab_indicator_rule(node, warn):
+    out = {}
+    state_colors(node, out, warn, "tab-indicator")
+    return out or None
+
+
+POSITIONS = ("top-left", "top-right", "bottom-left", "bottom-right", "top", "bottom", "left", "right")
+
+def rule_properties(rule, warn, radius_is_global):
+    """The properties of one window-rule as the keys of a Kiri rule, in niri's order."""
+    out = {}
+    floating = flag(child(rule, "open-floating"))
+    if floating is not None:
+        out["tile"] = not floating
+    for niri, kiri in (("default-column-width", "width"), ("default-window-height", "height")):
+        node = child(rule, niri)
+        if node is not None:
+            out[kiri] = size(node) or ""  # an empty block lets the window pick its own size
+    for niri, kiri in (("open-fullscreen", "fullscreen"), ("open-maximized", "maximized"),
+                       ("open-maximized-to-edges", "maximizedToEdges"), ("open-focused", "focused")):
+        value = flag(child(rule, niri))
+        if value is not None:
+            out[kiri] = value
+    workspace = child(rule, "open-on-workspace")
+    if workspace and workspace[1]:
+        out["workspace"] = workspace[1][0]
+    display = child(rule, "default-column-display")
+    if display and display[1][:1] in (["tabbed"], ["normal"]):
+        out["columnDisplay"] = display[1][0]
+    position = child(rule, "default-floating-position")
+    if position and float_of(position[2].get("x")) is not None and float_of(position[2].get("y")) is not None:
+        out["floatingPosition"] = {"x": num(float_of(position[2]["x"])), "y": num(float_of(position[2]["y"]))}
+        relative = position[2].get("relative-to")
+        if relative in POSITIONS and relative != "top-left":
+            out["floatingPosition"]["relativeTo"] = relative
+    for niri, kiri in (("min-width", "minWidth"), ("min-height", "minHeight"), ("max-width", "maxWidth"), ("max-height", "maxHeight")):
+        node = child(rule, niri)
+        if node and number(node[1]) is not None:
+            out[kiri] = max(0, number(node[1]))
+    opacity = child(rule, "opacity")
+    if opacity and opacity[1] and float_of(opacity[1][0]) is not None:
+        out["opacity"] = num(max(0.0, min(1.0, float_of(opacity[1][0]))))
+    for niri, kiri, convert in (("focus-ring", "focusRing", ring_rule), ("border", "border", ring_rule),
+                                ("shadow", "shadow", shadow_rule), ("tab-indicator", "tabIndicator", tab_indicator_rule)):
+        node = child(rule, niri)
+        converted = convert(node, warn) if node else None
+        if converted:
+            out[kiri] = converted
+    radius = child(rule, "geometry-corner-radius")
+    if radius and not radius_is_global:
+        values = [v for v in (float_of(a) for a in radius[1]) if v is not None]
+        if len(values) in (1, 4):
+            # the effect has one radius per window: niri's four corners (top-left first) give their largest one
+            if len(values) == 4 and len(set(values)) > 1:
+                warn("window-rule/geometry-corner-radius: different corners are not supported, the largest radius is used for all")
+            out["cornerRadius"] = max(0, js_round(max(values)))
+    return out
+
+
 def window_rules(nodes, warn):
+    """(Kiri rules, the global geometry-corner-radius or None)"""
     rules = []
+    radius = None
+    warned = set()
     for rule in find(nodes, "window-rule"):
         matches = find(rule[3], "match")
-        floating = child(rule, "open-floating")
-        floating = floating if floating and floating[1][:1] != ["false"] else None
-        width = size(child(rule, "default-column-width"))
-        height = size(child(rule, "default-window-height"))
-        fullscreen = child(rule, "open-fullscreen")
-        fullscreen = None if fullscreen is None else fullscreen[1][:1] != ["false"]
-        if not matches or not (floating or width or height or fullscreen is not None):
+        exclude_nodes = find(rule[3], "exclude")
+        radius_node = child(rule, "geometry-corner-radius")
+        # a rule for every window that sets geometry-corner-radius is the global setting
+        radius_is_global = not matches and not exclude_nodes and radius_node is not None and len(radius_node[1]) == 1
+        if radius_is_global and number(radius_node[1]) is not None:
+            radius = max(0, number(radius_node[1]))
+        properties = rule_properties(rule, warn, radius_is_global)
+        if not properties:
             continue
-        excludes = [e for e in (match_of(x, warn) for x in find(rule[3], "exclude")) if e is not None]
-        for m in matches:
-            entry = match_of(m, warn)
+        excludes = [e for e in (match_of(x, warn) for x in exclude_nodes) if e is not None]
+        for m in matches or [None]:  # a rule without match lines applies to every window
+            entry = {} if m is None else match_of(m, warn)
             if entry is None:
                 continue
-            if floating:
-                entry["tile"] = False
-            if width:
-                entry["width"] = width
-            if height:
-                entry["height"] = height
-            if fullscreen is not None:
-                entry["fullscreen"] = fullscreen
+            entry.update(properties)
             if excludes:
                 entry["exclude"] = excludes
             rules.append(entry)
-    return rules
+    return rules, radius
 
 
 # niri's animations: the setting of each is one text (src/lib/config/definition.ts, animWindowOpen and the others)
@@ -831,6 +960,11 @@ MAPPED_OPTIONS = {
     "animations/off", "animations/on", "animations/slowdown", "animations/window-open", "animations/window-close",
     "animations/window-movement", "animations/window-resize", "animations/horizontal-view-movement",
     "animations/workspace-switch", "animations/overview-open-close",
+    "window-rule/open-maximized", "window-rule/open-maximized-to-edges", "window-rule/open-focused", "window-rule/open-on-workspace",
+    "window-rule/default-column-display", "window-rule/default-floating-position", "window-rule/min-width", "window-rule/min-height",
+    "window-rule/max-width", "window-rule/max-height", "window-rule/opacity", "window-rule/focus-ring", "window-rule/border",
+    "window-rule/shadow", "window-rule/tab-indicator",
+    "window-rule/clip-to-geometry",  # Kiri's effect clips every window that has a corner radius to its rounded corners
 }
 LOOKED_INTO = ["layout", "input", "gestures", "window-rule", "overview", "animations", "hotkey-overlay", "debug"]
 SKIPPED_OPTIONS = {
@@ -860,11 +994,21 @@ SKIPPED_OPTIONS = {
     "overview/zoom": "not configurable yet",
     "overview/backdrop-color": "not configurable yet",
     "overview/workspace-shadow": "not configurable yet",
-    "window-rule/clip-to-geometry": "not supported yet",
     "animations/config-notification-open-close": "KWin scripts have no config reload notice to animate",
     "animations/exit-confirmation-open-close": "Kiri has no exit confirmation dialog",
     "animations/screenshot-ui-open": "the screenshot UI is Spectacle's",
     "animations/recent-windows-close": "Alt+Tab is KWin's Task Switcher",
+    "window-rule/open-on-output": "Kiri has one layout for all screens",
+    "window-rule/on-xdg-activate": "KWin's focus stealing prevention decides",
+    "window-rule/block-out-from": "KWin cannot hide a window from screen casts",
+    "window-rule/variable-refresh-rate": "adaptive sync is set per output in Plasma's Display settings",
+    "window-rule/scroll-factor": "Plasma's input settings; KWin has no per-window scroll scaling",
+    "window-rule/pinch-sensitivity": "Plasma's input settings",
+    "window-rule/tiled-state": "KWin gives scripts no xdg tiled state",
+    "window-rule/background-effect": "the blur effect has no per-window script setting",
+    "window-rule/popups": "KWin draws popups itself",
+    "window-rule/draw-border-with-background": "the effect draws no background under a border",
+    "window-rule/baba-is-float": "the effect has no bobbing animation",
 }
 
 
@@ -972,11 +1116,6 @@ def read_settings_inner(nodes, warn):
     if L("default-column-display"):
         out["tabbedColumnsByDefault"] = (L("default-column-display")[1] or [""])[0] == "tabbed"
     ring_settings(L("focus-ring"), "focusRing", out, warn)
-    for rule in find(nodes, "window-rule"):
-        node = child(rule, "geometry-corner-radius")
-        if node and not find(rule[3], "match") and number(node[1]) is not None:
-            out["cornerRadius"] = max(0, number(node[1]))
-            break
     ring_settings(L("border"), "border", out, warn)
 
     tab = L("tab-indicator")
@@ -1097,7 +1236,9 @@ def read_settings_inner(nodes, warn):
                         pass
             color_setting(child(shadow, "color"), "overviewShadowColor", out, warn)
 
-    rules = window_rules(nodes, warn)
+    rules, radius = window_rules(nodes, warn)
+    if radius is not None:
+        out["cornerRadius"] = radius
     if rules:
         base = default_rules()
         if base is None:

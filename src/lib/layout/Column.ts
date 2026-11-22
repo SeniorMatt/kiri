@@ -20,7 +20,7 @@ class Column {
     private minHeightsSeen: number[] = []; // the minimum heights the last height distribution was made with
     // while the user resizes one of the windows: the geometry the pointer asks for, before the client has committed
     // it. The other windows of the column are sent there at once (niri sends all the configures of a resize together)
-    private userResizeTarget: { window: Window, x: number, width: number } | null = null;
+    private userResizeTarget: { window: Window, width: number, leftEdge: boolean } | null = null;
     private beyondView = false; // a width step made the column wider than the view (niri allows it)
     private static readonly minWidth = 40;
     private static readonly maxWidthBeyondView = 4; // times the view width: keeps the window under the GPU's texture size
@@ -155,7 +155,7 @@ class Column {
     public getMinWidth() {
         let maxMinWidth = Column.minWidth;
         for (const window of this.windows.iterator()) {
-            const minWidth = window.client.kwinClient.minSize.width.ceil();
+            const minWidth = window.client.getMinWidth();
             if (minWidth > maxMinWidth) {
                 maxMinWidth = minWidth;
             }
@@ -167,8 +167,8 @@ class Column {
     public getMaxWidth(beyondView = false) {
         let minMaxWidth = this.grid.desktop.tilingArea.width * (beyondView ? Column.maxWidthBeyondView : 1);
         for (const window of this.windows.iterator()) {
-            const maxWidth = window.client.kwinClient.maxSize.width.floor();
-            if (maxWidth < minMaxWidth) {
+            const maxWidth = window.client.getMaxWidth();
+            if (maxWidth > 0 && maxWidth < minMaxWidth) {
                 minMaxWidth = maxWidth;
             }
         }
@@ -269,14 +269,13 @@ class Column {
         this.grid.desktop.recenterWhileResizing(this, this.grid.getLastFocusedColumn() === this);
     }
 
-    // the pointer asks for `requested` (the window had `previous` at the last step): the column's windows get the new
-    // sizes now, without waiting for the resized client's commit. Other columns still follow the committed geometry.
-    public onUserResizeRequested(window: Window, requested: QmlRect, previous: QmlRect) {
-        this.userResizeTarget = {
-            window: window,
-            x: requested.x,
-            width: clamp(requested.width, this.getMinWidth(), this.getMaxWidth()),
-        };
+    // the pointer asks for `requested` (the window had `previous` at the last step; `leftEdge`: the left edge is dragged): the
+    // column's windows get the new sizes now, without waiting for the resized client's commit. Other columns still follow
+    // the committed geometry. Returns the geometry the layout allows the dragged window, which is `requested` unless the
+    // pointer asks for more than the column can give (a size limit of this or another window of the column).
+    public onUserResizeRequested(window: Window, requested: QmlRect, previous: QmlRect, leftEdge: boolean) {
+        const width = clamp(requested.width, this.getMinWidth(), this.getMaxWidth());
+        this.userResizeTarget = { window: window, width: width, leftEdge: leftEdge };
         if (requested.height !== previous.height) {
             // like niri: the dragged window gets the height under the pointer and the rest of the column shares what is
             // left; the top edge of the first window does nothing
@@ -286,6 +285,15 @@ class Column {
             }
         }
         this.grid.desktop.onLayoutChanged();
+        if (this.tabbed || window.height <= 0) {
+            return requested;
+        }
+        // the pointer-driven frame keeps the edge that is not dragged where it is
+        const height = Math.min(requested.height, window.height);
+        const clampedWidth = Math.min(requested.width, width);
+        const y = requested.y !== previous.y ? requested.y + requested.height - height : requested.y;
+        const x = leftEdge ? requested.x + requested.width - clampedWidth : requested.x;
+        return Qt.rect(x, y, clampedWidth, height);
     }
 
     public clearUserResizeTarget() {
@@ -329,7 +337,7 @@ class Column {
     }
 
     private getMinWindowHeight(window: Window) {
-        return Math.max(1, window.client.kwinClient.minSize.height.ceil());
+        return Math.max(1, window.client.getMinHeight());
     }
 
     // like niri's set-window-height: the window gets this height, the others share the rest by their weights
@@ -344,7 +352,7 @@ class Column {
                 othersMin += this.getMinWindowHeight(other);
             }
         }
-        const max = window.client.kwinClient.maxSize.height.floor();
+        const max = window.client.getMaxHeight();
         height = Math.min(height, Math.max(1, totalHeight - othersMin));
         if (max > 0) {
             height = Math.min(height, max);
@@ -434,8 +442,15 @@ class Column {
         let heightLeft = totalHeight;
         let weightLeft = 0;
         windows.forEach((window, i) => {
-            if (window.fixedHeight !== null) {
-                let fixed = Math.round(window.fixedHeight);
+            // niri: a window with an exact height (its minimum and maximum height are the same, from the client or
+            // from min-height and max-height rules) is a fixed one; the maximum also caps a fixed height
+            const clientMax = window.client.getMaxHeight();
+            const exact = clientMax > 0 && minHeights[i] === clientMax;
+            if (window.fixedHeight !== null || exact) {
+                let fixed = Math.round(exact ? clientMax : window.fixedHeight!);
+                if (clientMax > 0) {
+                    fixed = Math.min(fixed, clientMax);
+                }
                 if (nWindows > 1) {
                     let othersMin = 0;
                     minHeights.forEach((min, j) => othersMin += j === i ? 0 : min);
@@ -515,9 +530,9 @@ class Column {
 
     public arrange(x: number, visibleRange: Range, forceOpaque: boolean) {
         if (this.grid.config.offScreenOpacity < 1.0 && !forceOpaque) {
-            const opacity = Range.contains(visibleRange, this) ? 100 : this.grid.config.offScreenOpacity;
+            const opacity = Range.contains(visibleRange, this) ? 1 : this.grid.config.offScreenOpacity;
             for (const window of this.windows.iterator()) {
-                window.client.kwinClient.opacity = opacity;
+                window.client.setBaseOpacity(opacity);
             }
         }
 
@@ -529,7 +544,9 @@ class Column {
         const target = this.userResizeTarget;
         for (const window of this.windows.iterator()) {
             if (target !== null && window !== target.window) {
-                window.arrange(target.x, y, target.width, window.height);
+                // like niri, a tile that is not as wide as the column starts at the column's left edge, but when the left edge is
+                // dragged the column grows to the left (what the pointer asks for may not be committed yet)
+                window.arrange(target.leftEdge ? x + this.getWidth() - target.width : x, y, target.width, window.height);
             } else {
                 window.arrange(x, y, this.getWidth(), window.height);
             }

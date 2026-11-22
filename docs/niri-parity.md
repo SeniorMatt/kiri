@@ -117,7 +117,7 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | move-floating-window -x -y (relative or absolute) | position a floating window | binds.rs `MoveFloatingWindowById` | n/a | `MoveFloatingWindowById` is `knuffel(skip)`: only `niri msg action move-floating-window` (IPC) has it, a config bind cannot; the arrow keys move floating windows by 50 px | floatingKeys |
 | close-window | | | done | `window-close` | closePick |
 | toggle-overview, open-overview, close-overview |  | layout/mod.rs 4758 | done | `overview` toggles, `overview-open` and `overview-close` do nothing when the overview is already in that state | overview, niriSizeActions |
-| toggle-window-rule-opacity | flips the rule's opacity | binds.rs | missing | no opacity rule | - |
+| toggle-window-rule-opacity | flips the rule's opacity | binds.rs | done | `window-toggle-rule-opacity` (no default key, like niri) | windowRules |
 | set-dynamic-cast-window/monitor, clear-dynamic-cast-target, stop-cast | screencast target | binds.rs | n/a | Plasma screencasts through KWin/xdg-portal | - |
 | switch-layout | keyboard layout | binds.rs | n/a | Plasma keyboard KCM | - |
 | show-hotkey-overlay | list of binds | binds.rs; ui/hotkey_overlay.rs | partial | `show-hotkey-overlay`: a notification ("Important Hotkeys") with the keys the important actions have now (Kiri's settings, an imported niri config, else the defaults); keys set only on Plasma's Shortcuts page are not seen; not a QML overlay | niriSizeActions |
@@ -153,8 +153,8 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | Focus after closing a window in a column | tile below, else above | scrolling.rs `remove_tile_by_idx` 1074 | done | Column.ts, FocusPassing.ts | closeFocus |
 | Focus after closing a floating or full-screen window | | layout/mod.rs; workspace.rs | done | ClientManager.ts | closeFullScreen, closePick |
 | New window placement | new column right of the active column; width from default-column-width / rule; window rule heights | scrolling.rs `add_tile` 903, `new_window_size` 516 | done | ClientManager.ts `addClient`, Tiled.ts, Grid.ts | layout, windowRules |
-| New window opens floating if it has a parent or has a fixed size | | window/mod.rs `compute_open_floating` 377 | partial | fixed-size windows float (Clients.canTileEver needs resizeable); a dialog with a parent is tiled unless a rule floats it | leaveUntiled |
-| New window gets focus; `open-focused` rule; `on-xdg-activate`; debug `strict-new-window-focus-policy` | | handlers/compositor.rs 148-153; window_rule.rs | partial | KWin's focus-stealing prevention decides; Kiri marks and warps the pointer to a new activated window | cursorFollowsFocus |
+| New window opens floating if it has a parent or has a fixed height | | window/mod.rs `compute_open_floating` 377 | done | a dialog with a parent floats; so does a window whose min and max height are the same (rules/WindowRuleEnforcer.ts `hasFixedHeight`); windows that cannot be resized at all (Clients.canTileEver) float as well; `open-floating false` tiles a dialog or fixed-height window that can be resized | leaveUntiled, windowRules |
+| New window gets focus; `open-focused` rule; `on-xdg-activate`; debug `strict-new-window-focus-policy` | | handlers/compositor.rs 148-153; window_rule.rs | partial | KWin's focus-stealing prevention decides; Kiri marks and warps the pointer to a new activated window; `open-focused` is done (the focus goes back to the previous window for false); on-xdg-activate is impossible | cursorFollowsFocus, windowRules |
 | Column width formula | `(working_w - gaps) * proportion - gaps - extra`; window sizes floor to integer | scrolling.rs `resolve_column_width` 4579, `new_window_size` 547 | done | PresetWidths.ts `getRatioFunction` (same formula when outer gap = inner gap, floor) | units/behavior/PresetWidths, presetWidths |
 | Preset cycle with a client that rounds the width | cycles by index after a preset was applied | scrolling.rs `toggle_width` 4991 | done | PresetWidths.ts | presetWidths |
 | Window heights: auto weights and fixed, last window takes the remainder, integer rounding | | scrolling.rs `update_tile_sizes` 4601-4890 | done | Column.ts 330-470 | windowHeights |
@@ -238,45 +238,59 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 
 ## 7. Window rules (`window-rule {}`)
 
-Matchers (`match` / `exclude`, window_rule.rs):
+Kiri's rules are the JSON list `windowRules` (Window Rules tab); the niri importer fills it from `window-rule` blocks. A block
+without `match` lines applies to every window, several `match` lines become one Kiri rule each. All matching rules are merged in
+order and the last one that sets a property wins (niri's `ResolvedWindowRules::compute`).
+`appId` and `title` are niri's regexes: Rust `regex` syntax, matching anywhere in the app id (resource class) and title
+(rules/RustRegex.ts translates inline flags, `\A`, `\z`, `(?P<n>)`, `\x{..}`, POSIX classes, `\pL` and punctuation escapes; class
+intersection and `\b{..}` are errors, which drop the rule with a log line). Kiri's older `class` and `caption` match the whole string.
+
+Matchers (`match` / `exclude`, window_rule.rs; window/mod.rs `window_matches`):
 
 | Item | niri behaviour | niri source | Status | Kiri | Test |
 |---|---|---|---|---|---|
-| app-id, title (regex, matches anywhere) | | window_rule.rs `Match` | done | `class`, `caption`, plus `resourceName`; matches the whole string, so import wraps with `.*` (niri/import.ts `anchored`) | rules/WindowRuleEnforcer, windowRules |
-| is-active, is-focused, is-floating | | | done | rules/WindowRuleEnforcer.ts | windowRules |
-| is-active-in-column | | | missing | feasible from Column.ts | - |
-| is-urgent | | | missing | KWin `demandsAttention` | - |
-| is-window-cast-target | | | n/a | | - |
-| at-startup (first 60 s) | | | missing | feasible: time since login | - |
-| Multiple match / exclude lines | | | done | `exclude` list | rules/WindowRuleEnforcer |
+| app-id, title (regex, matches anywhere) | | window_rule.rs `Match` | done | `appId`, `title` (and the older whole-string `class`, `caption`, which also match `resourceName`) | rules/RustRegex, rules/WindowRuleEnforcer, windowRules |
+| is-active, is-focused, is-floating | not for a window that is still opening | window/mod.rs 189-330 | done | rules/WindowRuleEnforcer.ts `RuleMatcher`; opening windows get false (floating, active, focused) | windowRules |
+| is-active-in-column | true for an opening window | window/mod.rs `is_active_in_column` | done | `isActiveInColumn`, ClientManager.ts `isActiveInColumn` | windowRules, rules/WindowRuleEnforcer |
+| is-urgent | | window/mod.rs | done | `isUrgent`: KWin `demandsAttention` (and its signal) | windowRules |
+| is-window-cast-target | | window/mod.rs | impossible | KWin does not tell which windows are screen cast targets, so `is-window-cast-target=true` never matches and `=false` always does | rules/WindowRuleEnforcer |
+| at-startup (first 60 s) | | niri.rs 2882 | done | `atStartup`: 60 s after Kiri started (not after a settings reload); the rules are evaluated again when they are over | windowRules |
+| Multiple match / exclude lines, no match line = every window | | window/mod.rs 205-218 | done | `exclude` list; importer | rules/WindowRuleEnforcer, NiriImport |
+| Rules are evaluated again when title, app-id, focus, active window of the column, floating state or urgency change | | window/mod.rs `recompute_window_rules`; niri.rs `refresh_window_rules` | done | `ClientManager.refreshRules` (after every action, only when a rule uses a dynamic matcher; on caption, class and urgency signals) | windowRules |
 
 Properties:
 
 | Item | niri behaviour | niri source | Status | Kiri | Test |
 |---|---|---|---|---|---|
-| open-floating (and false) | | window_rule.rs | done | `tile: false/true` | windowRules |
-| default-column-width, default-window-height | | | done | `width`, `height` | windowRules |
-| open-fullscreen | | | done | `fullscreen` | windowRules |
-| open-maximized (full-width column) | | | missing | | - |
-| open-maximized-to-edges | | | missing | | - |
-| open-focused | open without taking focus | compositor.rs 153 | missing | KWin may activate regardless; can re-activate the old window | - |
-| open-on-workspace, open-on-output | | | missing | feasible: `kwinClient.desktops` on `clientAdded` (workspace by name needs section 4) | - |
-| on-xdg-activate (ignore, set-urgent, focus) | | | missing | KWin policy | - |
-| min-width, min-height, max-width, max-height | | | missing | clients' own limits are read (Clients.ts, Column.ts); rule limits are not | - |
-| default-column-display | tabbed for this window | | missing | | - |
-| default-floating-position (x, y, relative-to) | | | missing | float rules centre the window (ClientManager.ts `applyOpenRules`) | windowRules |
-| focus-ring / border / shadow / tab-indicator rules | per-window overrides | | partial | the effect side is done: D-Bus `setWindowDecorations` on kiri_decorations, called by `setWindowDecorations(id, rule)` in Kiri.ts (rule shape: `WindowDecorationRule`, also `cornerRadius`); matching the rules and calling it is the window-rules work | decorations |
-| opacity | | | missing | feasible in the motion effect (`setOpacity`) | - |
-| geometry-corner-radius, clip-to-geometry | | | partial | global `cornerRadius` only (kiri_corners shader) | - |
-| draw-border-with-background | | | missing | | - |
+| open-floating (and false) | false tiles a window that has a parent or a fixed height | window/mod.rs `compute_open_floating` 377 | done | `tile: false/true` | windowRules |
+| Windows that open floating without a rule | a window with a parent (dialog) or a fixed height (min height = max height after the min/max-height rules) | window/mod.rs 377-395 | done | WindowRuleEnforcer.shouldTile: transient or modal windows float, `hasFixedHeight` floats the rest. KWin's own X11 window types (utility, splash, ...) also float, niri has no such types | windowRules, rules/WindowRuleEnforcer |
+| default-column-width, default-window-height | `{}` lets the window pick | window/mod.rs; workspace.rs `resolve_default_width` 819 | done | `width`, `height` (`""` is the empty block) | windowRules |
+| open-fullscreen (and false) | false refuses the window's own request | handlers/xdg_shell.rs 1191 | done | `fullscreen` | windowRules |
+| open-maximized | the new column opens at the full width (maximize-column goes back) | xdg_shell.rs 1175 | done | `maximized`; Column.widthBeforeMaximize | windowRules |
+| open-maximized-to-edges | | xdg_shell.rs 1191 | done | `maximizedToEdges` | windowRules |
+| open-focused | false: the window opens without the focus | compositor.rs 153 | done | `focused`: the focus goes back to the window that had it, or to the new one for `true` | windowRules |
+| open-on-workspace | by name | xdg_shell.rs 1119 | done | `workspace`: the desktop with that name, else the desktop at the place of that name among the `workspace "name"` lines of the pasted niri config. A window on a desktop that is not the current one does not take the focus (unless open-focused true) | windowRules |
+| open-on-output | | | n/a | Kiri has one layout for all screens; the importer lists it | - |
+| on-xdg-activate (ignore, set-urgent, focus) | | | impossible | KWin's focus stealing prevention decides, a script cannot tell an activation request from a click | - |
+| min-width, min-height, max-width, max-height | applied on top of the client's own limits; a fixed height (min = max) makes a tile fixed | window/mod.rs `apply_min_size`, `apply_max_size`; scrolling.rs 4774 | done | `minWidth`, ..., ClientWrapper `getMinWidth` etc. used by Column.ts; floating windows are fitted at open | windowRules |
+| default-column-display | tabbed for the column the window opens | scrolling.rs 499 | done | `columnDisplay` | windowRules |
+| default-floating-position (x, y, relative-to) | | floating.rs `stored_or_default_tile_pos` 1297 | done | `floatingPosition`; ClientManager.floatingPositionIn | windowRules |
+| opacity, toggle-window-rule-opacity | opacity applies to the window; the action turns it off and on for the focused window | tile.rs; binds.rs | done | `opacity`: KWin's window opacity (multiplied with offScreenOpacity); `window-toggle-rule-opacity` | windowRules |
+| focus-ring / border / shadow / tab-indicator rules | per-window overrides of the global options | window_rule.rs; tile.rs 190 | done | the rules are merged per window (colour replaces gradient and the other way round) and given to the effect with `setWindowDecorations(id, rule)` (Kiri.ts, D-Bus `setWindowDecorations` of kiri_decorations) | windowRules, decorations |
+| geometry-corner-radius | per window | layout/mod.rs 318 | partial | same channel, one radius per window; niri's four corners give their largest one (the effect's corner shader and ring have one radius). A rule without match lines is the global `cornerRadius` | windowRules |
+| clip-to-geometry | clips the window to its rounded corners | tile.rs 1115 | partial | the effect clips every window that has a corner radius, whether the rule says so or not; the importer accepts the property | - |
+| draw-border-with-background, baba-is-float | | | missing | the importer lists them; the effect draws no background under the border and has no bobbing animation | - |
+| scroll-factor, pinch-sensitivity | | window_rule.rs | n/a | Plasma's input settings; KWin has no per-window scroll scaling. The importer lists them | - |
+| variable-refresh-rate | | window_rule.rs `VrrRule` | n/a | Plasma's display settings (adaptive sync is per output); the importer lists it | - |
 | block-out-from (screencast, screen-capture) | | | impossible | KWin offers no per-window exclusion from screen casts | - |
-| variable-refresh-rate | | | n/a | Plasma output settings | - |
-| baba-is-float | joke: windows float | | missing | trivial with the float animation; low priority | - |
 | tiled-state | tell the client it is tiled | | impossible | KWin does not expose xdg tiled states to scripts | - |
 | background-effect (blur, xray, noise, saturation) and top-level `blur {}` | | appearance.rs 1025-1100 | impossible | the blur effect is Plasma's and has no per-window script API | - |
 | popups { opacity, corner-radius, background-effect } | | window_rule.rs `PopupsRule` | impossible | KWin draws popups itself | - |
-| Rule order: later rules win, merged | | window_rule.rs | done | rules/WindowRuleEnforcer.ts | windowRules |
+| Rule order: later rules win, merged | | window/mod.rs | done | `WindowRuleEnforcer.resolve` | rules/WindowRuleEnforcer |
 | Kiri-only rules: `tile`, class lists, `columnWidthRules`, defaults for Plasma's windows | | | n/a | config/definition.ts | windowRules |
+
+The look fields of a rule (`cornerRadius`, `focusRing`, `border`, `shadow`, `tabIndicator`, with the colour and gradient strings of
+the settings) are those of `WindowDecorationRule` in Kiri.ts; the window's merged ones go to the effect with `setWindowDecorations`.
 
 Layer rules (layer_rule.rs: opacity, block-out-from, shadow, geometry-corner-radius, place-within-backdrop, focus-on-type-in-overview, baba-is-float, background-effect, popups): **n/a**, layer-shell surfaces are managed by KWin and Plasma.
 

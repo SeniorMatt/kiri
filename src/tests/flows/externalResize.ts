@@ -111,3 +111,27 @@ tests.register("A window that snaps to its own height is not pulled in from beyo
     }
     Assert.assert(terminal.getActualFrameGeometry().x >= screen.width, { message: "the window is meant to be off screen" });
 });
+
+// niri gives a tile the slot's size and leaves a window that has another size at the slot's top-left; it does not ask
+// again for a size the window has answered with another one (Kiri did, and a terminal that snaps to whole cells then
+// flipped between the two sizes for ever, drifting from the column's x)
+tests.register("A window that snaps to its own height is not asked for the same size again", 1, () => {
+    const config = getDefaultConfig();
+    const { qtMock, workspaceMock } = init(config);
+    const [first, terminal] = workspaceMock.createClientsWithWidths(300, 300);
+    terminal.heightStep = 37;
+    qtMock.fireShortcut("window-move-left"); // both in one column: the terminal is the lower window
+    const column = terminal.getFrameGeometryCopy();
+    Assert.equal(column.x, first.getFrameGeometryCopy().x);
+    for (let i = 0; i < 6; i++) {
+        qtMock.fireShortcut(i % 2 === 0 ? "focus-up" : "focus-down");
+    }
+    const asked = terminal.assignedGeometries.length;
+    for (let i = 0; i < 6; i++) {
+        qtMock.fireShortcut(i % 2 === 0 ? "focus-up" : "focus-down");
+    }
+    Assert.equal(terminal.assignedGeometries.length, asked, { message: "the layout passes do not ask the terminal for its size again" });
+    const t = terminal.getActualFrameGeometry();
+    Assert.equal(t.height % 37, 0, { message: "the terminal has its own size" });
+    Assert.equal(t.x, first.getActualFrameGeometry().x, { message: "and stays aligned with the window above" });
+});

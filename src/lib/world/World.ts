@@ -213,6 +213,7 @@ class World {
         }
         this.currentDesktop = Workspace.currentDesktop;
         this.update();
+        this.clientManager.armStartupTimer();
     }
 
     private static createScroller(config: Config) {
@@ -373,6 +374,9 @@ class World {
 
     private update() {
         this.dynamicDesktops.update();
+        if (this.clientManager.hasDynamicRules()) {
+            this.clientManager.refreshRules(); // is-focused, is-active, is-floating ... may have changed
+        }
         if (this.arrangeHeld) {
             return;
         }

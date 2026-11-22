@@ -1,3 +1,12 @@
+namespace ClientWrapper {
+    export interface Answer {
+        askedWidth: number;
+        askedHeight: number;
+        width: number;
+        height: number;
+    }
+}
+
 class ClientWrapper {
     public readonly stateManager: ClientState.Manager;
     private readonly transients: ClientWrapper[];
@@ -21,6 +30,13 @@ class ClientWrapper {
     private awaitingCommit = false; // a size was requested and the client has not committed anything since
     private answeredSizeRequest = false; // the last frame change came after Kiri had asked for a size
     private static readonly maxConfigureWaitMs = 100;
+    // what the client committed in answer to the last size it was sent, and how long it took
+    private askedSize: { width: number, height: number } | null = null; // the size the layout last asked of the client
+    // what the client committed in answer to the last size it was sent, when that was another size
+    private lastAnswer: ClientWrapper.Answer | null = null;
+    private static readonly maxAnswerDelayMs = 300;
+    // the same answer to the same size twice: the client does not take that size (a terminal that snaps to whole cells)
+    private refusal: ClientWrapper.Answer | null = null;
 
     constructor(
         public readonly kwinClient: KwinClient,
@@ -41,6 +57,73 @@ class ClientWrapper {
         this.manipulatingGeometry = new Doer();
         this.lastPlacement = null;
         this.stateManager = new ClientState.Manager(constructInitialState(this));
+    }
+
+    // niri's min-width, min-height, max-width and max-height window rules on top of the limits the client states
+    // (niri's apply_min_size and apply_max_size: a rule can only tighten the limits, a max of 0 is no limit)
+    public ruleLimits = { minWidth: 0, minHeight: 0, maxWidth: 0, maxHeight: 0 };
+    public rulesKey = ""; // what the rules gave the window the last time they were applied
+
+    public getMinWidth() {
+        return Math.max(this.kwinClient.minSize.width.ceil(), this.ruleLimits.minWidth);
+    }
+
+    public getMinHeight() {
+        return Math.max(this.kwinClient.minSize.height.ceil(), this.ruleLimits.minHeight);
+    }
+
+    // the largest width; 0 when the client has none (the size KWin reports for no limit is huge)
+    public getMaxWidth() {
+        return ClientWrapper.limit(this.kwinClient.maxSize.width.floor(), this.ruleLimits.maxWidth);
+    }
+
+    public getMaxHeight() {
+        return ClientWrapper.limit(this.kwinClient.maxSize.height.floor(), this.ruleLimits.maxHeight);
+    }
+
+    private static limit(clientMax: number, ruleMax: number) {
+        if (ruleMax <= 0) {
+            return clientMax;
+        }
+        return clientMax <= 0 ? ruleMax : Math.min(clientMax, ruleMax);
+    }
+
+    // niri's opacity window rule (null: none) and toggle-window-rule-opacity, which turns the rule off for the window
+    private ruleOpacity: number | null = null;
+    private ignoreRuleOpacity = false;
+    private baseOpacity = 1; // the opacity Kiri itself wants (off-screen windows)
+
+    public setRuleOpacity(opacity: number | null) {
+        if (opacity === this.ruleOpacity) {
+            return;
+        }
+        this.ruleOpacity = opacity;
+        if (opacity === null || opacity >= 1) {
+            this.ignoreRuleOpacity = false; // niri resets the toggle when the rule no longer makes the window translucent
+        }
+        this.applyOpacity();
+    }
+
+    public toggleRuleOpacity() {
+        this.ignoreRuleOpacity = !this.ignoreRuleOpacity;
+        this.applyOpacity();
+    }
+
+    public hasRuleOpacity() {
+        return this.ruleOpacity !== null && this.ruleOpacity < 1;
+    }
+
+    public setBaseOpacity(opacity: number) {
+        this.baseOpacity = opacity;
+        this.applyOpacity();
+    }
+
+    private applyOpacity() {
+        const rule = this.ruleOpacity === null || this.ignoreRuleOpacity ? 1 : Math.min(Math.max(this.ruleOpacity, 0), 1);
+        const opacity = this.baseOpacity * rule;
+        if (this.kwinClient.opacity !== opacity) {
+            this.kwinClient.opacity = opacity;
+        }
     }
 
     // where Kiri last put the window (its frame, before the client has committed the size), null before the first placement
@@ -69,20 +152,43 @@ class ClientWrapper {
             if (throttle && this.awaitingCommit && Date.now() - this.lastPlacementTime < ClientWrapper.maxConfigureWaitMs) {
                 return; // still waiting for the commit of the previous size
             }
+            // A client that does not take a size (it answers the same size with the same other one, as a terminal that
+            // snaps to whole cells does) is not asked again, it would only answer the same and the window would flip
+            // between the two sizes for ever; it keeps its place with the size it chose, in the corner of its slot (niri:
+            // the tile has the slot's size, the window sits at its top-left).
+            let frameWidth = width;
+            let frameHeight = height;
+            const refusal = this.refusal;
+            if (refusal !== null && !this.kwinClient.fullScreen && !this.windowedFullScreen && !this.maximizedSeen && refusal.askedWidth === width && refusal.askedHeight === height &&
+                refusal.width === current.width && refusal.height === current.height) {
+                frameWidth = current.width;
+                frameHeight = current.height;
+            }
             this.lastPlacement = Qt.rect(x, y, width, height);
-            if (current.x === x && current.y === y && current.width === width && current.height === height) {
+            if (current.x === x && current.y === y && current.width === frameWidth && current.height === frameHeight) {
                 // nothing to do; a repeated set makes some Xwayland clients redraw (black flashes)
                 return;
             }
             this.lastPlacementTime = Date.now();
-            this.awaitingCommit = current.width !== width || current.height !== height;
-            this.kwinClient.frameGeometry = this.lastPlacement; // a commit that happens at once clears awaitingCommit
-            if (this.kwinClient.frameGeometry !== this.lastPlacement) {
+            this.awaitingCommit = current.width !== frameWidth || current.height !== frameHeight;
+            if (this.awaitingCommit) {
+                this.askedSize = { width: frameWidth, height: frameHeight };
+            }
+            const frame = frameWidth === width && frameHeight === height ? this.lastPlacement : Qt.rect(x, y, frameWidth, frameHeight);
+            this.kwinClient.frameGeometry = frame; // a commit that happens at once clears awaitingCommit
+            if (this.kwinClient.frameGeometry !== frame) {
                 // frameGeometry assignment failed. This sometimes happens on Wayland
                 // when a window is off-screen, effectively making it stuck there.
                 this.kwinClient.frameGeometry.x = x; // This makes it unstuck.
-                this.kwinClient.frameGeometry = this.lastPlacement;
+                this.kwinClient.frameGeometry = frame;
             }
+        });
+    }
+
+    // puts the frame where the user's resize should have left it (see Column.onUserResizeRequested)
+    public setFrame(rect: QmlRect) {
+        this.manipulatingGeometry.do(() => {
+            this.kwinClient.frameGeometry = rect;
         });
     }
 
@@ -314,6 +420,8 @@ class ClientWrapper {
         const manager = new SignalManager();
 
         manager.connect(client.kwinClient.fullScreenChanged, () => {
+            client.lastAnswer = null;
+            client.refusal = null;
             if (client.kwinClient.fullScreen) {
                 client.fullScreenSeen = true;
             } else {
@@ -334,6 +442,19 @@ class ClientWrapper {
 
         manager.connect(client.kwinClient.frameGeometryChanged, () => {
             client.answeredSizeRequest = client.awaitingCommit;
+            // (KWin may show the asked size for a moment before the client's own comes: only another size counts, and only
+            // right after the ask)
+            if (client.askedSize !== null && Date.now() - client.lastPlacementTime < ClientWrapper.maxAnswerDelayMs) {
+                const frame = client.kwinClient.frameGeometry;
+                if (frame.width !== client.askedSize.width || frame.height !== client.askedSize.height) {
+                    const answer = { askedWidth: client.askedSize.width, askedHeight: client.askedSize.height, width: frame.width, height: frame.height };
+                    const last = client.lastAnswer;
+                    if (last !== null && last.askedWidth === answer.askedWidth && last.askedHeight === answer.askedHeight && last.width === answer.width && last.height === answer.height) {
+                        client.refusal = answer;
+                    }
+                    client.lastAnswer = answer;
+                }
+            }
             client.awaitingCommit = false;
         });
         manager.connect(client.kwinClient.maximizedAboutToChange, (maximizedMode: MaximizedMode) => {

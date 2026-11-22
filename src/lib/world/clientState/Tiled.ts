@@ -128,6 +128,7 @@ namespace ClientState {
             let resizeStartWidth = 0;
             let resizeNeighbor: { column: Column, startWidth: number } | undefined;
             let resizeRequest: QmlRect | null = null; // the geometry the pointer asked for at the last step
+            let resizeStart = { x: 0, y: 0 };
             let resizeStepped = false; // KWin reports the pointer's steps; the committed geometry is then only used for the width
             let lastResizeStart: { time: number, edges: number } | null = null; // for niri's double resize-click
             let resizeIgnored = false; // a double resize-click: KWin still resizes the window by the pointer, the layout ignores it
@@ -172,6 +173,7 @@ namespace ClientState {
                     }
                     resizing = true;
                     resizeRequest = roundQtRect(kwinClient.frameGeometry);
+                    resizeStart = resizeRequest;
                     resizeStepped = false;
                     resizeStartWidth = window.column.getWidth();
                     if (config.resizeNeighborColumn) {
@@ -199,7 +201,14 @@ namespace ClientState {
                 const requested = roundQtRect(geometry);
                 const previous = resizeRequest;
                 resizeRequest = requested;
-                world.do(() => window.column.onUserResizeRequested(window, requested, previous));
+                const leftEdge = requested.x !== resizeStart.x;
+                let allowed = requested;
+                world.do(() => { allowed = window.column.onUserResizeRequested(window, requested, previous, leftEdge); });
+                if (allowed.width !== requested.width || allowed.height !== requested.height) {
+                    // the pointer asks for more than the layout gives the window: KWin would let it grow over the others
+                    resizeRequest = allowed;
+                    client.setFrame(allowed);
+                }
             });
 
             manager.connect(kwinClient.interactiveMoveResizeFinished, () => {
@@ -457,7 +466,7 @@ namespace ClientState {
                 client.kwinClient.keepBelow = false;
             }
             if (config.offScreenOpacity < 1.0) {
-                client.kwinClient.opacity = 1.0;
+                client.setBaseOpacity(1.0);
             }
             client.setFullScreen(false);
             if (config.hideTitlebars && !client.keepTitlebarHidden) {

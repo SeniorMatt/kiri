@@ -646,6 +646,15 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => Workspace.activeWindow?.closeWindow(),
         },
         {
+            name: "window-toggle-rule-opacity",
+            description: "Window: toggle rule opacity",
+            action: () => world.do(clientManager => {
+                if (Workspace.activeWindow !== null) {
+                    clientManager.toggleRuleOpacity(Workspace.activeWindow);
+                }
+            }),
+        },
+        {
             name: "window-toggle-fullscreen",
             description: "Window: toggle full-screen",
             defaultKeys: ["Meta+Shift+F"],

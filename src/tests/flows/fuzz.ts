@@ -80,6 +80,15 @@ function withoutKiriLog<T>(f: () => T): T {
                 config.gapsInnerHorizontal = this.pick([0, 4, 8]);
                 config.defaultColumnWidth = this.pick(["", "50%", "400px", "0.8"]);
             }
+            if (seed % 3 === 0) {
+                // rules with matchers that change all the time must not upset the layout
+                this.config.windowRules = JSON.stringify([
+                    { isFocused: false, opacity: 0.9 },
+                    { isActiveInColumn: false, isFloating: false, opacity: 0.8, cornerRadius: 4, shadow: { enabled: true } },
+                    { isUrgent: true, focusRing: { activeColor: "#ff0000" } },
+                    { atStartup: true, clipToGeometry: true },
+                ]);
+            }
             const { qtMock, workspaceMock, world } = init(this.config);
             this.qtMock = qtMock;
             this.workspaceMock = workspaceMock;

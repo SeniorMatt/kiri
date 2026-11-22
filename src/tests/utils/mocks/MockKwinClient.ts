@@ -53,6 +53,7 @@ class MockKwinClient {
     public readonly minimizedChanged = new MockQSignal<[]>();
     public readonly maximizedAboutToChange = new MockQSignal<[MaximizedMode]>();
     public readonly captionChanged = new MockQSignal<[]>();
+    public readonly windowClassChanged = new MockQSignal<[]>();
     public readonly tileChanged = new MockQSignal<[]>();
     public readonly interactiveMoveResizeStarted = new MockQSignal<[]>();
     public readonly interactiveMoveResizeStepped = new MockQSignal<[geometry: QmlRect]>();

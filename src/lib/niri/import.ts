@@ -74,6 +74,7 @@ namespace NiriImport {
         "focus-window-previous": "focus-window-previous",
         "open-overview": "overview-open",
         "close-overview": "overview-close",
+        "toggle-window-rule-opacity": "window-toggle-rule-opacity",
         "show-hotkey-overlay": "show-hotkey-overlay",
         // in niri's scrolling layout the width of a window is the width of its column
         "switch-preset-window-width": "cycle-preset-widths",
@@ -234,7 +235,6 @@ namespace NiriImport {
         [/^(toggle-debug-tint|debug-toggle)/, "niri renderer debugging"],
         [/monitor/, "no monitor concept in Kiri's layout (desktops are shared by every screen; screen-switch moves the grid)"],
         [/^(focus-workspace|move-(window|column)-to-workspace)$/, "this workspace reference is not mapped (a name with focus=false, or more than 12 names)"],
-        [/^toggle-window-rule-opacity$/, "window rule opacity is not supported yet"],
         [/-by-id$|^focus-window$|^load-config-file$|^mru-/, "IPC and window switcher actions cannot be bound"],
     ];
 
@@ -562,93 +562,247 @@ namespace NiriImport {
         colorSetting(Kdl.child(node, "inactive-color"), "shadowInactiveColor", out, warn);
     }
 
-    // niri regexes match anywhere in the string; Kiri's match the whole string
-    export function anchored(regex: string): string {
-        if (regex.endsWith("$") && !regex.endsWith("\\$")) {
-            regex = regex.substring(0, regex.length - 1);
-        } else {
-            regex += ".*";
-        }
-        return regex.startsWith("^") ? regex.substring(1) : ".*" + regex;
-    }
+    const MATCHERS: Record<string, string> = {
+        "app-id": "appId", "title": "title", "is-floating": "isFloating", "is-active": "isActive", "is-focused": "isFocused",
+        "is-active-in-column": "isActiveInColumn", "is-urgent": "isUrgent", "is-window-cast-target": "isWindowCastTarget",
+        "at-startup": "atStartup",
+    };
 
-    // One match or exclude line as a Kiri matcher; undefined when it uses a matcher Kiri has no data for
+    // One match or exclude line as a Kiri matcher; undefined when it uses a matcher Kiri does not know. The regexes are
+    // kept as niri has them: Kiri's appId and title match anywhere in the string, with Rust's regex syntax.
     function matchOf(node: Kdl.Node, warn: (msg: string) => void): Record<string, any>|undefined {
         const entry: Record<string, any> = {};
-        if (node.props["app-id"]) {
-            entry["class"] = anchored(node.props["app-id"]);
-        }
-        if (node.props["title"]) {
-            entry["caption"] = anchored(node.props["title"]);
-        }
-        for (const [niri, kiri] of [["is-floating", "isFloating"], ["is-active", "isActive"], ["is-focused", "isFocused"]]) {
-            if (node.props[niri] !== undefined) {
-                entry[kiri] = node.props[niri] === "true";
-            }
-        }
-        const unknown = Object.keys(node.props).filter(name => !["app-id", "title", "is-floating", "is-active", "is-focused"].includes(name));
+        const unknown = Object.keys(node.props).filter(name => !has(MATCHERS, name));
         if (unknown.length > 0) {
             warn(`window-rule/${node.name}: matcher ${unknown.join(", ")} is not supported, a line that uses it is ignored`);
             return undefined;
         }
+        for (const [niri, kiri] of Object.entries(MATCHERS)) {
+            const value = node.props[niri];
+            if (value === undefined) {
+                continue;
+            }
+            if (kiri === "appId" || kiri === "title") {
+                if (value !== "") {
+                    entry[kiri] = value;
+                }
+            } else {
+                entry[kiri] = value === "true";
+            }
+        }
         return entry;
+    }
+
+    function flag(node: Kdl.Node|undefined): boolean|undefined {
+        return node === undefined ? undefined : node.args[0] !== "false";
+    }
+
+    function colorOf(node: Kdl.Node|undefined, warn: (msg: string) => void, what: string): string|undefined {
+        if (node === undefined || node.args.length === 0) {
+            return undefined;
+        }
+        const color = parseColor(node.args[0]);
+        if (color === undefined) {
+            warn(`window-rule/${what}: colour '${node.args[0]}' not understood`);
+        }
+        return color;
+    }
+
+    // the colour and the gradient of one state (a rule's focus-ring, border or tab-indicator), in the format of the settings
+    function stateColors(node: Kdl.Node, out: Record<string, any>, warn: (msg: string) => void, what: string) {
+        for (const state of ["active", "inactive", "urgent"]) {
+            const color = colorOf(Kdl.child(node, state + "-color"), warn, `${what} ${state}`);
+            if (color !== undefined) {
+                out[state + "Color"] = color;
+            }
+            const gradient = gradientString(Kdl.child(node, state + "-gradient"), warn);
+            if (gradient !== undefined) {
+                out[state + "Gradient"] = gradient;
+            }
+        }
+    }
+
+    // the focus-ring and border rules
+    function ringRule(node: Kdl.Node, warn: (msg: string) => void): Record<string, any>|undefined {
+        const out: Record<string, any> = {};
+        if (Kdl.child(node, "off")) {
+            out["enabled"] = false;
+        } else if (Kdl.child(node, "on")) {
+            out["enabled"] = true;
+        }
+        const width = Kdl.child(node, "width");
+        if (width !== undefined && number(width.args) !== undefined) {
+            out["width"] = number(width.args);
+        }
+        stateColors(node, out, warn, node.name);
+        return Object.keys(out).length > 0 ? out : undefined;
+    }
+
+    // a number of a window rule as a finite, sane one (infinity or 1e300 would put windows off the screen)
+    function finiteNumber(raw: string|undefined): number|undefined {
+        const value = parseFloat(raw ?? "");
+        return isFinite(value) ? Math.max(-MAX_PIXELS, Math.min(MAX_PIXELS, value)) : undefined;
+    }
+
+    function shadowRule(node: Kdl.Node, warn: (msg: string) => void): Record<string, any>|undefined {
+        const out: Record<string, any> = {};
+        if (Kdl.child(node, "off")) {
+            out["enabled"] = false;
+        } else if (Kdl.child(node, "on")) {
+            out["enabled"] = true;
+        }
+        for (const name of ["softness", "spread"]) {
+            const child = Kdl.child(node, name);
+            const value = finiteNumber(child?.args[0]);
+            if (value !== undefined) {
+                out[name] = value;
+            }
+        }
+        const offset = Kdl.child(node, "offset");
+        if (offset !== undefined) {
+            const x = finiteNumber(offset.props["x"]);
+            const y = finiteNumber(offset.props["y"]);
+            if (x !== undefined) {
+                out["offsetX"] = x;
+            }
+            if (y !== undefined) {
+                out["offsetY"] = y;
+            }
+        }
+        const behind = flag(Kdl.child(node, "draw-behind-window"));
+        if (behind !== undefined) {
+            out["drawBehindWindow"] = behind;
+        }
+        const color = colorOf(Kdl.child(node, "color"), warn, "shadow");
+        if (color !== undefined) {
+            out["color"] = color;
+        }
+        const inactive = colorOf(Kdl.child(node, "inactive-color"), warn, "shadow inactive");
+        if (inactive !== undefined) {
+            out["inactiveColor"] = inactive;
+        }
+        return Object.keys(out).length > 0 ? out : undefined;
+    }
+
+    function tabIndicatorRule(node: Kdl.Node, warn: (msg: string) => void): Record<string, any>|undefined {
+        const out: Record<string, any> = {};
+        stateColors(node, out, warn, "tab-indicator");
+        return Object.keys(out).length > 0 ? out : undefined;
+    }
+
+    const POSITIONS = ["top-left", "top-right", "bottom-left", "bottom-right", "top", "bottom", "left", "right"];
+
+    // The properties of one window-rule as the keys of a Kiri rule, in niri's order. `radiusIsGlobal` leaves
+    // geometry-corner-radius out (it is the global cornerRadius setting then).
+    function ruleProperties(rule: Kdl.Node, warn: (msg: string) => void, radiusIsGlobal: boolean): Record<string, any> {
+        const out: Record<string, any> = {};
+        const floating = flag(Kdl.child(rule, "open-floating"));
+        if (floating !== undefined) {
+            out["tile"] = !floating;
+        }
+        for (const [niri, kiri] of [["default-column-width", "width"], ["default-window-height", "height"]]) {
+            const node = Kdl.child(rule, niri);
+            if (node !== undefined) {
+                out[kiri] = size(node) ?? ""; // an empty block lets the window pick its own size
+            }
+        }
+        for (const [niri, kiri] of [["open-fullscreen", "fullscreen"], ["open-maximized", "maximized"], ["open-maximized-to-edges", "maximizedToEdges"], ["open-focused", "focused"]]) {
+            const value = flag(Kdl.child(rule, niri));
+            if (value !== undefined) {
+                out[kiri] = value;
+            }
+        }
+        const workspace = Kdl.child(rule, "open-on-workspace");
+        if (workspace !== undefined && workspace.args[0] !== undefined) {
+            out["workspace"] = workspace.args[0];
+        }
+        const display = Kdl.child(rule, "default-column-display");
+        if (display !== undefined && (display.args[0] === "tabbed" || display.args[0] === "normal")) {
+            out["columnDisplay"] = display.args[0];
+        }
+        const position = Kdl.child(rule, "default-floating-position");
+        const positionX = finiteNumber(position?.props["x"]);
+        const positionY = finiteNumber(position?.props["y"]);
+        if (position !== undefined && positionX !== undefined && positionY !== undefined) {
+            out["floatingPosition"] = { x: positionX, y: positionY };
+            const relativeTo = position.props["relative-to"];
+            if (relativeTo !== undefined && POSITIONS.includes(relativeTo) && relativeTo !== "top-left") {
+                out["floatingPosition"].relativeTo = relativeTo;
+            }
+        }
+        for (const [niri, kiri] of [["min-width", "minWidth"], ["min-height", "minHeight"], ["max-width", "maxWidth"], ["max-height", "maxHeight"]]) {
+            const node = Kdl.child(rule, niri);
+            if (node !== undefined && number(node.args) !== undefined) {
+                out[kiri] = Math.max(0, number(node.args) as number);
+            }
+        }
+        const opacity = Kdl.child(rule, "opacity");
+        if (opacity !== undefined && finiteNumber(opacity.args[0]) !== undefined) {
+            out["opacity"] = Math.max(0, Math.min(1, finiteNumber(opacity.args[0]) as number));
+        }
+        for (const [niri, kiri, convert] of [
+            ["focus-ring", "focusRing", ringRule], ["border", "border", ringRule],
+            ["shadow", "shadow", shadowRule], ["tab-indicator", "tabIndicator", tabIndicatorRule],
+        ] as [string, string, (node: Kdl.Node, warn: (msg: string) => void) => Record<string, any>|undefined][]) {
+            const node = Kdl.child(rule, niri);
+            const converted = node === undefined ? undefined : convert(node, warn);
+            if (converted !== undefined) {
+                out[kiri] = converted;
+            }
+        }
+        const radius = Kdl.child(rule, "geometry-corner-radius");
+        if (radius !== undefined && !radiusIsGlobal) {
+            const values = radius.args.map(arg => finiteNumber(arg)).filter((value): value is number => value !== undefined);
+            if (values.length === 1 || values.length === 4) {
+                // the effect has one radius per window: niri's four corners (top-left first) give their largest one
+                if (values.length === 4 && values.some(value => value !== values[0])) {
+                    warn("window-rule/geometry-corner-radius: different corners are not supported, the largest radius is used for all");
+                }
+                out["cornerRadius"] = Math.max(0, Math.round(Math.max(...values)));
+            }
+        }
+        return out;
     }
 
     function windowRules(nodes: Kdl.Node[], warn: (msg: string) => void) {
         const rules: Record<string, any>[] = [];
+        let radius: number|undefined;
+        const warned = new Set<string>();
         for (const rule of Kdl.find(nodes, "window-rule")) {
             const matches = Kdl.find(rule.children, "match");
-            const floatingNode = Kdl.child(rule, "open-floating");
-            const floating = floatingNode !== undefined && floatingNode.args[0] !== "false";
-            const width = size(Kdl.child(rule, "default-column-width"));
-            const height = size(Kdl.child(rule, "default-window-height"));
-            const fullscreenNode = Kdl.child(rule, "open-fullscreen");
-            const fullscreen = fullscreenNode === undefined ? undefined : fullscreenNode.args[0] !== "false";
-            if (matches.length === 0 || !(floating || width !== undefined || height !== undefined || fullscreen !== undefined)) {
+            const excludeNodes = Kdl.find(rule.children, "exclude");
+            // a rule for every window that sets geometry-corner-radius is the global setting
+            const radiusNode = Kdl.child(rule, "geometry-corner-radius");
+            const radiusIsGlobal = matches.length === 0 && excludeNodes.length === 0;
+            if (radiusIsGlobal && radiusNode !== undefined && number(radiusNode.args) !== undefined && radiusNode.args.length === 1) {
+                radius = Math.max(0, number(radiusNode.args) as number);
+            }
+            const properties = ruleProperties(rule, warn, radiusIsGlobal && radiusNode !== undefined && radiusNode.args.length === 1);
+            if (Object.keys(properties).length === 0) {
                 continue;
             }
             const excludes: Record<string, any>[] = [];
-            for (const exclude of Kdl.find(rule.children, "exclude")) {
+            for (const exclude of excludeNodes) {
                 const entry = matchOf(exclude, warn);
                 if (entry !== undefined) {
                     excludes.push(entry);
                 }
             }
-            for (const match of matches) {
-                const entry = matchOf(match, warn);
+            // a rule without match lines applies to every window
+            const lines: (Kdl.Node|undefined)[] = matches.length === 0 ? [undefined] : matches;
+            for (const match of lines) {
+                const entry = match === undefined ? {} : matchOf(match, warn);
                 if (entry === undefined) {
                     continue;
                 }
-                if (floating) {
-                    entry["tile"] = false;
-                }
-                if (width !== undefined) {
-                    entry["width"] = width;
-                }
-                if (height !== undefined) {
-                    entry["height"] = height;
-                }
-                if (fullscreen !== undefined) {
-                    entry["fullscreen"] = fullscreen;
-                }
+                Object.assign(entry, properties);
                 if (excludes.length > 0) {
                     entry["exclude"] = excludes;
                 }
                 rules.push(entry);
             }
         }
-        return rules;
-    }
-
-    // geometry-corner-radius of the first window-rule that has no match lines, i.e. applies to every window
-    function cornerRadius(nodes: Kdl.Node[]): number|undefined {
-        for (const rule of Kdl.find(nodes, "window-rule")) {
-            const node = Kdl.child(rule, "geometry-corner-radius");
-            if (node !== undefined && Kdl.find(rule.children, "match").length === 0 && number(node.args) !== undefined) {
-                return Math.max(0, number(node.args) as number);
-            }
-        }
-        return undefined;
+        return { rules, radius };
     }
 
     function readSettings(nodes: Kdl.Node[], warn: (msg: string) => void): Record<string, any> {
@@ -704,10 +858,6 @@ namespace NiriImport {
             out["tabbedColumnsByDefault"] = (display.args[0] ?? "") === "tabbed";
         }
         ringSettings(L("focus-ring"), "focusRing", out, warn);
-        const radius = cornerRadius(nodes);
-        if (radius !== undefined) {
-            out["cornerRadius"] = radius;
-        }
         ringSettings(L("border"), "border", out, warn);
 
         const tab = L("tab-indicator");
@@ -965,6 +1115,11 @@ namespace NiriImport {
         "input/warp-mouse-to-focus", "input/focus-follows-mouse", "input/mod-key", "input/workspace-auto-back-and-forth", "gestures/hot-corners",
         "window-rule/match", "window-rule/exclude", "window-rule/open-floating", "window-rule/open-fullscreen",
         "window-rule/default-column-width", "window-rule/default-window-height", "window-rule/geometry-corner-radius",
+        "window-rule/open-maximized", "window-rule/open-maximized-to-edges", "window-rule/open-focused", "window-rule/open-on-workspace",
+        "window-rule/default-column-display", "window-rule/default-floating-position", "window-rule/min-width", "window-rule/min-height",
+        "window-rule/max-width", "window-rule/max-height", "window-rule/opacity", "window-rule/focus-ring", "window-rule/border",
+        "window-rule/shadow", "window-rule/tab-indicator",
+        "window-rule/clip-to-geometry", // Kiri's effect clips every window that has a corner radius to its rounded corners
         "animations/off", "animations/on", "animations/slowdown", "animations/window-open", "animations/window-close",
         "animations/window-movement", "animations/window-resize", "animations/horizontal-view-movement",
         "animations/workspace-switch", "animations/overview-open-close",
@@ -997,11 +1152,21 @@ namespace NiriImport {
         "overview/zoom": "not configurable yet",
         "overview/backdrop-color": "not configurable yet",
         "overview/workspace-shadow": "not configurable yet",
-        "window-rule/clip-to-geometry": "not supported yet",
         "animations/config-notification-open-close": "KWin scripts have no config reload notice to animate",
         "animations/exit-confirmation-open-close": "Kiri has no exit confirmation dialog",
         "animations/screenshot-ui-open": "the screenshot UI is Spectacle's",
         "animations/recent-windows-close": "Alt+Tab is KWin's Task Switcher",
+        "window-rule/open-on-output": "Kiri has one layout for all screens",
+        "window-rule/on-xdg-activate": "KWin's focus stealing prevention decides",
+        "window-rule/block-out-from": "KWin cannot hide a window from screen casts",
+        "window-rule/variable-refresh-rate": "adaptive sync is set per output in Plasma's Display settings",
+        "window-rule/scroll-factor": "Plasma's input settings; KWin has no per-window scroll scaling",
+        "window-rule/pinch-sensitivity": "Plasma's input settings",
+        "window-rule/tiled-state": "KWin gives scripts no xdg tiled state",
+        "window-rule/background-effect": "the blur effect has no per-window script setting",
+        "window-rule/popups": "KWin draws popups itself",
+        "window-rule/draw-border-with-background": "the effect draws no background under a border",
+        "window-rule/baba-is-float": "the effect has no bobbing animation",
     };
 
     // the paths of the options in a config that the importer has to account for: the top-level nodes, and one level down
@@ -1087,7 +1252,10 @@ namespace NiriImport {
                 }
             }
         }
-        const rules = windowRules(nodes, warn);
+        const { rules, radius } = windowRules(nodes, warn);
+        if (radius !== undefined) {
+            settings["cornerRadius"] = radius;
+        }
         if (rules.length > 0) {
             settings["windowRules"] = mergeRules(rules, existingWindowRules);
         }
