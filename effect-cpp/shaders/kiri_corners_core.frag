@@ -75,8 +75,12 @@ void main(void)
         }
         vec2 ps = c + n * min(t, 1e5);
         vec2 uv = (ps + windowTopLeft) / windowExpandedSize;
-        uv = clamp(uv, vec2(0.0), vec2(1.0));
-        vec4 behind = texture(sampler, vec2(uv.x, yInverted ? uv.y : 1.0 - uv.y));
+        // past the texture there is nothing (a window without a decoration has no shadow): clamping would smear the
+        // window's own edge pixels into the cut corner
+        vec4 behind = vec4(0.0);
+        if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
+            behind = texture(sampler, vec2(uv.x, yInverted ? uv.y : 1.0 - uv.y));
+        }
         float cover = inFrame ? clamp(0.5 - dist, 0.0, 1.0) : 0.0;
         tex = tex * cover + behind * (1.0 - cover);
     }
