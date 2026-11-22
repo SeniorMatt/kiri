@@ -467,3 +467,46 @@ tests.register("A dialog with a parent floats, open-floating false tiles it", 2,
     workspaceMock.createWindows(forced);
     world.do(clientManager => Assert.equal(clientManager.isFloating(forced), false));
 });
+// issue 62 (niri's min-width, max-width, min-height and max-height rules)
+tests.register("min/max size rules force the dimensions of a window", 3, () => {
+    const config = getDefaultConfig();
+    config.windowRules = '[{ "appId": "forced", "tile": true, "minWidth": 400, "maxWidth": 400, "minHeight": 300, "maxHeight": 300 }]';
+    const { qtMock, workspaceMock, world } = init(config);
+    const [plain] = workspaceMock.createClients(1);
+    const forced = createClassClient("forced", new MockQmlRect(5, 5, 700, 500));
+    workspaceMock.createWindows(forced);
+    world.do(clientManager => Assert.tiledClient(clientManager, forced));
+
+    const check = (message: string) => {
+        const frame = forced.getActualFrameGeometry();
+        Assert.equal(Math.round(frame.width), 400, { message: message + ": width" });
+        Assert.equal(Math.round(frame.height), 300, { message: message + ": height" });
+        Assert.equal(Math.round(frame.y), tilingArea.y, { message: message + ": it keeps the top of the column, the space below stays empty" });
+    };
+    check("at open");
+    qtMock.fireShortcut("cycle-preset-widths");
+    check("after a preset width");
+    qtMock.fireShortcut("column-width-maximize");
+    check("after maximizing the column");
+    qtMock.fireShortcut("window-height-increase");
+    check("after a height step");
+
+    // the other windows are not touched
+    Assert.assert(Math.round(plain.getActualFrameGeometry().height) > 300, { message: "a window without a rule has the whole height" });
+});
+
+tests.register("A max-height rule leaves the rest of the slot empty, the other windows keep theirs", 3, () => {
+    const config = getDefaultConfig();
+    config.windowRules = '[{ "appId": "small", "maxHeight": 150 }]';
+    const { qtMock, workspaceMock } = init(config);
+    const small = createClassClient("small", new MockQmlRect(5, 5, 300, 400));
+    const other = createClassClient("other", new MockQmlRect(5, 5, 300, 400));
+    workspaceMock.createWindows(other, small);
+    workspaceMock.activeWindow = small;
+    qtMock.fireShortcut("window-move-left"); // into the column of `other`: the column has two windows now
+    const slot = (tilingArea.height - gapV) / 2;
+    Assert.equal(Math.round(small.getActualFrameGeometry().height), 150);
+    Assert.equal(Math.round(other.getActualFrameGeometry().height), Math.round(slot));
+    Assert.equal(Math.round(small.getActualFrameGeometry().y), Math.round(other.getActualFrameGeometry().y + slot + gapV));
+});
+

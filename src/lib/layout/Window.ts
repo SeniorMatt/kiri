@@ -78,6 +78,16 @@ class Window {
                 height = fillArea.height;
             }
         }
+        // a window that cannot be as big as its slot (a maximum size from the client or a rule) keeps the top-left corner of
+        // the slot and leaves the rest empty, like niri's tile
+        const maxWidth = this.client.getMaxWidth();
+        const maxHeight = this.client.getMaxHeight();
+        if (!this.fillsWidth() && maxWidth > 0) {
+            width = Math.min(width, maxWidth);
+        }
+        if (!this.fillsHeight() && maxHeight > 0) {
+            height = Math.min(height, maxHeight);
+        }
         this.client.place(x, y, width, height, this.column.grid.isUserResizing());
     }
 
