@@ -151,7 +151,7 @@ class ClientManager {
                 if (slot !== null) {
                     client.preferredWidth = slot.preferredWidth;
                 } else if (!existing) {
-                    const width = this.windowRuleEnforcer.getColumnWidth(kwinClient, desktop!.tilingArea.width, open);
+                    const width = this.windowRuleEnforcer.getColumnWidth(kwinClient, desktop!.tilingArea.width, open, desktop!.profile);
                     if (open.maximized === true) {
                         // niri's open-maximized: the column opens at the full width, the width it would have is what
                         // maximize-column goes back to
@@ -170,7 +170,7 @@ class ClientManager {
                 }
                 if (!existing) {
                     // niri's default-window-height
-                    const height = this.windowRuleEnforcer.getWindowHeight(kwinClient, desktop!.tilingArea.height, open);
+                    const height = this.windowRuleEnforcer.getWindowHeight(kwinClient, desktop!.tilingArea.height, open, desktop!.profile);
                     if (height !== null) {
                         state.window.column.setFixedHeight(state.window, height, null);
                     }
@@ -350,7 +350,8 @@ class ClientManager {
     private applyContinuousRules(client: ClientWrapper, rules: ResolvedRules) {
         const limits = ClientManager.limitsOf(rules);
         const opacity = rules.opacity ?? null;
-        const key = JSON.stringify([limits, opacity, rules.style]);
+        const style = ClientManager.mergeLooks(this.layoutLookOf(client.kwinClient), rules.style);
+        const key = JSON.stringify([limits, opacity, style]);
         if (key === client.rulesKey) {
             return;
         }
@@ -358,7 +359,7 @@ class ClientManager {
         const limitsChanged = JSON.stringify(limits) !== JSON.stringify(client.ruleLimits);
         client.ruleLimits = limits;
         client.setRuleOpacity(opacity);
-        setWindowDecorations(String(client.kwinClient.internalId), rules.style); // the effect takes the rule's fields over the global look
+        setWindowDecorations(String(client.kwinClient.internalId), style); // the effect takes the rule's fields over the global look
         if (limitsChanged) {
             const window = this.findTiledWindow(client.kwinClient);
             if (window !== null) {
@@ -366,6 +367,28 @@ class ClientManager {
                 window.column.resizeWindows();
             }
         }
+    }
+
+    // the appearance keys of the layout {} of the desktop (and output) the window is on (LayoutProfiles)
+    private layoutLookOf(kwinClient: KwinClient): WindowDecorationRule | null {
+        const desktop = this.findTiledWindow(kwinClient)?.column.grid.desktop ?? this.desktopManager.getDesktopForClient(kwinClient);
+        return desktop === undefined ? null : desktop.profile.look;
+    }
+
+    // a window rule's fields win over the layout's, group by group
+    private static mergeLooks(layout: WindowDecorationRule | null, rule: WindowDecorationRule | null | undefined): WindowDecorationRule | null {
+        if (layout === null) {
+            return rule ?? null;
+        }
+        if (rule === null || rule === undefined) {
+            return layout;
+        }
+        const merged: Record<string, any> = Object.assign({}, layout);
+        for (const [key, value] of Object.entries(rule)) {
+            const base = merged[key];
+            merged[key] = typeof value === "object" && value !== null && typeof base === "object" ? Object.assign({}, base, value) : value;
+        }
+        return merged as WindowDecorationRule;
     }
 
     // niri's toggle-window-rule-opacity for the focused window

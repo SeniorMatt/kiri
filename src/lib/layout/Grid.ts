@@ -1,6 +1,5 @@
 class Grid {
     public readonly desktop: Desktop;
-    public readonly config: LayoutConfig;
     public readonly focusPasser: FocusPassing.Passer;
     private readonly columns: LinkedList<Column>;
     private lastFocusedColumn: Column|null;
@@ -21,9 +20,13 @@ class Grid {
     private userResize: boolean; // is any part of the grid being resized by the user
     private readonly userResizeFinishedDelayer: Delayer;
 
-    constructor(desktop: Desktop, config: LayoutConfig, focusPasser: FocusPassing.Passer) {
+    // the layout options of the desktop (they differ per desktop and output, see LayoutProfiles)
+    public get config(): LayoutConfig {
+        return this.desktop.profile.layout;
+    }
+
+    constructor(desktop: Desktop, focusPasser: FocusPassing.Passer) {
         this.desktop = desktop;
-        this.config = config;
         this.focusPasser = focusPasser;
         this.columns = new LinkedList();
         this.lastFocusedColumn = null;

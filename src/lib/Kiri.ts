@@ -28,12 +28,35 @@ function decorationsConfig(config: Config) {
 // what tests look at: the last JSON handed to the effect
 let lastDecorationsConfigJson = "";
 
+// niri's layout.background-color per output (from the layout {} of outputs and desktops): output name -> colour
+let outputBackgrounds: Record<string, string> = {};
+let baseDecorations: Record<string, any> = {};
+
+function setOutputBackgrounds(colors: Record<string, string>) {
+    if (JSON.stringify(colors) === JSON.stringify(outputBackgrounds)) {
+        return;
+    }
+    outputBackgrounds = colors;
+    sendDecorationsConfig();
+}
+
+function sendDecorationsConfig() {
+    const out = Object.assign({}, baseDecorations);
+    if (Object.keys(outputBackgrounds).length > 0) {
+        out["outputBackgrounds"] = outputBackgrounds; // read by the effect (DecorationsEffect.cpp, parseSettings)
+    }
+    lastDecorationsConfigJson = JSON.stringify(out);
+    if (typeof qmlBase !== "undefined") {
+        (qmlBase as any).decorationsConfig = lastDecorationsConfigJson;
+    }
+}
+
 function setRingConfig(config: Config) {
-    lastDecorationsConfigJson = JSON.stringify(decorationsConfig(config));
+    baseDecorations = decorationsConfig(config);
+    sendDecorationsConfig();
     if (typeof qmlBase === "undefined") {
         return; // tests
     }
-    (qmlBase as any).decorationsConfig = lastDecorationsConfigJson;
     (qmlBase as any).ringConfig = {
         cornerRadius: config.cornerRadius,
         focusRingEnabled: config.focusRingEnabled,
@@ -66,6 +89,7 @@ function setRingConfig(config: Config) {
 // the global setting. The effect (DecorationsEffect.cpp, D-Bus `setWindowDecorations`) merges it over the settings per window.
 interface WindowDecorationRule {
     cornerRadius?: number;
+    fullscreenBackdropColor?: string; // only from a layout {} of a desktop or output (niri's layout.fullscreen-backdrop-color)
     focusRing?: { enabled?: boolean, width?: number, activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
     border?: { enabled?: boolean, width?: number, activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
     shadow?: { enabled?: boolean, offsetX?: number, offsetY?: number, softness?: number, spread?: number, drawBehindWindow?: boolean, color?: string, inactiveColor?: string };

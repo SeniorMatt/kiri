@@ -17,6 +17,7 @@
 
 #include <KConfigWatcher>
 #include <QColor>
+#include <vector>
 #include <QElapsedTimer>
 #include <QHash>
 #include <memory>
@@ -68,6 +69,8 @@ public:
     qreal zoom() const { return m_zoom; }
     QVariantMap dnd() const { return m_dnd; }
     QColor backdropColor() const { return m_backdrop; }
+    // niri's output { backdrop-color }: the backdrop of the overview on one output
+    Q_INVOKABLE QColor backdropFor(const QString &outputName) const;
     bool shadowOn() const { return m_shadowOn; }
     qreal shadowSoftness() const { return m_shadowSoftness; }
     qreal shadowSpread() const { return m_shadowSpread; }
@@ -163,6 +166,18 @@ private:
     QColor m_shadowColor = QColor(0, 0, 0, 0x50);
     // niri's hot-corners: top-left, top-right, bottom-left, bottom-right
     bool m_corners[4] = {true, false, false, false};
+    bool m_cornersOn = true; // the global hot-corners are not off
+    // niri's output { backdrop-color; hot-corners }, from the `outputOverrides` setting (JSON, keyed by the output's name)
+    struct OutputOptions
+    {
+        QString id; // lower case: the connector name
+        QColor backdrop; // invalid: the global one
+        bool hasCorners = false;
+        bool cornersOn = true;
+        bool corners[4] = {false, false, false, false};
+    };
+    std::vector<OutputOptions> m_outputs;
+    const OutputOptions *optionsOf(const QString &outputName) const;
     void pointerMoved(const QPointF &pos, const QPointF &, Qt::MouseButtons buttons, Qt::MouseButtons, Qt::KeyboardModifiers, Qt::KeyboardModifiers);
     KConfigWatcher::Ptr m_watcher;
     bool m_hotCorner = true;

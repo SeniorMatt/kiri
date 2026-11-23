@@ -504,11 +504,11 @@ class Actions {
     };
 
     public readonly columnWidthIncrease = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        this.config.columnResizer.increaseWidth(column);
+        grid.desktop.profile.columnResizer.increaseWidth(column);
     };
 
     public readonly columnWidthDecrease = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        this.config.columnResizer.decreaseWidth(column);
+        grid.desktop.profile.columnResizer.decreaseWidth(column);
     };
 
     // niri's set-column-width "+10%" / "-10%": the width changes by a share of the screen
@@ -588,15 +588,15 @@ class Actions {
     };
 
     public readonly columnWidthMinimize = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        this.config.columnResizer.minimizeWidth(column);
+        grid.desktop.profile.columnResizer.minimizeWidth(column);
     };
 
     public readonly cyclePresetWidths = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        this.config.presetWidths.cycle(column, true);
+        grid.desktop.profile.presetWidths.cycle(column, true);
     };
 
     public readonly cyclePresetWidthsReverse = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
-        this.config.presetWidths.cycle(column, false);
+        grid.desktop.profile.presetWidths.cycle(column, false);
     };
 
     // niri's expand-column-to-available-width: the column takes the screen space that no other visible column uses
@@ -633,7 +633,7 @@ class Actions {
     // niri's switch-preset-window-height (toggle_window_height): a window that is on a preset goes to the next one,
     // otherwise to the first preset taller than it (the last one shorter when going back)
     private cycleHeight(window: Window, column: Column, grid: Grid, reverse: boolean) {
-        const presets = this.config.presetHeights.getOrdered(grid.desktop.tilingArea.height);
+        const presets = grid.desktop.profile.presetHeights.getOrdered(grid.desktop.tilingArea.height);
         const len = presets.length;
         if (len === 0) {
             return;
@@ -1145,14 +1145,7 @@ namespace Actions {
         floatingPresetHeights: { getOrdered(size: number): number[] };
         columnWidthStep: number;
         windowHeightStep: number;
-        presetWidths: {
-            cycle: (column: Column, forwards: boolean) => void;
-        };
         verticalResizeStep: number;
-        presetHeights: {
-            getOrdered: (tilingAreaHeight: number) => number[];
-        };
-        columnResizer: ColumnResizer;
         clampDesktopIndex: (index: number) => number; // niri: a desktop number past the last one means the last one
         emptyDesktopNextToCurrent: (below: boolean) => number|null; // index of the empty desktop to move to, made if it does not exist
         releaseNewDesktop: () => void; // the move into that desktop is done

@@ -22,6 +22,7 @@ class Desktop {
     private dirty: boolean;
     private dirtyScroll: boolean;
     private dirtyPins: boolean;
+    private margins = ""; // the outer gaps the tiling area was worked out with (they change with the desktop's name)
     public clientArea: QmlRect;
     public fullScreenArea: QmlRect;
     public tilingArea: QmlRect;
@@ -29,11 +30,10 @@ class Desktop {
     constructor(
         public readonly kwinDesktop: KwinDesktop,
         private readonly pinManager: PinManager,
-        private readonly config: Desktop.Config,
+        private readonly getProfile: (desktop: Desktop) => LayoutProfile, // the layout options of this desktop on this output
         public readonly outputName: string, // like niri's per-monitor workspaces, every output has a strip of its own
         private readonly getScreen: () => Output,
         private readonly getOutputCount: () => number,
-        layoutConfig: LayoutConfig,
         focusPasser: FocusPassing.Passer,
     ) {
         this.scrollX = 0;
@@ -41,10 +41,21 @@ class Desktop {
         this.dirty = true;
         this.dirtyScroll = true;
         this.dirtyPins = true;
-        this.grid = new Grid(this, layoutConfig, focusPasser);
+        this.grid = new Grid(this, focusPasser);
         this.clientArea = Desktop.getClientArea(this.getScreen(), kwinDesktop);
         this.fullScreenArea = Desktop.getFullScreenArea(this.getScreen(), kwinDesktop);
+        const config = this.config;
+        this.margins = [config.marginTop, config.marginBottom, config.marginLeft, config.marginRight].join();
         this.tilingArea = Desktop.getTilingArea(this.clientArea, kwinDesktop, pinManager, config);
+    }
+
+    // the layout options that apply here: the global ones with the layout {} of the output and of the desktop's name over them
+    public get profile(): LayoutProfile {
+        return this.getProfile(this);
+    }
+
+    private get config(): Desktop.Config {
+        return this.getProfile(this).desktop;
     }
 
     // the time of the latest screen size or dock change; windows are resized by KWin around it
@@ -60,9 +71,12 @@ class Desktop {
 
     private updateArea() {
         const newClientArea = Desktop.getClientArea(this.getScreen(), this.kwinDesktop);
-        if (rectEquals(newClientArea, this.clientArea) && !this.dirtyPins) {
+        const config = this.config;
+        const margins = [config.marginTop, config.marginBottom, config.marginLeft, config.marginRight].join();
+        if (rectEquals(newClientArea, this.clientArea) && !this.dirtyPins && margins === this.margins) {
             return;
         }
+        this.margins = margins;
         this.clientArea = newClientArea;
         this.fullScreenArea = Desktop.getFullScreenArea(this.getScreen(), this.kwinDesktop);
         this.tilingArea = Desktop.getTilingArea(newClientArea, this.kwinDesktop, this.pinManager, this.config);

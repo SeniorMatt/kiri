@@ -247,21 +247,23 @@ class WindowRuleEnforcer {
     }
 
     // returns the width a new window's column should get, or null to keep the window's own width
-    public getColumnWidth(kwinClient: KwinClient, tilingAreaWidth: number, resolved = this.resolve(kwinClient)): number | null {
+    // `profile`: the layout options of the desktop the window opens on (they may differ from the global ones)
+    public getColumnWidth(kwinClient: KwinClient, tilingAreaWidth: number, resolved = this.resolve(kwinClient), profile?: LayoutProfile): number | null {
         if (resolved.width !== undefined) {
             // an empty width (niri's `default-column-width {}`) lets the window pick its own
-            const width = resolved.width === "" ? null : WindowRuleEnforcer.resolveSize(resolved.width, tilingAreaWidth, this.gapsInnerHorizontal);
+            const width = resolved.width === "" ? null : WindowRuleEnforcer.resolveSize(resolved.width, tilingAreaWidth, profile?.layout.gapsInnerHorizontal ?? this.gapsInnerHorizontal);
             return width;
         }
-        return this.defaultWidth === null ? null : this.defaultWidth(tilingAreaWidth);
+        const defaultWidth = profile === undefined ? this.defaultWidth : profile.defaultColumnWidth;
+        return defaultWidth === null ? null : defaultWidth(tilingAreaWidth);
     }
 
     // niri's default-window-height: the height a rule gives a new tiled window, null when none sets one
-    public getWindowHeight(kwinClient: KwinClient, tilingAreaHeight: number, resolved = this.resolve(kwinClient)): number | null {
+    public getWindowHeight(kwinClient: KwinClient, tilingAreaHeight: number, resolved = this.resolve(kwinClient), profile?: LayoutProfile): number | null {
         if (resolved.height === undefined || resolved.height === "") {
             return null;
         }
-        return WindowRuleEnforcer.resolveSize(resolved.height, tilingAreaHeight, this.gapsInnerVertical);
+        return WindowRuleEnforcer.resolveSize(resolved.height, tilingAreaHeight, profile?.layout.gapsInnerVertical ?? this.gapsInnerVertical);
     }
 
     // Size of a new window that a float rule (niri's open-floating) matches, in pixels of the work area; a side that no

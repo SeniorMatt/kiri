@@ -823,26 +823,55 @@ namespace NiriImport {
         return { rules, radius };
     }
 
-    function readSettings(nodes: Kdl.Node[], warn: (msg: string) => void): Record<string, any> {
-        const out: Record<string, any> = {};
+    // the keys in name order, so that both importers write the same text whatever order they found them in
+    function sortedKeys(object: Record<string, any>) {
+        const result: Record<string, any> = {};
+        for (const key of Object.keys(object).sort()) {
+            result[key] = object[key];
+        }
+        return result;
+    }
+
+    function layoutLookup(blocks: Kdl.Node[]) {
         const layout = new Map<string, Kdl.Node>();
-        for (const block of Kdl.find(nodes, "layout")) {
+        for (const block of blocks) {
             for (const node of block.children) {
                 layout.set(node.name, node);
             }
         }
-        const L = (name: string): Kdl.Node|undefined => layout.get(name);
+        return (name: string): Kdl.Node|undefined => layout.get(name);
+    }
+
+    // The options of niri's LayoutPart in `blocks` (the layout {} blocks of the config, or the one of a workspace or an
+    // output) as Kiri settings. `base` is given for a layout {} of a workspace or output: the gaps and struts below it,
+    // `where` says which one for the messages.
+    function layoutSettings(blocks: Kdl.Node[], out: Record<string, any>, warn: (msg: string) => void, base?: { gaps: number, struts: Kdl.Node|undefined }, where = "layout") {
+        const L = layoutLookup(blocks);
 
         const gapsNode = L("gaps");
-        if (gapsNode !== undefined && number(gapsNode.args) !== undefined) {
+        const strutsNode = L("struts");
+        if (base !== undefined) {
+            // an override: niri merges gaps and struts one by one over the layout below it, the outer gap is both added
+            if (gapsNode !== undefined || strutsNode !== undefined) {
+                const gapValue = gapsNode !== undefined ? number(gapsNode.args) : undefined;
+                const gap = gapValue ?? base.gaps;
+                if (gapValue !== undefined) {
+                    out["gapsInnerHorizontal"] = out["gapsInnerVertical"] = gap;
+                }
+                const struts = strutsNode ?? base.struts;
+                for (const [side, name] of [["top", "Top"], ["bottom", "Bottom"], ["left", "Left"], ["right", "Right"]]) {
+                    const strut = Kdl.child(struts, side);
+                    out["gapsOuter" + name] = gap + (strut !== undefined ? number(strut.args) ?? 0 : 0);
+                }
+            }
+        } else if (gapsNode !== undefined && number(gapsNode.args) !== undefined) {
             const gap = number(gapsNode.args) as number;
             out["gapsInnerHorizontal"] = out["gapsInnerVertical"] = gap;
-            const struts = L("struts");
             for (const [side, name] of [["top", "Top"], ["bottom", "Bottom"], ["left", "Left"], ["right", "Right"]]) {
-                const strut = Kdl.child(struts, side);
+                const strut = Kdl.child(strutsNode, side);
                 out["gapsOuter" + name] = gap + (strut !== undefined ? number(strut.args) ?? 0 : 0);
             }
-        } else if (L("struts") !== undefined) {
+        } else if (strutsNode !== undefined) {
             warn("layout/struts: ignored without gaps (Kiri's gaps default is 16, niri's too, so add 'gaps 16' to use them)");
         }
 
@@ -858,7 +887,7 @@ namespace NiriImport {
             }
         }
         if (L("always-center-single-column") !== undefined) {
-            out["alwaysCenterSingleColumn"] = true;
+            out["alwaysCenterSingleColumn"] = L("always-center-single-column")!.args[0] !== "false";
         }
         if (sizes(L("preset-column-widths")) !== "") {
             out["presetWidths"] = sizes(L("preset-column-widths"));
@@ -918,7 +947,9 @@ namespace NiriImport {
 
         shadowSettings(L("shadow"), out, warn);
         const hint = L("insert-hint");
-        if (hint !== undefined) {
+        if (hint !== undefined && base !== undefined) {
+            warn(`${where}/layout/insert-hint: the insert hint is global in Kiri`);
+        } else if (hint !== undefined) {
             if (Kdl.child(hint, "off")) {
                 out["insertHintEnabled"] = false;
             } else if (Kdl.child(hint, "on")) {
@@ -932,6 +963,16 @@ namespace NiriImport {
         }
         colorSetting(L("fullscreen-backdrop-color"), "fullscreenBackdropColor", out, warn);
         colorSetting(L("background-color"), "backgroundColor", out, warn);
+        if (base !== undefined && L("empty-workspace-above-first") !== undefined) {
+            warn(`${where}/layout/empty-workspace-above-first: it is global in Kiri`);
+        }
+    }
+
+    function readSettings(nodes: Kdl.Node[], warn: (msg: string) => void): Record<string, any> {
+        const out: Record<string, any> = {};
+        const globalBlocks = Kdl.find(nodes, "layout");
+        layoutSettings(globalBlocks, out, warn);
+        const L = layoutLookup(globalBlocks);
 
         out["hideTitlebars"] = Kdl.find(nodes, "prefer-no-csd").length > 0;
         // niri always has dynamic workspaces; Kiri's are an option that stays as the user set it
@@ -941,9 +982,59 @@ namespace NiriImport {
         const declared = declaredWorkspaces(nodes);
         if (declared.length > 0) {
             out["namedDesktops"] = JSON.stringify(declared);
-            if (Kdl.find(nodes, "workspace").some(node => node.children.length > 0)) {
-                warn("workspace blocks: open-on-output and layout are not mapped (the names are)");
+            if (Kdl.find(nodes, "workspace").some(node => Kdl.child(node, "open-on-output") !== undefined)) {
+                warn("workspace blocks: open-on-output is not mapped (the names are)");
             }
+        }
+        // niri: the layout {} of a workspace and of an output are merged over the global one (output first, workspace last)
+        const globalGaps = { gaps: number(L("gaps")?.args ?? []) ?? 16, struts: L("struts") };
+        const workspaceLayouts: Record<string, any> = {};
+        for (const node of Kdl.find(nodes, "workspace")) {
+            const layoutBlock = Kdl.child(node, "layout");
+            if (node.args.length > 0 && layoutBlock !== undefined && !has(workspaceLayouts, node.args[0])) {
+                const layoutOut: Record<string, any> = {};
+                layoutSettings([layoutBlock], layoutOut, warn, globalGaps, `workspace "${node.args[0]}"`);
+                if (Object.keys(layoutOut).length > 0) {
+                    workspaceLayouts[node.args[0]] = sortedKeys(layoutOut);
+                }
+            }
+        }
+        if (Object.keys(workspaceLayouts).length > 0) {
+            out["desktopLayouts"] = JSON.stringify(workspaceLayouts);
+        }
+        const outputOverrides: Record<string, any> = {};
+        for (const node of Kdl.find(nodes, "output")) {
+            if (node.args.length === 0 || has(outputOverrides, node.args[0])) {
+                continue;
+            }
+            const entry: Record<string, any> = {};
+            const layoutOut: Record<string, any> = {};
+            const layoutBlock = Kdl.child(node, "layout");
+            if (layoutBlock !== undefined) {
+                layoutSettings([layoutBlock], layoutOut, warn, globalGaps, `output "${node.args[0]}"`);
+            }
+            if (layoutOut["backgroundColor"] === undefined) {
+                colorSetting(Kdl.child(node, "background-color"), "backgroundColor", layoutOut, warn); // the deprecated place of it
+            }
+            if (Object.keys(layoutOut).length > 0) {
+                entry["layout"] = sortedKeys(layoutOut);
+            }
+            const backdrop: Record<string, any> = {};
+            colorSetting(Kdl.child(node, "backdrop-color"), "backdropColor", backdrop, warn);
+            if (backdrop["backdropColor"] !== undefined) {
+                entry["backdropColor"] = backdrop["backdropColor"];
+            }
+            const corners = Kdl.child(node, "hot-corners");
+            if (corners !== undefined) {
+                const named = ["top-left", "top-right", "bottom-left", "bottom-right"].map(name => Kdl.child(corners, name) !== undefined);
+                entry["hotCorners"] = { enabled: Kdl.child(corners, "off") === undefined, topLeft: !named.some(x => x) || named[0], topRight: named[1], bottomLeft: named[2], bottomRight: named[3] };
+            }
+            if (Object.keys(entry).length > 0) {
+                outputOverrides[node.args[0]] = entry;
+            }
+        }
+        if (Object.keys(outputOverrides).length > 0) {
+            out["outputOverrides"] = JSON.stringify(outputOverrides);
         }
         for (const block of Kdl.find(nodes, "input")) {
             if (Kdl.child(block, "warp-mouse-to-focus")) {
@@ -1145,7 +1236,7 @@ namespace NiriImport {
     const LOOKED_INTO = ["layout", "input", "gestures", "window-rule", "overview", "animations", "hotkey-overlay", "debug"];
     const SKIPPED_OPTIONS: Record<string, string> = {
         "include": "KWin scripts cannot read files (tools/niri2kiri.py follows includes)",
-        "output": "the display layout is Plasma's (Display settings)",
+        "output": "only its layout, background-color, backdrop-color and hot-corners are mapped; the display setup is Plasma's (Display settings)",
         "spawn-at-startup": "programs start with Plasma's autostart",
         "spawn-sh-at-startup": "programs start with Plasma's autostart",
         "hotkey-overlay": "Kiri has no hotkey overlay",

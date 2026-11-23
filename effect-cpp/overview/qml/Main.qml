@@ -25,7 +25,8 @@ FocusScope {
     property QtObject currentDesktop: KWinComponents.SceneView.currentDesktop
 
     // niri constants
-    readonly property color backdropColor: effect.backdropColor
+    // niri's output { backdrop-color } wins over the overview's; `effect.backdropColor` is read for the binding to follow the settings
+    readonly property color backdropColor: { effect.backdropColor; return effect.backdropFor(targetScreen.name); }
     readonly property color hintColor: Qt.rgba(127 / 255, 200 / 255, 255 / 255, 128 / 255)
     readonly property color ringColor: "#7fc8ff"
     readonly property real moveThreshold: 256 // layout px of pointer travel (scaled by the zoom)

@@ -989,7 +989,7 @@ MAPPED_OPTIONS = {
 LOOKED_INTO = ["layout", "input", "gestures", "window-rule", "overview", "animations", "hotkey-overlay", "debug"]
 SKIPPED_OPTIONS = {
     "include": "KWin scripts cannot read files (tools/niri2kiri.py follows includes)",
-    "output": "the display layout is Plasma's (Display settings)",
+    "output": "only its layout, background-color, backdrop-color and hot-corners are mapped; the display setup is Plasma's (Display settings)",
     "spawn-at-startup": "programs start with Plasma's autostart",
     "spawn-sh-at-startup": "programs start with Plasma's autostart",
     "hotkey-overlay": "Kiri has no hotkey overlay",
@@ -1101,21 +1101,49 @@ def read_settings(path, warn):
     return settings
 
 
-def read_settings_inner(nodes, warn):
-    out = {}
-    layout = {}
-    for blk in find(nodes, "layout"):
-        layout.update({n[0]: n for n in blk[3]})
-    L = lambda name: layout.get(name)
+def compact_json(value):
+    """JSON like JavaScript's JSON.stringify: no spaces, 8.0 written as 8"""
+    def fix(item):
+        if isinstance(item, float) and item.is_integer():
+            return int(item)
+        if isinstance(item, dict):
+            return {k: fix(v) for k, v in item.items()}
+        return item
+    return json.dumps(fix(value), separators=(",", ":"), ensure_ascii=False)
 
-    if L("gaps") and number(L("gaps")[1]) is not None:
-        gap = number(L("gaps")[1])
+
+def layout_lookup(blocks):
+    layout = {}
+    for blk in blocks:
+        layout.update({n[0]: n for n in blk[3]})
+    return lambda name: layout.get(name)
+
+
+def layout_settings(blocks, out, warn, base=None, where="layout"):
+    """The options of niri's LayoutPart in `blocks` (the layout {} blocks of the config, or the one of a workspace or an
+    output) as Kiri settings. `base` is (gaps, struts node) of the layout below it for a layout {} of a workspace or
+    output; `where` says which one for the messages."""
+    L = layout_lookup(blocks)
+
+    gaps_node, struts_node = L("gaps"), L("struts")
+    if base is not None:
+        # an override: niri merges gaps and struts one by one over the layout below it, the outer gap is both added
+        if gaps_node or struts_node:
+            gap_value = number(gaps_node[1]) if gaps_node else None
+            gap = gap_value if gap_value is not None else base[0]
+            if gap_value is not None:
+                out["gapsInnerHorizontal"] = out["gapsInnerVertical"] = gap
+            struts = struts_node or base[1]
+            for side in ("top", "bottom", "left", "right"):
+                s = child(struts, side)
+                out["gapsOuter" + side.title()] = gap + (number(s[1]) or 0 if s else 0)
+    elif gaps_node and number(gaps_node[1]) is not None:
+        gap = number(gaps_node[1])
         out["gapsInnerHorizontal"] = out["gapsInnerVertical"] = gap
-        struts = L("struts")
         for side in ("top", "bottom", "left", "right"):
-            s = child(struts, side)
+            s = child(struts_node, side)
             out["gapsOuter" + side.title()] = gap + (number(s[1]) or 0 if s else 0)
-    elif L("struts"):
+    elif struts_node:
         warn("layout/struts: ignored without gaps (Kiri's gaps default is 16, niri's too, so add 'gaps 16' to use them)")
     if L("center-focused-column"):
         mode = (L("center-focused-column")[1] or ["never"])[0]
@@ -1125,7 +1153,7 @@ def read_settings_inner(nodes, warn):
                 out[key] = key == modes[mode]
             out["scrollingGrouped"] = False
     if L("always-center-single-column"):
-        out["alwaysCenterSingleColumn"] = True
+        out["alwaysCenterSingleColumn"] = (L("always-center-single-column")[1] or [""])[0] != "false"
     if L("preset-column-widths") and sizes(L("preset-column-widths")):
         out["presetWidths"] = sizes(L("preset-column-widths"))
     if L("preset-window-heights") and sizes(L("preset-window-heights")):
@@ -1163,7 +1191,9 @@ def read_settings_inner(nodes, warn):
 
     shadow_settings(L("shadow"), out, warn)
     hint = L("insert-hint")
-    if hint:
+    if hint and base is not None:
+        warn(f"{where}/layout/insert-hint: the insert hint is global in Kiri")
+    elif hint:
         if child(hint, "off"):
             out["insertHintEnabled"] = False
         elif child(hint, "on"):
@@ -1174,6 +1204,15 @@ def read_settings_inner(nodes, warn):
             out["insertHintGradient"] = gradient
     color_setting(L("fullscreen-backdrop-color"), "fullscreenBackdropColor", out, warn)
     color_setting(L("background-color"), "backgroundColor", out, warn)
+    if base is not None and L("empty-workspace-above-first"):
+        warn(f"{where}/layout/empty-workspace-above-first: it is global in Kiri")
+
+
+def read_settings_inner(nodes, warn):
+    out = {}
+    global_blocks = find(nodes, "layout")
+    layout_settings(global_blocks, out, warn)
+    L = layout_lookup(global_blocks)
 
     out["hideTitlebars"] = bool(find(nodes, "prefer-no-csd"))
     # niri always has dynamic workspaces; Kiri's are an option that stays as the user set it
@@ -1182,8 +1221,47 @@ def read_settings_inner(nodes, warn):
     declared = declared_workspaces(nodes)
     if declared:
         out["namedDesktops"] = json.dumps(declared, separators=(",", ":"))
-        if any(node[3] for node in find(nodes, "workspace")):
-            warn("workspace blocks: open-on-output and layout are not mapped (the names are)")
+        if any(child(node, "open-on-output") for node in find(nodes, "workspace")):
+            warn("workspace blocks: open-on-output is not mapped (the names are)")
+    # niri: the layout {} of a workspace and of an output are merged over the global one (output first, workspace last)
+    global_gaps = (number(L("gaps")[1]) if L("gaps") else None)
+    global_gaps = (16 if global_gaps is None else global_gaps, L("struts"))
+    workspace_layouts = {}
+    for node in find(nodes, "workspace"):
+        block = child(node, "layout")
+        if node[1] and block and node[1][0] not in workspace_layouts:
+            layout_out = {}
+            layout_settings([block], layout_out, warn, global_gaps, f'workspace "{node[1][0]}"')
+            if layout_out:
+                workspace_layouts[node[1][0]] = dict(sorted(layout_out.items()))
+    if workspace_layouts:
+        out["desktopLayouts"] = compact_json(workspace_layouts)
+    output_overrides = {}
+    for node in find(nodes, "output"):
+        if not node[1] or node[1][0] in output_overrides:
+            continue
+        entry = {}
+        layout_out = {}
+        block = child(node, "layout")
+        if block:
+            layout_settings([block], layout_out, warn, global_gaps, f'output "{node[1][0]}"')
+        if "backgroundColor" not in layout_out:
+            color_setting(child(node, "background-color"), "backgroundColor", layout_out, warn)  # the deprecated place of it
+        if layout_out:
+            entry["layout"] = dict(sorted(layout_out.items()))
+        backdrop = {}
+        color_setting(child(node, "backdrop-color"), "backdropColor", backdrop, warn)
+        if "backdropColor" in backdrop:
+            entry["backdropColor"] = backdrop["backdropColor"]
+        corners = child(node, "hot-corners")
+        if corners:
+            named = [child(corners, n) is not None for n in ("top-left", "top-right", "bottom-left", "bottom-right")]
+            entry["hotCorners"] = {"enabled": child(corners, "off") is None, "topLeft": not any(named) or named[0],
+                                   "topRight": named[1], "bottomLeft": named[2], "bottomRight": named[3]}
+        if entry:
+            output_overrides[node[1][0]] = entry
+    if output_overrides:
+        out["outputOverrides"] = compact_json(output_overrides)
     for blk in find(nodes, "input"):
         if child(blk, "warp-mouse-to-focus"):
             out["cursorFollowsFocus"] = True

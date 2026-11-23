@@ -13,15 +13,12 @@ class DesktopManager {
     // a tile): a tile that is scrolled out of view may be on another output than the one its strip is on
     constructor(
         private readonly pinManager: PinManager,
-        private readonly config: Desktop.Config,
-        private readonly layoutConfig: LayoutConfig,
+        private readonly profiles: LayoutProfiles,
         private readonly focusPasser: FocusPassing.Passer,
         private readonly desktopFilter: DesktopFilter,
         private readonly getFocusedOutputName: () => string | null = () => null,
     ) {
         this.pinManager = pinManager;
-        this.config = config;
-        this.layoutConfig = layoutConfig;
         this.desktops = new Map();
         this.kwinActivities = new Set(Workspace.activities);
         this.kwinDesktops = new Set(Workspace.desktops);
@@ -119,15 +116,23 @@ class DesktopManager {
         const desktop = new Desktop(
             kwinDesktop,
             this.pinManager,
-            this.config,
+            desktop => this.getProfile(desktop),
             outputName,
             () => this.resolveScreen(outputName),
             () => this.getOutputCount(),
-            this.layoutConfig,
             this.focusPasser,
         );
         this.desktops.set(desktopKey, desktop);
         return desktop;
+    }
+
+    // the layout options of a desktop: niri's global layout, the layout {} of its output and the layout {} of its name over it
+    public getProfile(desktop: Desktop): LayoutProfile {
+        if (this.profiles.isEmpty()) {
+            return this.profiles.getBase();
+        }
+        const screen = this.screenList.find(item => item.name === desktop.outputName);
+        return this.profiles.resolve(desktop.kwinDesktop.name, LayoutProfiles.outputIds(screen, desktop.outputName));
     }
 
     private static getDesktopKey(activity: string, kwinDesktop: KwinDesktop, outputName: string) {

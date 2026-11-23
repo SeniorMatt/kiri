@@ -19,5 +19,5 @@ circle of its own colour), and after every scenario:
 
 `/st` needs once: `cmake` builds of `effect-cpp` into `/st/eb`, the `inp` (inp/ here) and `shot` (shot.cpp) binaries,
 `/st/panel` (a layer-shell dock) and `/st/qtplug` (the built plugins). The host side needs `pnpm exec tsc -p src/main` and
-the config generator first (see the Makefile) so that `package/` is complete. Never kill other agents' processes.
+the config generator first (see the Makefile) so that `package/` is complete. Don't kill processes of other test runs.
 `niri_fuzz.py` and `src/tests/units/niri/NiriImportOdd.ts` fuzz the niri config importers.

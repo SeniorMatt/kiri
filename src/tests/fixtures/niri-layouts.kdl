@@ -1,0 +1,41 @@
+layout {
+    gaps 12
+    struts { left 10; right 10; }
+    preset-column-widths { proportion 0.5; proportion 1.0; }
+    focus-ring { width 4; }
+}
+workspace "web" {
+    layout {
+        gaps 0
+        default-column-width { proportion 0.25; }
+        preset-column-widths { proportion 0.333; proportion 0.667; }
+        center-focused-column "always"
+        always-center-single-column
+        focus-ring { width 1; active-color "#ff0000"; }
+        background-color "#101010"
+        insert-hint { off; }
+        empty-workspace-above-first
+    }
+}
+workspace "chat" {
+    open-on-output "DP-2"
+    layout { struts { top 20; } }
+}
+workspace "plain"
+output "DP-1" {
+    scale 2
+    layout {
+        gaps 4
+        tab-indicator { width 8; }
+        default-column-display "tabbed"
+    }
+    backdrop-color "#202020"
+    hot-corners { top-right; bottom-left; }
+}
+output "DP-2" {
+    background-color "#303030"
+    hot-corners { off; }
+}
+output "Acme Panel 1234" {
+    layout { always-center-single-column false; fullscreen-backdrop-color "#112233"; }
+}

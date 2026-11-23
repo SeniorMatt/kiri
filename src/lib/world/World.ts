@@ -28,6 +28,7 @@ class World {
     private overview!: Overview;
     public previousDesktop: KwinDesktop|null = null; // niri's focus-workspace-previous
     private readonly shortcutKeys: Record<string, string[]>;
+    private readonly layoutProfiles: LayoutProfiles;
 
     // `keyBindings` and `layout` are given when Kiri reloads its settings: the shortcuts stay registered
     // and the windows are put back into the columns they were in.
@@ -41,25 +42,7 @@ class World {
         this.focusPasser = focusPasser;
         this.workspaceSignalManager = initWorkspaceSignalHandlers(this, focusPasser);
 
-        let presetWidths = {
-            cycle: (column: Column, forwards: boolean) => {},
-            getWidths: (minWidth: number, maxWidth: number, tilingAreaWidth: number): number[] => [],
-        };
-        try {
-            presetWidths = new PresetWidths(config.presetWidths, config.gapsInnerHorizontal);
-        } catch (error: any) {
-            notificationInvalidPresetWidths.sendEvent();
-            log("failed to parse presetWidths:", error);
-        }
-
-        let presetHeights = {
-            getOrdered: (tilingAreaHeight: number): number[] => [],
-        };
-        try {
-            presetHeights = new PresetWidths(config.presetHeights, config.gapsInnerVertical);
-        } catch (error: any) {
-            log("failed to parse presetHeights:", error);
-        }
+        this.layoutProfiles = new LayoutProfiles(config, layoutConfig => World.buildProfile(layoutConfig));
 
         // niri's floating layer takes the presets relative to the work area, without the gaps of the grid
         let floatingPresetWidths = { getOrdered: (size: number): number[] => [] };
@@ -77,10 +60,7 @@ class World {
             manualScrollStep: config.manualScrollStep,
             columnWidthStep: config.columnWidthStep,
             windowHeightStep: config.windowHeightStep,
-            presetWidths: presetWidths,
-            presetHeights: presetHeights,
             verticalResizeStep: config.verticalResizeStep,
-            columnResizer: config.scrollingCentered ? new RawResizer(presetWidths) : new ContextualResizer(presetWidths),
             clampDesktopIndex: (index: number) => this.dynamicDesktops.clampIndex(index),
             emptyDesktopNextToCurrent: (below: boolean) => this.dynamicDesktops.emptyDesktopNextToCurrent(below),
             releaseNewDesktop: () => this.dynamicDesktops.releaseReserved(),
@@ -131,45 +111,9 @@ class World {
 
         this.pinManager = new PinManager();
 
-        const layoutConfig = {
-            gapsInnerHorizontal: config.gapsInnerHorizontal,
-            gapsInnerVertical: config.gapsInnerVertical,
-            offScreenOpacity: config.offScreenOpacity / 100.0,
-            tabbedColumnsByDefault: config.tabbedColumnsByDefault,
-            tabIndicatorEnabled: config.tabIndicatorEnabled,
-            tabIndicatorWidth: config.tabIndicatorWidth,
-            tabIndicatorGap: config.tabIndicatorGap,
-            tabIndicatorLength: config.tabIndicatorLength,
-            tabIndicatorPosition: config.tabIndicatorPosition,
-            tabIndicatorHideWhenSingleTab: config.tabIndicatorHideWhenSingleTab,
-            tabIndicatorPlaceWithinColumn: config.tabIndicatorPlaceWithinColumn,
-            tabIndicatorGapsBetweenTabs: config.tabIndicatorGapsBetweenTabs,
-            resizeNeighborColumn: config.resizeNeighborColumn,
-            reMaximize: config.reMaximize,
-            tileMaximized: config.tileMaximized,
-            tileFullScreen: config.tileFullScreen,
-            hideTitlebars: config.hideTitlebars,
-            skipSwitcher: config.skipSwitcher,
-            tiledKeepBelow: config.tiledKeepBelow,
-            maximizedKeepAbove: config.floatingKeepAbove,
-            untileOnDrag: config.untileOnDrag,
-        };
-
         this.desktopManager = new DesktopManager(
             this.pinManager,
-            {
-                marginTop: config.gapsOuterTop,
-                marginBottom: config.gapsOuterBottom,
-                marginLeft: config.gapsOuterLeft,
-                marginRight: config.gapsOuterRight,
-                scroller: World.createScroller(config),
-                clamper: (config.scrollingLazy || config.scrollingOnOverflow) ? new EdgeClamper(config.centerGridWhenFits) : new CenterClamper(),
-                alwaysCenterSingleColumn: config.alwaysCenterSingleColumn,
-                gestureScroll: config.gestureScroll,
-                gestureScrollInvert: config.gestureScrollInvert,
-                gestureScrollStep: config.gestureScrollStep,
-            },
-            layoutConfig,
+            this.layoutProfiles,
             focusPasser,
             new DesktopFilter(config.tiledDesktops),
             () => this.getFocusedTileOutput(),
@@ -215,6 +159,85 @@ class World {
         this.currentDesktop = Workspace.currentDesktop;
         this.update();
         this.clientManager.armStartupTimer();
+    }
+
+    // everything the layout takes from the settings, for one set of settings: the global ones, or those with the layout {}
+    // of an output and of a desktop merged over them (LayoutProfiles)
+    private static buildProfile(config: Config): LayoutProfile {
+        let presetWidths = {
+            cycle: (column: Column, forwards: boolean) => {},
+            getWidths: (minWidth: number, maxWidth: number, tilingAreaWidth: number): number[] => [],
+        };
+        try {
+            presetWidths = new PresetWidths(config.presetWidths, config.gapsInnerHorizontal);
+        } catch (error: any) {
+            notificationInvalidPresetWidths.sendEvent();
+            log("failed to parse presetWidths:", error);
+        }
+
+        let presetHeights = {
+            getOrdered: (tilingAreaHeight: number): number[] => [],
+        };
+        try {
+            presetHeights = new PresetWidths(config.presetHeights, config.gapsInnerVertical);
+        } catch (error: any) {
+            log("failed to parse presetHeights:", error);
+        }
+
+        let defaultColumnWidth: ((tilingAreaWidth: number) => number) | null = null;
+        if (config.defaultColumnWidth.trim() !== "") {
+            try {
+                defaultColumnWidth = PresetWidths.parseWidth(config.defaultColumnWidth, config.gapsInnerHorizontal);
+            } catch (error: any) {
+                log("invalid defaultColumnWidth:", config.defaultColumnWidth, error);
+            }
+        }
+
+        const layout: LayoutConfig = {
+            gapsInnerHorizontal: config.gapsInnerHorizontal,
+            gapsInnerVertical: config.gapsInnerVertical,
+            offScreenOpacity: config.offScreenOpacity / 100.0,
+            tabbedColumnsByDefault: config.tabbedColumnsByDefault,
+            tabIndicatorEnabled: config.tabIndicatorEnabled,
+            tabIndicatorWidth: config.tabIndicatorWidth,
+            tabIndicatorGap: config.tabIndicatorGap,
+            tabIndicatorLength: config.tabIndicatorLength,
+            tabIndicatorPosition: config.tabIndicatorPosition,
+            tabIndicatorHideWhenSingleTab: config.tabIndicatorHideWhenSingleTab,
+            tabIndicatorPlaceWithinColumn: config.tabIndicatorPlaceWithinColumn,
+            tabIndicatorGapsBetweenTabs: config.tabIndicatorGapsBetweenTabs,
+            resizeNeighborColumn: config.resizeNeighborColumn,
+            reMaximize: config.reMaximize,
+            tileMaximized: config.tileMaximized,
+            tileFullScreen: config.tileFullScreen,
+            hideTitlebars: config.hideTitlebars,
+            skipSwitcher: config.skipSwitcher,
+            tiledKeepBelow: config.tiledKeepBelow,
+            maximizedKeepAbove: config.floatingKeepAbove,
+            untileOnDrag: config.untileOnDrag,
+        };
+        return {
+            desktop: {
+                marginTop: config.gapsOuterTop,
+                marginBottom: config.gapsOuterBottom,
+                marginLeft: config.gapsOuterLeft,
+                marginRight: config.gapsOuterRight,
+                scroller: World.createScroller(config),
+                clamper: (config.scrollingLazy || config.scrollingOnOverflow) ? new EdgeClamper(config.centerGridWhenFits) : new CenterClamper(),
+                alwaysCenterSingleColumn: config.alwaysCenterSingleColumn,
+                gestureScroll: config.gestureScroll,
+                gestureScrollInvert: config.gestureScrollInvert,
+                gestureScrollStep: config.gestureScrollStep,
+            },
+            layout: layout,
+            presetWidths: presetWidths,
+            presetHeights: presetHeights,
+            columnResizer: config.scrollingCentered ? new RawResizer(presetWidths) : new ContextualResizer(presetWidths),
+            defaultColumnWidth: defaultColumnWidth,
+            look: null,
+            fullscreenBackdropColor: undefined,
+            backgroundColor: undefined,
+        };
     }
 
     private static createScroller(config: Config) {
@@ -397,9 +420,10 @@ class World {
 
     private update() {
         this.dynamicDesktops.update();
-        if (this.clientManager.hasDynamicRules()) {
-            this.clientManager.refreshRules(); // is-focused, is-active, is-floating ... may have changed
+        if (this.clientManager.hasDynamicRules() || this.layoutProfiles.hasLooks()) {
+            this.clientManager.refreshRules(); // is-focused, is-active, is-floating ... may have changed; a window may be on another desktop or output with another look
         }
+        this.updateOutputBackgrounds();
         if (this.arrangeHeld) {
             return;
         }
@@ -415,6 +439,22 @@ class World {
             }
         }
         flushCursorWarp();
+    }
+
+    // niri's layout.background-color of every output: the global one, the output's over it, and the layout {} of the desktop
+    // that is on the output now over that (LayoutProfiles). The effect paints it over the wallpaper of that output.
+    private updateOutputBackgrounds() {
+        if (this.layoutProfiles.isEmpty()) {
+            return;
+        }
+        const colors: Record<string, string> = {};
+        for (const desktop of this.desktopManager.getOutputDesktops(Workspace.currentActivity, Workspace.currentDesktop)) {
+            const color = desktop.profile.backgroundColor;
+            if (color !== undefined) {
+                colors[desktop.outputName] = color;
+            }
+        }
+        setOutputBackgrounds(colors);
     }
 
     // niri's double resize-click on an edge: the column's full width is toggled (left or right edge), the window's

@@ -55,7 +55,7 @@ const enum MaximizedMode {
 }
 
 interface Tile { __brand: "Tile" }
-interface Output { __brand: "Output", readonly name: string }
+interface Output { __brand: "Output", readonly name: string, readonly manufacturer?: string, readonly model?: string, readonly serialNumber?: string }
 
 interface KwinClient {
     __brand: "KwinClient";

@@ -818,6 +818,9 @@ Look Effect::parseLook(const QVariantMap &m) const
 // niri's window-rule merge: the rule's fields replace the look's, a colour replaces a gradient and the other way round
 void Effect::applyOverride(Look &look, const QVariantMap &rule) const
 {
+    if (QColor c; parseColor(rule.value(QStringLiteral("fullscreenBackdropColor")).toString(), c)) {
+        look.fullscreenBackdrop = c;
+    }
     if (rule.contains(QStringLiteral("cornerRadius"))) {
         look.cornerRadius = std::max(0, integer(rule, "cornerRadius", look.cornerRadius));
     }
@@ -895,6 +898,12 @@ Settings Effect::parseSettings(const QVariantMap &m, bool kiriEnabled) const
     QColor background;
     if (parseColor(str(m, "backgroundColor"), background)) {
         s.background = background;
+    }
+    const QVariantMap backgrounds = m.value(QStringLiteral("outputBackgrounds")).toMap();
+    for (auto it = backgrounds.constBegin(); it != backgrounds.constEnd(); ++it) {
+        if (QColor c; parseColor(it.value().toString(), c)) {
+            s.outputBackgrounds.insert(it.key(), c);
+        }
     }
     // the default is niri's default config's wheel binds (keep in step with `pointerBinds` in src/lib/config/definition.ts)
     s.pointerBinds = str(m, "pointerBinds", QStringLiteral(
@@ -1466,8 +1475,12 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
 KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
 {
     // niri's layout background-color: the wallpaper is Plasma's desktop window, which is painted as a solid colour instead
-    if (w->isDesktop() && isActive() && m_settings.background.isValid() && !w->data(CaptureRole).toBool()) {
-        fillRect(viewport, KWin::RectF(w->frameGeometry()), m_settings.background, deviceRegion, data.opacity());
+    QColor background = m_settings.background;
+    if (w->isDesktop() && w->screen()) {
+        background = m_settings.outputBackgrounds.value(w->screen()->name(), background);
+    }
+    if (w->isDesktop() && isActive() && background.isValid() && !w->data(CaptureRole).toBool()) {
+        fillRect(viewport, KWin::RectF(w->frameGeometry()), background, deviceRegion, data.opacity());
         KIRI_RET(true);
     }
     const double radius = radiusFor(w);
@@ -1831,7 +1844,8 @@ void Effect::drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow
 // is smaller than the screen centred in it; it grows from the window's own rect with the expand animation and fades in
 void Effect::drawBackdrop(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &painted, const KWin::Region &deviceRegion, double opacity)
 {
-    if (!w->isFullScreen() || !w->screen() || m_settings.fullscreenBackdrop.alphaF() <= 0) {
+    const QColor &color = lookOf(w).fullscreenBackdrop.isValid() ? lookOf(w).fullscreenBackdrop : m_settings.fullscreenBackdrop;
+    if (!w->isFullScreen() || !w->screen() || color.alphaF() <= 0) {
         return;
     }
     const double progress = expandedProgress(w);
@@ -1843,7 +1857,7 @@ void Effect::drawBackdrop(const KWin::RenderViewport &viewport, KWin::EffectWind
     const KWin::RectF tile(painted.x() + painted.width() / 2 - tw / 2, painted.y() + painted.height() / 2 - th / 2, tw, th);
     const auto mix = [progress](double a, double b) { return a + (b - a) * progress; };
     const KWin::RectF rect(mix(painted.x(), tile.x()), mix(painted.y(), tile.y()), mix(painted.width(), tile.width()), mix(painted.height(), tile.height()));
-    fillRect(viewport, rect, m_settings.fullscreenBackdrop, deviceRegion, opacity * progress);
+    fillRect(viewport, rect, color, deviceRegion, opacity * progress);
 }
 
 } // namespace KiriDecorations

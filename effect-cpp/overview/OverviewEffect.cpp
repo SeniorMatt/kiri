@@ -124,6 +124,28 @@ void OverviewEffect::loadHotCorner()
     m_corners[1] = kiri.readEntry("hotCornerTopRight", false);
     m_corners[2] = kiri.readEntry("hotCornerBottomLeft", false);
     m_corners[3] = kiri.readEntry("hotCornerBottomRight", false);
+    m_cornersOn = m_hotCorner;
+    m_outputs.clear();
+    const QJsonObject overrides = QJsonDocument::fromJson(kiri.readEntry("outputOverrides", QString()).toUtf8()).object();
+    for (auto it = overrides.constBegin(); it != overrides.constEnd(); ++it) {
+        const QJsonObject entry = it.value().toObject();
+        OutputOptions options;
+        options.id = it.key().toLower();
+        options.backdrop = kiriColor(entry.value(QStringLiteral("backdropColor")).toString(), QColor());
+        if (entry.contains(QStringLiteral("hotCorners"))) {
+            const QJsonObject corners = entry.value(QStringLiteral("hotCorners")).toObject();
+            options.hasCorners = true;
+            options.cornersOn = corners.value(QStringLiteral("enabled")).toBool(true);
+            options.corners[0] = corners.value(QStringLiteral("topLeft")).toBool(false);
+            options.corners[1] = corners.value(QStringLiteral("topRight")).toBool(false);
+            options.corners[2] = corners.value(QStringLiteral("bottomLeft")).toBool(false);
+            options.corners[3] = corners.value(QStringLiteral("bottomRight")).toBool(false);
+            if (options.cornersOn && config->group(QStringLiteral("Plugins")).readEntry("kiriEnabled", false)) {
+                m_hotCorner = true; // an output may have corners that the global setting does not
+            }
+        }
+        m_outputs.push_back(options);
+    }
     if (!m_hotCorner) {
         m_insideCorner = false;
     }
@@ -151,14 +173,35 @@ void OverviewEffect::loadHotCorner()
     Q_EMIT optionsChanged();
 }
 
+// the first block of the `outputOverrides` setting that is for this output (niri: the first output block that matches)
+const OverviewEffect::OutputOptions *OverviewEffect::optionsOf(const QString &outputName) const
+{
+    for (const OutputOptions &options : m_outputs) {
+        if (options.id == outputName.toLower()) {
+            return &options;
+        }
+    }
+    return nullptr;
+}
+
+QColor OverviewEffect::backdropFor(const QString &outputName) const
+{
+    const OutputOptions *options = optionsOf(outputName);
+    return options && options->backdrop.isValid() ? QColor(options->backdrop.red(), options->backdrop.green(), options->backdrop.blue()) : m_backdrop;
+}
+
 bool OverviewEffect::inHotCorner(const QPointF &pos) const
 {
     for (LogicalOutput *output : effects->screens()) {
         const RectF g = output->geometry();
         // niri (Niri::is_inside_hot_corner): the 1x1 logical pixel at each enabled corner of the output
         const QPointF corners[4] = {g.topLeft(), QPointF(g.right() - 1, g.top()), QPointF(g.left(), g.bottom() - 1), QPointF(g.right() - 1, g.bottom() - 1)};
+        // niri: an output's own hot-corners replace the global ones as a whole
+        const OutputOptions *options = optionsOf(output->name());
+        const bool *flags = options && options->hasCorners ? options->corners : m_corners;
+        const bool on = options && options->hasCorners ? options->cornersOn : m_cornersOn;
         for (int i = 0; i < 4; i++) {
-            if (!m_corners[i] || pos.x() < corners[i].x() || pos.x() >= corners[i].x() + 1 || pos.y() < corners[i].y() || pos.y() >= corners[i].y() + 1) {
+            if (!on || !flags[i] || pos.x() < corners[i].x() || pos.x() >= corners[i].x() + 1 || pos.y() < corners[i].y() || pos.y() >= corners[i].y() + 1) {
                 continue;
             }
             if (!isRunning()) {

@@ -711,6 +711,16 @@ const configDef = [
         default: "", // niri's `workspace "name"`: a JSON list of names; the desktops exist from the start and are never removed
     },
     {
+        name: "desktopLayouts",
+        type: "String",
+        default: "", // niri's `workspace "name" { layout { } }`: a JSON object, the desktop's name -> the layout keys it overrides
+    },
+    {
+        name: "outputOverrides",
+        type: "String",
+        default: "", // niri's `output "name" { layout {} backdrop-color hot-corners }`: a JSON object, the output's name -> { layout, backdropColor, hotCorners }
+    },
+    {
         name: "desktopBindNames",
         type: "String",
         default: "", // the names the niri binds refer to (a JSON list); the shortcuts "...-named-N" mean the Nth of them

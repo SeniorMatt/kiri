@@ -108,6 +108,8 @@ interface Config {
     emptyDesktopAboveFirst: boolean;
     desktopAutoBackAndForth: boolean;
     namedDesktops: string;
+    desktopLayouts: string;
+    outputOverrides: string;
     desktopBindNames: string;
     niriConfigEnabled: boolean;
     niriConfig: string;

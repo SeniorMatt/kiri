@@ -89,6 +89,7 @@ struct Look
     BandStyle border{false, 4, {}};
     ShadowStyle shadow;
     TabColors tabColors;
+    QColor fullscreenBackdrop; // invalid: the global one (a layout {} of a desktop or output may set it)
 };
 
 struct Settings
@@ -107,6 +108,7 @@ struct Settings
     Gradient insertHint;
     QColor fullscreenBackdrop = QColor(Qt::black);
     QColor background; // invalid: the wallpaper stays
+    QHash<QString, QColor> outputBackgrounds; // niri's layout background-color of an output (its own layout {}, or that of the desktop on it); wins over `background`
     QString pointerBinds; // Kiri's `pointerBinds` setting: the wheel and mouse button binds
 };
 
