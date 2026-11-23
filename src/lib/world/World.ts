@@ -687,13 +687,6 @@ class World {
         }
     }
 
-    // niri's show-hotkey-overlay: a notification with the important hotkeys (a QML window would need the effect's help)
-    public showHotkeyOverlay() {
-        if (typeof qmlBase !== "undefined") {
-            (qmlBase as any).showHotkeys(getHotkeyOverlayText(this.shortcutKeys));
-        }
-    }
-
     // niri's open-overview and close-overview
     public openOverview() {
         if (!this.overview.isOpen()) {

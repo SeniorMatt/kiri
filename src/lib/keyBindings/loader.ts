@@ -116,13 +116,21 @@ const NO_REPEAT = new Set([
     "window-close", "overview", "window-toggle-floating", "window-toggle-fullscreen", "window-toggle-windowed-fullscreen", "window-move-to-floating",
     "window-move-to-tiling", "column-toggle-tabbed", "column-display-normal", "column-display-tabbed",
     "column-width-maximize", "column-width-expand", "window-maximize-to-edges", "window-switch-focus-floating-tiling",
-    "desktop-previous-used", "screen-switch", "overview-open", "overview-close", "show-hotkey-overlay",
+    "desktop-previous-used", "screen-switch", "overview-open", "overview-close",
 ]);
 
 // Actions that had no default keys in earlier versions (kglobalacceld stored them as "no key" and never applies a new default)
 const GAINED_DEFAULT_KEYS = new Set([
     "window-height-cycle-presets", "window-height-reset", "column-width-expand", "cycle-preset-widths-reverse",
 ]);
+
+// The kiri-mode switch (tools/install.sh): no Kiri action takes it, or the switch could not leave Kiri mode. dev builds
+// stored it for column-move-to-monitor-up (niri's default) and a niri config import can bring it too.
+const RESERVED_KEYS = ["Meta+Ctrl+Shift+K"];
+function withoutReserved(keys: number[]) {
+    const reserved = parseKeys(RESERVED_KEYS);
+    return keys.filter(key => !reserved.includes(key));
+}
 
 namespace KGlobalAccel {
     export const path = "/kglobalaccel";
@@ -194,18 +202,24 @@ class KeyBindings {
         let pending = shortcuts.length;
         for (const shortcut of shortcuts) {
             const actionId = [KGlobalAccel.component, shortcut.name, KGlobalAccel.componentFriendly, shortcut.description];
-            const defaultKeys = parseKeys(shortcut.defaultKeys);
+            const defaultKeys = withoutReserved(parseKeys(shortcut.defaultKeys));
             KGlobalAccel.call("doRegister", ["as"], [actionId]);
             KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.isDefault]);
             // keys typed in Kiri's own settings replace the stored ones (NoAutoloading), so they also show up in Plasma's Shortcuts page
             // without them, keys the user already set in Plasma's settings are kept (autoloading)
-            const userKeys = parseKeys(shortcutKeys[shortcut.name] ?? []);
+            const userKeys = withoutReserved(parseKeys(shortcutKeys[shortcut.name] ?? []));
             const flags = userKeys.length > 0 ? KGlobalAccel.setPresent | KGlobalAccel.noAutoloading : KGlobalAccel.setPresent;
-            KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, userKeys.length > 0 ? userKeys : defaultKeys, flags], (keys: number[]|undefined) => {
+            KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, userKeys.length > 0 ? userKeys : defaultKeys, flags], (storedKeys: number[]|undefined) => {
                 if (this.destroyed) {
                     return; // the script stopped before kglobalaccel answered
                 }
-                if (userKeys.length === 0 && defaultKeys.length > 0 && (keys ?? []).length === 0 && GAINED_DEFAULT_KEYS.has(shortcut.name)) {
+                let keys = plainKeys(storedKeys);
+                if (withoutReserved(keys).length < keys.length) {
+                    // a stored key is the kiri-mode switch: give it back
+                    keys = withoutReserved(keys);
+                    KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, keys, KGlobalAccel.setPresent | KGlobalAccel.noAutoloading]);
+                }
+                if (userKeys.length === 0 && defaultKeys.length > 0 && keys.length === 0 && GAINED_DEFAULT_KEYS.has(shortcut.name)) {
                     // kglobalacceld keeps what it stored, and older versions stored "no key" for these actions
                     // (their default keys came later), so the default never took effect: set it once more
                     KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.setPresent | KGlobalAccel.noAutoloading], (newKeys: number[]|undefined) => {
@@ -214,10 +228,10 @@ class KeyBindings {
                         }
                     });
                 }
-                for (const key of keys ?? []) {
+                for (const key of keys) {
                     this.activeKeys.add(key);
                 }
-                this.kiriKeys.set(shortcut.name, keys ?? []);
+                this.kiriKeys.set(shortcut.name, keys);
                 pending--;
                 if (pending === 0) {
                     // the twins first, so that taking priority also switches off KWin's twin actions
@@ -471,7 +485,13 @@ function syncTwin(twin: string, wanted: number[], record: Map<string, number[]>,
 }
 
 // Earlier versions registered their shortcuts in KWin's group as "kiri-*"
+// actions that were taken out (show-hotkey-overlay: 0.10.10 dev builds only), so they don't linger on Plasma's Shortcuts page
+const RETIRED_ACTIONS = ["show-hotkey-overlay"];
+
 function removeOldShortcuts() {
+    for (const name of RETIRED_ACTIONS) {
+        KGlobalAccel.call("unregister", ["s", "s"], [KGlobalAccel.component, name]);
+    }
     kglobalaccel.call("/component/kwin", KGlobalAccel.componentIface, "shortcutNames", [], [], (names: string[]|undefined) => {
         for (const name of names ?? []) {
             if (name.startsWith("kiri-")) {

@@ -1312,6 +1312,9 @@ def s_backdrop(h):
     n, box = find_color(shot, ws[1].rgb)
     if n < 200:
         h.fail('backdrop', 'neighbour %s is not visible next to the full-screen window (%d px)' % (ws[1].name, n))
+    h.tap('overview'); h.inp.sleep(900); h.inp.flush(); time.sleep(1.5)
+    save_png(h.screenshot(), TMP + '/bugs/backdrop_4_overview.png', down=1)
+    h.tap('overview'); h.inp.flush(); h.settle(5)
     for rep in range(2):
         nfr = 30
         p = subprocess.Popen([ST + '/shot', TMP + '/bd', str(nfr)], env=dict(env, QT_QPA_PLATFORM='wayland', SHOT_DOWN='4'), stdout=subprocess.PIPE, text=True)
@@ -1329,6 +1332,41 @@ def s_backdrop(h):
                 os.unlink('%s.%d.raw' % (TMP + '/bd', k))
         h.settle(5)
     h.check('end')
+
+
+@scn
+def s_maxgame(h):
+    """an X11 SDL game that goes full-screen by itself when it is maximized (MonoGame does): maximize it next to two normal
+    columns (needs XWL=1 and /st/sdlmax). The game's geometry changes are counted: a resize loop shows as a stream of them."""
+    h.visual = False
+    h.launch_n(2)
+    h.settle(5)
+    disp = sorted(f for f in os.listdir('/tmp/.X11-unix') if f.startswith('X'))
+    if not disp or not os.path.exists(ST + '/sdlmax'):
+        h.fail('maxgame', 'no Xwayland (XWL=1) or no /st/sdlmax')
+        return
+    log = TMP + '/sdlmax.log'
+    p = subprocess.Popen([ST + '/sdlmax'], env=dict(env, DISPLAY=':' + disp[-1][1:], SDLLOG=log), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(4)
+    h.tail(); h.geo.clear()
+    os.makedirs(TMP + '/bugs', exist_ok=True)
+    save_png(h.screenshot(), TMP + '/bugs/maxgame_1_before.png', down=2)
+    h.cmd('const g = workspace.windowList().find(x => x.caption === "Stardew Valley"); print("GAME", g ? g.frameGeometry.width : -1); if (g) { workspace.activeWindow = g; }')
+    time.sleep(0.5)
+    h.spam(['window-maximize-to-edges'], 1, 100, hold=False)
+    t0 = now_ms()
+    time.sleep(5)
+    h.tail()
+    g = [x for x in h.geo if x[1] == 'Stardew Valley' and x[0] >= t0 - 100]
+    print('  game geometry changes after maximize: %d' % len(g))
+    for x in g[:40]:
+        print('    %+5dms %d,%d %dx%d' % (x[0] - t0, x[2], x[3], x[4], x[5]))
+    save_png(h.screenshot(), TMP + '/bugs/maxgame_2_after.png', down=2)
+    print(open(log).read()[-1500:] if os.path.exists(log) else 'no sdl log')
+    if len(g) > 12:
+        h.fail('maxgame', 'resize loop: %d geometry changes of the game in 5 s after maximizing' % len(g))
+    p.kill()
+    h.settle(5)
 
 
 @scn

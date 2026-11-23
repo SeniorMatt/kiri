@@ -93,7 +93,6 @@ namespace NiriImport {
         "open-overview": "overview-open",
         "close-overview": "overview-close",
         "toggle-window-rule-opacity": "window-toggle-rule-opacity",
-        "show-hotkey-overlay": "show-hotkey-overlay",
         // in niri's scrolling layout the width of a window is the width of its column
         "switch-preset-window-width": "cycle-preset-widths",
         "switch-preset-window-width-back": "cycle-preset-widths-reverse",
@@ -246,6 +245,7 @@ namespace NiriImport {
     const UNMAPPED: [RegExp, string][] = [
         [/^(spawn|spawn-sh)$/, "starts a program: a Plasma command shortcut (tools/niri2kiri.py --apply makes them)"],
         [/^screenshot/, "screenshots are Spectacle's"],
+        [/^show-hotkey-overlay$/, "Kiri has no hotkey overlay"],
         [/^(quit|suspend|power-off-monitors|power-on-monitors|change-vt|toggle-touchpad|do-screen-transition)$/, "session and hardware actions are Plasma's"],
         [/^switch-layout$/, "keyboard layouts are Plasma's"],
         [/^toggle-keyboard-shortcuts-inhibit$/, "KWin has its own shortcut inhibit key"],
@@ -1148,7 +1148,7 @@ namespace NiriImport {
         "output": "the display layout is Plasma's (Display settings)",
         "spawn-at-startup": "programs start with Plasma's autostart",
         "spawn-sh-at-startup": "programs start with Plasma's autostart",
-        "hotkey-overlay": "Kiri shows no hotkey overlay at startup",
+        "hotkey-overlay": "Kiri has no hotkey overlay",
         "screenshot-path": "screenshots are Spectacle's",
         "layer-rule": "layer-shell surfaces (panels, wallpapers) are Plasma's",
         "debug": "niri debug options",

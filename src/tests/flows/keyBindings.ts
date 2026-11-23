@@ -54,6 +54,9 @@
             const keys = registered.get(action);
             Assert.assert(keys !== undefined, { message: `niri binds ${action}, which Kiri doesn't register` });
             for (const key of def.shortcutKeys[action]) {
+                if (key === "Meta+Ctrl+Shift+K") {
+                    continue; // the kiri-mode switch
+                }
                 Assert.assert(keys!.includes(parseKeySequence(key)!), { message: `${action}: niri's ${key} is missing in Kiri` });
                 checked++;
             }
@@ -211,4 +214,18 @@ tests.register("A failed D-Bus lookup leaves a twin's keys alone", 1, () => {
         a.failing.add("getGlobalShortcutsByKey");
     });
     Assert.equalArrays(keysOf(other, "Window Move Center"), []);
+});
+
+tests.register("No Kiri action takes the kiri-mode switch key", 1, () => {
+    const modeSwitch = code("Meta+Ctrl+Shift+K");
+    // the default keys, and niri's keys brought by an import
+    const config = getDefaultConfig();
+    config.shortcutKeys = { "column-move-to-monitor-up": ["Meta+Ctrl+Shift+Up", "Meta+Ctrl+Shift+K"] };
+    for (const accel of [twinInit(() => {}), twinInit(() => {}, config)]) {
+        accel.registered.forEach((keys, name) => Assert.assert(!keys.includes(modeSwitch), { message: name + " has the kiri-mode switch key" }));
+        Assert.equalArrays(accel.registered.get("column-move-to-monitor-up")!, [code("Meta+Ctrl+Shift+Up")]);
+    }
+    // stored by a dev build, whose default for this action had it
+    const stored = twinInit(accel => accel.call("", "", "setShortcut", [], [["kiri", "column-move-to-monitor-up"], [code("Meta+Ctrl+Shift+Up"), modeSwitch], 4], () => {}));
+    Assert.equalArrays(stored.registered.get("column-move-to-monitor-up")!, [code("Meta+Ctrl+Shift+Up")]);
 });

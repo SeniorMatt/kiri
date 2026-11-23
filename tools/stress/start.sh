@@ -25,7 +25,7 @@ timeout 60 kpackagetool6 --type=KWin/Script --install '$ST'/probe >/dev/null 2>&
 QT_QPA_PLATFORM=offscreen /usr/lib/kactivitymanagerd >/dev/null 2>&1 &
 KACT=$!
 sleep 2
-kwin_wayland --virtual --no-lockscreen --width '$W' --height '$H' > '$ST'/kwin.log 2>&1 &
+kwin_wayland ${XWL:+--xwayland} --virtual --no-lockscreen --width '$W' --height '$H' > '$ST'/kwin.log 2>&1 &
 KW=$!
 echo $KW > '$ST'/kwin.pid
 for i in $(seq 1 60); do qdbus6 org.kde.KWin /KWin org.kde.KWin.supportInformation >/dev/null 2>&1 && break; sleep 0.5; done

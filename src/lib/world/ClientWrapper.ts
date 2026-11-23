@@ -192,12 +192,13 @@ class ClientWrapper {
             // A client that does not take a size (it answers the same size with the same other one, as a terminal that
             // snaps to whole cells does) is not asked again, it would only answer the same and the window would flip
             // between the two sizes for ever; it keeps its place with the size it chose, in the corner of its slot (niri:
-            // the tile has the slot's size, the window sits at its top-left).
+            // the tile has the slot's size, the window sits at its top-left). The same for a maximized or full-screen window
+            // that answers with a size of its own (a game): it keeps that size in its tile, and the resize loop ends.
             let frameWidth = width;
             let frameHeight = height;
             const refusal = this.refusal;
-            if (refusal !== null && !this.kwinClient.fullScreen && !this.windowedFullScreen && !this.maximizedSeen && refusal.askedWidth === width && refusal.askedHeight === height &&
-                refusal.width === current.width && refusal.height === current.height) {
+            if (refusal !== null && refusal.askedWidth === width && refusal.askedHeight === height &&
+                Math.round(refusal.width) === Math.round(current.width) && Math.round(refusal.height) === Math.round(current.height)) {
                 frameWidth = current.width;
                 frameHeight = current.height;
             }
@@ -472,6 +473,8 @@ class ClientWrapper {
         noteUrgent();
 
         manager.connect(client.kwinClient.maximizedAboutToChange, (mode: MaximizedMode) => {
+            client.lastAnswer = null; // what the client answered to the size of the other mode says nothing about this one
+            client.refusal = null;
             if (mode !== MaximizedMode.Unmaximized) {
                 client.maximizedSeen = true;
             }

@@ -607,7 +607,8 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         {
             name: "column-move-to-monitor-up",
             description: "Screen: move column up",
-            defaultKeys: ["Meta+Ctrl+Shift+Up", "Meta+Ctrl+Shift+K"],
+            // niri also binds Mod+Shift+Ctrl+K here, which is the kiri-mode switch
+            defaultKeys: ["Meta+Ctrl+Shift+Up"],
             action: () => world.doIfTiledFocused(actions.columnMoveToMonitor.partial("up")),
         },
         {
@@ -834,12 +835,6 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.toggleOverview(),
         },
         {
-            name: "show-hotkey-overlay",
-            description: "Overview: show the important hotkeys",
-            defaultKeys: ["Meta+Shift+/"],
-            action: () => world.showHotkeyOverlay(),
-        },
-        {
             name: "overview-open",
             description: "Overview: open",
             action: () => world.openOverview(),
@@ -1046,45 +1041,4 @@ function getNumKeyBindings(world: World, actions: Actions): NumKeyBinding[] {
             },
         },
     ];
-}
-
-// niri's "Important Hotkeys" list: these actions with the keys they have now (the keys typed into Kiri's settings or imported
-// from a niri config, else the default keys)
-const IMPORTANT_HOTKEYS: [string, string][] = [
-    ["show-hotkey-overlay", "Show Important Hotkeys"],
-    ["overview", "Open the Overview"],
-    ["window-close", "Close Focused Window"],
-    ["focus-left", "Focus Column to the Left"],
-    ["focus-right", "Focus Column to the Right"],
-    ["focus-down", "Focus Window Below"],
-    ["focus-up", "Focus Window Above"],
-    ["column-move-left", "Move Column Left"],
-    ["column-move-right", "Move Column Right"],
-    ["window-move-down", "Move Window Down"],
-    ["window-move-up", "Move Window Up"],
-    ["desktop-next", "Switch to the Next Desktop"],
-    ["desktop-previous", "Switch to the Previous Desktop"],
-    ["column-move-to-next-desktop", "Move Column to the Next Desktop"],
-    ["column-move-to-previous-desktop", "Move Column to the Previous Desktop"],
-    ["cycle-preset-widths", "Switch Preset Column Widths"],
-    ["column-width-maximize", "Maximize Column"],
-    ["window-toggle-fullscreen", "Full-screen Window"],
-    ["window-toggle-floating", "Toggle Floating"],
-    ["column-toggle-tabbed", "Toggle Tabbed Column"],
-];
-
-function getHotkeyOverlayText(shortcutKeys: Record<string, string[]>) {
-    const empty: any = {};
-    const defaults = new Map<string, string[]>();
-    for (const shortcut of getShortcuts(empty, empty)) {
-        defaults.set(shortcut.name, shortcut.defaultKeys);
-    }
-    const lines: string[] = [];
-    for (const [name, title] of IMPORTANT_HOTKEYS) {
-        const keys = shortcutKeys[name] ?? defaults.get(name) ?? [];
-        if (keys.length > 0) {
-            lines.push(`${keys.join(" / ")}: ${title}`);
-        }
-    }
-    return lines.join("\n");
 }

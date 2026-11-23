@@ -11,7 +11,7 @@ Status: **done** = same behaviour; **partial** = works but differs or lacks opti
 Kiri places: `TS` = `src/lib/...`; `FX` = `effect-cpp/<name>/`; `QML` = `package/contents/ui/` or `effect-cpp/overview/qml/`.
 Tests: names are files in `src/tests/flows/` (`units/` for units); "-" = no test (visual or KWin-only).
 
-Counts: done 89, partial 32, missing 50, impossible 8, n/a 30 (209 rows).
+Counts: done 150, partial 19, missing 6, impossible 9, n/a 29 (213 rows).
 
 The subtle behaviours are in these rows: focus after close, new-window placement and column width rounding (3.1), scroll
 animations and gesture scrolling (3.1), interactive move and resize (3.2), workspace creation, removal and back-and-forth (4),
@@ -84,7 +84,7 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | move-window-to-workspace-down/up/N | same for a window | layout/mod.rs | done | `window-move-to-*desktop*`; `focus=false`: `window-move-to-next/previous-desktop-no-focus`, `window-move-to-desktop-no-focus-N` | followWindowToDesktop, workspaces |
 | move-column-to-workspace "name", move-window-to-workspace "name" | | layout/mod.rs | done | `column-move-to-desktop-named-N`, `window-move-to-desktop-named-N` (see focus-workspace "name"); `focus=false` with a name is not mapped | workspaces |
 | move-window-to-new-workspace-below/above, move-column-to-new-workspace-below/above | new workspace next to the current one | layout/mod.rs | done | `window/column-move-to-new-desktop-below/above` (+ `-no-focus`); the empty desktop at the bottom/top is reused like `add_or_reuse_empty_workspace_at`; a workspace reference argument is not mapped | workspaces |
-| move-window/column-to-monitor-* | | layout/mod.rs | done | `column-move-to-monitor-*`, `window-move-to-monitor-*` (also floating windows): to the right of the active column of the other output, the focus goes along | multiMonitor |
+| move-window/column-to-monitor-* | | layout/mod.rs | done | `column-move-to-monitor-*`, `window-move-to-monitor-*` (also floating windows): to the right of the active column of the other output, the focus goes along. Mod+Shift+Ctrl+K is not bound to `column-move-to-monitor-up`: it is the kiri-mode switch, and no Kiri action takes it (also not from an import) | multiMonitor, keyBindings |
 | move-workspace-down/up | reorder workspaces | monitor.rs `move_workspace_down` 1257 | done | `desktop-move-down/up` emulated by replacing the neighbour desktop (DynamicDesktops.moveCurrent: columns, view and focus move along, named stays named, previous desktop follows); KWin cannot reorder | dynamicDesktops, workspaces |
 | move-workspace-to-index N | | monitor.rs | done | `move-desktop-to-index-N`, the same emulation repeated | workspaces |
 | move-workspace-to-monitor-* | | layout/mod.rs | partial | `screen-switch` gathers the strips of all outputs on the active one | multiMonitor |
@@ -120,7 +120,7 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | toggle-window-rule-opacity | flips the rule's opacity | binds.rs | done | `window-toggle-rule-opacity` (no default key, like niri) | windowRules |
 | set-dynamic-cast-window/monitor, clear-dynamic-cast-target, stop-cast | screencast target | binds.rs | n/a | Plasma screencasts through KWin/xdg-portal | - |
 | switch-layout | keyboard layout | binds.rs | n/a | Plasma keyboard KCM | - |
-| show-hotkey-overlay | list of binds | binds.rs; ui/hotkey_overlay.rs | partial | `show-hotkey-overlay`: a notification ("Important Hotkeys") with the keys the important actions have now (Kiri's settings, an imported niri config, else the defaults); keys set only on Plasma's Shortcuts page are not seen; not a QML overlay | niriSizeActions |
+| show-hotkey-overlay | list of binds | binds.rs; ui/hotkey_overlay.rs | n/a | left out on purpose (owner's choice); both importers skip the bind with "Kiri has no hotkey overlay" | NiriImport |
 | spawn, spawn-sh, spawn-at-startup | run commands | binds.rs, misc.rs | n/a | Plasma custom shortcuts and autostart | - |
 | screenshot, screenshot-screen, screenshot-window, screenshot-path | | binds.rs, misc.rs | n/a | Spectacle | - |
 | quit, suspend, power-off/on-monitors, change-vt, toggle-touchpad, do-screen-transition | session and hardware | binds.rs | n/a | Plasma | - |
@@ -185,7 +185,7 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | Drag a tiled window against the view edge: view scrolls | | input/move_grab.rs `begin_view_offset` 140; scrolling.rs 3204 | done | DndEdgeScroll.ts (see section 7); stops while the drag is a floating one, like niri | dragTiled |
 | Mod+right drag resizes | width of column, height of window, neighbours move | scrolling.rs `interactive_resize_*` 3607-3720; input/resize_grab.rs | done | Tiled.ts interactiveMoveResizeStepped path, Grid.ts | userResize, columnWidthView, verticalResize |
 | Resize keeps view frozen, centred lone column stays centred | | scrolling.rs 3607-3720 | partial | the centred-column growth by 2*dx is impossible (KWin sizes the dragged window from the pointer); rest done | singleColumnResize, userResize |
-| Double click on a left/right resize edge: toggle full width; top/bottom: reset window height | | input/mod.rs 3446 | missing | an effect could see button events on the frame; KWin handles titlebar double click itself | - |
+| Double click on a left/right resize edge: toggle full width; top/bottom: reset window height | | input/mod.rs 3446 | done | two resize presses on the same edge within 400 ms (niri's DOUBLE_CLICK_TIME); Tiled.ts, World.ts `doResizeEdgeDoubleClick` | userResize |
 | Mod+middle drag: scroll view horizontally, vertically: workspace | after 8 px the axis is chosen; the view follows the pointer 1:1 (is_touchpad false) and settles with the swipe's momentum and snapping; vertically the desktops follow it, one screen height per desktop; never over the overview, a user bind on Mod+MouseMiddle wins; the press is not passed on and does not activate the window | input/spatial_movement_grab.rs; input/mod.rs 3355 | done | FX swipe/ (input spy and filter; KWin's Meta+middle "toggle raise and lower" does not run), FX switch/ (vertical), common/PointerGrab.h; the script drives the settle like a touchpad swipe (World.gestureRaw `ptr`). Mod is the Plasma window-action key (`[MouseBindings] CommandAllKey`, Meta by default, which is niri's Super; neither install.sh nor kiri-mode changes it). Mod+wheel is `pointerBinds` | gestureNiri (pointer drag) |
 
 ## 4. Workspaces
