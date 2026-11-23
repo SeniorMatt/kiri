@@ -172,6 +172,7 @@ class World {
             layoutConfig,
             focusPasser,
             new DesktopFilter(config.tiledDesktops),
+            () => this.getFocusedTileOutput(),
         );
         this.clientManager = new ClientManager(config, this, this.desktopManager, this.pinManager);
         warpFrame.provider = kwinClient => this.clientManager.getWarpFrame(kwinClient);
@@ -242,8 +243,19 @@ class World {
             }
             kwinClients = kwinClients.slice().sort((a, b) => (order.get(String(a.internalId)) ?? Infinity) - (order.get(String(b.internalId)) ?? Infinity));
         }
+        // a window that is scrolled out of its output's view is parked, so the output it is on is not the one of its strip
+        const outputs = new Map<string, string>();
+        if (layout !== null) {
+            for (const column of layout.columns) {
+                for (const window of column.windows) {
+                    if (column.output !== undefined) {
+                        outputs.set(window.id, column.output);
+                    }
+                }
+            }
+        }
         for (const kwinClient of kwinClients) {
-            this.clientManager.addClient(kwinClient, true);
+            this.clientManager.addClient(kwinClient, true, outputs.get(String(kwinClient.internalId)));
         }
     }
 
@@ -267,6 +279,7 @@ class World {
                     })),
                     heightRatios: column.getHeightRatios(),
                     tabbed: column.isTabbed(),
+                    output: desktop.outputName,
                 });
             }
             const focused = desktop.grid.getLastFocusedWindow();
@@ -370,6 +383,16 @@ class World {
                 desktop.fitColumnInView(focusedColumn);
             }
         }
+    }
+
+    // the output of the strip that the focused window is a tile of
+    private getFocusedTileOutput() {
+        const active = Workspace.activeWindow;
+        if (active === null || this.clientManager === undefined) {
+            return null;
+        }
+        const window = this.clientManager.findTiledWindow(active);
+        return window === null ? null : window.column.grid.desktop.outputName;
     }
 
     private update() {
@@ -841,6 +864,7 @@ namespace World {
     // plain data (windows are named by their internal id), so it can be stored as JSON
     export interface Layout {
         columns: {
+            output?: string; // the output of the strip
             windows: {
                 id: string;
                 fullScreen: boolean;

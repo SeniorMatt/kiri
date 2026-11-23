@@ -88,7 +88,7 @@ namespace ClientState {
 
             manager.connect(kwinClient.desktopsChanged, () => {
                 world.do((clientManager, desktopManager) => {
-                    const desktop = desktopManager.getDesktopForClient(kwinClient);
+                    const desktop = desktopManager.getDesktopForClient(kwinClient, window.column.grid.desktop.outputName);
                     if (desktop === undefined) {
                         // windows on multiple desktops are not supported; it may only be a transient state (lock,
                         // sleep, the Pager), so the window is tiled again when the desktop settles
@@ -101,7 +101,7 @@ namespace ClientState {
 
             manager.connect(kwinClient.activitiesChanged, () => {
                 world.do((clientManager, desktopManager) => {
-                    const desktop = desktopManager.getDesktopForClient(kwinClient);
+                    const desktop = desktopManager.getDesktopForClient(kwinClient, window.column.grid.desktop.outputName);
                     if (desktop === undefined) {
                         // windows on multiple activities are not supported (see above)
                         clientManager.floatClient(client, true);
@@ -342,7 +342,12 @@ namespace ClientState {
                     if (moved !== null && moved.onlyMoved) {
                         return;
                     }
-                    if (externalFrameGeometryChangedRateLimiter.acquire()) {
+                    if (client.takeLearnedHeight()) {
+                        world.do(() => {
+                            window.onFrameGeometryChanged();
+                            window.column.resizeWindows(); // the window has a new height bound
+                        });
+                    } else if (externalFrameGeometryChangedRateLimiter.acquire()) {
                         world.do(() => window.onFrameGeometryChanged());
                     } else {
                         relayoutDelayer.run();

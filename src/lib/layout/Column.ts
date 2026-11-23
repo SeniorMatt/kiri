@@ -17,6 +17,8 @@ class Column {
     private tabbed: boolean;
     private normalSizing = true; // niri's sizing_mode is normal: no window is full-screen or maximized in the grid
     private focusTaker: Window|null;
+    // the output this column was on before its output was unplugged: it goes back there when the output returns
+    public homeOutput: string | undefined = undefined;
     private minHeightsSeen: number[] = []; // the minimum heights the last height distribution was made with
     // while the user resizes one of the windows: the geometry the pointer asks for, before the client has committed
     // it. The other windows of the column are sent there at once (niri sends all the configures of a resize together)
@@ -36,11 +38,11 @@ class Column {
         this.grid.onColumnAdded(this, leftColumn);
     }
 
-    public moveToGrid(targetGrid: Grid, leftColumn: Column|null) {
+    public moveToGrid(targetGrid: Grid, leftColumn: Column|null, passFocus = this.isFocused() ? FocusPassing.Type.Immediate : FocusPassing.Type.None) {
         if (targetGrid === this.grid) {
             this.grid.moveColumn(this, leftColumn);
         } else {
-            this.grid.onColumnRemoved(this, this.isFocused() ? FocusPassing.Type.Immediate : FocusPassing.Type.None);
+            this.grid.onColumnRemoved(this, passFocus);
             this.grid = targetGrid;
             targetGrid.onColumnAdded(this, leftColumn);
             for (const window of this.windows.iterator()) {
@@ -342,6 +344,7 @@ class Column {
 
     // like niri's set-window-height: the window gets this height, the others share the rest by their weights
     public setFixedHeight(window: Window, height: number, presetIndex: number|null) {
+        window.client.forgetLearnedHeight();
         if (window.fixedHeight === null) {
             this.convertHeightsToAuto();
         }
@@ -365,6 +368,7 @@ class Column {
 
     // niri's reset-window-height: the window is auto-sized again (all windows of a tabbed column)
     public resetWindowHeight(window: Window) {
+        window.client.forgetLearnedHeight();
         if (this.tabbed) {
             for (const other of this.windows.iterator()) {
                 other.setAutoHeight();
@@ -536,8 +540,9 @@ class Column {
             }
         }
 
+        const parked = this.isParked(visibleRange, forceOpaque);
         if (this.tabbed) {
-            this.arrangeTabbed(x);
+            this.arrangeTabbed(x, parked);
             return;
         }
         let y = this.grid.desktop.tilingArea.y;
@@ -546,17 +551,23 @@ class Column {
             if (target !== null && window !== target.window) {
                 // like niri, a tile that is not as wide as the column starts at the column's left edge, but when the left edge is
                 // dragged the column grows to the left (what the pointer asks for may not be committed yet)
-                window.arrange(target.leftEdge ? x + this.getWidth() - target.width : x, y, target.width, window.height);
+                window.arrange(target.leftEdge ? x + this.getWidth() - target.width : x, y, target.width, window.height, parked);
             } else {
-                window.arrange(x, y, this.getWidth(), window.height);
+                window.arrange(x, y, this.getWidth(), window.height, parked);
             }
             y += window.height + this.grid.config.gapsInnerVertical;
         }
     }
 
+    // Completely out of the view while the outputs are more than one (see Desktop.parkTop). Not while the user resizes.
+    private isParked(visibleRange: Range, forceOpaque: boolean) {
+        return !forceOpaque && this.grid.desktop.getParkOffset() !== null &&
+            (this.getRight() <= visibleRange.getLeft() || this.getLeft() >= visibleRange.getRight());
+    }
+
     // every window gets the whole column (less the room of a tab indicator placed within the column), only the active one is
     // raised above the others
-    private arrangeTabbed(x: number) {
+    private arrangeTabbed(x: number, parked: boolean) {
         const area = this.grid.desktop.tilingArea;
         const width = this.getWidth();
         const extra = this.tabIndicatorExtra();
@@ -566,7 +577,7 @@ class Column {
         const toWidth = position === "left" || position === "right" ? extra : 0;
         const toHeight = position === "top" || position === "bottom" ? extra : 0;
         for (const window of this.windows.iterator()) {
-            window.arrange(x + toLeft, area.y + toTop, width - toWidth, area.height - toHeight);
+            window.arrange(x + toLeft, area.y + toTop, width - toWidth, area.height - toHeight, parked);
         }
         this.arrangeZ();
         this.grid.desktop.addTabIndicator(this.getTabIndicator(x + toLeft, area.y + toTop, width - toWidth, area.height - toHeight));
@@ -731,6 +742,7 @@ class Column {
         // like niri: the window below takes the place of the removed one, the one above if it was the bottom one
         const windowToFocus = this.getBelowWindow(window) ?? this.getAboveWindow(window);
         const widthBefore = this.getWidth();
+        const overflowBefore = this.getOverflow();
 
         this.windows.remove(window);
         if (!lastWindow) {
@@ -757,8 +769,9 @@ class Column {
                 }
             }
             this.resizeWindows();
-            if (this.getWidth() !== widthBefore) {
-                this.grid.onColumnWidthChanged(this); // the maximized window that filled the screen left
+            const overflow = this.getOverflow();
+            if (this.getWidth() !== widthBefore || overflow[0] !== overflowBefore[0] || overflow[1] !== overflowBefore[1]) {
+                this.grid.onColumnWidthChanged(this); // the maximized window that filled the screen left (the column keeps its width, the overflow past its edges goes)
             }
             if (windowToFocus !== null) {
                 switch (passFocus) {

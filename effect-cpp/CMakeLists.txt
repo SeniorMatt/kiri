@@ -37,9 +37,14 @@ find_package(KF6 REQUIRED COMPONENTS Config CoreAddons)
 find_package(KWin REQUIRED COMPONENTS kwineffects)
 find_package(epoxy REQUIRED)
 
-if(KWin_VERSION VERSION_LESS 6.7.90)
-    message(FATAL_ERROR "Kiri decorations needs KWin 6.7.90 or newer, found ${KWin_VERSION}")
+if(KWin_VERSION VERSION_LESS 6.7.0)
+    message(FATAL_ERROR "Kiri effects need KWin 6.7 or newer, found ${KWin_VERSION}")
 endif()
+# 6.7 has the void paint hooks and QRectF geometry; 6.7.90 (the 6.8 beta) has the bool ones and RectF
+if(KWin_VERSION VERSION_LESS 6.7.90)
+    add_compile_definitions(KIRI_KWIN_OLD)
+endif()
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/common)
 
 add_subdirectory(src)
 add_subdirectory(switch)

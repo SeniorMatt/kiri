@@ -872,8 +872,92 @@ class Actions {
         grid.desktop.scrollToColumn(rightColumn, false);
     };
 
+    // The strips of all the outputs come to the active output (every desktop): what the one grid of earlier versions did
     public readonly screenSwitch = (cm: ClientManager, dm: DesktopManager) => {
-        dm.selectScreen(Workspace.activeScreen);
+        dm.gatherOnOutput(dm.getActiveOutputName());
+    };
+
+    private getMonitor(dm: DesktopManager, direction: Actions.MonitorDirection) {
+        const from = dm.getActiveOutputName();
+        switch (direction) {
+        case "left": return dm.getOutputInDirection(from, -1, 0);
+        case "right": return dm.getOutputInDirection(from, 1, 0);
+        case "up": return dm.getOutputInDirection(from, 0, -1);
+        case "down": return dm.getOutputInDirection(from, 0, 1);
+        case "next": return dm.getAdjacentOutput(from, 1);
+        case "previous": return dm.getAdjacentOutput(from, -1);
+        }
+    }
+
+    // niri's focus-monitor-*: the window that is active on the output next to this one gets the focus; an output without
+    // windows only gets the pointer
+    public readonly focusMonitor = (direction: Actions.MonitorDirection, cm: ClientManager, dm: DesktopManager) => {
+        const output = this.getMonitor(dm, direction);
+        if (output === null) {
+            return;
+        }
+        const window = dm.getDesktopInCurrentActivity(Workspace.currentDesktop, output.name)?.grid.getLastFocusedWindow() ?? null;
+        if (window !== null) {
+            window.focus();
+            return;
+        }
+        const floating = cm.getTopFloatingOnOutput(output);
+        if (floating !== null) {
+            activateWindow(floating, "focus-monitor");
+            return;
+        }
+        dm.setForcedOutput(output.name);
+        const area = Workspace.clientArea(ClientAreaOption.ScreenArea, output, Workspace.currentDesktop);
+        warpPointerTo(Math.round(area.x + area.width / 2), Math.round(area.y + area.height / 2));
+    };
+
+    // niri's move-column-to-monitor-*: the column goes to the right of the active column of the other output, keeps the focus
+    // and takes the active output along
+    public readonly columnMoveToMonitor = (direction: Actions.MonitorDirection, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        const output = this.getMonitor(dm, direction);
+        if (output === null) {
+            return;
+        }
+        const newGrid = dm.getDesktopInCurrentActivity(oldGrid.desktop.kwinDesktop, output.name)?.grid;
+        if (newGrid === undefined || newGrid === oldGrid) {
+            return;
+        }
+        const wasFocused = window.isFocused();
+        column.homeOutput = undefined;
+        column.moveToGrid(newGrid, newGrid.getLastFocusedColumn() ?? newGrid.getLastColumn());
+        if (wasFocused) {
+            window.focus();
+        }
+    };
+
+    // niri's move-window-to-monitor-*: the window becomes a column of the other output
+    public readonly windowMoveToMonitor = (direction: Actions.MonitorDirection, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
+        if (column.getWindowCount() === 1) {
+            this.columnMoveToMonitor(direction, cm, dm, window, column, oldGrid);
+            return;
+        }
+        const output = this.getMonitor(dm, direction);
+        if (output === null) {
+            return;
+        }
+        const newGrid = dm.getDesktopInCurrentActivity(oldGrid.desktop.kwinDesktop, output.name)?.grid;
+        if (newGrid === undefined || newGrid === oldGrid) {
+            return;
+        }
+        const wasFocused = window.isFocused();
+        const newColumn = new Column(newGrid, newGrid.getLastFocusedColumn() ?? newGrid.getLastColumn());
+        window.moveToColumn(newColumn, true, wasFocused ? FocusPassing.Type.Immediate : FocusPassing.Type.None);
+        if (wasFocused) {
+            window.focus();
+        }
+    };
+
+    // the same keys on a floating window: it goes to the other output at the same relative place
+    public readonly floatingMoveToMonitor = (direction: Actions.MonitorDirection, cm: ClientManager, dm: DesktopManager, active: KwinClient) => {
+        const output = this.getMonitor(dm, direction);
+        if (output !== null) {
+            cm.moveFloatingToOutput(active, output);
+        }
     };
 
     public readonly focus = (columnIndex: number, cm: ClientManager, dm: DesktopManager) => {
@@ -971,7 +1055,7 @@ class Actions {
         if (kwinDesktop === undefined) {
             return null;
         }
-        const newDesktop = dm.getDesktopInCurrentActivity(kwinDesktop);
+        const newDesktop = dm.getDesktopInCurrentActivity(kwinDesktop, oldGrid.desktop.outputName); // on the same output
         if (newDesktop === undefined) {
             return null;
         }
@@ -1019,7 +1103,7 @@ class Actions {
         if (kwinDesktop === undefined) {
             return;
         }
-        const newDesktop = dm.getDesktopInCurrentActivity(kwinDesktop);
+        const newDesktop = dm.getDesktopInCurrentActivity(kwinDesktop, oldGrid.desktop.outputName);
         if (newDesktop === undefined) {
             return;
         }
@@ -1053,6 +1137,8 @@ class Actions {
 }
 
 namespace Actions {
+    export type MonitorDirection = "left" | "right" | "up" | "down" | "next" | "previous";
+
     export interface Config {
         manualScrollStep: number;
         floatingPresetWidths: { getOrdered(size: number): number[] };

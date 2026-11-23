@@ -29,11 +29,70 @@ class MockWorkspace {
 
     public panelLeft = 0; // width of a panel reserved on the left screen edge
 
-    public clientArea(option: ClientAreaOption, output: Output, kwinDesktop: KwinDesktop) {
-        if (this.panelLeft > 0 && option !== ClientAreaOption.FullScreenArea && option !== ClientAreaOption.ScreenArea && option !== ClientAreaOption.FullArea) {
-            return new MockQmlRect(screen.x + this.panelLeft, screen.y, screen.width - this.panelLeft, screen.height);
+    // where each output is, for tests with more than one (see setOutputs); without any, every output is `screen`
+    public readonly outputRects = new Map<string, MockQmlRect>();
+
+    // the outputs in a row or any other layout: [name, rect] each; the first one is the active screen
+    public setOutputs(...outputs: [string, MockQmlRect][]) {
+        this.outputRects.clear();
+        const old = this.screens;
+        this.screens = outputs.map(([name, rect]) => {
+            this.outputRects.set(name, rect);
+            return old.find(output => output.name === name) ?? { __brand: "Output", name: name } as Output;
+        });
+        this.activeScreen = this.screens[0];
+        this.screensChanged.fire();
+    }
+
+    // an output is unplugged (its windows are squeezed into the others by KWin: the tests do that) or plugged in again
+    public removeOutput(name: string) {
+        const rect = this.outputRects.get(name);
+        this.outputRects.delete(name);
+        this.screens = this.screens.filter(output => output.name !== name);
+        if (this.activeScreen.name === name) {
+            this.activeScreen = this.screens[0];
         }
-        return screen;
+        return rect;
+    }
+
+    public addOutput(name: string, rect: MockQmlRect) {
+        this.outputRects.set(name, rect);
+        this.screens = [...this.screens, { __brand: "Output", name: name } as Output];
+    }
+
+    public getOutputRect(output: Output) {
+        return this.outputRects.get(output.name) ?? screen;
+    }
+
+    // KWin puts a window on the output that has the center of its frame, or the nearest one
+    public outputAt(x: number, y: number): Output {
+        let best = this.screens[0];
+        let bestDistance = Infinity;
+        for (const output of this.screens) {
+            const rect = this.getOutputRect(output);
+            const dx = Math.max(rect.x - x, 0, x - rectRight(rect));
+            const dy = Math.max(rect.y - y, 0, y - rectBottom(rect));
+            const distance = dx * dx + dy * dy;
+            if (distance < bestDistance) {
+                best = output;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    public clientArea(option: ClientAreaOption, output: Output, kwinDesktop: KwinDesktop) {
+        let rect = output === undefined ? screen : this.getOutputRect(output);
+        if (option === ClientAreaOption.FullArea && this.outputRects.size > 0) {
+            const rects = Array.from(this.outputRects.values());
+            const left = Math.min(...rects.map(r => r.x));
+            const top = Math.min(...rects.map(r => r.y));
+            rect = new MockQmlRect(left, top, Math.max(...rects.map(r => rectRight(r))) - left, Math.max(...rects.map(r => rectBottom(r))) - top);
+        }
+        if (this.panelLeft > 0 && option !== ClientAreaOption.FullScreenArea && option !== ClientAreaOption.ScreenArea && option !== ClientAreaOption.FullArea) {
+            return new MockQmlRect(rect.x + this.panelLeft, rect.y, rect.width - this.panelLeft, rect.height);
+        }
+        return rect;
     }
 
     public raiseWindow(kwinClient: KwinClient) {}

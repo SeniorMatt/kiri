@@ -16,7 +16,7 @@ namespace ClientState {
             manager.connect(client.kwinClient.minimizedChanged, () => {
                 console.assert(!client.kwinClient.minimized);
                 world.do((clientManager, desktopManager) => {
-                    const desktop = desktopManager.getDesktopForClient(client.kwinClient);
+                    const desktop = desktopManager.getDesktopForClient(client.kwinClient, slot?.grid.desktop.outputName);
                     if (desktop !== undefined) {
                         clientManager.tileClient(client, desktop.grid, slot !== null && slot.grid === desktop.grid ? slot.placement : undefined);
                     } else {

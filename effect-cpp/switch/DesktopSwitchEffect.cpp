@@ -222,7 +222,7 @@ void DesktopSwitchScreen::prePaintScreen(ScreenPrePaintData &data)
     data.mask |= Effect::PAINT_SCREEN_TRANSFORMED;
 }
 
-bool DesktopSwitchEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
+KIRI_PAINT_RET DesktopSwitchEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
 {
     if (DesktopSwitchScreen *slideScreen = getDesktopSwitchScreen(screen)) {
         slideScreen->paintScreen();
@@ -291,7 +291,7 @@ void DesktopSwitchEffect::prePaintWindow(RenderView *view, EffectWindow *w, Wind
     effects->prePaintWindow(view, w, data);
 }
 
-bool DesktopSwitchEffect::paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceGeometry, WindowPaintData &data)
+KIRI_PAINT_RET DesktopSwitchEffect::paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceGeometry, WindowPaintData &data)
 {
     if (DesktopSwitchScreen *slideScreen = getDesktopSwitchScreen(w->screen())) {
         return slideScreen->paintWindow(renderTarget, viewport, w, mask, deviceGeometry, data);
@@ -300,10 +300,10 @@ bool DesktopSwitchEffect::paintWindow(const RenderTarget &renderTarget, const Re
     }
 }
 
-bool DesktopSwitchScreen::paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceGeometry, WindowPaintData &data)
+KIRI_PAINT_RET DesktopSwitchScreen::paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceGeometry, WindowPaintData &data)
 {
     if (!willBePainted(w)) {
-        return true;
+        KIRI_RET(true);
     }
 
     if (!isTranslated(w)) {
@@ -342,19 +342,19 @@ bool DesktopSwitchScreen::paintWindow(const RenderTarget &renderTarget, const Re
             const Rect screenArea = screen->geometry();
             const Rect logicalDamage = screenArea.translated(drawTranslation).intersected(screenArea);
 
-            if (!effects->paintWindow(
+            if (!KIRI_CALL(effects->paintWindow(
                     renderTarget, viewport, w, mask,
                     // Only paint the region that intersects the current screen and desktop.
                     deviceGeometry.intersected(viewport.mapToDeviceCoordinatesAligned(logicalDamage)),
-                    data)) {
-                return false;
+                    data))) {
+                KIRI_RET(false);
             }
 
             // Undo the translation for the next screen. I know, it hurts me too.
             data += QPoint(-drawTranslation.x(), -drawTranslation.y());
         }
     }
-    return true;
+    KIRI_RET(true);
 }
 
 void DesktopSwitchEffect::postPaintScreen()

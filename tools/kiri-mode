@@ -30,7 +30,7 @@ fi
 KWIN="$QDBUS org.kde.KWin"
 KIRI_EFFECTS="kiri_decorations kiri_desktop_switch kiri_motion kiri_swipe kiri_overview kiri_animations"
 # Plasma effects Kiri replaces, with whether Plasma has them on by default
-PLASMA_EFFECTS="slide:true overview:true kwin4_effect_geometry_change:true fade:false scale:true glide:false maximize:true"
+PLASMA_EFFECTS="slide:true overview:true kwin4_effect_geometry_change:true fade:false scale:true glide:false maximize:true fullscreen:true"
 
 r() { kreadconfig6 --file kwinrc --group "$1" --key "$2" ${3:+--default "$3"}; }
 w() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" "$3"; }
@@ -249,7 +249,7 @@ case $cmd in
         echo "$(current) mode"
         if script_loaded; then echo "script: loaded"; else echo "script: not loaded"; fi
         loaded=
-        for e in $KIRI_EFFECTS slide overview kwin4_effect_geometry_change fade scale glide maximize; do
+        for e in $KIRI_EFFECTS slide overview kwin4_effect_geometry_change fade scale glide maximize fullscreen; do
             effect_loaded "$e" && loaded="$loaded $e"
         done
         echo "effects:${loaded:- none}"

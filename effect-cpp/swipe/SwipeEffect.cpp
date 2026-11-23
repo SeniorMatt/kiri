@@ -447,7 +447,7 @@ void SwipeEffect::prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePai
     effects->prePaintWindow(view, w, data);
 }
 
-bool SwipeEffect::drawWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data)
+KIRI_PAINT_RET SwipeEffect::drawWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data)
 {
     if (m_visual != Visual::Off && m_began) {
         data.setXTranslation(data.xTranslation() + windowOffset(w));

@@ -1140,9 +1140,9 @@ void Effect::setGradient(KWin::GLShader *shader, int layer, const Gradient &g, c
 
 // The hint is drawn over everything except the dragged window (drawWindow draws it under that one, so the
 // window, translucent while it is loose, stays on top of its own hint like in niri).
-bool Effect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, int mask, const KWin::Region &deviceRegion, KWin::LogicalOutput *screen)
+KIRI_PAINT_RET Effect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, int mask, const KWin::Region &deviceRegion, KWin::LogicalOutput *screen)
 {
-    const bool result = OffscreenEffect::paintScreen(renderTarget, viewport, mask, deviceRegion, screen);
+    const bool result = KIRI_CALL(OffscreenEffect::paintScreen(renderTarget, viewport, mask, deviceRegion, screen));
     if (!m_insertHint.isEmpty() && isActive()) {
         KWin::Region region = deviceRegion;
         if (!m_hintWindow.isNull()) {
@@ -1154,7 +1154,7 @@ bool Effect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::Ren
         }
         drawInsertHint(viewport, region);
     }
-    return result;
+    KIRI_RET(result);
 }
 
 double Effect::alphaOf(const QUuid &id) const
@@ -1463,18 +1463,18 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     OffscreenEffect::prePaintWindow(view, w, data);
 }
 
-bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
+KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
 {
     // niri's layout background-color: the wallpaper is Plasma's desktop window, which is painted as a solid colour instead
     if (w->isDesktop() && isActive() && m_settings.background.isValid() && !w->data(CaptureRole).toBool()) {
         fillRect(viewport, KWin::RectF(w->frameGeometry()), m_settings.background, deviceRegion, data.opacity());
-        return true;
+        KIRI_RET(true);
     }
     const double radius = radiusFor(w);
     if (radius > 0) {
         const double scale = w->screen()->scale();
-        const auto frame = KWin::snapToPixels(w->frameGeometry(), scale) * scale;
-        const auto expanded = KWin::snapToPixels(w->expandedGeometry(), scale) * scale;
+        const auto frame = kiriScaled(KWin::snapToPixels(w->frameGeometry(), scale), scale);
+        const auto expanded = kiriScaled(KWin::snapToPixels(w->expandedGeometry(), scale), scale);
         redirect(w);
         setShader(w, m_cornerShader.get());
         KWin::ShaderManager::instance()->pushShader(m_cornerShader.get());
@@ -1534,9 +1534,9 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
                                       << "frame" << qRound(f.x()) << qRound(f.y()) << qRound(f.width()) << qRound(f.height())
                                       << "cur" << qRound(KWin::effects->cursorPos().x()) << qRound(KWin::effects->cursorPos().y());
     }
-    const bool result = OffscreenEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+    const bool result = KIRI_CALL(OffscreenEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data));
     if (w->data(CaptureRole).toBool()) {
-        return result; // kiri_motion is taking a snapshot of the window: the ring and tab indicator are not part of it
+        KIRI_RET(result); // kiri_motion is taking a snapshot of the window: the ring and tab indicator are not part of it
     }
 
     {
@@ -1573,7 +1573,7 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
             drawTabIndicator(viewport, *group, w, visual, deviceRegion, data.opacity() * fade, tabProgress(*group));
         }
     }
-    return result;
+    KIRI_RET(result);
 }
 
 void Effect::fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &rect, const QColor &color, const KWin::Region &deviceRegion, double opacity)

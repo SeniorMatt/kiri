@@ -555,8 +555,124 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         },
         {
             name: "screen-switch",
-            description: "Screen: move grid to this screen",
+            description: "Screen: gather all columns on this screen",
             action: () => world.do(actions.screenSwitch),
+        },
+        {
+            name: "focus-monitor-left",
+            description: "Screen: focus left",
+            defaultKeys: ["Meta+Shift+Left", "Meta+Shift+H"],
+            action: () => world.do((cm, dm) => actions.focusMonitor("left", cm, dm)),
+        },
+        {
+            name: "column-move-to-monitor-left",
+            description: "Screen: move column left",
+            defaultKeys: ["Meta+Ctrl+Shift+Left", "Meta+Ctrl+Shift+H"],
+            action: () => world.doIfTiledFocused(actions.columnMoveToMonitor.partial("left")),
+        },
+        {
+            name: "window-move-to-monitor-left",
+            description: "Screen: move window left",
+            action: () => world.doIfTiledFocusedOrFloating(
+                actions.windowMoveToMonitor.partial("left"),
+                (cm, active) => world.do((cm2, dm) => actions.floatingMoveToMonitor("left", cm2, dm, active)),
+            ),
+        },
+        {
+            name: "focus-monitor-right",
+            description: "Screen: focus right",
+            defaultKeys: ["Meta+Shift+Right", "Meta+Shift+L"],
+            action: () => world.do((cm, dm) => actions.focusMonitor("right", cm, dm)),
+        },
+        {
+            name: "column-move-to-monitor-right",
+            description: "Screen: move column right",
+            defaultKeys: ["Meta+Ctrl+Shift+Right", "Meta+Ctrl+Shift+L"],
+            action: () => world.doIfTiledFocused(actions.columnMoveToMonitor.partial("right")),
+        },
+        {
+            name: "window-move-to-monitor-right",
+            description: "Screen: move window right",
+            action: () => world.doIfTiledFocusedOrFloating(
+                actions.windowMoveToMonitor.partial("right"),
+                (cm, active) => world.do((cm2, dm) => actions.floatingMoveToMonitor("right", cm2, dm, active)),
+            ),
+        },
+        {
+            name: "focus-monitor-up",
+            description: "Screen: focus up",
+            defaultKeys: ["Meta+Shift+Up", "Meta+Shift+K"],
+            action: () => world.do((cm, dm) => actions.focusMonitor("up", cm, dm)),
+        },
+        {
+            name: "column-move-to-monitor-up",
+            description: "Screen: move column up",
+            defaultKeys: ["Meta+Ctrl+Shift+Up", "Meta+Ctrl+Shift+K"],
+            action: () => world.doIfTiledFocused(actions.columnMoveToMonitor.partial("up")),
+        },
+        {
+            name: "window-move-to-monitor-up",
+            description: "Screen: move window up",
+            action: () => world.doIfTiledFocusedOrFloating(
+                actions.windowMoveToMonitor.partial("up"),
+                (cm, active) => world.do((cm2, dm) => actions.floatingMoveToMonitor("up", cm2, dm, active)),
+            ),
+        },
+        {
+            name: "focus-monitor-down",
+            description: "Screen: focus down",
+            defaultKeys: ["Meta+Shift+Down", "Meta+Shift+J"],
+            action: () => world.do((cm, dm) => actions.focusMonitor("down", cm, dm)),
+        },
+        {
+            name: "column-move-to-monitor-down",
+            description: "Screen: move column down",
+            defaultKeys: ["Meta+Ctrl+Shift+Down", "Meta+Ctrl+Shift+J"],
+            action: () => world.doIfTiledFocused(actions.columnMoveToMonitor.partial("down")),
+        },
+        {
+            name: "window-move-to-monitor-down",
+            description: "Screen: move window down",
+            action: () => world.doIfTiledFocusedOrFloating(
+                actions.windowMoveToMonitor.partial("down"),
+                (cm, active) => world.do((cm2, dm) => actions.floatingMoveToMonitor("down", cm2, dm, active)),
+            ),
+        },
+        {
+            name: "focus-monitor-next",
+            description: "Screen: focus next",
+            action: () => world.do((cm, dm) => actions.focusMonitor("next", cm, dm)),
+        },
+        {
+            name: "column-move-to-monitor-next",
+            description: "Screen: move column next",
+            action: () => world.doIfTiledFocused(actions.columnMoveToMonitor.partial("next")),
+        },
+        {
+            name: "window-move-to-monitor-next",
+            description: "Screen: move window next",
+            action: () => world.doIfTiledFocusedOrFloating(
+                actions.windowMoveToMonitor.partial("next"),
+                (cm, active) => world.do((cm2, dm) => actions.floatingMoveToMonitor("next", cm2, dm, active)),
+            ),
+        },
+        {
+            name: "focus-monitor-previous",
+            description: "Screen: focus previous",
+            action: () => world.do((cm, dm) => actions.focusMonitor("previous", cm, dm)),
+        },
+        {
+            name: "column-move-to-monitor-previous",
+            description: "Screen: move column previous",
+            action: () => world.doIfTiledFocused(actions.columnMoveToMonitor.partial("previous")),
+        },
+        {
+            name: "window-move-to-monitor-previous",
+            description: "Screen: move window previous",
+            action: () => world.doIfTiledFocusedOrFloating(
+                actions.windowMoveToMonitor.partial("previous"),
+                (cm, active) => world.do((cm2, dm) => actions.floatingMoveToMonitor("previous", cm2, dm, active)),
+            ),
         },
         {
             name: "tail-move-to-next-desktop",

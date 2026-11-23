@@ -45,6 +45,8 @@ function withoutKiriLog<T>(f: () => T): T {
         public readonly log: string[] = [];
         private counter = 0;
         private viewDetached: string | null = null;
+        private readonly twoOutputs: boolean; // every third seed has a second output to the right of the first one
+        private secondOutput = true;
 
         private signature() {
             const current = this.workspaceMock.currentDesktop;
@@ -90,6 +92,10 @@ function withoutKiriLog<T>(f: () => T): T {
                 ]);
             }
             const { qtMock, workspaceMock, world } = init(this.config);
+            this.twoOutputs = seed % 3 === 1;
+            if (this.twoOutputs) {
+                workspaceMock.setOutputs(["DP-1", screen], ["DP-2", new MockQmlRect(screen.width, 0, screen.width, screen.height)]);
+            }
             this.qtMock = qtMock;
             this.workspaceMock = workspaceMock;
             this.world = world;
@@ -113,7 +119,10 @@ function withoutKiriLog<T>(f: () => T): T {
         private open() {
             const n = 1 + this.int(2);
             const widths = Array.from({ length: n }, () => 80 + this.int(700));
-            const clients = this.workspaceMock.createClientsWithWidths(...widths);
+            const second = this.twoOutputs && this.secondOutput && this.chance(0.5);
+            const clients = second ?
+                this.workspaceMock.createClientsWithFrames(...widths.map(width => new MockQmlRect(screen.width + this.int(100), this.int(100), width, 100 + this.int(400)))) :
+                this.workspaceMock.createClientsWithWidths(...widths);
             for (const client of clients) {
                 client.caption = "W" + (this.counter++);
                 client.closeWindow = () => { this.pendingClose.push(client); };
@@ -240,6 +249,15 @@ function withoutKiriLog<T>(f: () => T): T {
                 const size = this.chance(0.5) ? this.fullScreenSize : { width: 400 + this.int(1500), height: 300 + this.int(900) };
                 description = `screen ${size.width}x${size.height}`;
                 screen = new MockQmlRect(0, 0, size.width, size.height);
+                if (this.twoOutputs && this.chance(0.4)) {
+                    description = this.secondOutput ? "unplug the second output" : "plug in the second output";
+                    this.toggleSecondOutput();
+                } else if (this.twoOutputs) {
+                    wm.outputRects.set("DP-1", screen);
+                    if (this.secondOutput) {
+                        wm.outputRects.set("DP-2", new MockQmlRect(screen.width, 0, size.width, size.height));
+                    }
+                }
                 wm.virtualScreenSizeChanged.fire();
             } else if (roll < 94) {
                 this.config = Object.assign({}, this.config);
@@ -270,6 +288,25 @@ function withoutKiriLog<T>(f: () => T): T {
             }
             this.settleActivation();
             return description;
+        }
+
+        // KWin squeezes the windows of an unplugged output into the others
+        private toggleSecondOutput() {
+            const wm = this.workspaceMock;
+            if (this.secondOutput) {
+                const rect = wm.removeOutput("DP-2")!;
+                for (const client of wm.windows) {
+                    const frame = client.getFrameGeometryCopy();
+                    if (frame.x >= rect.x - 1) {
+                        client.frameGeometry = new MockQmlRect(Math.max(0, frame.x - rect.x), frame.y, frame.width, frame.height);
+                    }
+                }
+            } else {
+                wm.addOutput("DP-2", new MockQmlRect(screen.width, 0, screen.width, screen.height));
+            }
+            wm.outputRects.set("DP-1", screen);
+            this.secondOutput = !this.secondOutput;
+            wm.screensChanged.fire();
         }
 
         // for a failure: the columns of the current desktop

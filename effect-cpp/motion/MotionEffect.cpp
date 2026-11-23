@@ -10,6 +10,7 @@
 #include <scene/windowitem.h>
 
 #include <QDynamicPropertyChangeEvent>
+#include <QDateTime>
 #include <QLoggingCategory>
 
 Q_LOGGING_CATEGORY(KIRI_MOTION, "kiri.motion", QtWarningMsg)
@@ -395,6 +396,11 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
     qCDebug(KIRI_MOTION) << "geometry" << w->caption() << old << "->" << frame << "snapshot" << s.snapshot;
     // where the window is painted right now, by the old animation
     const QPointF offset = moveOffset(s, t);
+    static const bool trace = qEnvironmentVariableIsSet("KIRI_MOTION_TRACE");
+    if (trace) {
+        qCWarning(KIRI_MOTION).nospace() << "TRACE retarget " << qint64(QDateTime::currentMSecsSinceEpoch()) << " " << w->caption() << " old=" << old << " new=" << frame
+                                         << " moving=" << s.moving << " from=" << s.moveFrom << " offset=" << offset << " t=" << t << " moveStart=" << s.moveStart;
+    }
     const QSizeF visualSize = s.resizing ? paintedSize(s, old, t) : old.size();
 
     // move: niri's animate_move_from: the new offset is the jump of the layout position plus what is left of the old offset
@@ -460,7 +466,7 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     KWin::CrossFadeEffect::prePaintWindow(view, w, data);
 }
 
-bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
+KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
 {
     auto it = m_windows.find(w);
     if (m_capturing || it == m_windows.end()) {
@@ -501,6 +507,14 @@ bool Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::Rend
         height *= zoom;
     }
 
+    {
+        static const bool trace = qEnvironmentVariableIsSet("KIRI_MOTION_TRACE"); // painted rect per frame; xs0/xt0 is what the effects before this one left in the paint data
+        if (trace && w->isNormalWindow()) {
+            qCWarning(KIRI_MOTION).nospace() << "TRACE paint " << qint64(QDateTime::currentMSecsSinceEpoch()) << " " << w->caption() << " ft=" << t << " frame=" << frame << " off=" << offset
+                                             << " size=" << size << " sizeFrom=" << s.sizeFrom << " rs=" << s.resizeStart << " ms=" << s.moveStart << " xs0=" << data.xScale() << " xt0=" << data.xTranslation()
+                                             << " mv=" << s.moving << " rz=" << s.resizing;
+        }
+    }
     data.setXScale(data.xScale() * width / frame.width());
     data.setYScale(data.yScale() * height / frame.height());
     data.setXTranslation(data.xTranslation() + x - frame.x());

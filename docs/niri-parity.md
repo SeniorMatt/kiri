@@ -67,7 +67,7 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | focus-floating, focus-tiling, switch-focus-between-floating-and-tiling | layer focus | layout/workspace.rs | done | `focus-floating`, `focus-tiling`, `window-switch-focus-floating-tiling` | floatingKeys, leaveUntiled |
 | focus-workspace-down/up, N, previous | | monitor.rs | done | `desktop-next/previous`, `desktop-{}`, `desktop-previous-used`; DesktopManager.ts, DynamicDesktops.ts `clampIndex` | keyBindings, dynamicDesktops |
 | focus-workspace "name" | by workspace name | layout/mod.rs `find_workspace_by_name` | done | `desktop-named-N` (the Nth name of `desktopBindNames`, which the importer fills); DynamicDesktops.ts `findByName` | workspaces |
-| focus-monitor-left/right/up/down/next/previous/NAME | | layout/mod.rs | n/a | desktops are shared by every output; Kiri keeps one grid per desktop on the chosen screen. `screen-switch` is the nearest thing | - |
+| focus-monitor-left/right/up/down/next/previous/NAME | | layout/mod.rs | done (no NAME) | `focus-monitor-*`: the active window of the strip on the next output (an output without windows only gets the pointer); DesktopManager.ts | multiMonitor |
 | focus-window ID (IPC) | | binds.rs `skip` | n/a | no IPC | - |
 
 ### 2.2 Move
@@ -84,10 +84,10 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | move-window-to-workspace-down/up/N | same for a window | layout/mod.rs | done | `window-move-to-*desktop*`; `focus=false`: `window-move-to-next/previous-desktop-no-focus`, `window-move-to-desktop-no-focus-N` | followWindowToDesktop, workspaces |
 | move-column-to-workspace "name", move-window-to-workspace "name" | | layout/mod.rs | done | `column-move-to-desktop-named-N`, `window-move-to-desktop-named-N` (see focus-workspace "name"); `focus=false` with a name is not mapped | workspaces |
 | move-window-to-new-workspace-below/above, move-column-to-new-workspace-below/above | new workspace next to the current one | layout/mod.rs | done | `window/column-move-to-new-desktop-below/above` (+ `-no-focus`); the empty desktop at the bottom/top is reused like `add_or_reuse_empty_workspace_at`; a workspace reference argument is not mapped | workspaces |
-| move-window/column-to-monitor-* | | layout/mod.rs | n/a | see focus-monitor | - |
+| move-window/column-to-monitor-* | | layout/mod.rs | done | `column-move-to-monitor-*`, `window-move-to-monitor-*` (also floating windows): to the right of the active column of the other output, the focus goes along | multiMonitor |
 | move-workspace-down/up | reorder workspaces | monitor.rs `move_workspace_down` 1257 | done | `desktop-move-down/up` emulated by replacing the neighbour desktop (DynamicDesktops.moveCurrent: columns, view and focus move along, named stays named, previous desktop follows); KWin cannot reorder | dynamicDesktops, workspaces |
 | move-workspace-to-index N | | monitor.rs | done | `move-desktop-to-index-N`, the same emulation repeated | workspaces |
-| move-workspace-to-monitor-* | | layout/mod.rs | n/a | no monitors | - |
+| move-workspace-to-monitor-* | | layout/mod.rs | partial | `screen-switch` gathers the strips of all outputs on the active one | multiMonitor |
 | set-workspace-name / unset-workspace-name | name a workspace | layout/mod.rs 4683 | done | `set-desktop-name-N` (the Nth of `desktopBindNames`), `unset-desktop-name`; the script sets `desktop.name` (works on a live KWin). A named desktop counts as occupied; its id is kept in Kiri's saved state. The `reference` variants are not mapped | workspaces |
 
 ### 2.3 Sizes, display, state
@@ -196,7 +196,7 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | Empty workspace in the middle is removed when switching away | | monitor.rs 664 | done | same option; removed 500 ms after the last switch (niri: when the animation ends) | dynamicDesktops, workspaces |
 | workspace-auto-back-and-forth | `focus-workspace N` on the current workspace goes to the previous one | input.rs `workspace_auto_back_and_forth`; layout/mod.rs 2354; monitor.rs 1025 | done | `desktopAutoBackAndForth`; applies to `desktop-N` and `desktop-named-N` | workspaces |
 | focus-workspace-previous | | monitor.rs 1037 | done | `desktop-previous-used` | keyBindings |
-| Workspaces per monitor, move between monitors | | wiki Workspaces | n/a | KWin desktops are global; outputs share them | - |
+| Workspaces per monitor, move between monitors | | wiki Workspaces | partial | KWin desktops are global (a desktop switch changes every output), so every output has its own strip of columns on each desktop; an unplugged output hands its columns to the first remaining one and gets them back (`homeOutput`); a column that is completely out of the view is parked below all outputs, one that is partly out of it still overlaps the next output (KWin cannot clip a window) | multiMonitor |
 | Named workspaces (`workspace "name" {}`, open-on-output, layout) | persist when empty, addressable by name | workspace.rs; wiki Configuration:-Named-Workspaces; layout/mod.rs `ensure_named_workspace` 3046 | partial | `namedDesktops` (JSON list; the importer maps `workspace "name"`): created at the top in config order at start, never removed (also with dynamic desktops off). `open-on-output` and the per-workspace `layout {}` are not mapped. For `open-on-workspace` (WP3): `world.dynamicDesktops.findByName(name)` returns the KwinDesktop to put `kwinClient.desktops` on | workspaces |
 | Workspace index addressing (`focus-workspace 2` = whatever is 2nd) | | wiki Workspaces | done | desktop order | keyBindings |
 | Workspace switch with a window moved along | | layout/mod.rs | done | `window-move-to-*desktop` + follow | followWindowToDesktop |

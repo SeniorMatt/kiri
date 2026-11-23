@@ -45,7 +45,7 @@ class Window {
         this.presetHeightIndex = null;
     }
 
-    public arrange(x: number, y: number, width: number, height: number) {
+    public arrange(x: number, y: number, width: number, height: number, parked = false) {
         if (this.skipArrange) {
             // window is maximized or full-screen outside of the grid, prevent fighting with the user
             return;
@@ -58,11 +58,13 @@ class Window {
             return;
         }
 
-        if (!this.fillsWidth() && !this.fillsHeight()) {
+        const fillsWidth = this.fillsWidth();
+        const fillsHeight = this.fillsHeight();
+        if (!fillsWidth && !fillsHeight) {
             this.client.hadSlot = true;
         } else {
             const fillArea = this.getFillArea();
-            if (this.fillsWidth()) {
+            if (fillsWidth) {
                 if (this.isFocused() && this.isColumnInView(x, width) && !this.column.grid.desktop.isGestureScrolling() && !this.column.grid.isUserResizing()) {
                     // the focused window sits exactly on its area, whatever the scroll is at the moment
                     x = fillArea.x;
@@ -73,7 +75,7 @@ class Window {
                     width += overflowLeft + overflowRight;
                 }
             }
-            if (this.fillsHeight()) {
+            if (fillsHeight) {
                 y = fillArea.y;
                 height = fillArea.height;
             }
@@ -82,11 +84,14 @@ class Window {
         // the slot and leaves the rest empty, like niri's tile
         const maxWidth = this.client.getMaxWidth();
         const maxHeight = this.client.getMaxHeight();
-        if (!this.fillsWidth() && maxWidth > 0) {
+        if (!fillsWidth && maxWidth > 0) {
             width = Math.min(width, maxWidth);
         }
-        if (!this.fillsHeight() && maxHeight > 0) {
+        if (!fillsHeight && maxHeight > 0) {
             height = Math.min(height, maxHeight);
+        }
+        if (parked) {
+            y += this.column.grid.desktop.getParkOffset() ?? 0;
         }
         this.client.place(x, y, width, height, this.column.grid.isUserResizing());
     }
@@ -263,6 +268,22 @@ class Window {
     public fillsHeight() {
         const maximizedMode = this.getMaximizedModeInGrid();
         return this.isFullScreenInGrid() || maximizedMode === MaximizedMode.Vertically || maximizedMode === MaximizedMode.Maximized;
+    }
+
+    // where the window is at its slot [x, y, width, height]: a maximized or full-screen window fills its area, like niri's
+    // full-screen tile that is the size of the view, not the slot (the overview draws windows by this)
+    public getFilledRect(x: number, y: number, width: number, height: number): number[] {
+        if (this.fillsWidth()) {
+            const [overflowLeft, overflowRight] = this.getOverflow();
+            x -= overflowLeft;
+            width += overflowLeft + overflowRight;
+        }
+        if (this.fillsHeight()) {
+            const fillArea = this.getFillArea();
+            y = fillArea.y;
+            height = fillArea.height;
+        }
+        return [x, y, width, height];
     }
 
     // the area a maximized or full-screen window fills, instead of the tiling area

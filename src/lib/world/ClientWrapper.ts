@@ -34,9 +34,16 @@ class ClientWrapper {
     private askedSize: { width: number, height: number } | null = null; // the size the layout last asked of the client
     // what the client committed in answer to the last size it was sent, when that was another size
     private lastAnswer: ClientWrapper.Answer | null = null;
-    private static readonly maxAnswerDelayMs = 300;
+    private static readonly maxAnswerDelayMs = 1500; // a client may take a while (a round trip, a busy event loop)
     // the same answer to the same size twice: the client does not take that size (a terminal that snaps to whole cells)
     private refusal: ClientWrapper.Answer | null = null;
+    // A refusal that is far off (a fixed aspect ratio, a window that ignores configures: scrcpy, wine) is not a snap to cells:
+    // the height the client keeps becomes a bound of the window, so the column shares the rest with the others (until the
+    // user sets a height). Set when `refusal` is recorded, taken by the layout (see takeLearnedHeight).
+    private learnedMinHeight = 0;
+    private learnedMaxHeight = Infinity;
+    private learnedHeightPending = false;
+    private static readonly snapToleranceHeight = 48;
 
     constructor(
         public readonly kwinClient: KwinClient,
@@ -69,7 +76,7 @@ class ClientWrapper {
     }
 
     public getMinHeight() {
-        return Math.max(this.kwinClient.minSize.height.ceil(), this.ruleLimits.minHeight);
+        return Math.max(this.kwinClient.minSize.height.ceil(), this.ruleLimits.minHeight, this.learnedMinHeight);
     }
 
     // the largest width; 0 when the client has none (the size KWin reports for no limit is huge)
@@ -78,7 +85,37 @@ class ClientWrapper {
     }
 
     public getMaxHeight() {
-        return ClientWrapper.limit(this.kwinClient.maxSize.height.floor(), this.ruleLimits.maxHeight);
+        const max = ClientWrapper.limit(this.kwinClient.maxSize.height.floor(), this.ruleLimits.maxHeight);
+        return this.learnedMaxHeight === Infinity ? max : max > 0 ? Math.min(max, this.learnedMaxHeight) : this.learnedMaxHeight;
+    }
+
+    private learnHeight(answer: ClientWrapper.Answer) {
+        if (this.kwinClient.fullScreen || this.windowedFullScreen || this.maximizedSeen ||
+            Math.abs(answer.height - answer.askedHeight) <= ClientWrapper.snapToleranceHeight) {
+            return;
+        }
+        if (answer.height < answer.askedHeight) {
+            this.learnedMaxHeight = Math.round(answer.height);
+        } else {
+            this.learnedMinHeight = Math.round(answer.height);
+        }
+        this.learnedHeightPending = true;
+    }
+
+    // True once after a refusal made the client's height a bound: the column has to share its height again
+    public takeLearnedHeight() {
+        const pending = this.learnedHeightPending;
+        this.learnedHeightPending = false;
+        return pending;
+    }
+
+    // the user chose a height: whatever the client did before does not count, it is asked again
+    public forgetLearnedHeight() {
+        this.learnedMinHeight = 0;
+        this.learnedMaxHeight = Infinity;
+        this.learnedHeightPending = false;
+        this.refusal = null;
+        this.lastAnswer = null;
     }
 
     private static limit(clientMax: number, ruleMax: number) {
@@ -445,12 +482,13 @@ class ClientWrapper {
             // (KWin may show the asked size for a moment before the client's own comes: only another size counts, and only
             // right after the ask)
             if (client.askedSize !== null && Date.now() - client.lastPlacementTime < ClientWrapper.maxAnswerDelayMs) {
-                const frame = client.kwinClient.frameGeometry;
+                const frame = { width: client.kwinClient.frameGeometry.width.round(), height: client.kwinClient.frameGeometry.height.round() };
                 if (frame.width !== client.askedSize.width || frame.height !== client.askedSize.height) {
                     const answer = { askedWidth: client.askedSize.width, askedHeight: client.askedSize.height, width: frame.width, height: frame.height };
                     const last = client.lastAnswer;
                     if (last !== null && last.askedWidth === answer.askedWidth && last.askedHeight === answer.askedHeight && last.width === answer.width && last.height === answer.height) {
                         client.refusal = answer;
+                        client.learnHeight(answer);
                     }
                     client.lastAnswer = answer;
                 }

@@ -530,7 +530,7 @@ Item {
     // (at runtime only; kwinrc keeps the user's Plasma settings). Stopping the script reverses it. `kiri-mode`
     // (tools/kiri-mode) does the same from outside and covers a script that was stopped without getting to do it.
     property var unloadedPlasmaEffects: []
-    readonly property var plasmaEffects: ["slide", "overview", "kwin4_effect_geometry_change", "fade", "scale", "glide", "maximize"]
+    readonly property var plasmaEffects: ["slide", "overview", "kwin4_effect_geometry_change", "fade", "scale", "glide", "maximize", "fullscreen"]
     readonly property var kiriEffects: ["kiri_decorations", "kiri_desktop_switch", "kiri_motion", "kiri_swipe", "kiri_overview"]
 
     function effectCall(member, name, callback) {
@@ -551,15 +551,36 @@ Item {
         );
     }
 
-    function enterKiriMode() {
+    function unloadPlasmaEffects() {
         for (const name of plasmaEffects) {
             effectCall("isEffectLoaded", name, (loaded) => {
                 if (loaded) {
-                    qmlBase.unloadedPlasmaEffects.push(name);
+                    if (!qmlBase.unloadedPlasmaEffects.includes(name)) {
+                        qmlBase.unloadedPlasmaEffects.push(name);
+                    }
                     qmlBase.effectCall("unloadEffect", name, null);
                 }
             });
         }
+    }
+
+    // KWin loads some of its effects after the scripts when a session starts (the full-screen effect scales a window from its
+    // old to its new size on top of kiri_motion's animation and left black frames), so the unloading is repeated for a while
+    Timer {
+        interval: 2000
+        repeat: true
+        property int runs: 0
+        running: true
+        onTriggered: {
+            qmlBase.unloadPlasmaEffects();
+            if (++runs >= 5) {
+                running = false;
+            }
+        }
+    }
+
+    function enterKiriMode() {
+        unloadPlasmaEffects();
         for (const name of kiriEffects) {
             effectCall("loadEffect", name, (ok) => {
                 // the script effect is only the fallback where the compiled one is not installed

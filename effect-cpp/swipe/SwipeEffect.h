@@ -13,6 +13,7 @@
     effect then runs the settle spring itself, while the script has already moved the windows to where it ends.
 */
 #pragma once
+#include "KwinCompat.h"
 
 #include "effect/effect.h"
 #include "input_event_spy.h"
@@ -47,7 +48,7 @@ public:
     int requestedEffectChainPosition() const override;
     void prePaintScreen(ScreenPrePaintData &data) override;
     void prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data) override;
-    bool drawWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data) override;
+    KIRI_PAINT_RET drawWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data) override;
     void postPaintScreen() override;
 
     void swipeGestureBegin(PointerSwipeGestureBeginEvent *event) override;

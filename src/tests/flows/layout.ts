@@ -292,28 +292,24 @@ tests.register("Focus and move windows", 1, () => {
     });
 }
 
-tests.register("The grid keeps its output when the active screen changes briefly (wake)", 1, () => {
-    const { workspaceMock, world } = init(getDefaultConfig());
-    const first = workspaceMock.activeScreen;
-    const second: Output = { __brand: "Output", name: "HDMI-1" };
-    workspaceMock.screens = [first, second];
-    const selected = () => {
-        let result: Output | undefined;
-        world.do((clientManager, desktopManager) => result = (desktopManager as any).selectedScreen);
-        return result;
-    };
-    Assert.equal(selected(), first);
+tests.register("The strip keeps its output when the active screen changes briefly (wake)", 1, () => {
+    const { workspaceMock } = init(getDefaultConfig());
+    workspaceMock.setOutputs(["DP-1", screen], ["HDMI-1", new MockQmlRect(800, 0, 800, 600)]);
+    const [client] = workspaceMock.createClientsWithWidths(300);
+    const x = () => client.getActualFrameGeometry().x;
+    Assert.assert(x() < 800, { message: "the window is on the first output" });
 
-    workspaceMock.activeScreen = second; // wrong for a moment on wake
+    workspaceMock.activeScreen = workspaceMock.screens[1]; // wrong for a moment on wake
     workspaceMock.screensChanged.fire();
-    Assert.equal(selected(), first, { message: "the grid must stay on its output" });
+    Assert.assert(x() < 800, { message: "the strip must stay on its output" });
 
-    workspaceMock.screens = [second]; // its output is gone
+    workspaceMock.removeOutput("DP-1"); // its output is gone, KWin moves the window
+    const frame = client.getFrameGeometryCopy();
+    client.frameGeometry = new MockQmlRect(frame.x + 800, frame.y, frame.width, frame.height);
     workspaceMock.screensChanged.fire();
-    Assert.equal(selected(), second);
+    Assert.assert(x() >= 800, { message: "the strip goes to the other output" });
 
-    const back: Output = { __brand: "Output", name: "DP-1" }; // and comes back
-    workspaceMock.screens = [back, second];
+    workspaceMock.addOutput("DP-1", screen); // and comes back
     workspaceMock.screensChanged.fire();
-    Assert.equal(selected(), back);
+    Assert.assert(x() < 800, { message: "the strip returns to its output" });
 });

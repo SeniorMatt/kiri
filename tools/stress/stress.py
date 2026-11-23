@@ -1295,6 +1295,43 @@ def s_deskrm(h):
 
 
 @scn
+def s_backdrop(h):
+    """a full-screen window next to normal columns: focus the neighbour (it and its colour must show, not a black backdrop
+    over it) and toggle full-screen in and out with frames captured (PNGs in TMP/bugs/backdrop_*)"""
+    h.visual = False
+    ws = h.launch_n(3)
+    h.settle(5)
+    os.makedirs(TMP + '/bugs', exist_ok=True)
+    h.spam(['window-toggle-fullscreen'], 1, 100, hold=False)
+    h.settle(5)
+    save_png(h.screenshot(), TMP + '/bugs/backdrop_1_fullscreen.png', down=2)
+    h.spam(['focus-left'], 1, 100, hold=False)
+    time.sleep(1.5)
+    shot = h.screenshot()
+    save_png(shot, TMP + '/bugs/backdrop_2_neighbour_focused.png', down=2)
+    n, box = find_color(shot, ws[1].rgb)
+    if n < 200:
+        h.fail('backdrop', 'neighbour %s is not visible next to the full-screen window (%d px)' % (ws[1].name, n))
+    for rep in range(2):
+        nfr = 30
+        p = subprocess.Popen([ST + '/shot', TMP + '/bd', str(nfr)], env=dict(env, QT_QPA_PLATFORM='wayland', SHOT_DOWN='4'), stdout=subprocess.PIPE, text=True)
+        time.sleep(0.15)
+        h.spam(['window-toggle-fullscreen'], 1, 100, hold=False)
+        time.sleep(0.5)
+        h.spam(['window-toggle-fullscreen'], 1, 100, hold=False)
+        out = p.communicate()[0]
+        for l in out.split('\n'):
+            if l.strip():
+                k = int(l.split()[0])
+                fr = read_raw('%s.%d.raw' % (TMP + '/bd', k))
+                if k % 4 == 0:
+                    save_png(fr, TMP + '/bugs/backdrop_3_toggle%d_f%d.png' % (rep, k), down=1)
+                os.unlink('%s.%d.raw' % (TMP + '/bd', k))
+        h.settle(5)
+    h.check('end')
+
+
+@scn
 def s_fsblack(h):
     """OBSERVED: an empty (black) frame in the middle of full-screen / maximize / focus toggling at 150 ms. Frame timeline plus the
     geometry changes around it."""

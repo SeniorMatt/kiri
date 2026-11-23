@@ -30,7 +30,9 @@ class Desktop {
         public readonly kwinDesktop: KwinDesktop,
         private readonly pinManager: PinManager,
         private readonly config: Desktop.Config,
+        public readonly outputName: string, // like niri's per-monitor workspaces, every output has a strip of its own
         private readonly getScreen: () => Output,
+        private readonly getOutputCount: () => number,
         layoutConfig: LayoutConfig,
         focusPasser: FocusPassing.Passer,
     ) {
@@ -407,9 +409,27 @@ class Desktop {
         }
     }
 
+    // With more than one output, the part of a strip that is scrolled out of the view lies on the next output (the windows
+    // are not clipped to their output). Columns that are completely out of the view are parked below all the outputs.
+    private parkTop: number | null = null;
+
+    public getParkOffset() {
+        return this.parkTop === null ? null : this.parkTop - this.tilingArea.y;
+    }
+
+    private updateParking() {
+        const parkTop = this.getOutputCount() > 1 ?
+            rectBottom(Workspace.clientArea(ClientAreaOption.FullArea, this.getScreen(), this.kwinDesktop)) : null;
+        if (parkTop !== this.parkTop) {
+            this.parkTop = parkTop;
+            this.dirty = true;
+        }
+    }
+
     public arrange() {
         // TODO (optimization): only arrange visible windows
         this.updateArea();
+        this.updateParking();
         this.grid.refreshMinHeights();
         if (this.dirty) {
             this.tabIndicators = [];

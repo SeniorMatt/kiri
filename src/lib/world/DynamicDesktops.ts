@@ -310,12 +310,14 @@ class DynamicDesktops {
             if (replacement === undefined) {
                 return false;
             }
-            const from = desktopManager.getDesktopInCurrentActivity(neighbor);
-            const to = desktopManager.getDesktopInCurrentActivity(replacement);
-            if (from !== undefined && to !== undefined) {
-                const scrollX = from.getScrollX();
-                from.grid.evacuate(to.grid);
-                to.setScroll(scrollX, true);
+            // the strips of every output
+            for (const from of Array.from(desktopManager.getOutputDesktops(Workspace.currentActivity, neighbor))) {
+                const to = desktopManager.getDesktopInCurrentActivity(replacement, from.outputName);
+                if (to !== undefined) {
+                    const scrollX = from.getScrollX();
+                    from.grid.evacuate(to.grid);
+                    to.setScroll(scrollX, true);
+                }
             }
             for (const kwinClient of Workspace.windows) {
                 if (kwinClient.desktops.includes(neighbor)) {

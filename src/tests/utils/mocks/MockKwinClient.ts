@@ -12,7 +12,16 @@ class MockKwinClient {
     public resize = false;
     public readonly fullScreenable: boolean = true;
     public readonly maximizable: boolean = true;
-    public readonly output: Output = Workspace.activeScreen;
+    private readonly firstOutput: Output = Workspace.activeScreen;
+
+    // like KWin: the output that has the center of the frame (with several outputs)
+    public get output(): Output {
+        const workspace = Workspace as MockWorkspace;
+        if (workspace.outputRects.size === 0) {
+            return this.firstOutput;
+        }
+        return workspace.outputAt(this._frameGeometry.x + this._frameGeometry.width / 2, this._frameGeometry.y + this._frameGeometry.height / 2);
+    }
     public resourceClass = "app";
     public resourceName = "app";
     public readonly dock: boolean = false;
@@ -95,7 +104,7 @@ class MockKwinClient {
             ),
         );
 
-        const area = Workspace.clientArea(ClientAreaOption.MaximizeArea, Workspace.activeScreen, Workspace.currentDesktop);
+        const area = Workspace.clientArea(ClientAreaOption.MaximizeArea, this.output, Workspace.currentDesktop);
         this.frameGeometry = new MockQmlRect(
             horizontally ? area.x        : this.windowedFrameGeometry.x,
             vertically   ? area.y        : this.windowedFrameGeometry.y,
@@ -113,6 +122,10 @@ class MockKwinClient {
         if (!this._fullScreen) {
             this._noBorder = noBorder;
         }
+    }
+
+    private get outputRect(): MockQmlRect {
+        return (Workspace as MockWorkspace).getOutputRect(this.output);
     }
 
     public get clientGeometry() {
@@ -160,6 +173,7 @@ class MockKwinClient {
             return; // like KWin: nothing changes, the window keeps its frame
         }
         this.hasBorder = !fullScreen;
+        const screen = this.outputRect; // the output the window is on
         const targetFrameGeometry = fullScreen ? screen : this.windowedFrameGeometry;
         if (fullScreen) {
             // Kwin remembers the windowed geometry before entering full-screen mode,
@@ -249,6 +263,21 @@ class MockKwinClient {
     public heightStep: number | null = null;
     // like KWin, which keeps 100 px of a window on the screen whenever it commits an answer to a configure
     public keepsVisible = false;
+
+    // a client that keeps its own height whatever it is asked for (scrcpy with its aspect ratio, wine): each call is
+    // one answer to the requests so far, like a commit; returns false when there was nothing to answer
+    public stubbornHeight: number | null = null;
+
+    public answerStubborn() {
+        const frame = this._frameGeometry;
+        const height = this.stubbornHeight;
+        if (height === null || Math.round(frame.height) === height) {
+            return false;
+        }
+        // KWin keeps the window's center when the client commits another size
+        this.setFrameByKwin(new MockQmlRect(frame.x, frame.y + Math.round((frame.height - height) / 2), frame.width, height));
+        return true;
+    }
 
     // every geometry the script assigned (KWin's own changes are not in it)
     public assignedGeometries: MockQmlRect[] = [];

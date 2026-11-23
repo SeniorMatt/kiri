@@ -12,6 +12,7 @@
 */
 
 #pragma once
+#include "KwinCompat.h"
 
 // kwineffects
 #include "effect/effect.h"
@@ -65,7 +66,7 @@ public:
     void paintScreen();
     void postPaintScreen();
 
-    bool paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceGeometry, WindowPaintData &data);
+    KIRI_PAINT_RET paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceGeometry, WindowPaintData &data);
 
     bool isActive() const;
     void desktopChanged(VirtualDesktop *old, VirtualDesktop *current, EffectWindow *with);
@@ -153,11 +154,11 @@ public:
     void reconfigure(ReconfigureFlags) override;
 
     void prePaintScreen(ScreenPrePaintData &data) override;
-    bool paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen) override;
+    KIRI_PAINT_RET paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen) override;
     void postPaintScreen() override;
 
     void prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data) override;
-    bool paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceGeometry, WindowPaintData &data) override;
+    KIRI_PAINT_RET paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceGeometry, WindowPaintData &data) override;
 
     bool isActive() const override;
     int requestedEffectChainPosition() const override;

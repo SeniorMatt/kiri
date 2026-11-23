@@ -59,6 +59,11 @@ const WARPING_PREFIXES = ["desktop-", "focus-", "focus-window-in-column-", "wind
     "column-move-to-column-no-focus-", "column-move-to-desktop-no-focus-", "window-move-to-desktop-no-focus-"];
 // niri's maybe_warp_cursor_to_focus_centered: after a move to another screen
 const WARPING_BOTH = new Set(["screen-switch"]);
+for (const direction of ["left", "right", "up", "down", "next", "previous"]) {
+    WARPING_BOTH.add(`focus-monitor-${direction}`);
+    WARPING_BOTH.add(`column-move-to-monitor-${direction}`);
+    WARPING_BOTH.add(`window-move-to-monitor-${direction}`);
+}
 
 function warpsCursor(name: string) {
     return WARPING_SHORTCUTS.has(name) || WARPING_BOTH.has(name) ||

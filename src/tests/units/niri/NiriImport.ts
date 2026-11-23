@@ -322,3 +322,18 @@ tests.register("NiriImport window rules: every property and matcher of niri's wi
     Assert.equal(result.skipped.filter(line => line.includes("block-out-from")).length, 1);
     Assert.equal(result.skipped.filter(line => line.includes("open-on-output")).length, 1);
 });
+
+tests.register("NiriImport monitor binds", 1, () => {
+    const result = NiriImport.parse(`
+        binds {
+            Mod+Shift+Left { focus-monitor-left; }
+            Mod+Shift+Ctrl+Right { move-column-to-monitor-right; }
+            Mod+Alt+Down { move-window-to-monitor-down; }
+            Mod+Alt+N { focus-monitor-next; }
+        }
+    `);
+    Assert.equalArrays(result.shortcutKeys["focus-monitor-left"], ["Meta+Shift+Left"]);
+    Assert.equalArrays(result.shortcutKeys["column-move-to-monitor-right"], ["Meta+Ctrl+Shift+Right"]);
+    Assert.equalArrays(result.shortcutKeys["window-move-to-monitor-down"], ["Meta+Alt+Down"]);
+    Assert.equalArrays(result.shortcutKeys["focus-monitor-next"], ["Meta+Alt+N"]);
+});

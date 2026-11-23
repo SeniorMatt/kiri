@@ -66,13 +66,13 @@ dep_hint() {
     esac
 }
 
-# the effects use KWin 6.8 API (6.7.90 is the 6.8 beta); an older KWin keeps the script and the script effect
+# the effects build against KWin 6.7 and 6.8 (the paint hooks differ, effect-cpp/common/KwinCompat.h); an older KWin keeps the script and the script effect
 kwinver=
 for c in /usr/lib*/cmake/KWin/KWinConfigVersion.cmake /usr/lib/*/cmake/KWin/KWinConfigVersion.cmake; do
     [ -f "$c" ] && { kwinver=$(sed -n 's/^set(PACKAGE_VERSION "\(.*\)")/\1/p' "$c" | head -1); break; }
 done
-if [ -n "$kwinver" ] && [ "$(printf '%s\n6.7.90\n' "$kwinver" | sort -V | head -1)" != 6.7.90 ]; then
-    echo "KWin $kwinver is older than 6.7.90 (Plasma 6.8): skipping the compiled effects; Kiri draws its rings itself." >&2
+if [ -n "$kwinver" ] && [ "$(printf '%s\n6.7.0\n' "$kwinver" | sort -V | head -1)" != 6.7.0 ]; then
+    echo "KWin $kwinver is older than 6.7 (Plasma 6.7): skipping the compiled effects; Kiri draws its rings itself." >&2
     build=false
 fi
 

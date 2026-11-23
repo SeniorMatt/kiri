@@ -110,13 +110,13 @@ class ClientManager {
         if (Workspace.activeWindow === kwinClient) {
             return true;
         }
-        const desktop = this.desktopManager.getDesktopForClient(kwinClient);
+        const desktop = this.findTiledWindow(kwinClient)?.column.grid.desktop ?? this.desktopManager.getDesktopForClient(kwinClient);
         const column = desktop?.grid.getLastFocusedColumn() ?? null;
         return column !== null && column.getWindowToFocus().client.kwinClient === kwinClient;
     }
 
     // `existing` is for windows that were already open when Kiri started, they keep their width
-    public addClient(kwinClient: KwinClient, existing = false) {
+    public addClient(kwinClient: KwinClient, existing = false, outputName?: string) {
         if (kwinClient.caption.startsWith(ringCaption)) {
             return; // our own focus ring window
         }
@@ -143,7 +143,7 @@ class ClientManager {
         } else if (
             Clients.canTileEver(kwinClient) &&
             this.windowRuleEnforcer.shouldTile(kwinClient, open) &&
-            (desktop = this.desktopManager.getDesktopForClient(kwinClient)) !== undefined
+            (desktop = this.desktopManager.getDesktopForClient(kwinClient, outputName)) !== undefined
         ) {
             Clients.makeTileable(kwinClient);
             console.assert(Clients.canTileNow(kwinClient));
@@ -1104,6 +1104,7 @@ class ClientManager {
     private warpedToTiled: { client: KwinClient, time: number }|null = null;
 
     public onClientFocused(kwinClient: KwinClient) {
+        this.desktopManager.setForcedOutput(null); // a window has the focus: it decides which output is the active one
         if (Clients.isShellUi(kwinClient)) {
             // KRunner, panels and their popups keep the keyboard focus but are no focus change for the layout: no
             // scroll, no pointer warp (the user wants to type, not to point), and the window that had the focus
@@ -1270,6 +1271,35 @@ class ClientManager {
             activateWindow(best, "client-manager");
         }
         return best !== null;
+    }
+
+    // the floating window on an output that was focused last (niri's focus-monitor focuses the active window there)
+    public getTopFloatingOnOutput(output: Output) {
+        for (const kwinClient of this.floatingFocusOrder.slice().reverse()) {
+            if (this.isFloatingOnCurrentDesktop(kwinClient) && kwinClient.output.name === output.name && !kwinClient.minimized) {
+                return kwinClient;
+            }
+        }
+        return null;
+    }
+
+    // niri's move-window-to-monitor-* on a floating window: the same relative place on the other output
+    public moveFloatingToOutput(kwinClient: KwinClient, target: Output) {
+        const client = this.clientMap.get(kwinClient);
+        if (client === undefined || !this.isFloating(kwinClient)) {
+            return;
+        }
+        const kwinDesktop = Clients.getKwinDesktopApprox(kwinClient);
+        const from = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, kwinDesktop);
+        const to = Workspace.clientArea(ClientAreaOption.PlacementArea, target, kwinDesktop);
+        const frame = kwinClient.frameGeometry;
+        const width = Math.min(frame.width.round(), Math.round(to.width));
+        const height = Math.min(frame.height.round(), Math.round(to.height));
+        const x = to.x + (frame.x - from.x) / Math.max(1, from.width) * to.width;
+        const y = to.y + (frame.y - from.y) / Math.max(1, from.height) * to.height;
+        const pos = ClientManager.clampFloatingPosition(to, Math.round(x), Math.round(y), width, height);
+        client.place(pos.x, pos.y, width, height);
+        activateWindow(kwinClient, "move-to-monitor");
     }
 
     // niri's focus_leftmost/rightmost/topmost/bottommost of the floating layer (by the windows' top-left corners)

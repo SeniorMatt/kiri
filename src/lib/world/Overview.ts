@@ -90,7 +90,7 @@ class Overview {
                 const wins = column.getWindows().map(window => {
                     const rect = tabbed ? [x, area.y, width, area.height] : [x, y, width, window.height];
                     y += window.height + config.gapsInnerVertical;
-                    return Overview.windowJson(window.client.kwinClient, rect);
+                    return Overview.windowJson(window.client.kwinClient, window.getFilledRect(rect[0], rect[1], rect[2], rect[3]));
                 });
                 return { x: x, w: width, tab: tabbed, wins: wins };
             });
