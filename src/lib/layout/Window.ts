@@ -1,9 +1,8 @@
 class Window {
     public column: Column;
     public readonly client: ClientWrapper;
-    public height: number; // the height the column gave the window in its last layout
-    // niri's window heights: auto windows share the free space of the column by weight, a window that was resized
-    // by hand or with the presets has a fixed height (set-window-height, switch-preset-window-height)
+    public height: number;
+    // niri's window heights: auto windows share the free space by weight, a resized one has a fixed height
     public heightWeight = 1;
     public fixedHeight: number|null = null;
     public presetHeightIndex: number|null = null;
@@ -29,7 +28,6 @@ class Window {
         column.onWindowAdded(this, true, after);
     }
 
-    // `after` puts the window right below that window of the target column (null: at the top); without it, `bottom` decides
     public moveToColumn(targetColumn: Column, bottom: boolean, passFocus: FocusPassing.Type, after?: Window|null) {
         if (targetColumn === this.column) {
             return;
@@ -47,7 +45,6 @@ class Window {
 
     public arrange(x: number, y: number, width: number, height: number, parked = false) {
         if (this.skipArrange) {
-            // window is maximized or full-screen outside of the grid, prevent fighting with the user
             return;
         }
 
@@ -66,7 +63,6 @@ class Window {
             const fillArea = this.getFillArea();
             if (fillsWidth) {
                 if (this.isFocused() && this.isColumnInView(x, width) && !this.column.grid.desktop.isGestureScrolling() && !this.column.grid.isUserResizing()) {
-                    // the focused window sits exactly on its area, whatever the scroll is at the moment
                     x = fillArea.x;
                     width = fillArea.width;
                 } else {
@@ -80,8 +76,7 @@ class Window {
                 height = fillArea.height;
             }
         }
-        // a window that cannot be as big as its slot (a maximum size from the client or a rule) keeps the top-left corner of
-        // the slot and leaves the rest empty, like niri's tile
+        // a window that cannot be as big as its slot keeps the slot's top-left corner, like niri's tile
         const maxWidth = this.client.getMaxWidth();
         const maxHeight = this.client.getMaxHeight();
         if (!fillsWidth && maxWidth > 0) {
@@ -165,7 +160,6 @@ class Window {
         }
         this.updateLayering();
         if (wasOutsideGrid) {
-            // KWin may put the window back to its old frame after the flag changed and the layout ran: place it again
             this.column.grid.desktop.onLayoutChanged();
         }
     }
@@ -177,7 +171,6 @@ class Window {
         this.onMaximizedOrFullScreenChanged();
     }
 
-    // niri's toggle-windowed-fullscreen: the client is told it is full-screen, the window stays a tile of its column
     public toggleWindowedFullScreen() {
         const client = this.client;
         const kwinClient = client.kwinClient;
@@ -186,18 +179,17 @@ class Window {
         }
         if (client.windowedFullScreen && kwinClient.fullScreen) {
             client.windowedFullScreen = false;
-            kwinClient.fullScreen = false; // the signal brings the layout pass
+            kwinClient.fullScreen = false;
         } else {
             client.windowedFullScreen = true;
             if (kwinClient.fullScreen) {
-                this.onFullScreenChanged(true); // it was full-screen for real
+                this.onFullScreenChanged(true);
             } else {
                 kwinClient.fullScreen = true;
             }
         }
     }
 
-    // niri's fullscreen-window on a windowed full-screen window: it becomes full-screen for real
     public makeFullScreenReal() {
         if (this.client.windowedFullScreen) {
             this.client.windowedFullScreen = false;
@@ -217,15 +209,14 @@ class Window {
         this.skipArrange = this.isMaximizedOutsideGrid();
         this.updateLayering();
         if ((this.fillsWidth() || this.fillsHeight()) && this.column.getWindowCount() > 1 && !this.column.isTabbed()) {
-            // a maximized or full-screen window gets a column of its own (a tabbed column keeps its tabs, like niri)
             const newColumn = new Column(this.column.grid, this.column);
             this.moveToColumn(newColumn, true, FocusPassing.Type.None);
         }
-        const backToNormal = this.column.updateSizingMode(scrollBefore); // niri: remember the view when going full-screen
+        const backToNormal = this.column.updateSizingMode(scrollBefore);
         this.column.grid.onColumnWidthChanged(this.column);
         this.column.grid.desktop.onLayoutChanged();
         if (backToNormal) {
-            this.column.grid.onColumnSizingBecameNormal(this.column); // niri: ... and restore it when leaving full-screen
+            this.column.grid.onColumnSizingBecameNormal(this.column);
         }
     }
 
@@ -233,7 +224,6 @@ class Window {
         const config = this.column.grid.config;
         const outsideGrid = this.isMaximizedOutsideGrid();
         if (config.tiledKeepBelow) {
-            // a focused full-screen window must not be kept below, otherwise it doesn't cover panels
             this.client.kwinClient.keepBelow = !outsideGrid && !(this.isFullScreenInGrid() && this.isFocused());
         }
         if (config.maximizedKeepAbove) {
@@ -253,7 +243,6 @@ class Window {
         return this.column.grid.config.tileMaximized ? this.getMaximizedMode() : MaximizedMode.Unmaximized;
     }
 
-    // maximized or full-screen windows that are not kept in the grid are left to KWin
     private isMaximizedOutsideGrid() {
         const config = this.column.grid.config;
         return (!config.tileFullScreen && this.client.kwinClient.fullScreen && !this.client.windowedFullScreen) ||
@@ -270,8 +259,7 @@ class Window {
         return this.isFullScreenInGrid() || maximizedMode === MaximizedMode.Vertically || maximizedMode === MaximizedMode.Maximized;
     }
 
-    // where the window is at its slot [x, y, width, height]: a maximized or full-screen window fills its area, like niri's
-    // full-screen tile that is the size of the view, not the slot (the overview draws windows by this)
+    // a maximized or full-screen window fills its area, like niri's full-screen tile, not the slot
     public getFilledRect(x: number, y: number, width: number, height: number): number[] {
         if (this.fillsWidth()) {
             const [overflowLeft, overflowRight] = this.getOverflow();
@@ -286,13 +274,11 @@ class Window {
         return [x, y, width, height];
     }
 
-    // the area a maximized or full-screen window fills, instead of the tiling area
     private getFillArea() {
         const desktop = this.column.grid.desktop;
         return this.isFullScreenInGrid() ? desktop.fullScreenArea : desktop.clientArea;
     }
 
-    // returns how far the window reaches past the left and right edges of its column
     public getOverflow(): [number, number] {
         if (!this.fillsWidth()) {
             return [0, 0];
@@ -312,16 +298,15 @@ class Window {
 
     private adoptFrameWidth() {
         const newGeometry = this.client.kwinClient.frameGeometry;
-        // while outputs come and go KWin squeezes windows into whatever screen is left; their widths are not wanted and
-        // must not replace the column's proportion, which brings the width back with the screen
+        // while outputs come and go KWin squeezes windows into the screen that is left; those widths must not replace
+        // the column's
         if (!Clients.isFrameFullScreenSize(this.client.kwinClient) && !this.column.grid.desktop.isScreenSettling()) {
-            this.column.setWidth(newGeometry.width.round(), true, true); // the preset stays: clients may snap to a slightly different size
+            this.column.setWidth(newGeometry.width.round(), true, true);
         }
     }
 
-    // KWin has put the frame of a window that leaves full-screen mode back and the layout is about to place it. A column
-    // that has had its slot keeps its width (niri: the window is back exactly as it was); one whose window arrived
-    // full-screen has none yet and takes the size KWin restores.
+    // a window left full-screen: a column that had its slot keeps its width, one that arrived full-screen takes the size
+    // KWin restores
     public onLeftFullScreenFrame() {
         if (!this.client.hadSlot) {
             this.adoptFrameWidth();

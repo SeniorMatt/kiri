@@ -438,7 +438,8 @@ def read_binds(path, mod="Meta", nodes=None):
     for blk in find(nodes, "binds"):
         has_binds = True
         for key, _, bind_props, cmds in blk[3]:
-            # `press { action }` is a plain bind; a `release { action }` needs the key release, which kglobalaccel does not give
+            # `press { action }` is a plain bind; a `release { action }` needs the key release, which kglobalaccel does
+            # not give
             if cmds and cmds[0][0] in ("press", "release"):
                 cmds = [c for node in cmds for c in (node[3] if node[0] == "press" else [node])]
             else:
@@ -499,7 +500,7 @@ def key_fields(binds):
 
 
 def stale_key_fields(kwinrc, keep):
-    """key fields in kwinrc [Script-kiri] that the niri config no longer sets (an earlier run wrote them)."""
+    """key fields in kwinrc [Script-kiri] that the niri config no longer sets (written by an earlier import)."""
     stale, inside = [], False
     try:
         lines = Path(kwinrc).expanduser().read_text().splitlines()

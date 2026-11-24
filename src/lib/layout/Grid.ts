@@ -4,23 +4,18 @@ class Grid {
     private readonly columns: LinkedList<Column>;
     private lastFocusedColumn: Column|null;
     private previousFocusedColumn: Column|null;
-    // niri's activate_prev_column_on_removal: a column that was just opened to the right of the active one gives the
-    // focus back to the column left of it when it is closed, as long as nothing else was focused in between
+    // niri's activate_prev_column_on_removal
     private opened: { column: Column, previous: Column, scrollX: number } | null = null;
     private returnTo: { column: Column, scrollX: number } | null = null;
-    // niri's view_offset_to_restore: when the active column goes full-screen or maximized, the view offset it had
-    // (relative to the column) is kept, and restored when the column is back to its normal size. It is dropped as soon
-    // as the active column changes, the column moves or is closed, or the column gets back to normal by a window leaving it.
+    // niri's view_offset_to_restore: kept while the active column is full-screen or maximized, dropped when the column
+    // changes or moves
     private viewRestore: { column: Column, offset: number } | null = null;
-    // where the view was just before the focus last moved to another column (a closing window's neighbour is often
-    // focused by KWin before the close is reported)
     private focusMemo: { from: Column, scrollX: number, time: number } | null = null;
     private width: number;
-    private userResized = false; // a user resize happened since the layout was last settled
+    private userResized = false;
     private userResize: boolean; // is any part of the grid being resized by the user
     private readonly userResizeFinishedDelayer: Delayer;
 
-    // the layout options of the desktop (they differ per desktop and output, see LayoutProfiles)
     public get config(): LayoutConfig {
         return this.desktop.profile.layout;
     }
@@ -41,8 +36,7 @@ class Grid {
             this.userResized = false;
             if (focused !== null && resized) {
                 this.desktop.recenterWhileResizing(focused, true);
-                // niri's interactive_resize_end: the view moves only to bring the column into view; a column that is
-                // fully visible leaves the view where the drag put it (no snapping back to the grid's edges)
+                // niri's interactive_resize_end: the view moves only to bring the column into view
                 if (!Range.contains(this.desktop.getCurrentVisibleRange(), focused)) {
                     this.desktop.autoAdjustScroll();
                 }
@@ -53,21 +47,18 @@ class Grid {
         });
     }
 
-    // the x of the column in a grid where it has its normal size, in grid space
     private getNaturalLeft(column: Column) {
         const left = this.columns.getPrev(column);
         return left === null ? 0 : left.getRight() + left.getOverflow()[1] + this.config.gapsInnerHorizontal;
     }
 
-    // `column` just stopped having its normal size (a window in it went full-screen or maximized) while the view was at `scrollX`
     public onColumnSizingLeftNormal(column: Column, scrollX: number) {
         if (column === this.getLastFocusedColumn()) {
             this.viewRestore = { column: column, offset: scrollX - this.getNaturalLeft(column) };
         }
     }
 
-    // `column` is back to its normal size: niri takes the stored offset whatever the situation, and puts the view back
-    // unless the user is resizing or swiping
+    // `column` is back to its normal size: niri puts the view back unless the user is resizing or swiping
     public onColumnSizingBecameNormal(column: Column) {
         if (column !== this.getLastFocusedColumn()) {
             return;
@@ -78,7 +69,7 @@ class Grid {
             return;
         }
         this.desktop.setScroll(this.getNaturalLeft(column) + restore.offset, false);
-        this.desktop.scrollToColumn(column, false); // like niri: still make sure the column is in view
+        this.desktop.scrollToColumn(column, false);
     }
 
     public clearViewRestore(column?: Column) {
@@ -97,7 +88,6 @@ class Grid {
         }
     }
 
-    // the scroll position before the focus moved away from `column`, if that was just now
     public getScrollBeforeFocusLeft(column: Column) {
         const memo = this.focusMemo;
         return memo !== null && memo.from === column && Date.now() - memo.time < 200 ? memo.scrollX : null;
@@ -175,8 +165,7 @@ class Grid {
         return this.lastFocusedColumn;
     }
 
-    // niri's focus-column-left/right-under-mouse on a workspace that is not the active one: only its active column
-    // changes (the window gets the focus when the desktop is switched to)
+    // niri's focus-column-left/right-under-mouse on a desktop that is not the active one: only its active column changes
     public setActiveColumn(column: Column) {
         if (column.grid === this && column !== this.lastFocusedColumn) {
             this.previousFocusedColumn = this.lastFocusedColumn;
@@ -184,7 +173,6 @@ class Grid {
         }
     }
 
-    // the column that had focus before the current one, if it still exists
     public getPreviousFocusedColumn() {
         if (this.previousFocusedColumn === null || !this.hasColumn(this.previousFocusedColumn)) {
             return null;
@@ -276,13 +264,12 @@ class Grid {
         }
         this.columnsSetX(column);
         if (this.getLastFocusedColumn() === null) {
-            this.lastFocusedColumn = column; // niri: the first column of a workspace is its active one
+            this.lastFocusedColumn = column;
         }
         this.desktop.onLayoutChanged();
         this.desktop.autoAdjustScroll();
     }
 
-    // `previous` is the column that was active before the new column `column` was put to the right of it
     public onColumnOpened(column: Column, previous: Column|null, scrollX: number) {
         if (previous === null || this.getLeftColumn(column) !== previous) {
             return;
@@ -298,11 +285,10 @@ class Grid {
         const isLastColumn = this.columns.length() === 1;
         const rightColumn = this.getRightColumn(column);
         const leftColumn = this.getLeftColumn(column);
-        // like niri: the column that takes the place of the closed one (the right neighbour) gets the focus,
-        // or the left one when the closed one was the last, or the one it was opened from
+        // like niri: the right neighbour gets the focus, or the left one when the closed one was the last, or the one it
+        // was opened from
         const returnTo = this.returnTo !== null && column === this.lastFocusedColumn && this.returnTo.column === leftColumn ? this.returnTo : null;
         let columnToFocus = isLastColumn ? null : returnTo !== null ? leftColumn : rightColumn ?? leftColumn;
-        // when several windows close at once the neighbour may already be empty: take the next column that still has a window
         if (columnToFocus !== null && columnToFocus.isEmpty()) {
             const goRight = columnToFocus === rightColumn;
             columnToFocus = this.findNonEmptyColumn(columnToFocus, goRight, column) ?? this.findNonEmptyColumn(columnToFocus, !goRight, column);
@@ -325,14 +311,14 @@ class Grid {
 
         this.desktop.onLayoutChanged();
         if (returnTo !== null) {
-            this.desktop.setScroll(returnTo.scrollX, false); // the view goes back to where it was before the window opened
+            this.desktop.setScroll(returnTo.scrollX, false);
         }
-        this.desktop.recenterLoneColumn(); // the focus passing below may leave the view where it is
+        this.desktop.recenterLoneColumn();
         if (columnToFocus !== null) {
             switch (passFocus) {
             case FocusPassing.Type.Immediate:
                 columnToFocus.getWindowToFocus().focus();
-                this.focusPasser.request(columnToFocus.getWindowToFocus().client.kwinClient); // KWin may still drop the focus while closing
+                this.focusPasser.request(columnToFocus.getWindowToFocus().client.kwinClient);
                 this.ensureInView(columnToFocus);
                 return;
             case FocusPassing.Type.OnUnfocus:
@@ -353,9 +339,7 @@ class Grid {
         return null;
     }
 
-    // The focus passing above scrolls the view when the focus really moves. When KWin had already focused the column
-    // (it picks the neighbour of a closing window before the close is reported) no focus change follows, and a view
-    // left where the closed window was (a maximized one, say) would show nothing but an empty desktop.
+    // a view left where a closed window was would show an empty desktop when KWin had already focused the neighbour
     private ensureInView(column: Column) {
         if (this.columns.length() > 0 && !Range.contains(this.desktop.getCurrentVisibleRange(), column)) {
             this.desktop.autoAdjustScroll();
@@ -363,11 +347,10 @@ class Grid {
     }
 
     public onColumnWidthChanged(column: Column) {
-        // niri: the view offset is relative to the active column, so its left edge stays where it is on the screen and
-        // the columns to its right slide; the view only moves when the column no longer fits
+        // niri: the view offset is relative to the active column
         const keepOffset = !this.userResize && column === this.lastFocusedColumn && this.desktop.keepsViewOffset();
         const offset = keepOffset ? this.desktop.getScrollX() - column.getLeft() : 0;
-        this.columnsSetX(column); // starting at `column`, because its overflow may have changed too
+        this.columnsSetX(column);
         this.desktop.onLayoutChanged();
         if (keepOffset) {
             this.desktop.setScroll(column.getLeft() + offset, true);
@@ -402,7 +385,7 @@ class Grid {
             column.updateWidth();
             column.resizeWindows();
         }
-        this.columnsSetX(this.columns.getFirst()); // widths of maximized and full-screen columns depend on the screen size
+        this.columnsSetX(this.columns.getFirst());
     }
 
     public onUserResizeStarted() {
@@ -429,7 +412,6 @@ class Grid {
         for (const column of this.columns.iterator()) {
             column.moveToGrid(targetGrid, targetGrid.getLastColumn());
         }
-        // the whole desktop moves, so the column that had the focus keeps it there
         if (focused !== null && focused.grid === targetGrid && targetGrid.getLastFocusedColumn() === null) {
             targetGrid.lastFocusedColumn = focused;
         }

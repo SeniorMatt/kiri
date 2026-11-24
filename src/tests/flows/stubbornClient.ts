@@ -32,7 +32,7 @@ tests.register("A client that keeps its own height does not make the layout ask 
     });
 });
 
-tests.register("A client that cannot be smaller than its own height makes the others share what is left", 3, () => {
+tests.register("A client that cannot be smaller than its height: the others share the rest", 3, () => {
     timeControl(addTime => {
         const config = getDefaultConfig();
         const { qtMock, workspaceMock } = init(config);
@@ -52,7 +52,7 @@ tests.register("A client that cannot be smaller than its own height makes the ot
     });
 });
 
-tests.register("A client that snaps to its own steps (a terminal's cells) is not taken for one that keeps its height", 3, () => {
+tests.register("A client that snaps to steps is not taken for one that keeps its height", 3, () => {
     timeControl(addTime => {
         const config = getDefaultConfig();
         const { qtMock, workspaceMock } = init(config);

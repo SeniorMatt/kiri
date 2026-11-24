@@ -1,6 +1,4 @@
-// The touchpad swipe against niri itself. src/tests/fixtures/swipe/*.json hold a trace (events in touchpad units) and
-// what niri v26.04 does with it (made by tools/swipe/ref, a harness that runs niri's own gesture code).
-// With SWIPE_TRACES=<dir> SWIPE_OUT=<dir>, every .trace in the directory is run and Kiri's result is written there.
+// The touchpad swipe against the traces in src/tests/fixtures/swipe and what niri does with them (tools/swipe/ref)
 
 function swipeEnv(name: string): string | undefined {
     return (process as any).env[name];
@@ -284,7 +282,8 @@ for (const visual of [false, true]) {
                             Assert.equal(x, to, { message: "the layout moved after the release: " + seen.join(",") });
                         }
                     } else {
-                        // the script paints the settle: one spring towards `to` (it may first carry on with the fingers' velocity and
+                        // the script paints the settle: one spring towards `to` (it may first carry on with the fingers'
+                        // velocity and
                         // turn once, never wobble), and it ends there
                         let turns = 0;
                         for (let i = 2; i < seen.length; i++) {

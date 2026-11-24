@@ -4,7 +4,7 @@ function desktopNames() {
     return (Workspace as MockWorkspace).desktops.map(desktop => desktop.name);
 }
 
-tests.register("workspace-auto-back-and-forth: the key of the current desktop goes to the previous one", 3, () => {
+tests.register("workspace-auto-back-and-forth: the current desktop's key goes back", 3, () => {
     for (const on of [true, false]) {
         const config = getDefaultConfig();
         config.desktopAutoBackAndForth = on;
@@ -234,7 +234,8 @@ tests.register("Dynamic desktops: an empty desktop goes only after it has been l
     try {
         workspaceMock.activeWindow = a;
         qtMock.fireShortcut("column-move-to-next-desktop");
-        // the empty desktop below is made as soon as the window is there, before the switch starts; nothing changes under the animation
+        // the empty desktop below is made as soon as the window is there, before the switch starts; nothing changes
+        // under the animation
         Assert.equal(workspaceMock.desktops.length, 3);
         Assert.assert(workspaceMock.desktops.includes(d1), { message: "the desktop that was left is still there during the switch" });
         MockQmlTimer.flush();

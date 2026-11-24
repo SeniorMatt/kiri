@@ -1,24 +1,13 @@
-// niri's workspaces on KWin's virtual desktops (monitor.rs clean_up_workspaces, add_workspace_top/bottom,
-// move_workspace_up/down/to_idx, layout/mod.rs set/unset_workspace_name, ensure_named_workspace):
-//  - there is always exactly one empty desktop at the bottom (and one at the top with empty-workspace-above-first): a
-//    desktop that gets its first window gets a new empty one next to it, at once;
-//  - an empty desktop in between is removed once it is not the current one;
-//  - KWin's desktop switch effects stop the animation they are running when a desktop is added or removed. niri
-//    changes its workspaces under a running animation without a jump, so here nothing is added or removed while the
-//    desktop switch animates: the work waits until the desktops have been left alone for CLEANUP_DELAY, which is
-//    longer than the animation. No desktop disappears under the animation, nothing jumps, the Pager does not flicker,
-//    and a key held down that crosses desktops does not create and remove them again and again;
-//  - a named desktop (`workspace "name"` in niri's config, or set-workspace-name) counts as occupied: it stays when it
-//    is empty. KWin names every desktop, so Kiri keeps the ids of the named ones.
+// niri's workspaces on KWin's virtual desktops: one empty desktop at the bottom (and at the top with empty-workspace-
+// above-first), empty ones in between removed, named ones kept; nothing is added or removed while a desktop switch
+// animates, because KWin's effects stop their animation then
 class DynamicDesktops {
-    // niri's workspace switch animation is a spring that has settled well within this time
     private static readonly CLEANUP_DELAY = 500;
     private lastSwitch = -Infinity;
-    // a desktop made for a window that is about to move there (move to a new desktop): not to be removed as empty
     private reserved: { id: string, until: number } | null = null;
 
-    private suspended = false; // createDesktop and removeDesktop signal back into Kiri
-    private named: Set<string>; // ids of the named desktops
+    private suspended = false;
+    private named: Set<string>;
     private namedSynced = false;
     private cleanupArmed = false;
     private touched = false;
@@ -29,7 +18,6 @@ class DynamicDesktops {
         private readonly config: DynamicDesktops.Config,
         private readonly isOccupied: (kwinDesktop: KwinDesktop) => boolean,
         savedNamed: string[] = [],
-        // a desktop was replaced by a new one with the same content (see moveCurrent)
         private readonly onReplaced: (oldDesktop: KwinDesktop, newDesktop: KwinDesktop) => void = () => {},
     ) {
         this.named = new Set(savedNamed);
@@ -64,14 +52,12 @@ class DynamicDesktops {
         return result;
     }
 
-    // ---- what is a named, an empty desktop ----
 
     public isNamed(kwinDesktop: KwinDesktop) {
         return this.named.has(kwinDesktop.id);
     }
 
-    // niri's has_windows_or_name, negated. Windows Kiri does not manage (dialogs of the desktop) count as well, so that
-    // removing the desktop can never take a window away from where it is.
+    // niri's has_windows_or_name, negated; windows Kiri does not manage count too
     private isEmpty(kwinDesktop: KwinDesktop) {
         if (this.named.has(kwinDesktop.id) || this.isOccupied(kwinDesktop)) {
             return false;
@@ -81,19 +67,16 @@ class DynamicDesktops {
             kwinClient.desktops.length > 0 && kwinClient.desktops.includes(kwinDesktop));
     }
 
-    // niri's find_workspace_by_name: a named desktop, or else any desktop that happens to have the name
     public findByName(name: string): KwinDesktop|undefined {
         const desktops = Workspace.desktops;
         return desktops.find(desktop => this.named.has(desktop.id) && desktop.name === name) ?? desktops.find(desktop => desktop.name === name);
     }
 
-    // the desktops that are named now, to survive a reload of the script
     public captureNamed() {
         const ids = new Set(Workspace.desktops.map(desktop => desktop.id));
         return [...this.named].filter(id => ids.has(id));
     }
 
-    // "Desktop N" with the lowest N that no desktop has yet
     private static freeName() {
         const names = new Set(Workspace.desktops.map(desktop => desktop.name));
         let n = Workspace.desktops.length + 1;
@@ -103,7 +86,6 @@ class DynamicDesktops {
         return "Desktop " + n;
     }
 
-    // ---- keeping the empty desktops ----
 
     public update() {
         if (this.suspended) {
@@ -126,7 +108,6 @@ class DynamicDesktops {
         }
     }
 
-    // niri creates the named workspaces from the config at the top, in the order of the config
     private syncNamed() {
         if (this.namedSynced || Workspace.desktops.length === 0) {
             return;
@@ -149,8 +130,7 @@ class DynamicDesktops {
         }
     }
 
-    // monitor.rs: a window that lands on the last workspace makes a new empty one below it (and above the first one
-    // with empty-workspace-above-first). Done at once, so that the next desktop is there before anybody goes to it.
+    // niri's monitor.rs: a window on the last desktop makes a new empty one below it, at once
     private ensureEmptyDesktops() {
         let desktops = Workspace.desktops;
         if (desktops.length === 0) {
@@ -173,12 +153,10 @@ class DynamicDesktops {
         return this.reserved !== null && this.reserved.id === kwinDesktop.id && Date.now() < this.reserved.until;
     }
 
-    // the move into the desktop made by emptyDesktopNextToCurrent is done (or did not happen)
     public releaseReserved() {
         this.reserved = null;
     }
 
-    // the desktops clean_up_workspaces would remove now
     private removable() {
         const desktops = Workspace.desktops;
         const result: KwinDesktop[] = [];
@@ -194,7 +172,6 @@ class DynamicDesktops {
         return Date.now() - this.lastSwitch < DynamicDesktops.CLEANUP_DELAY - 50;
     }
 
-    // whether the empty desktop at the bottom (top) is missing
     private needsEmptyDesktops() {
         const desktops = Workspace.desktops;
         return desktops.length > 0 && (!this.isEmpty(desktops[desktops.length - 1]) || (this.config.emptyAbove && !this.isEmpty(desktops[0])));
@@ -210,7 +187,6 @@ class DynamicDesktops {
         }
     }
 
-    // a switch of the desktop starts the wait again: nothing is removed while the user is on the move
     public onDesktopChanged() {
         this.lastSwitch = Date.now();
         if (this.cleanupArmed) {
@@ -218,13 +194,12 @@ class DynamicDesktops {
         }
     }
 
-    // monitor.rs: with empty-workspace-above-first and nothing but two empty workspaces, the second one goes
     private allEmptyAboveFirst() {
         const desktops = Workspace.desktops;
         return this.config.emptyAbove && desktops.length === 2 && this.isEmpty(desktops[0]) && this.isEmpty(desktops[1]);
     }
 
-    // monitor.rs clean_up_workspaces. The ids of the desktops that stay are untouched, so the Pager keeps them as they are.
+    // niri's clean_up_workspaces; the ids of the desktops that stay are untouched
     private cleanup() {
         if (!this.config.enabled) {
             return;
@@ -250,7 +225,6 @@ class DynamicDesktops {
         }
     }
 
-    // KWin's desktop grid has one row per desktop (the compiled effect sets it, the script API can't)
     private publishRows() {
         const count = Workspace.desktops.length;
         if ((this.config.enabled || this.touched) && count !== this.rows) {
@@ -259,15 +233,12 @@ class DynamicDesktops {
         }
     }
 
-    // niri's focus-workspace N (and the move-to-workspace actions) with an N past the last workspace go to the last one,
-    // which is the empty one at the bottom
+    // niri: a number past the last workspace goes to the last one, the empty one at the bottom
     public clampIndex(index: number) {
         return this.config.enabled ? Math.min(index, Workspace.desktops.length - 1) : index;
     }
 
-    // ---- names ----
 
-    // niri's set-workspace-name: ignored when the name is used by another workspace
     public setName(name: string) {
         name = name.trim();
         const current = Workspace.currentDesktop;
@@ -278,7 +249,6 @@ class DynamicDesktops {
         this.named.add(current.id);
     }
 
-    // niri's unset-workspace-name: the desktop is an ordinary one again, and goes once it is empty and left
     public unsetName() {
         const current = Workspace.currentDesktop;
         if (!this.named.delete(current.id)) {
@@ -287,12 +257,9 @@ class DynamicDesktops {
         current.name = DynamicDesktops.freeName();
     }
 
-    // ---- moving desktops ----
 
-    // niri's move-workspace-up / move-workspace-down, emulated: KWin cannot reorder desktops, so the neighbour the
-    // current desktop swaps places with is replaced by a new desktop with the same name on the other side of it, and
-    // everything on the neighbour moves there (columns keep their layout, so does the view). The current desktop keeps
-    // its id. Returns whether the desktop moved.
+    // niri's move-workspace-up/down, emulated: KWin cannot reorder desktops, so the neighbour is replaced by a new
+    // desktop with its name on the other side
     public moveCurrent(desktopManager: DesktopManager, step: 1 | -1) {
         const desktops = Workspace.desktops;
         const index = desktops.indexOf(Workspace.currentDesktop);
@@ -310,7 +277,6 @@ class DynamicDesktops {
             if (replacement === undefined) {
                 return false;
             }
-            // the strips of every output
             for (const from of Array.from(desktopManager.getOutputDesktops(Workspace.currentActivity, neighbor))) {
                 const to = desktopManager.getDesktopInCurrentActivity(replacement, from.outputName);
                 if (to !== undefined) {
@@ -335,7 +301,6 @@ class DynamicDesktops {
         }
     }
 
-    // niri's move-workspace-to-index N (1-based; clamped to the last desktop)
     public moveCurrentToIndex(desktopManager: DesktopManager, index: number) {
         const target = Math.max(0, Math.min(index, Workspace.desktops.length - 1));
         for (let guard = 0; guard < 1000; guard++) {
@@ -346,8 +311,7 @@ class DynamicDesktops {
         }
     }
 
-    // niri's add_or_reuse_empty_workspace_at, for move-column-to-new-workspace-below/above: the index of an empty
-    // desktop right below (above) the current one; the empty one at the bottom (top) is used as it is
+    // niri's add_or_reuse_empty_workspace_at
     public emptyDesktopNextToCurrent(below: boolean) {
         let desktops = Workspace.desktops;
         const index = below ? desktops.indexOf(Workspace.currentDesktop) + 1 : desktops.indexOf(Workspace.currentDesktop);
@@ -377,8 +341,8 @@ class DynamicDesktops {
 
 namespace DynamicDesktops {
     export interface Config {
-        enabled: boolean; // niri's dynamic workspaces
-        emptyAbove: boolean; // layout { empty-workspace-above-first }
-        names: string[]; // the declared named workspaces, in the order of the config
+        enabled: boolean;
+        emptyAbove: boolean;
+        names: string[];
     }
 }

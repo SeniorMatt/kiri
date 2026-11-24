@@ -7,14 +7,13 @@ namespace ClientState {
         private readonly maximizedDelayer: Delayer;
         private readonly fullScreenDelayer: Delayer;
         private pendingMaximized: MaximizedMode | null = null;
-        private readonly userResize: { grid: Grid | null } = { grid: null }; // the grid that this window's user resize holds
-        private readonly fullScreenFrame = { pending: false }; // the frame of a window entering or leaving full-screen mode changed before its flag did
+        private readonly userResize: { grid: Grid | null } = { grid: null };
+        private readonly fullScreenFrame = { pending: false };
         private static readonly maxExternalFrameGeometryChangedIntervalMs = 1000;
 
-        // `placement` puts the window where a window that was just closed and mapped again was
         constructor(world: World, client: ClientWrapper, grid: Grid, placement?: Tiled.Placement) {
             if (client.ownNoBorder === null) {
-                client.ownNoBorder = client.kwinClient.noBorder; // kept while a drag takes the window out of the grid and back
+                client.ownNoBorder = client.kwinClient.noBorder;
             }
             this.defaultState = { skipSwitcher: client.kwinClient.skipSwitcher, noBorder: client.ownNoBorder };
             Tiled.prepareClientForTiling(client, grid.config);
@@ -38,12 +37,11 @@ namespace ClientState {
             }
 
             this.window = window;
-            // one relayout after a burst of external geometry changes that was rate limited
             this.relayoutDelayer = new Delayer(Tiled.maxExternalFrameGeometryChangedIntervalMs, () => {
                 world.do(() => window.column.grid.desktop.onLayoutChanged());
             });
-            // KWin does not take a geometry for a window that is in the middle of being maximized or restored (an X11
-            // window ends up with the wrong size): the layout reacts when KWin is done
+            // KWin does not take a geometry for a window that is being maximized or restored: the layout reacts when it
+            // is done
             this.maximizedDelayer = new Delayer(0, () => {
                 const mode = this.pendingMaximized;
                 this.pendingMaximized = null;
@@ -51,9 +49,8 @@ namespace ClientState {
                     world.do(() => { window.onMaximizedChanged(mode); });
                 }
             });
-            // KWin changes the frame of a window that enters or leaves full-screen mode a moment before it sets the flag. A
-            // layout pass in between would give the client the old size again, and a client that is slow to commit would
-            // show it, one more size on the way: the layout waits for the flag
+            // KWin changes the frame of a window entering or leaving full-screen before it sets the flag: the layout
+            // waits for the flag
             this.fullScreenDelayer = new Delayer(0, () => {
                 this.fullScreenFrame.pending = false;
                 world.do(() => window.onFrameGeometryChanged());
@@ -68,7 +65,6 @@ namespace ClientState {
             this.fullScreenDelayer.destroy();
             this.window.client.userResizeIgnored = false;
             if (this.userResize.grid !== null) {
-                // closed or floated in the middle of a resize: KWin's finished signal will not come
                 this.userResize.grid.onUserResizeFinished();
                 this.userResize.grid = null;
             }
@@ -90,8 +86,7 @@ namespace ClientState {
                 world.do((clientManager, desktopManager) => {
                     const desktop = desktopManager.getDesktopForClient(kwinClient, window.column.grid.desktop.outputName);
                     if (desktop === undefined) {
-                        // windows on multiple desktops are not supported; it may only be a transient state (lock,
-                        // sleep, the Pager), so the window is tiled again when the desktop settles
+                        // windows on multiple desktops are not supported; the window is tiled again when the desktop settles
                         clientManager.floatClient(client, true);
                         return;
                     }
@@ -127,22 +122,22 @@ namespace ClientState {
             let resizing = false;
             let resizeStartWidth = 0;
             let resizeNeighbor: { column: Column, startWidth: number } | undefined;
-            let resizeRequest: QmlRect | null = null; // the geometry the pointer asked for at the last step
+            let resizeRequest: QmlRect | null = null;
             let resizeStart = { x: 0, y: 0 };
-            let resizeStepped = false; // KWin reports the pointer's steps; the committed geometry is then only used for the width
-            let lastResizeStart: { time: number, edges: number } | null = null; // for niri's double resize-click
-            let resizeIgnored = false; // a double resize-click: KWin still resizes the window by the pointer, the layout ignores it
+            let resizeStepped = false;
+            let lastResizeStart: { time: number, edges: number } | null = null;
+            let resizeIgnored = false;
             let dragStart: { x: number, y: number } | null = null;
             let dragLimit = 0;
             let dragHome = { x: 0, y: 0 };
             manager.connect(kwinClient.interactiveMoveResizeStarted, () => {
                 if (kwinClient.move) {
                     if (config.untileOnDrag) {
-                        // niri: the window stays in the grid until the pointer has travelled 256 px, then it follows the pointer
+                        // niri: the window stays in the grid until the pointer has travelled 256 px
                         dragStart = { x: Workspace.cursorPos.x, y: Workspace.cursorPos.y };
                         dragHome = { x: kwinClient.frameGeometry.x, y: kwinClient.frameGeometry.y };
                         dragLimit = ClientManager.dragStartDistance;
-                        // the other mouse button takes it out of the grid at once, as a floating window (niri's move grab)
+                        // the other mouse button takes it out of the grid at once, as a floating window
                         world.do((clientManager, desktopManager) => clientManager.setDragPending(client, () => {
                             if (dragStart !== null) {
                                 dragStart = null;
@@ -157,14 +152,14 @@ namespace ClientState {
                 }
 
                 if (kwinClient.resize) {
-                    // niri's double resize-click: pressing on the same edge again within 400 ms toggles the full width
-                    // (a left or right edge) or resets the window height (a top or bottom edge) instead of resizing
+                    // niri's double resize-click: the same edge again within 400 ms toggles the full width or resets the
+                    // height
                     const edges = Tiled.resizeEdgesUnderCursor(kwinClient);
                     const now = Date.now();
                     const last = lastResizeStart;
                     lastResizeStart = edges === 0 ? null : { time: now, edges: edges };
                     if (edges !== 0 && last !== null && now - last.time <= Tiled.doubleClickTimeMs) {
-                        lastResizeStart = null; // niri: a triple click resizes again
+                        lastResizeStart = null;
                         const common = edges & last.edges;
                         client.userResizeIgnored = true;
                         resizeIgnored = true;
@@ -190,9 +185,7 @@ namespace ClientState {
                 }
             });
 
-            // niri sends the new sizes of all the windows of a column together, as soon as the pointer moves. KWin only
-            // tells about the resized window's new size when its client has committed it, which is later, and the
-            // neighbours would then start only from there. The step has the geometry the pointer asks for.
+            // like niri, the neighbours get the geometry the pointer asks for before the client has committed it
             manager.connect(kwinClient.interactiveMoveResizeStepped, (geometry: QmlRect) => {
                 if (!resizing || resizeRequest === null) {
                     return;
@@ -205,7 +198,6 @@ namespace ClientState {
                 let allowed = requested;
                 world.do(() => { allowed = window.column.onUserResizeRequested(window, requested, previous, leftEdge); });
                 if (allowed.width !== requested.width || allowed.height !== requested.height) {
-                    // the pointer asks for more than the layout gives the window: KWin would let it grow over the others
                     resizeRequest = allowed;
                     client.setFrame(allowed);
                 }
@@ -224,7 +216,7 @@ namespace ClientState {
                 if (resizeIgnored) {
                     resizeIgnored = false;
                     client.userResizeIgnored = false;
-                    world.do(() => window.column.grid.desktop.onLayoutChanged()); // put the window back where the layout has it
+                    world.do(() => window.column.grid.desktop.onLayoutChanged());
                 }
                 if (resizing) {
                     resizing = false;
@@ -257,8 +249,8 @@ namespace ClientState {
                             clientManager.floatForDrag(client);
                         });
                     } else {
-                        // niri's rubber band (limit 0.5, stiffness 1): KWin moves the window with the pointer, the effect
-                        // paints it at (1 - 1 / (2x + 1)) / 2 of the travel, x = squared distance / threshold squared
+                        // niri's rubber band (limit 0.5, stiffness 1): the effect paints the window at (1 - 1 / (2x +
+                        // 1)) / 2 of the travel
                         const x = squared / (dragLimit * dragLimit);
                         const factor = (1 - 1 / (2 * x + 1)) / 2;
                         setVisualPosition(String(kwinClient.internalId), [Math.round(dragHome.x + dx * factor), Math.round(dragHome.y + dy * factor)]);
@@ -298,8 +290,7 @@ namespace ClientState {
                             );
                         }
                         if (!resizeStepped && newGeometry.height !== oldGeometry.height) {
-                            // like niri: the dragged window gets the height under the pointer and the rest of
-                            // the column shares what is left; the top edge of the first window does nothing
+                            // like niri: the dragged window gets the height under the pointer, the rest shares what is left
                             const top = newGeometry.y !== oldGeometry.y;
                             if (!(top && window.column.isTopWindow(window))) {
                                 window.column.setFixedHeight(window, newGeometry.height, null);
@@ -307,34 +298,30 @@ namespace ClientState {
                         }
                     });
                 } else if (window.column.grid.isUserResizing() && !client.isManipulatingGeometry(newGeometry)) {
-                    // this window has committed a size it was sent while another one is being resized: it may have a newer one waiting
                     world.do(() => window.column.grid.desktop.onLayoutChanged());
                 } else if (client.windowedFullScreen && kwinClient.fullScreen && !window.column.grid.isUserResizing() &&
                     Clients.isFrameFullScreenSize(kwinClient)) {
-                    // KWin gave the window the screen when the client was told it is full-screen: it is a tile, put it back
                     world.do(() => window.column.grid.desktop.onLayoutChanged());
                 } else if (
                     !window.column.grid.isUserResizing() &&
                     !client.isManipulatingGeometry(newGeometry) &&
                     client.getMaximizedMode() === MaximizedMode.Unmaximized &&
-                    // Without a title bar the client area is the whole frame, so a screen-sized frame looks like full-screen
-                    // geometry even when the window has just left full-screen mode (KWin can still restore a screen-sized
-                    // frame then); KWin sets the full-screen flag before the frame of a window that enters it.
-                    (!Clients.isFullScreenGeometry(kwinClient) || (config.hideTitlebars && !kwinClient.fullScreen)) // not using `kwinClient.fullScreen` because it may not be set yet at this point
+                    // without a title bar a screen-sized frame looks like full-screen geometry, also right after leaving
+                    // full-screen mode
+                    // not using `kwinClient.fullScreen` because it may not be set yet at this point
+                    (!Clients.isFullScreenGeometry(kwinClient) || (config.hideTitlebars && !kwinClient.fullScreen))
                 ) {
                     if (kwinClient.fullScreenable && !client.windowedFullScreen && Clients.isFrameFullScreenSize(kwinClient) !== kwinClient.fullScreen) {
                         fullScreenFrame.pending = true;
-                        fullScreenDelayer.run(); // the full-screen flag follows
+                        fullScreenDelayer.run();
                         return;
                     }
                     const moved = kwinClient.move ? null : client.getMovedByKwinFrom(newGeometry, oldGeometry);
                     if (moved !== null) {
-                        // the position is not Kiri's: put the window back (the rest of the layout is fine if only the
-                        // position changed, and the rate limit below must not leave the other windows of a burst misplaced)
+                        // the position is not Kiri's: put the window back
                         if (Clients.isOnVirtualDesktop(kwinClient, Workspace.currentDesktop)) {
                             client.place(moved.rect.x, moved.rect.y, moved.rect.width, moved.rect.height);
                         } else {
-                            // not shown now (KWin does this to the desktop it leaves): the next arrange puts it back
                             window.column.grid.desktop.onLayoutChanged();
                             return;
                         }
@@ -345,7 +332,7 @@ namespace ClientState {
                     if (client.takeLearnedHeight()) {
                         world.do(() => {
                             window.onFrameGeometryChanged();
-                            window.column.resizeWindows(); // the window has a new height bound
+                            window.column.resizeWindows();
                         });
                     } else if (externalFrameGeometryChangedRateLimiter.acquire()) {
                         world.do(() => window.onFrameGeometryChanged());
@@ -371,7 +358,6 @@ namespace ClientState {
                     }
 
                     window.onFullScreenChanged(kwinClient.fullScreen);
-                    // KWin brings the title bar back when a window leaves full-screen mode
                     if (config.hideTitlebars && !kwinClient.fullScreen) {
                         client.setNoBorder(true);
                     }
@@ -390,12 +376,11 @@ namespace ClientState {
             return manager;
         }
 
-        private static readonly doubleClickTimeMs = 400; // niri's DOUBLE_CLICK_TIME
+        private static readonly doubleClickTimeMs = 400;
         private static readonly edgesLeftRight = 3;
         private static readonly edgesTopBottom = 12;
 
-        // niri's resize_edges_under: the window is split in thirds, the pointer's third says which edges a resize takes
-        // (1 left, 2 right, 4 top, 8 bottom)
+        // niri's resize_edges_under: the pointer's third of the window says the edges (1 left, 2 right, 4 top, 8 bottom)
         private static resizeEdgesUnderCursor(kwinClient: KwinClient) {
             const frame = kwinClient.frameGeometry;
             const x = Workspace.cursorPos.x - frame.x;
@@ -481,7 +466,7 @@ namespace ClientState {
             if (client.kwinClient.tile === null) {
                 client.setMaximize(false, false);
             }
-            if (!client.keepTitlebarHidden) { // a window that is being dragged out follows the pointer, wherever that is (niri)
+            if (!client.keepTitlebarHidden) {
                 client.ensureVisible(screenSize);
             }
         }
@@ -489,10 +474,10 @@ namespace ClientState {
 
     export namespace Tiled {
         export interface Placement {
-            column: Column|null; // the column the window was in, if it still exists and the window was not alone in it
-            after: Window|null; // the window above it in that column
-            leftColumn: Column|null; // otherwise: the column to the left of where its own column was
-            atStart?: boolean; // there was none: its own column was the first one
+            column: Column|null;
+            after: Window|null;
+            leftColumn: Column|null;
+            atStart?: boolean;
         }
 
         export interface WindowState {

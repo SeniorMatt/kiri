@@ -26,7 +26,8 @@ namespace Clients {
     }
 
     export function canTileEver(kwinClient: KwinClient) {
-        const shapeable = (kwinClient.moveable && kwinClient.resizeable) || kwinClient.fullScreen; // full-screen windows may become shapeable after exiting full-screen mode
+        // full-screen windows may become shapeable after exiting full-screen mode
+        const shapeable = (kwinClient.moveable && kwinClient.resizeable) || kwinClient.fullScreen;
         return shapeable &&
             !kwinClient.popupWindow &&
             !prohibitedClasses.includes(kwinClient.resourceClass);

@@ -232,7 +232,7 @@ tests.register("Resize: the column follows the pointer's step, the other columns
     Assert.equal(rectBottom(b), tilingArea.y + tilingArea.height);
 });
 
-tests.register("Resize from the left edge: the right edge stays and the window below follows the step", 6, () => {
+tests.register("Resize from the left edge: the right edge stays, the window below follows", 6, () => {
     const config = getDefaultConfig();
     config.centerGridWhenFits = false; // niri keeps the view where it is
     const { qtMock, workspaceMock } = init(config);

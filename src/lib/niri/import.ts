@@ -1,5 +1,4 @@
-// Turns the text of a niri config.kdl into Kiri settings and shortcut keys.
-// Keep the mappings in step with tools/niri2kiri.py.
+// turns a niri config.kdl into Kiri settings and keys; keep in step with tools/niri2kiri.py
 namespace NiriImport {
     export interface Result {
         settings: Record<string, any>;
@@ -93,7 +92,6 @@ namespace NiriImport {
         "open-overview": "overview-open",
         "close-overview": "overview-close",
         "toggle-window-rule-opacity": "window-toggle-rule-opacity",
-        // in niri's scrolling layout the width of a window is the width of its column
         "switch-preset-window-width": "cycle-preset-widths",
         "switch-preset-window-width-back": "cycle-preset-widths-reverse",
         "set-window-fullscreen": "window-set-fullscreen",
@@ -102,7 +100,6 @@ namespace NiriImport {
         "unset-windowed-fullscreen": "window-unset-windowed-fullscreen",
         "set-window-maximized-to-edges": "window-set-maximized-to-edges",
         "unset-window-maximized-to-edges": "window-unset-maximized-to-edges",
-        // with one output these do what the plain action does (niri: no output in that direction)
         "focus-window-or-monitor-up": "focus-up",
         "focus-window-or-monitor-down": "focus-down",
         "focus-column-or-monitor-left": "focus-left",
@@ -111,7 +108,6 @@ namespace NiriImport {
         "move-column-right-or-to-monitor-right": "column-move-right",
     };
 
-    // the same actions with focus=false (the focus stays where it was, see Actions.columnMoveNoFocus)
     const NO_FOCUS: Record<string, string> = {
         "move-column-left": "column-move-left-no-focus",
         "move-column-right": "column-move-right-no-focus",
@@ -135,8 +131,8 @@ namespace NiriImport {
     const NUMBERED_NO_FOCUS: Record<string, string> = {
         "move-column-to-index": "column-move-to-column-no-focus-{}",
     };
-    const NO_FOCUS_SLOTS = 12; // how many numbered no-focus actions Kiri has
-    const SIZE_SLOTS = 12; // how many column-width-set-N and window-height-set-N actions Kiri has
+    const NO_FOCUS_SLOTS = 12;
+    const SIZE_SLOTS = 12;
 
     const MODIFIERS: Record<string, string> = {
         mod: "Meta", super: "Meta", win: "Meta", ctrl: "Ctrl", control: "Ctrl", shift: "Shift", alt: "Alt",
@@ -155,7 +151,6 @@ namespace NiriImport {
 
     const has = (map: Record<string, string>, key: string) => Object.prototype.hasOwnProperty.call(map, key);
 
-    // `mod` is what niri's Mod stands for (input { mod-key }): Kiri's name of that modifier, Meta (Super) by default
     export function convertKey(niriKey: string, mod = "Meta"): string|undefined {
         const parts = niriKey.split("+");
         let key = parts.pop() as string;
@@ -172,14 +167,12 @@ namespace NiriImport {
         } else if (has(KEYS, key.toLowerCase())) {
             key = KEYS[key.toLowerCase()];
         } else {
-            return undefined; // mouse wheel, XF86 keys etc.
+            return undefined;
         }
         const sorted = MODIFIER_ORDER.filter(modifier => mods.has(modifier));
         return [...sorted, key].join("+");
     }
 
-    // Workspace binds that need more than a name lookup: a workspace by name (the Nth name of the bind list is the
-    // shortcut "...-named-N", 12 at most), focus=false, new workspaces, move-workspace-to-index.
     function desktopAction(command: Kdl.Node, names: string[]): string|undefined {
         const arg = command.args[0];
         const noFocusSuffix = command.props["focus"] === "false" ? "-no-focus" : "";
@@ -212,24 +205,20 @@ namespace NiriImport {
             return noFocusSuffix === "" ? undefined : `window-move-to-${command.name.endsWith("down") ? "next" : "previous"}-desktop-no-focus`;
         case "move-column-to-new-workspace-below": case "move-column-to-new-workspace-above":
         case "move-window-to-new-workspace-below": case "move-window-to-new-workspace-above":
-            // a workspace reference is not mapped
             return arg !== undefined ? undefined : `${command.name.startsWith("move-column") ? "column" : "window"}-move-to-new-desktop-${command.name.endsWith("below") ? "below" : "above"}${noFocusSuffix}`;
         }
         return undefined;
     }
 
 
-    // niri's mod-key names -> Kiri's modifier names
     const MOD_KEYS: Record<string, string> = { super: "Meta", alt: "Alt", ctrl: "Ctrl", shift: "Shift" };
 
-    // The pointer triggers of niri's binds that Kiri's effect can take: the wheel and the mouse buttons.
-    // TouchpadScroll* is continuous in KWin (no ticks to count) and TabletStylusButton* has no KWin hook.
+    // the wheel and mouse button triggers of niri's binds; TouchpadScroll* and TabletStylusButton* have no KWin hook
     const POINTER_TRIGGERS = [
         "WheelScrollDown", "WheelScrollUp", "WheelScrollLeft", "WheelScrollRight",
         "MouseLeft", "MouseRight", "MouseMiddle", "MouseForward", "MouseBack",
     ];
 
-    // "Mod+Ctrl+WheelScrollDown" -> "Meta+Ctrl+WheelScrollDown" (Kiri's pointerBinds setting names triggers like niri does)
     export function convertPointerKey(niriKey: string, mod = "Meta"): string|undefined {
         const parts = niriKey.split("+");
         const last = (parts.pop() as string).toLowerCase();
@@ -241,7 +230,6 @@ namespace NiriImport {
         return keys === undefined ? undefined : keys.substring(0, keys.length - 1) + trigger;
     }
 
-    // why a niri action has no Kiri action (a regex on the name, the reason that is told)
     const UNMAPPED: [RegExp, string][] = [
         [/^(spawn|spawn-sh)$/, "starts a program: a Plasma command shortcut (tools/niri2kiri.py --apply makes them)"],
         [/^screenshot/, "screenshots are Spectacle's"],
@@ -256,7 +244,6 @@ namespace NiriImport {
         [/-by-id$|^focus-window$|^load-config-file$|^mru-/, "IPC and window switcher actions cannot be bound"],
     ];
 
-    // undefined when the importer has no explicit reason for the action
     export function unmappedReason(name: string, args: string[]): string|undefined {
         const found = UNMAPPED.find(([regex]) => regex.test(name));
         return found === undefined ? undefined : found[1];
@@ -266,7 +253,6 @@ namespace NiriImport {
         return value === "false" || value === "#false";
     }
 
-    // a bind that has `focus=false` (the property of the move actions)
     function withoutFocus(command: Kdl.Node) {
         return isFalse(command.props["focus"]);
     }
@@ -275,14 +261,14 @@ namespace NiriImport {
         const binds: Record<string, string[]> = {};
         const pointer: string[] = [];
         const skipped: string[] = [];
-        const steps: Record<string, any> = {}; // set-column-width "+5%" gives the step of the width keys
-        const slots: Record<string, string[]> = { column: [], window: [] }; // the sizes the other set-column-width and set-window-height binds set
+        const steps: Record<string, any> = {};
+        const slots: Record<string, string[]> = { column: [], window: [] };
         let hasBinds = false;
-        const bindNames = declaredWorkspaces(nodes); // the names that binds refer to; declared workspaces come first
+        const bindNames = declaredWorkspaces(nodes);
         for (const block of Kdl.find(nodes, "binds")) {
             hasBinds = true;
             for (const bind of block.children) {
-                // `press { action }` is a plain bind; a `release { action }` needs the key release, which kglobalaccel does not give
+                // `release { action }` needs the key release, which kglobalaccel does not give
                 const commands = bind.children.length > 0 && ["press", "release"].includes(bind.children[0].name) ?
                     bind.children.flatMap(node => node.name === "press" ? node.children : [node]) :
                     bind.children.slice(0, 1);
@@ -291,7 +277,6 @@ namespace NiriImport {
                     let action: string|undefined = desktopAction(command, bindNames);
                     let reason: string|undefined;
                     if (action !== undefined) {
-                        // a workspace bind
                     } else if (has(NUMBERED, command.name) && args.length > 0 && /^\d+$/.test(args[0])) {
                         const noFocus = withoutFocus(command);
                         if (noFocus && (!has(NUMBERED_NO_FOCUS, command.name) || parseInt(args[0]) > NO_FOCUS_SLOTS)) {
@@ -357,9 +342,7 @@ namespace NiriImport {
         return ["focus-window-previous", ...parts].join("-");
     }
 
-    // The Kiri action for set-column-width, set-window-width and set-window-height: "+10%" keeps to the width and height
-    // step keys of the first such bind; any other size gets one of the numbered "set to" actions, with the size
-    // stored in the columnWidthSet / windowHeightSet setting.
+    // the Kiri action for a size: "+10%" uses the step keys, any other size one of the numbered slots
     function sizeAction(niriName: string, value: string, steps: Record<string, any>, slots: Record<string, string[]>) {
         const kind = niriName === "set-window-height" ? "window" : "column";
         const percentStep = /^[+-]\d+%$/.exec(value);
@@ -385,7 +368,6 @@ namespace NiriImport {
         return (kind === "column" ? "column-width-set-" : "window-height-set-") + (index + 1);
     }
 
-    // workspace "name" { ... } at the top level, in the order of the config
     function declaredWorkspaces(nodes: Kdl.Node[]) {
         const names: string[] = [];
         for (const node of Kdl.find(nodes, "workspace")) {
@@ -417,7 +399,6 @@ namespace NiriImport {
         return (v < 16 ? "0" : "") + v.toString(16);
     }
 
-    // "#rrggbb", or "#rrggbbaa" when the colour is not opaque (niri's colours are CSS ones)
     export function parseColor(value: string): string|undefined {
         const v = value.trim().toLowerCase();
         if (has(COLOR_NAMES, v)) {
@@ -454,8 +435,6 @@ namespace NiriImport {
         return undefined;
     }
 
-    // niri's `active-gradient from="#80c8ff" to="#bbddff" angle=45 relative-to="workspace-view" in="oklch longer hue"` in the
-    // one-line format of the Kiri settings: "from=#80c8ff to=#bbddff angle=45 relative-to=workspace-view in=oklch longer hue"
     function gradientString(node: Kdl.Node|undefined, warn: (msg: string) => void): string|undefined {
         if (node === undefined) {
             return undefined;
@@ -475,11 +454,10 @@ namespace NiriImport {
         return out;
     }
 
-    // proportion 0.5 -> "50%", fixed 800 -> "800px"
     function oneSize(node: Kdl.Node): string|undefined {
         const value = parseFloat(node.args[0]);
         if (!isFinite(value) || value <= 0) {
-            return undefined; // niri refuses these too; "Infinity%" or "0px" would collapse the columns
+            return undefined;
         }
         if (node.name === "proportion") {
             return parseFloat((value * 100).toFixed(3)) + "%";
@@ -501,7 +479,6 @@ namespace NiriImport {
         return node === undefined ? "" : node.children.map(oneSize).filter(s => s !== undefined).join(", ");
     }
 
-    // a number from the config is a size in pixels: infinity or 1e300 would put every window off the screen
     const MAX_PIXELS = 10000;
 
     function number(args: string[]): number|undefined {
@@ -521,7 +498,7 @@ namespace NiriImport {
         }
     }
 
-    // niri: a colour and a gradient of one state; the gradient wins, and a colour set after it (in the block) is ignored by niri too
+    // niri: the gradient wins over a colour
     function colorOrGradient(node: Kdl.Node, name: string, key: string, out: Record<string, any>, warn: (msg: string) => void) {
         colorSetting(Kdl.child(node, name + "-color"), key + "Color", out, warn);
         const gradient = gradientString(Kdl.child(node, name + "-gradient"), warn);
@@ -586,8 +563,7 @@ namespace NiriImport {
         "at-startup": "atStartup",
     };
 
-    // One match or exclude line as a Kiri matcher; undefined when it uses a matcher Kiri does not know. The regexes are
-    // kept as niri has them: Kiri's appId and title match anywhere in the string, with Rust's regex syntax.
+    // one match or exclude line as a Kiri matcher; undefined for a matcher Kiri does not know
     function matchOf(node: Kdl.Node, warn: (msg: string) => void): Record<string, any>|undefined {
         const entry: Record<string, any> = {};
         const unknown = Object.keys(node.props).filter(name => !has(MATCHERS, name));
@@ -626,7 +602,6 @@ namespace NiriImport {
         return color;
     }
 
-    // the colour and the gradient of one state (a rule's focus-ring, border or tab-indicator), in the format of the settings
     function stateColors(node: Kdl.Node, out: Record<string, any>, warn: (msg: string) => void, what: string) {
         for (const state of ["active", "inactive", "urgent"]) {
             const color = colorOf(Kdl.child(node, state + "-color"), warn, `${what} ${state}`);
@@ -640,7 +615,6 @@ namespace NiriImport {
         }
     }
 
-    // the focus-ring and border rules
     function ringRule(node: Kdl.Node, warn: (msg: string) => void): Record<string, any>|undefined {
         const out: Record<string, any> = {};
         if (Kdl.child(node, "off")) {
@@ -656,7 +630,6 @@ namespace NiriImport {
         return Object.keys(out).length > 0 ? out : undefined;
     }
 
-    // a number of a window rule as a finite, sane one (infinity or 1e300 would put windows off the screen)
     function finiteNumber(raw: string|undefined): number|undefined {
         const value = parseFloat(raw ?? "");
         return isFinite(value) ? Math.max(-MAX_PIXELS, Math.min(MAX_PIXELS, value)) : undefined;
@@ -710,8 +683,7 @@ namespace NiriImport {
 
     const POSITIONS = ["top-left", "top-right", "bottom-left", "bottom-right", "top", "bottom", "left", "right"];
 
-    // The properties of one window-rule as the keys of a Kiri rule, in niri's order. `radiusIsGlobal` leaves
-    // geometry-corner-radius out (it is the global cornerRadius setting then).
+    // the properties of one window-rule as the keys of a Kiri rule
     function ruleProperties(rule: Kdl.Node, warn: (msg: string) => void, radiusIsGlobal: boolean): Record<string, any> {
         const out: Record<string, any> = {};
         const floating = flag(Kdl.child(rule, "open-floating"));
@@ -721,7 +693,7 @@ namespace NiriImport {
         for (const [niri, kiri] of [["default-column-width", "width"], ["default-window-height", "height"]]) {
             const node = Kdl.child(rule, niri);
             if (node !== undefined) {
-                out[kiri] = size(node) ?? ""; // an empty block lets the window pick its own size
+                out[kiri] = size(node) ?? "";
             }
         }
         for (const [niri, kiri] of [["open-fullscreen", "fullscreen"], ["open-maximized", "maximized"], ["open-maximized-to-edges", "maximizedToEdges"], ["open-focused", "focused"], ["draw-border-with-background", "drawBorderWithBackground"], ["baba-is-float", "babaIsFloat"]]) {
@@ -772,7 +744,6 @@ namespace NiriImport {
         if (radius !== undefined && !radiusIsGlobal) {
             const values = radius.args.map(arg => finiteNumber(arg)).filter((value): value is number => value !== undefined);
             if (values.length === 1 || values.length === 4) {
-                // the effect has one radius per window: niri's four corners (top-left first) give their largest one
                 if (values.length === 4 && values.some(value => value !== values[0])) {
                     warn("window-rule/geometry-corner-radius: different corners are not supported, the largest radius is used for all");
                 }
@@ -789,7 +760,6 @@ namespace NiriImport {
         for (const rule of Kdl.find(nodes, "window-rule")) {
             const matches = Kdl.find(rule.children, "match");
             const excludeNodes = Kdl.find(rule.children, "exclude");
-            // a rule for every window that sets geometry-corner-radius is the global setting
             const radiusNode = Kdl.child(rule, "geometry-corner-radius");
             const radiusIsGlobal = matches.length === 0 && excludeNodes.length === 0;
             if (radiusIsGlobal && radiusNode !== undefined && number(radiusNode.args) !== undefined && radiusNode.args.length === 1) {
@@ -806,7 +776,6 @@ namespace NiriImport {
                     excludes.push(entry);
                 }
             }
-            // a rule without match lines applies to every window
             const lines: (Kdl.Node|undefined)[] = matches.length === 0 ? [undefined] : matches;
             for (const match of lines) {
                 const entry = match === undefined ? {} : matchOf(match, warn);
@@ -823,7 +792,6 @@ namespace NiriImport {
         return { rules, radius };
     }
 
-    // the keys in name order, so that both importers write the same text whatever order they found them in
     function sortedKeys(object: Record<string, any>) {
         const result: Record<string, any> = {};
         for (const key of Object.keys(object).sort()) {
@@ -842,16 +810,14 @@ namespace NiriImport {
         return (name: string): Kdl.Node|undefined => layout.get(name);
     }
 
-    // The options of niri's LayoutPart in `blocks` (the layout {} blocks of the config, or the one of a workspace or an
-    // output) as Kiri settings. `base` is given for a layout {} of a workspace or output: the gaps and struts below it,
-    // `where` says which one for the messages.
+    // the options of niri's LayoutPart as Kiri settings; `base` is the layout below it, `where` names it for messages
     function layoutSettings(blocks: Kdl.Node[], out: Record<string, any>, warn: (msg: string) => void, base?: { gaps: number, struts: Kdl.Node|undefined }, where = "layout") {
         const L = layoutLookup(blocks);
 
         const gapsNode = L("gaps");
         const strutsNode = L("struts");
         if (base !== undefined) {
-            // an override: niri merges gaps and struts one by one over the layout below it, the outer gap is both added
+            // niri merges gaps and struts one by one over the layout below
             if (gapsNode !== undefined || strutsNode !== undefined) {
                 const gapValue = gapsNode !== undefined ? number(gapsNode.args) : undefined;
                 const gap = gapValue ?? base.gaps;
@@ -897,7 +863,6 @@ namespace NiriImport {
         }
         const defaultWidthNode = L("default-column-width");
         if (defaultWidthNode !== undefined) {
-            // an empty block lets the windows pick their own width, which is "" for Kiri
             out["defaultColumnWidth"] = size(defaultWidthNode) ?? "";
         }
         const display = L("default-column-display");
@@ -975,7 +940,6 @@ namespace NiriImport {
         const L = layoutLookup(globalBlocks);
 
         out["hideTitlebars"] = Kdl.find(nodes, "prefer-no-csd").length > 0;
-        // niri always has dynamic workspaces; Kiri's are an option that stays as the user set it
         if (L("empty-workspace-above-first") !== undefined) {
             out["emptyDesktopAboveFirst"] = true;
         }
@@ -986,7 +950,6 @@ namespace NiriImport {
                 warn("workspace blocks: open-on-output is not mapped (the names are)");
             }
         }
-        // niri: the layout {} of a workspace and of an output are merged over the global one (output first, workspace last)
         const globalGaps = { gaps: number(L("gaps")?.args ?? []) ?? 16, struts: L("struts") };
         const workspaceLayouts: Record<string, any> = {};
         for (const node of Kdl.find(nodes, "workspace")) {
@@ -1014,7 +977,7 @@ namespace NiriImport {
                 layoutSettings([layoutBlock], layoutOut, warn, globalGaps, `output "${node.args[0]}"`);
             }
             if (layoutOut["backgroundColor"] === undefined) {
-                colorSetting(Kdl.child(node, "background-color"), "backgroundColor", layoutOut, warn); // the deprecated place of it
+                colorSetting(Kdl.child(node, "background-color"), "backgroundColor", layoutOut, warn);
             }
             if (Object.keys(layoutOut).length > 0) {
                 entry["layout"] = sortedKeys(layoutOut);
@@ -1047,12 +1010,11 @@ namespace NiriImport {
             if (follows !== undefined) {
                 out["focusFollowsMouse"] = true;
                 const maxScroll = parseFloat(follows.props["max-scroll-amount"] ?? "");
-                out["focusFollowsMouseMaxScroll"] = isNaN(maxScroll) ? 100 : Math.max(0, Math.round(maxScroll)); // the share of the screen the view may scroll for it; without the property there is no limit
+                out["focusFollowsMouseMaxScroll"] = isNaN(maxScroll) ? 100 : Math.max(0, Math.round(maxScroll));
             }
         }
         const gestures = Kdl.find(nodes, "gestures");
-        // niri: `off` disables the corners; with none of the four named the top-left one is the default, and naming
-        // other corners without top-left leaves only those (the last gestures / hot-corners block wins, as in niri)
+        // niri: `off` disables the corners; naming other corners without top-left leaves only those
         for (const block of gestures) {
             const corners = Kdl.child(block, "hot-corners");
             if (corners !== undefined) {
@@ -1084,7 +1046,7 @@ namespace NiriImport {
             }
         }
         for (const block of Kdl.find(nodes, "animations")) {
-            // niri: `off` of any block turns the animations off, `on` turns them on again; the last slowdown wins
+            // niri: `off` of any block turns the animations off, `on` turns them on again
             if (Kdl.child(block, "off") !== undefined) {
                 out["animationsOff"] = true;
             }
@@ -1095,7 +1057,6 @@ namespace NiriImport {
             if (slowdown !== undefined && !isNaN(parseFloat(slowdown.args[0]))) {
                 out["animationsSlowdown"] = Math.max(0, parseFloat(slowdown.args[0]));
             }
-            // an animation node replaces the whole animation of the blocks before it
             for (const [name, key, fallback] of ANIMATIONS) {
                 const node = Kdl.child(block, name);
                 if (node !== undefined) {
@@ -1137,7 +1098,6 @@ namespace NiriImport {
         return out;
     }
 
-    // Kiri's own windowRules (a JSON list) get the niri rules in front, so nothing the user wrote is lost
     function mergeRules(niriRules: Record<string, any>[], existing: string|undefined): string {
         let base: any[] = [];
         try {
@@ -1151,7 +1111,6 @@ namespace NiriImport {
         return JSON.stringify([...niriRules, ...base]);
     }
 
-    // niri's animations: the setting of each is one text (src/lib/config/definition.ts, animWindowOpen and the others)
     const ANIMATIONS: [string, string, string][] = [
         ["window-open", "animWindowOpen", "ease-out-expo 150"],
         ["window-close", "animWindowClose", "ease-out-quad 150"],
@@ -1167,8 +1126,7 @@ namespace NiriImport {
         return String(x);
     }
 
-    // niri-config/src/animations.rs Animation::decode_node: `off`, a `spring`, or `duration-ms` and `curve` (the missing
-    // one of the two from the animation's default easing, or 250 ms / ease-out-cubic when the default is a spring)
+    // like niri's Animation::decode_node
     function animationText(node: Kdl.Node, fallback: string, path: string, warn: (msg: string) => void): string {
         if (Kdl.child(node, "custom-shader") !== undefined) {
             warn(`${path}/custom-shader: niri's custom shaders are GLSL for niri's renderer, not KWin's`);
@@ -1213,8 +1171,7 @@ namespace NiriImport {
         return [curveName, ms, ...bezier].join(" ");
     }
 
-    // What the importer reads, by path in the config (the blocks that hold options are looked into one level down).
-    // Everything else is reported as skipped, with the reason from SKIPPED_OPTIONS.
+    // what the importer reads, by path in the config
     const MAPPED_OPTIONS = new Set([
         "binds", "prefer-no-csd", "layout", "input", "gestures", "window-rule", "workspace",
         "layout/gaps", "layout/struts", "layout/center-focused-column", "layout/always-center-single-column",
@@ -1229,7 +1186,7 @@ namespace NiriImport {
         "window-rule/max-width", "window-rule/max-height", "window-rule/opacity", "window-rule/focus-ring", "window-rule/border",
         "window-rule/shadow", "window-rule/tab-indicator",
         "window-rule/draw-border-with-background", "window-rule/baba-is-float",
-        "window-rule/clip-to-geometry", // Kiri's effect clips every window that has a corner radius to its rounded corners
+        "window-rule/clip-to-geometry",
         "animations/off", "animations/on", "animations/slowdown", "animations/window-open", "animations/window-close",
         "animations/window-movement", "animations/window-resize", "animations/horizontal-view-movement",
         "animations/workspace-switch", "animations/overview-open-close",
@@ -1277,8 +1234,6 @@ namespace NiriImport {
         "window-rule/popups": "KWin draws popups itself",
     };
 
-    // the paths of the options in a config that the importer has to account for: the top-level nodes, and one level down
-    // in the blocks that hold options
     export function optionPaths(nodes: Kdl.Node[]): string[] {
         const paths: string[] = [];
         for (const node of nodes) {
@@ -1298,7 +1253,6 @@ namespace NiriImport {
         return MAPPED_OPTIONS.has(path);
     }
 
-    // why an option is not mapped, if the importer has a reason for it
     export function skippedOptionReason(path: string): string|undefined {
         return has(SKIPPED_OPTIONS, path) ? SKIPPED_OPTIONS[path] : undefined;
     }
@@ -1311,7 +1265,6 @@ namespace NiriImport {
         }
     }
 
-    // what niri's Mod stands for: input { mod-key "Alt" }, Super by default
     function modKey(nodes: Kdl.Node[], warn: (msg: string) => void): string {
         let mod = "Meta";
         for (const block of Kdl.find(nodes, "input")) {
@@ -1342,7 +1295,6 @@ namespace NiriImport {
         const settings = Object.assign(readSettings(nodes, warn), bound.steps);
         reportUnmapped(nodes, warn);
         if (bound.pointer !== undefined) {
-            // niri has only the binds of the config: the wheel binds Kiri has by default go when the config has none
             settings["pointerBinds"] = bound.pointer;
         }
         if (bound.slots["column"].length > 0) {
@@ -1351,7 +1303,7 @@ namespace NiriImport {
         if (bound.slots["window"].length > 0) {
             settings["windowHeightSet"] = bound.slots["window"].join(", ");
         }
-        for (const [key, value] of Object.entries(settings)) { // whatever number got through: finite and a sane size
+        for (const [key, value] of Object.entries(settings)) {
             if (typeof value === "number") {
                 if (isFinite(value)) {
                     settings[key] = Math.max(-MAX_PIXELS, Math.min(MAX_PIXELS, value));
@@ -1370,8 +1322,6 @@ namespace NiriImport {
         return { settings, shortcutKeys: bound.binds, skipped };
     }
 
-    // Applies the pasted niri config to a loaded config, on top of the other settings.
-    // Keys typed into Kiri's own key fields win over niri's binds.
     export function apply(config: Config) {
         if (!config.niriConfigEnabled || config.niriConfig.trim() === "") {
             return;

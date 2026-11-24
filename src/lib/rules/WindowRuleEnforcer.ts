@@ -1,6 +1,4 @@
-// What the dynamic matchers (is-floating, is-active, is-focused, ...) ask about a window. The ones after isFocused are
-// optional so that a context written for the first three still works: a missing answer is "no" (isActiveInColumn:
-// "yes", like niri's unmapped windows).
+// what the dynamic matchers (is-floating, is-active, is-focused, ...) ask about a window; a missing answer is "no"
 interface WindowRuleContext {
     isFloating(kwinClient: KwinClient): boolean;
     isActive(kwinClient: KwinClient): boolean;
@@ -10,11 +8,9 @@ interface WindowRuleContext {
     atStartup?(): boolean;
 }
 
-// The time Kiri was started; niri's at-startup matcher is true for the first 60 s of the compositor
 const kiriStartedAt = Date.now();
 const atStartupMs = 60000;
 
-// One match line of a rule, with the rule's exclude lines
 class RuleMatcher {
     private readonly matcher: ClientMatcher | null;
     private readonly appId: RegExp | null;
@@ -34,7 +30,6 @@ class RuleMatcher {
         this.excludes = excludes.map(exclude => new RuleMatcher(exclude, [], context));
     }
 
-    // whether any condition of this line or of its excludes depends on what the window or the layout is doing
     public isDynamic(): boolean {
         const match = this.match;
         return match.isFloating !== undefined || match.isActive !== undefined || match.isFocused !== undefined ||
@@ -50,8 +45,8 @@ class RuleMatcher {
         return this.matcher !== null || this.appId !== null || this.title !== null || this.excludes.some(exclude => exclude.usesText());
     }
 
-    // `opening`: the window is not mapped yet. niri evaluates the rules of a window that is being opened as if it were
-    // not focused, not active, not urgent and not floating, and active in its column.
+    // `opening`: niri evaluates the rules of a window that is being opened as if it were not focused, active, urgent or
+    // floating
     public matches(kwinClient: KwinClient, opening = false): boolean {
         const match = this.match;
         const context = this.context;
@@ -80,8 +75,7 @@ const noWindowRuleContext: WindowRuleContext = {
     isFocused: () => false,
 };
 
-// The rules of one window, all matching rules merged in order of appearance: for each property the last rule that
-// sets it wins (niri's ResolvedWindowRules). `style` merges field by field.
+// the rules of one window merged in order of appearance: the last rule that sets a property wins
 interface ResolvedRules {
     tile?: boolean;
     width?: string;
@@ -101,7 +95,6 @@ interface ResolvedRules {
     style: WindowDecorationRule;
 }
 
-// Properties that are simply replaced by a later rule
 const plainRuleKeys = [
     "tile", "width", "height", "fullscreen", "maximized", "maximizedToEdges", "focused", "workspace", "columnDisplay",
     "floatingPosition", "minWidth", "minHeight", "maxWidth", "maxHeight", "opacity",
@@ -128,7 +121,6 @@ class WindowRuleEnforcer {
         private readonly gapsInnerVertical = 0,
     ) {
         this.gapsInnerHorizontal = gapsInnerHorizontal;
-        // a rule with a broken regex (or no rule at all, like a null in the JSON) is dropped, the others still work
         this.entries = [];
         for (const rule of windowRules) {
             try {
@@ -164,12 +156,10 @@ class WindowRuleEnforcer {
         this.followCaption = WindowRuleEnforcer.createFollowCaptionRegex(this.entries.map(entry => entry.rule));
     }
 
-    // true when a rule matches on something that changes while a window lives (focus, floating state, urgency, ...)
     public hasDynamicRules() {
         return this.dynamic;
     }
 
-    // true when a rule has an at-startup matcher: the rules change 60 s after Kiri started
     public hasStartupRules() {
         return this.startup;
     }
@@ -178,7 +168,7 @@ class WindowRuleEnforcer {
         return Math.max(0, kiriStartedAt + atStartupMs - Date.now());
     }
 
-    // niri's ResolvedWindowRules::compute. `opening`: the window is being opened, see RuleMatcher.matches.
+    // niri's ResolvedWindowRules::compute
     public resolve(kwinClient: KwinClient, opening = false): ResolvedRules {
         const resolved: ResolvedRules = { style: {} };
         const out = resolved as any;
@@ -207,8 +197,8 @@ class WindowRuleEnforcer {
         return resolved;
     }
 
-    // niri's merge of a focus-ring, border, shadow or tab-indicator rule into the ones before it: a field replaces the same
-    // field, and for a state's paint a colour replaces a gradient and a gradient a colour
+    // niri's merge of a rule into the ones before it: a field replaces the same field, a colour replaces a gradient and
+    // the other way round
     private static mergeLook(base: any, part: any) {
         const merged = Object.assign({}, base);
         for (const key of Object.keys(part)) {
@@ -221,7 +211,6 @@ class WindowRuleEnforcer {
         return merged;
     }
 
-    // whether the window should open floating according to the rules alone: undefined when no rule says
     private preferTilingOf(resolved: ResolvedRules) {
         return resolved.tile === true;
     }
@@ -230,8 +219,7 @@ class WindowRuleEnforcer {
         return resolved.tile === false;
     }
 
-    // niri's compute_open_floating heuristic for a window the rules do not decide: a window with a fixed height
-    // (its minimum and maximum height are the same, with the rules' min-height and max-height applied) opens floating
+    // niri's compute_open_floating heuristic: a window with a fixed height opens floating
     public static hasFixedHeight(kwinClient: KwinClient, resolved: ResolvedRules) {
         const min = kwinClient.minSize;
         const max = kwinClient.maxSize;
@@ -246,11 +234,8 @@ class WindowRuleEnforcer {
         return minHeight > 0 && minHeight === maxHeight;
     }
 
-    // returns the width a new window's column should get, or null to keep the window's own width
-    // `profile`: the layout options of the desktop the window opens on (they may differ from the global ones)
     public getColumnWidth(kwinClient: KwinClient, tilingAreaWidth: number, resolved = this.resolve(kwinClient), profile?: LayoutProfile): number | null {
         if (resolved.width !== undefined) {
-            // an empty width (niri's `default-column-width {}`) lets the window pick its own
             const width = resolved.width === "" ? null : WindowRuleEnforcer.resolveSize(resolved.width, tilingAreaWidth, profile?.layout.gapsInnerHorizontal ?? this.gapsInnerHorizontal);
             return width;
         }
@@ -258,7 +243,6 @@ class WindowRuleEnforcer {
         return defaultWidth === null ? null : defaultWidth(tilingAreaWidth);
     }
 
-    // niri's default-window-height: the height a rule gives a new tiled window, null when none sets one
     public getWindowHeight(kwinClient: KwinClient, tilingAreaHeight: number, resolved = this.resolve(kwinClient), profile?: LayoutProfile): number | null {
         if (resolved.height === undefined || resolved.height === "") {
             return null;
@@ -266,8 +250,7 @@ class WindowRuleEnforcer {
         return WindowRuleEnforcer.resolveSize(resolved.height, tilingAreaHeight, profile?.layout.gapsInnerVertical ?? this.gapsInnerVertical);
     }
 
-    // Size of a new window that a float rule (niri's open-floating) matches, in pixels of the work area; a side that no
-    // rule sets is undefined. Null when no float rule matches, so the window is left alone.
+    // size of a new window that a float rule matches, in pixels of the work area; null when no float rule matches
     public getFloatingSize(kwinClient: KwinClient, area: QmlRect, resolved = this.resolve(kwinClient)): { width?: number, height?: number } | null {
         if (!this.preferFloatingOf(resolved)) {
             return null;
@@ -285,7 +268,6 @@ class WindowRuleEnforcer {
         return WindowRuleEnforcer.resolveSize(size, available, 0) ?? undefined;
     }
 
-    // niri's open-fullscreen; the last matching rule that has the property wins
     public shouldOpenFullScreen(kwinClient: KwinClient, resolved = this.resolve(kwinClient)): boolean {
         return resolved.fullscreen === true;
     }
@@ -312,7 +294,6 @@ class WindowRuleEnforcer {
         );
     }
 
-    // Why `shouldTile` / `canTileEver` refuse a window, for the log (empty when nothing does)
     public whyNotTiled(kwinClient: KwinClient, resolved = this.resolve(kwinClient)) {
         const reasons: string[] = [];
         if (!(kwinClient.moveable && kwinClient.resizeable) && !kwinClient.fullScreen) {
@@ -354,9 +335,8 @@ class WindowRuleEnforcer {
         return reasons.join(", ");
     }
 
-    // Re-evaluates the rules when the window's title, app id or urgency changes (niri recomputes a window's rules then,
-    // and when the focus, the active window of its column or its floating state change, which Kiri does after every
-    // action, see ClientManager.refreshRules). A float or tile rule that depends on the caption also moves the window.
+    // niri recomputes the rules when the title, app id or urgency changes; a rule that depends on the caption also moves
+    // the window
     public initClientSignalManager(world: World, kwinClient: KwinClient) {
         const follows = this.followCaption.test(kwinClient.resourceClass) || this.followCaption.test(kwinClient.resourceName);
         if (!follows && !this.text && !this.dynamic) {
@@ -368,10 +348,8 @@ class WindowRuleEnforcer {
         let lastShouldTile = enforcer.shouldTile(kwinClient);
         let lastRules = JSON.stringify(enforcer.resolve(kwinClient));
         const onChanged = () => {
-            // only a caption that changes what the rules say acts, and never over the user's own float/tile toggle
             const ruleResult = follows ? enforcer.shouldTile(kwinClient) : lastShouldTile;
             if (ruleResult === lastShouldTile) {
-                // titles change all the time: the layout is only touched when the rules say something else now
                 const rules = JSON.stringify(enforcer.resolve(kwinClient));
                 if (enforcer.dynamic || rules !== lastRules) {
                     lastRules = rules;

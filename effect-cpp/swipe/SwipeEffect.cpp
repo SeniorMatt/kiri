@@ -27,7 +27,8 @@ namespace KWin
 
 // niri: "Threshold copied from GNOME Shell."
 static constexpr double AxisLockDistance = 16.0;
-// kiri_decorations paints a parked full-screen X11 window (see its setParkedPositions) somewhere else than its real place and
+// kiri_decorations paints a parked full-screen X11 window (see its setParkedPositions) somewhere else than its real
+// place and
 // publishes the offset as window data; the swipe moves the window from where it is painted
 static constexpr int ParkedOffsetRole = 0x4B495250;
 static double paintedX(const EffectWindow *w)
@@ -121,7 +122,8 @@ void SwipeEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event)
     // niri reads dx_unaccelerated(). KWin passes exactly that on since Plasma 6.2 (backends/libinput GestureEvent::delta
     // uses libinput_event_gesture_get_dx_unaccelerated, "don't apply pointer acceleration to touchpad gestures"), and this
     // effect needs KWin 6.7.90 or newer: the delta is niri's own, whatever the pointer speed and profile are. Undoing an
-    // acceleration that was never applied made the view run at 0.4x to 4x the speed of niri's depending on the speed setting.
+    // acceleration that was never applied made the view run at 0.4x to 4x the speed of niri's depending on the speed
+    // setting.
     const double ux = event->delta.x();
     const double uy = event->delta.y();
     if (m_phase == Phase::Pending) {
@@ -144,7 +146,8 @@ void SwipeEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event)
             effects->addRepaintFull();
         }
     } else if (m_phase == Phase::Vertical && m_fingers == 4) {
-        // niri's overview gesture uses the delta as the touchpad reports it (uninverted_delta_y), not the natural-scrolling one
+        // niri's overview gesture uses the delta as the touchpad reports it (uninverted_delta_y), not the natural-
+        // scrolling one
         m_queue.append({event->time.count() / 1000.0, uy});
     }
 }
@@ -391,7 +394,8 @@ bool SwipeEffect::command(const QString &json)
             m_sEnd = shift();
         }
         qCDebug(KIRI_SWIPE) << "release" << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-        // niri's horizontal-view-movement (a spring 1.0 / 800 / 0.0001 by default), slowed down or off like niri's clock says
+        // niri's horizontal-view-movement (a spring 1.0 / 800 / 0.0001 by default), slowed down or off like niri's clock
+        // says
         const double scale = NiriAnim::config().timeScale();
         m_spring = NiriAnim::config().horizontalViewMovement.make(from, to, o.value(QStringLiteral("v")).toDouble(), scale > 0 ? 1.0 / scale : 1.0);
         if (scale <= 0) {

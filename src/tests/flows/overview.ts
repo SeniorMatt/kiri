@@ -121,7 +121,7 @@ tests.register("Overview: drop into a column, out of a column, and reorder", 1, 
     Assert.assert(b.getActualFrameGeometry().x < a.getActualFrameGeometry().x, { message: "b is first" });
 });
 
-tests.register("Overview: a focused window alone in its column can be dropped to the end, the front or another desktop", 1, () => {
+tests.register("Overview: a lone focused window can be dropped at the end, front or on another desktop", 1, () => {
     const config = getDefaultConfig();
     config.centerGridWhenFits = false;
     const { qtMock, workspaceMock, world } = init(config);
@@ -167,7 +167,7 @@ tests.register("Overview: a focused window alone in its column can be dropped to
     Assert.tiledClient(clientManager, a);
 });
 
-tests.register("Overview: a floating window dropped stays floating, where it was let go and on the desktop under the pointer", 1, () => {
+tests.register("Overview: a dropped floating window stays floating under the pointer", 1, () => {
     const config = getDefaultConfig();
     const { qtMock, workspaceMock, world } = init(config);
     overviewCalls.length = 0;
@@ -216,7 +216,7 @@ tests.register("Overview: a floating window dropped stays floating, where it was
     Assert.equal(a.getActualFrameGeometry().x, x);
 });
 
-tests.register("Overview: the drop index counts the column without the dragged window (the hint's index)", 1, () => {
+tests.register("Overview: the drop index counts the column without the dragged window", 1, () => {
     const config = getDefaultConfig();
     config.centerGridWhenFits = false;
     const { qtMock, workspaceMock, world } = init(config);

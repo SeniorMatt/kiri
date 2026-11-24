@@ -1,7 +1,4 @@
-// Toggling full-screen mode with the shortcut: KWin changes the frame of the window a moment before it sets the
-// flag, in either order. A layout pass in between must not hand the client another size (a client that is slow to
-// commit then shows it for a moment: the window bounces), and leaving full-screen mode gives back exactly the place
-// and the width the column had.
+// Toggling full-screen mode: a layout pass between the frame and the flag must not hand the client another size
 {
     function distinct(rects: MockQmlRect[]) {
         const result: MockQmlRect[] = [];

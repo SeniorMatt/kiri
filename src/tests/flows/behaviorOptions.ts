@@ -251,7 +251,7 @@ tests.register("niri's defaults: new windows are half as wide, columns aligned l
     Assert.equal(client1.getActualFrameGeometry().x, tilingArea.x + halfWidth + gapH);
 });
 
-tests.register("Shortcut keys from the settings or a pasted niri config apply without a new login", 1, () => {
+tests.register("Shortcut keys from settings or a niri config apply at once", 1, () => {
     const config = getDefaultConfig();
     const { world } = init(config);
     const settings: any = Object.assign({}, config);

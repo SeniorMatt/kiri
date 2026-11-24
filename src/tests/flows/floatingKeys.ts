@@ -342,7 +342,7 @@ tests.register("Floating window returns with its old size and position", 1, () =
     Assert.equalArrays(frame(), before);
 });
 
-tests.register("Floating-window keys leave the desktop (wallpaper) alone and act on the last focused tile", 1, () => {
+tests.register("Floating-window keys leave the desktop alone and act on the last focused tile", 1, () => {
     const { qtMock, workspaceMock } = init(getDefaultConfig());
     const [a] = workspaceMock.createClientsWithWidths(300);
     const desktop = new MockKwinClient(new MockQmlRect(0, 0, screen.width, screen.height));
@@ -363,7 +363,7 @@ tests.register("Floating-window keys leave the desktop (wallpaper) alone and act
 // niri (layout/workspace.rs remove_tile, floating.rs remove_tile_by_idx): the focused floating window closes: the
 // topmost floating window left gets the focus, without one the tiling layer's active window; never the window under
 // the pointer (what KWin picks with NextFocusPrefersMouse)
-tests.register("Closing a floating window gives the focus back to the tiling layer's active window, not the one under the pointer", 1, () => {
+tests.register("Closing a floating window focuses the tiling layer's active window", 1, () => {
     const { qtMock, workspaceMock } = init(getDefaultConfig());
     const [left, right, floating] = workspaceMock.createClients(3);
     workspaceMock.activeWindow = floating;
@@ -376,7 +376,7 @@ tests.register("Closing a floating window gives the focus back to the tiling lay
     Assert.equal(workspaceMock.activeWindow, right, { message: "the window that was focused before the floating one gets the focus back" });
 });
 
-tests.register("Closing a floating window: nothing picked by KWin, the tiling layer's active window gets the focus", 1, () => {
+tests.register("Closing a floating window with no KWin pick focuses the tiling layer", 1, () => {
     const { qtMock, workspaceMock } = init(getDefaultConfig());
     const [left, right, floating] = workspaceMock.createClients(3);
     workspaceMock.activeWindow = floating;

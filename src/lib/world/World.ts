@@ -11,7 +11,6 @@ class World {
     private readonly gestureEndDelayer: Delayer;
     private readonly gestureAnimationTimer: QmlTimer;
     private readonly minSizeTimer: QmlTimer;
-    // the desktop a swipe started on: it keeps the swipe if the current desktop changes while the fingers are down
     private gestureDesktop: Desktop|null = null;
     private gestureRawId: number|undefined = undefined;
     private gestureVisualId: number|undefined = undefined;
@@ -22,16 +21,14 @@ class World {
     private readonly closeRelayoutDelay: number;
     private arrangeHeld = false;
     public readonly dynamicDesktops: DynamicDesktops;
-    public readonly desktopAutoBackAndForth: boolean; // niri's workspace-auto-back-and-forth
-    public readonly desktopBindNames: string[]; // the names the "...-named-N" shortcuts mean
+    public readonly desktopAutoBackAndForth: boolean;
+    public readonly desktopBindNames: string[];
     private currentDesktop: KwinDesktop|null = null;
     private overview!: Overview;
-    public previousDesktop: KwinDesktop|null = null; // niri's focus-workspace-previous
+    public previousDesktop: KwinDesktop|null = null;
     private readonly shortcutKeys: Record<string, string[]>;
     private readonly layoutProfiles: LayoutProfiles;
 
-    // `keyBindings` and `layout` are given when Kiri reloads its settings: the shortcuts stay registered
-    // and the windows are put back into the columns they were in.
     private readonly viewAnimationConfig: { animHorizontalViewMovement: string, animationsOff: boolean, animationsSlowdown: number };
 
     constructor(config: Config, keyBindings: KeyBindings | null = null, layout: World.Layout | null = null) {
@@ -44,7 +41,7 @@ class World {
 
         this.layoutProfiles = new LayoutProfiles(config, layoutConfig => World.buildProfile(layoutConfig));
 
-        // niri's floating layer takes the presets relative to the work area, without the gaps of the grid
+        // niri's floating layer takes the presets relative to the work area
         let floatingPresetWidths = { getOrdered: (size: number): number[] => [] };
         let floatingPresetHeights = { getOrdered: (size: number): number[] => [] };
         try {
@@ -85,14 +82,13 @@ class World {
 
         this.gestureSettleDuration = config.gestureSettleDuration;
         this.gestureDesktopSwitch = config.gestureDesktopSwitch;
-        // a gesture that is cancelled by KWin because the swipe changed direction continues right after
         this.gestureEndDelayer = new Delayer(40, () => this.gestureRelease());
         this.gestureAnimationTimer = initQmlTimer()!;
         this.gestureAnimationTimer.interval = 16;
         this.gestureAnimationTimer.repeat = true;
         this.gestureAnimationTimer.triggered.connect(() => this.gestureAnimationStep());
 
-        // KWin has no signal for a client that changes its minimum size: look twice a second, lay out only on a change
+        // KWin has no signal for a change of a client's minimum size: look twice a second
         this.minSizeTimer = initQmlTimer()!;
         this.minSizeTimer.interval = 500;
         this.minSizeTimer.repeat = true;
@@ -130,7 +126,7 @@ class World {
             layout?.namedDesktops ?? [],
             (oldDesktop, newDesktop) => {
                 if (this.previousDesktop === oldDesktop) {
-                    this.previousDesktop = newDesktop; // niri keeps the id of the previous workspace when workspaces move
+                    this.previousDesktop = newDesktop;
                 }
             },
         );
@@ -147,8 +143,7 @@ class World {
         if (layout !== null) {
             this.restoreLayout(layout);
         }
-        // the window that has the focus keeps it (KWin does not say it again), and Kiri has to know it as the focused
-        // one: closing it passes the focus on, and the view keeps it in sight
+        // the focused window keeps the focus (KWin does not say it again)
         const active = Workspace.activeWindow;
         if (active !== null && this.clientManager.hasClient(active)) {
             this.clientManager.onClientFocused(active);
@@ -161,8 +156,6 @@ class World {
         this.clientManager.armStartupTimer();
     }
 
-    // everything the layout takes from the settings, for one set of settings: the global ones, or those with the layout {}
-    // of an output and of a desktop merged over them (LayoutProfiles)
     private static buildProfile(config: Config): LayoutProfile {
         let presetWidths = {
             cycle: (column: Column, forwards: boolean) => {},
@@ -266,7 +259,6 @@ class World {
             }
             kwinClients = kwinClients.slice().sort((a, b) => (order.get(String(a.internalId)) ?? Infinity) - (order.get(String(b.internalId)) ?? Infinity));
         }
-        // a window that is scrolled out of its output's view is parked, so the output it is on is not the one of its strip
         const outputs = new Map<string, string>();
         if (layout !== null) {
             for (const column of layout.columns) {
@@ -282,9 +274,7 @@ class World {
         }
     }
 
-    // remembers the whole state that is not in the windows themselves (columns and their order, heights, floating
-    // windows, the focus and the view of every desktop), to rebuild the world as it was. Windows are named by their
-    // internal id, so it survives a reload of the script too (see Kiri.saveState)
+    // the state that is not in the windows themselves, to rebuild the world after a reload
     public captureLayout(): World.Layout {
         const columns: World.Layout["columns"] = [];
         const views: World.Layout["views"] = [];
@@ -333,7 +323,7 @@ class World {
                 const kwinClient = byId.get(saved.id);
                 const window = kwinClient === undefined ? null : this.clientManager.findTiledWindow(kwinClient);
                 if (window === null || window.client.kwinClient !== kwinClient) {
-                    continue; // the window is no longer tiled
+                    continue;
                 }
                 windows.push(window);
                 savedWindows.push(saved);
@@ -341,7 +331,7 @@ class World {
                     window.client.windowedFullScreen = saved.windowedFullScreen === true;
                     window.client.setFullScreen(true);
                     if (window.client.windowedFullScreen) {
-                        window.onFullScreenChanged(true); // the window was added as a real full-screen one
+                        window.onFullScreenChanged(true);
                     }
                 } else if (saved.maximizedMode !== MaximizedMode.Unmaximized) {
                     window.client.setMaximize(
@@ -368,7 +358,6 @@ class World {
                 column.setHeightRatios(savedColumn.heightRatios);
             }
             if (column.getWindowCount() === savedWindows.length) {
-                // the heights as they were set: fixed ones (resized by hand or by a preset) and the weights of the auto ones
                 savedWindows.forEach((saved, i) => {
                     if (saved.fixedHeight !== undefined) {
                         windows[i].heightWeight = saved.heightWeight ?? 1;
@@ -382,7 +371,6 @@ class World {
         }
     }
 
-    // the focused window and the scroll position of every desktop
     private restoreViews(layout: World.Layout) {
         const byId = new Map<string, KwinClient>();
         for (const kwinClient of Workspace.windows) {
@@ -397,10 +385,10 @@ class World {
             const window = kwinClient === undefined ? null : this.clientManager.findTiledWindow(kwinClient);
             const active = Workspace.activeWindow === null ? null : this.clientManager.findTiledWindow(Workspace.activeWindow);
             if (window !== null && window.column.grid === desktop.grid && (active === null || active.column.grid !== desktop.grid)) {
-                window.column.onWindowFocused(window); // the window that has the focus now keeps it
+                window.column.onWindowFocused(window);
             }
             desktop.setScroll(view.scrollX, true);
-            // the focused window may be a tiled one that was not in the saved layout (it was floating, minimized): keep it in view
+            // the focused window may be a tiled one that was not in the saved layout: keep it in view
             const focusedColumn = desktop.grid.getLastFocusedColumn();
             if (focusedColumn !== null && focusedColumn.getWidth() <= desktop.tilingArea.width && !Range.contains(desktop.getCurrentVisibleRange(), focusedColumn)) {
                 desktop.fitColumnInView(focusedColumn);
@@ -408,7 +396,6 @@ class World {
         }
     }
 
-    // the output of the strip that the focused window is a tile of
     private getFocusedTileOutput() {
         const active = Workspace.activeWindow;
         if (active === null || this.clientManager === undefined) {
@@ -421,7 +408,9 @@ class World {
     private update() {
         this.dynamicDesktops.update();
         if (this.clientManager.hasDynamicRules() || this.layoutProfiles.hasLooks()) {
-            this.clientManager.refreshRules(); // is-focused, is-active, is-floating ... may have changed; a window may be on another desktop or output with another look
+            // is-focused, is-active, is-floating ... may have changed; a window may be on another desktop or output with
+            // another look
+            this.clientManager.refreshRules();
         }
         this.updateOutputBackgrounds();
         if (this.arrangeHeld) {
@@ -431,8 +420,7 @@ class World {
         if (currentDesktop !== undefined) {
             currentDesktop.arrange();
         }
-        // like niri, every workspace stays laid out: a window opened, closed or resized on another desktop, a
-        // screen or panel change, a config reload show up there before it is visited (arrange does nothing when clean)
+        // like niri, every desktop stays laid out
         for (const desktop of this.desktopManager.getAllDesktops()) {
             if (desktop !== currentDesktop) {
                 desktop.arrange();
@@ -441,8 +429,7 @@ class World {
         flushCursorWarp();
     }
 
-    // niri's layout.background-color of every output: the global one, the output's over it, and the layout {} of the desktop
-    // that is on the output now over that (LayoutProfiles). The effect paints it over the wallpaper of that output.
+    // niri's layout.background-color of every output, with the layout {} of the desktop on it merged over
     private updateOutputBackgrounds() {
         if (this.layoutProfiles.isEmpty()) {
             return;
@@ -457,8 +444,8 @@ class World {
         setOutputBackgrounds(colors);
     }
 
-    // niri's double resize-click on an edge: the column's full width is toggled (left or right edge), the window's
-    // height is reset to auto (top or bottom edge); the window takes the focus first
+    // niri's double resize-click on an edge: the column width toggles (left, right) or the window height resets (top,
+    // bottom)
     public doResizeEdgeDoubleClick(window: Window, horizontal: boolean, vertical: boolean) {
         this.do((clientManager, desktopManager) => {
             window.client.focus();
@@ -496,8 +483,7 @@ class World {
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
     ) {
         if (Workspace.activeWindow === null || Workspace.activeWindow.desktopWindow) {
-            // niri always has a focused window: when KWin left none (or gave it to the desktop), the actions work on the
-            // one that had it last
+            // niri always has a focused window: the actions work on the one that had it last
             const window = this.getCurrentGridWindowToFocus();
             if (window === null) {
                 return;
@@ -518,15 +504,12 @@ class World {
         return window as Window|null;
     }
 
-    // niri's two layers: when a floating window has the focus, the focus keys act on the floating layer only (`floating`
-    // runs, and if nothing is in that direction nothing happens), they never jump into the grid. Anything else
-    // runs `f` on the grid like `doIfTiledFocusedOrEnterGrid`. Only the floating/tiling switch keys cross the layers.
+    // niri's two layers: with a floating window focused the focus keys act on the floating layer only
     public doFocusLayered(
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
         floating: (clientManager: ClientManager, active: KwinClient) => void,
     ) {
         const active = Workspace.activeWindow;
-        // a full-screen window that is only floating because it could not be tiled (a game) can still be left
         if (active !== null && this.clientManager.isUserFloating(active) && !active.fullScreen) {
             this.do(clientManager => floating(clientManager, active));
             return;
@@ -542,8 +525,7 @@ class World {
         this.doFocusLayered(f, (cm, active) => cm.focusFloatingDirectional(active, dx, dy));
     }
 
-    // Like `doIfTiledFocused`, but when the focused window is not in the grid (floating, a full-screen game that
-    // was not tiled, nothing focused) the focus moves into the grid instead, so such a window can always be left
+    // like `doIfTiledFocused`, but the focus moves into the grid when no tiled window has it
     public doIfTiledFocusedOrEnterGrid(
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
     ) {
@@ -561,8 +543,7 @@ class World {
         this.doIfTiled(active, f);
     }
 
-    // Runs `f` for a tiled focused window; for a floating one `floating` runs instead (niri's floating layer
-    // answers the size keys too)
+    // runs `f` for a tiled focused window, `floating` for a floating one
     public doIfTiledFocusedOrFloating(
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
         floating: (clientManager: ClientManager, active: KwinClient) => void,
@@ -575,7 +556,7 @@ class World {
         this.doIfTiledFocused(f);
     }
 
-    // Runs `f` for a tiled focused window; a floating focused window is moved by (dx, dy) instead
+    // runs `f` for a tiled focused window; a floating one moves by (dx, dy)
     public doIfTiledFocusedOrMoveFloating(
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
         dx: number,
@@ -588,7 +569,6 @@ class World {
         this.doIfTiledFocused(f);
     }
 
-    // Called when a tiled window was closed: the others keep their place until the close animation is over
     public holdArrangeForClose() {
         if (this.closeRelayoutDelay === 0) {
             return;
@@ -597,7 +577,6 @@ class World {
         this.closeRelayoutDelayer.run();
     }
 
-    // A closed window may come back at once (see ClientManager.rememberClosed): nothing moves meanwhile
     public holdArrange() {
         this.arrangeHeld = true;
     }
@@ -606,7 +585,6 @@ class World {
         this.arrangeHeld = false;
     }
 
-    // a swipe is in progress or settling: niri's focus-follows-mouse does not switch windows then
     public isScrollBusy() {
         if (this.gestureAnimation !== null) {
             return true;
@@ -619,7 +597,6 @@ class World {
         return this.gestureDesktop !== null ? this.gestureDesktop : this.desktopManager.getCurrentDesktop();
     }
 
-    // a swipe that settles on a desktop which is not the current one any more ends there, a new swipe starts on the current one
     private endGestureOnOtherDesktop() {
         if (this.gestureDesktop !== null && this.gestureAnimation !== null && this.gestureDesktop !== this.desktopManager.getCurrentDesktop()) {
             const desktop = this.gestureDesktop;
@@ -643,8 +620,7 @@ class World {
         });
     }
 
-    // Raw swipe from the compiled effect kiri_swipe (the JSON of its poll()): the uncapped finger travel of a
-    // 3-finger horizontal swipe, with timestamps. KWin's own progress (capped at 200 units) is ignored then.
+    // raw swipe from kiri_swipe: the uncapped finger travel of a 3-finger horizontal swipe
     public gestureRaw(json: string) {
         let swipe: { id?: number, phase: string, end: boolean, ev: number[][], f?: number, d0?: number, ptr?: boolean };
         try {
@@ -653,7 +629,6 @@ class World {
             return;
         }
         if (swipe.f === 4) {
-            // 4 fingers: niri's overview gesture (vertical)
             if (overviewEffectLoaded()) {
                 if (swipe.phase === "v") {
                     this.overview.gestureUpdate(swipe.ev);
@@ -668,8 +643,7 @@ class World {
             this.gestureEndDelayer.stop();
             this.endGestureOnOtherDesktop();
             if (swipe.id !== this.gestureRawId) {
-                // the fingers came down again: a swipe never continues the position or the velocity of the one before
-                // it, not even when it lands while that one is still settling
+                // a swipe never continues the position or velocity of the one before it
                 this.gestureRawId = swipe.id;
                 this.cutGestureSettle();
             }
@@ -694,8 +668,7 @@ class World {
         }
     }
 
-    // A new swipe starts on the view where it is right now, as niri's does: the one before it ends there (it
-    // gets its focus change, the view stays where it is), and none of its state is carried over.
+    // a new swipe starts on the view where it is now, as niri's does
     private cutGestureSettle() {
         const desktop = this.gestureDesktop;
         if (desktop === null || !desktop.isGestureScrolling()) {
@@ -704,30 +677,25 @@ class World {
         const x = desktop.getScrollX();
         this.stopGestureAnimation();
         this.gestureAnimationDone();
-        // focusing the column the old swipe chose must not scroll the view away from the fingers
         this.do(() => desktop.setScroll(x, true));
     }
 
-    // niri's Mod+middle drag scrolls the view: kiri_swipe tells the script to start asking for the pointer's travel
     public startPointerViewScroll() {
         if (typeof qmlBase !== "undefined") {
             (qmlBase as any).startSwipePoll();
         }
     }
 
-    // niri's move grab: the other mouse button while a window is dragged toggles floating
     public toggleDragFloating() {
         this.do((clientManager, desktopManager) => clientManager.toggleDragFloating());
     }
 
-    // niri's toggle-overview: the compiled effect draws it, without the effect Plasma's own Overview opens
     public toggleOverview() {
         if (!this.overview.toggle()) {
             kglobalaccel.call("/component/kwin", "org.kde.kglobalaccel.Component", "invokeShortcut", ["s"], ["Overview"], () => {});
         }
     }
 
-    // niri's open-overview and close-overview
     public openOverview() {
         if (!this.overview.isOpen()) {
             this.toggleOverview();
@@ -748,7 +716,6 @@ class World {
         this.overview.poll(json);
     }
 
-    // `activated` means the fingers were lifted, `cancelled` may also be just a change of swipe direction
     public gestureScrollFinish(delayed: boolean) {
         if (delayed) {
             this.gestureEndDelayer.run();
@@ -770,7 +737,6 @@ class World {
             this.gestureDesktop = null;
             return;
         }
-        // a raw swipe (kiri_swipe) settles like niri: a spring from the release position with the release velocity
         const raw = desktop.isRawGesture() ? desktop.getRawRelease() : null;
         const from = desktop.getScrollX();
         const to = raw !== null ? raw.to : desktop.getGestureSettleTarget(Date.now());
@@ -786,10 +752,9 @@ class World {
             return;
         }
         if (visual && raw !== null) {
-            // the effect paints the settle at frame rate, from where the fingers left the view; the layout is already where it ends
             swipeCall("release", { from: from, to: to, v: raw.velocity });
             this.do(() => desktop.setScroll(to, true));
-            // niri moves the focus when the fingers are lifted, not when the settle ends
+            // niri moves the focus when the fingers are lifted
             this.gestureFocusTarget(desktop);
         }
         this.gestureAnimation = { from: from, to: to, start: Date.now(), spring: raw !== null ? niriViewAnimation(this.viewAnimationConfig, from, to, raw.velocity) : null, visual: visual };
@@ -806,7 +771,6 @@ class World {
         const spring = animation.spring;
         const t = spring !== null ? (Date.now() - animation.start) / 1000 / spring.duration : (Date.now() - animation.start) / this.gestureSettleDuration;
         const x = spring !== null ? spring.value((Date.now() - animation.start) / 1000) : animation.from + (animation.to - animation.from) * easeOutCubic(t);
-        // a raw swipe's target may be outside of what the clamper allows (niri's snaps do not ask it)
         if (animation.visual !== true) {
             this.do(() => desktop.setScroll(x, spring !== null));
         }
@@ -834,14 +798,12 @@ class World {
             const currentDesktop = this.getGestureDesktop();
             this.gestureDesktop = null;
             if (currentDesktop !== undefined) {
-                // an untiled focused window (a full-screen game) is left by the gesture as well; the focus does not
-                // follow a swipe on a desktop that is no longer the current one, that would switch back to it
+                // the focus does not follow a swipe on a desktop that is not the current one
                 currentDesktop.gestureScrollFinish(focusedWindow, Workspace.activeWindow !== null && focusedWindow === null, currentDesktop === desktopManager.getCurrentDesktop());
             }
         });
     }
 
-    // 3-finger vertical swipe: switch to the next (down) or previous (up) desktop
     public gestureSwitchDesktop(offset: number) {
         if (!this.gestureDesktopSwitch) {
             return;
@@ -852,7 +814,6 @@ class World {
         }
     }
 
-    // the shortcuts stay registered, for a new world to take over
     public releaseKeyBindings() {
         this.keyBindingsReleased = true;
         return this.keyBindings;
@@ -894,10 +855,9 @@ class World {
 }
 
 namespace World {
-    // plain data (windows are named by their internal id), so it can be stored as JSON
     export interface Layout {
         columns: {
-            output?: string; // the output of the strip
+            output?: string;
             windows: {
                 id: string;
                 fullScreen: boolean;
@@ -910,11 +870,11 @@ namespace World {
             heightRatios: number[];
             tabbed: boolean;
         }[];
-        floating: string[]; // windows the user floated that are floating now
-        manual: string[]; // windows the user floated or tiled by hand (rules leave them alone)
+        floating: string[];
+        manual: string[];
         floatingFrames: { id: string, x: number, y: number, width: number, height: number }[];
         views: { desktop: string, scrollX: number, focused: string | null }[];
-        namedDesktops?: string[]; // ids of the desktops that have a niri workspace name
-        previousDesktop?: string; // id of the desktop before the current one (focus-workspace-previous)
+        namedDesktops?: string[];
+        previousDesktop?: string;
     }
 }

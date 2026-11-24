@@ -1,6 +1,4 @@
-// KWin tells a script that a window is about to be maximized or restored before it is: an X11 window that is given a
-// geometry in that moment ends up with the wrong size after a restore (it stayed screen-sized and unmaximized). The
-// layout reacts when KWin is done.
+// An X11 window that is given a geometry while KWin maximizes or restores it ends up with the wrong size: the layout waits
 tests.register("Layout waits for KWin to finish maximizing and restoring a window", 10, () => {
     const config = getDefaultConfig();
     config.tileMaximized = true;

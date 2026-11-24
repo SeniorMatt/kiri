@@ -23,7 +23,8 @@ class SizeChange {
         return new SizeChange(percent, str.startsWith("+") || str.startsWith("-"), parseFloat(str));
     }
 
-    // a comma-separated list; an entry that does not parse stays in its place as undefined, so the numbering of the slots holds
+    // a comma-separated list; an entry that does not parse stays in its place as undefined, so the numbering of the
+    // slots holds
     public static parseList(text: string): (SizeChange|undefined)[] {
         return text.trim() === "" ? [] : text.split(",").map(entry => SizeChange.parse(entry));
     }

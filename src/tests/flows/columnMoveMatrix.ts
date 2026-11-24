@@ -1,6 +1,4 @@
-// Moving the focused column to another desktop (Meta+Shift+N): the moved column must land fully in view (centred when
-// the mode centres), and the columns left behind must be laid out as niri would: no stale scroll, a lone column centred
-// with always-center-single-column, everything that fits centred with "center when everything fits".
+// Moving the focused column to another desktop: it lands fully in view and the columns left behind are laid out as niri would
 namespace ColumnMoveMatrix {
     export interface Mode {
         name: string;
@@ -68,7 +66,7 @@ namespace ColumnMoveMatrix {
     }
 }
 
-tests.register("Column move to desktop: matrix of source and target columns, widths and centering modes", 1, () => {
+tests.register("Column move to desktop: matrix of columns, widths and centering", 1, () => {
     const widthsOf = (area: number) => [Math.round(area / 3), Math.round(area / 2), Math.round(area * 2 / 3)];
     let cases = 0;
     for (const mode of ColumnMoveMatrix.modes) {
@@ -192,10 +190,8 @@ tests.register("Column move to desktop: random histories keep the view right on 
     }
 });
 
-// The owner's report: moving columns with Meta+Shift+N sometimes left them off-centre. A column that is alone on its
-// desktop has no neighbour to take the focus, so its window stays the active one; KWin then does not announce the
-// activation that follows the move, and the target desktop never scrolled to the column.
-tests.register("Column move to desktop: a lone column is scrolled to on the target when KWin does not announce the focus again", 1, () => {
+// A column alone on its desktop keeps the focus, so KWin does not announce the activation after the move.
+tests.register("Column move to desktop: a lone column is scrolled to", 1, () => {
     for (const alwaysCenter of [false, true]) {
         const config = getDefaultConfig();
         config.alwaysCenterSingleColumn = alwaysCenter;
@@ -229,7 +225,7 @@ tests.register("Column move to desktop: a lone column is scrolled to on the targ
     }
 });
 
-tests.register("Column move to desktop with focus=false into an empty desktop: the lone column is centred", 1, () => {
+tests.register("Column move to desktop with focus=false: the lone column is centred", 1, () => {
     const config = getDefaultConfig();
     config.alwaysCenterSingleColumn = true;
     const { qtMock, workspaceMock } = init(config);

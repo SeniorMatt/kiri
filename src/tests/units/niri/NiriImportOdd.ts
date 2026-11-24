@@ -1,5 +1,4 @@
-// The importer reads whatever the user pastes: it must never throw, and what it returns must be usable. Odd configs,
-// and seeded mutations (cut, doubled, shuffled, bytes swapped) of niri's default config and of the file named in NIRI_FILE.
+// the importer never throws on odd configs or seeded mutations of niri's default config
 tests.register("NiriImport odd configs", 1, () => {
     const fs = require("fs");
     const odd = [

@@ -1,4 +1,5 @@
-// niri's window heights: auto windows share what the fixed one leaves, other windows keep their height when one comes or goes
+// niri's window heights: auto windows share what the fixed one leaves, other windows keep their height when one comes or
+// goes
 tests.register("Window heights (niri auto and fixed)", 10, () => {
     const config = getDefaultConfig();
     config.presetHeights = "25%, 50%, 75%";

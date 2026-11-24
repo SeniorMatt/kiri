@@ -167,7 +167,7 @@ tests.register("Window rules merge in order: the last rule that sets a property 
     Assert.equal(new WindowRuleEnforcer([{ appId: "x", width: "10%" }], true, "50%").getColumnWidth(ruleClient("y"), 1000), 500);
 });
 
-tests.register("Window rule matchers: is-active-in-column, is-urgent, at-startup, is-window-cast-target, opening", 1, () => {
+tests.register("Window rule matchers: is-active-in-column, is-urgent, at-startup", 1, () => {
     const state = { activeInColumn: true, urgent: false, startup: true, active: false };
     const context = {
         isFloating: () => false,

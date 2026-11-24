@@ -148,7 +148,7 @@
         }
     });
 
-    tests.register("Multi-monitor: an output that is unplugged hands its columns to the other and gets them back", 5, () => {
+    tests.register("Multi-monitor: an unplugged output hands its columns over and gets them back", 5, () => {
         const { workspaceMock } = setup();
         const [a] = workspaceMock.createClientsWithWidths(200);
         const c = openOnRight(workspaceMock, 200);

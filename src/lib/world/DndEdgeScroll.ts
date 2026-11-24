@@ -1,7 +1,5 @@
-// niri's dnd-edge-view-scroll (scrolling.rs / workspace.rs dnd_scroll_gesture_scroll): while a window is dragged, the
-// pointer within `trigger-width` of the left or right edge of the working area scrolls the columns; the speed grows
-// from 0 at the edge of the zone to `max-speed` at the screen edge, and nothing moves until the pointer has stayed in
-// the zone for `delay-ms`.
+// niri's dnd-edge-view-scroll: while a window is dragged, the pointer within `trigger-width` of the left or right edge
+// scrolls the columns, faster towards the screen edge, after it has stayed in the zone for `delay-ms`
 class DndEdgeScroll {
     private static readonly INTERVAL_MS = 16;
 

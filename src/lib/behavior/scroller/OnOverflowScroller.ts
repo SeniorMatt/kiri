@@ -1,5 +1,5 @@
-// niri's center-focused-column "on-overflow" (scrolling.rs compute_new_view_offset_for_column): a newly focused column is
-// centered only if it doesn't fit on the screen together with its neighbour on the side the focus came from
+// niri's center-focused-column "on-overflow": a newly focused column is centered only if it doesn't fit
+// on the screen together with its neighbour on the side the focus came from
 class OnOverflowScroller {
     public readonly alwaysScroll = true;
 

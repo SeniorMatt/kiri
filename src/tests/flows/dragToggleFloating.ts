@@ -1,4 +1,5 @@
-// niri's move grab: the other mouse button toggles floating while a window is dragged (input/move_grab.rs on_toggle_floating)
+// niri's move grab: the other mouse button toggles floating while a window is dragged (input/move_grab.rs
+// on_toggle_floating)
 
 function dragToggleConfig() {
     const config = getDefaultConfig();
@@ -45,7 +46,7 @@ tests.register("Drag toggle: before the 256 px the window leaves the grid at onc
     Assert.tiledClient(clientManager, b);
 });
 
-tests.register("Drag toggle: a floating window dragged and toggled is dropped into the grid (niri)", 10, () => {
+tests.register("Drag toggle: a floating window is dropped into the grid", 10, () => {
     const config = dragToggleConfig();
     const { qtMock, workspaceMock, world } = init(config);
     const clientManager = getClientManager(world);

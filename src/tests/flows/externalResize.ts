@@ -68,7 +68,7 @@ tests.register("A rate limited external resize gets one relayout afterwards", 1,
     Assert.equal(tiled.width, 100);
 });
 
-tests.register("Windows that KWin pulls back to the screen edge are put back at once, however many", 1, () => {
+tests.register("Windows that KWin pulls back to the screen edge are put back", 1, () => {
     const { workspaceMock } = init(getDefaultConfig());
     const clients = workspaceMock.createClientsWithFrames(...[0, 1, 2, 3, 4, 5, 6, 7].map(() => new MockQmlRect(10, 10, 100, 200)));
     const slots = clients.map(client => client.getActualFrameGeometry());
@@ -87,7 +87,7 @@ tests.register("Windows that KWin pulls back to the screen edge are put back at 
     });
 });
 
-tests.register("A window that snaps to its own height is not pulled in from beyond the right edge", 1, () => {
+tests.register("A window that snaps to its height is not pulled in from the right edge", 1, () => {
     const config = getDefaultConfig();
     const { qtMock, workspaceMock } = init(config);
     // KWin keeps 100 px of a window on the screen when the window commits an answer to a configure, and a CSD
@@ -138,7 +138,7 @@ tests.register("A window that snaps to its own height is not asked for the same 
 
 // A game that is maximized and answers the size it is given with another one (SDL clients choose their own size) is not
 // asked for the same size again and again: the layout passes of a focus change must not resize it each time
-tests.register("A maximized window that snaps to its own height is not asked for the same size again", 1, () => {
+tests.register("A maximized window that snaps to its height is not asked again", 1, () => {
     const config = getDefaultConfig();
     const { qtMock, workspaceMock } = init(config);
     const [first, game] = workspaceMock.createClientsWithWidths(300, 300);

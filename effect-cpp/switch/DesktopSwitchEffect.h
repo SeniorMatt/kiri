@@ -76,8 +76,7 @@ public:
     void windowDeleted(EffectWindow *w);
     void finishedSwitching();
     QPointF visualPosition() const;
-    // niri's workspace switch swipe: follow the fingers to a (fractional) row of the desktop grid, then
-    // spring to a row with the release velocity
+    // niri's workspace switch swipe: follow the fingers, then spring to a row with the release velocity
     void niriGesture(double row);
     void startNiriAnimation(double fromRow, int toRow, double velocity);
 
@@ -89,7 +88,7 @@ private:
     QPointF moveInsideDesktopGrid(QPointF p);
     QPointF constrainToDrawableRange(QPointF p);
     QPointF forcePositivePosition(QPointF p) const;
-    void optimizePath(); // Find the best path to target desktop
+    void optimizePath();
 
     void startAnimation(const QPointF &oldPos, VirtualDesktop *current, EffectWindow *movingWindow = nullptr);
     void prepareSwitching();
@@ -105,17 +104,15 @@ private:
     SpringMotion m_motionX;
     SpringMotion m_motionY;
 
-    // When the desktop isn't desktopChanging(), these two variables are used to control the animation path.
-    // They use desktops as a unit.
+    // used when the desktop isn't desktopChanging(); desktops as a unit
     QPointF m_startPos;
     QPointF m_endPos;
 
     QPointF m_gesturePos;
     NiriAnim::Anim m_niriSpring;
     bool m_niriAnim = false;
-    double m_niriElapsed = 0.0; // seconds
+    double m_niriElapsed = 0.0;
     double m_niriX = 0.0;
-    // where the desktops were on screen relative to the gesture start desktop when the fingers came down
     QPointF m_gestureBase;
 
     EffectWindow *m_movingWindow = nullptr;
@@ -165,15 +162,11 @@ public:
 
     static bool supported();
 
-    // niri's three-finger vertical swipe, from the raw touchpad events: the desktops follow the fingers 1:1
-    // (300 units per desktop, a rubber band past the first and last one), and on release spring to the
-    // desktop niri would pick from the projected velocity. KWin's own gesture (offset capped at its
-    // threshold, always the next desktop or none) is ignored for these swipes.
+    // niri's three-finger vertical swipe from the raw touchpad events: 300 units per desktop, a rubber band at the ends, a spring on release
     void swipeGestureBegin(PointerSwipeGestureBeginEvent *event) override;
     void swipeGestureUpdate(PointerSwipeGestureUpdateEvent *event) override;
     void swipeGestureEnd(PointerSwipeGestureEndEvent *event) override;
     void swipeGestureCancelled(PointerSwipeGestureCancelEvent *event) override;
-    // niri's Mod+middle drag: a vertical one drags the desktops with the pointer (a desktop is one screen height of travel)
     void pointerButton(PointerButtonEvent *event) override;
     void pointerMotion(PointerMotionEvent *event) override;
 
@@ -182,10 +175,7 @@ public:
     bool slideBackground() const;
 
 public Q_SLOTS:
-    // Debug interface (nested KWin has no touchpad): drive the gesture code path by hand.
-    // debugGesture feeds the same signal Plasma emits while three fingers swipe, offset in desktops
-    // (positive y = fingers up = next desktop), debugRelease lifts the fingers without a switch,
-    // debugPosition returns the on-screen desktop position (x, y in desktops) or "idle".
+    // debug interface (nested KWin has no touchpad): debugGesture, debugRelease and debugPosition drive the gesture by hand
     Q_SCRIPTABLE void debugGesture(double x, double y);
     Q_SCRIPTABLE void debugRelease();
     Q_SCRIPTABLE QString debugPosition();
@@ -213,8 +203,8 @@ private:
     bool m_swipeNatural = false;
     NiriSwipe::WorkspaceGesture::Release m_swipeRelease{};
     bool m_swipeReleasePending = false;
-    KConfigWatcher::Ptr m_animWatch; // niri's `animations` block (kwinrc [Script-kiri])
-    bool m_swipePointer = false; // the swipe is a Mod+middle drag, not fingers
+    KConfigWatcher::Ptr m_animWatch;
+    bool m_swipePointer = false;
 
 private:
     int m_hGap;

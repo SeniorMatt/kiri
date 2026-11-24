@@ -1,8 +1,5 @@
-// Descriptions are what Plasma's Shortcuts page shows, sorted alphabetically, and they also make the pages in Kiri's own
-// settings (tools/gen_config_ui.py): write "Group: what it does", with a group that already exists when one fits (Focus,
-// Move, Column, Width, Height, Window, Scroll, Desktop, Screen, Overview), niri's action wording and a lower-case rest,
-// like "Focus: column left", "Desktop: move column to 3", "Width: next preset". The `name` (the kglobalaccel id) must
-// never change, users' keys are stored under it.
+// descriptions are shown in Plasma's Shortcuts page and make Kiri's settings pages: "Group: what it does"; the `name`
+// must never change
 function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
     return [
         {
@@ -12,13 +9,11 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => world.do(actions.windowToggleFloating),
         },
         {
-            // niri's move grab: the other mouse button toggles floating while a window is dragged (kiri_decorations sends it)
             name: "window-drag-toggle-floating",
             description: "Kiri internal: toggle floating while dragging (don't bind)",
             action: () => world.toggleDragFloating(),
         },
         {
-            // niri's Mod+middle drag (kiri_swipe sends it when the drag goes horizontal; the script then asks for the travel)
             name: "view-scroll-pointer",
             description: "Kiri internal: pointer drag of the view (don't bind)",
             action: () => world.startPointerViewScroll(),
@@ -607,7 +602,6 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         {
             name: "column-move-to-monitor-up",
             description: "Screen: move column up",
-            // niri also binds Mod+Shift+Ctrl+K here, which is the kiri-mode switch
             defaultKeys: ["Meta+Ctrl+Shift+Up"],
             action: () => world.doIfTiledFocused(actions.columnMoveToMonitor.partial("up")),
         },
@@ -778,7 +772,6 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             action: () => {
                 const window = Workspace.activeWindow;
                 if (window !== null && window.fullScreenable) {
-                    // a windowed full-screen window (niri's toggle-windowed-fullscreen) becomes full-screen for real
                     let wasWindowed = false;
                     world.doIfTiled(window, (cm, dm, tiled) => {
                         wasWindowed = tiled.client.windowedFullScreen && window.fullScreen;
@@ -847,8 +840,7 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
     ];
 }
 
-// niri's set-window-fullscreen and unset-window-fullscreen. A windowed full-screen window becomes full-screen for
-// real on set; on unset, windowed full-screen ends (niri: request_windowed_fullscreen(false)).
+// niri's set-window-fullscreen and unset-window-fullscreen
 function setFullScreen(world: World, fullScreen: boolean) {
     const window = Workspace.activeWindow;
     if (window === null || !window.fullScreenable) {
@@ -868,7 +860,7 @@ function setFullScreen(world: World, fullScreen: boolean) {
     }
 }
 
-// niri's set-windowed-fullscreen and unset-windowed-fullscreen: the application thinks it is full-screen, the tile stays
+// niri's set-windowed-fullscreen and unset-windowed-fullscreen
 function setWindowedFullScreen(world: World, windowed: boolean) {
     world.doIfTiledFocused((cm, dm, window) => {
         if ((window.client.windowedFullScreen && window.client.kwinClient.fullScreen) !== windowed) {
@@ -895,8 +887,7 @@ function switchToDesktop(index: number) {
     }
 }
 
-// niri's focus-workspace N and focus-workspace "name": with workspace-auto-back-and-forth, asking for the desktop that
-// is shown goes to the previous one (monitor.rs switch_workspace_auto_back_and_forth)
+// like niri's workspace-auto-back-and-forth, asking for the desktop that is shown goes to the previous one
 function focusDesktop(world: World, index: number) {
     const desktop = Workspace.desktops[index];
     if (desktop === undefined) {
@@ -909,7 +900,6 @@ function focusDesktop(world: World, index: number) {
     }
 }
 
-// the desktop a "...-named-N" shortcut means: the Nth name of the niri binds
 function boundDesktopIndex(world: World, slot: number) {
     const name = world.desktopBindNames[slot];
     const desktop = name === undefined ? undefined : world.dynamicDesktops.findByName(name);

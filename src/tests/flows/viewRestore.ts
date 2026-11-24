@@ -1,6 +1,4 @@
-// niri's view_offset_to_restore: when the focused column goes full-screen or maximized, the view offset it had is
-// kept, and when it is back to its normal size the view returns to it, instead of being worked out again. Nothing is
-// restored when the column moved, or when the focus went elsewhere in between.
+// niri's view_offset_to_restore: the view offset is kept while the column is full-screen or maximized
 {
     function setup(modify: (config: Config) => void = () => {}) {
         const config = getDefaultConfig();

@@ -102,7 +102,7 @@ tests.register("Decorations: tab indicator placed within the column", 10, () => 
     Assert.equal(lone.getActualFrameGeometry().height, tilingArea.height);
 });
 
-tests.register("Decorations: niri config import (shadow, gradients, tab indicator, insert hint, backdrops)", 5, () => {
+tests.register("Decorations: niri config import", 5, () => {
     const result = NiriImport.parse(`
         layout {
             focus-ring {

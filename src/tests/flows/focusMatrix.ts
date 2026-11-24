@@ -1,7 +1,4 @@
-// "The focused window stays focused, and in sight, whatever you do with it and whatever settings are on."
-// Every action runs on the focused window under a cross product of the settings that touch focus; afterwards the
-// window must still be the active one, Kiri's own idea of the focus (last focused client and column) must agree, and
-// the window must be where the user can see it. Failures are collected per action and setting, so one run lists them all.
+// Every action runs on the focused window under a cross product of the focus settings; it must stay focused and in sight
 {
     interface Variant {
         scroll: "lazy" | "centered" | "grouped" | "overflow";
@@ -206,7 +203,8 @@
         ctx.qtMock.fireShortcut(name);
     }
 
-    // a mouse drag with the pointer moving: the pointer events reach focus follows mouse, which ignores them while a button is held
+    // a mouse drag with the pointer moving: the pointer events reach focus follows mouse, which ignores them while a
+    // button is held
     function drag(ctx: Ctx, window: MockKwinClient, dx: number, dy: number, steps: number) {
         const wsm = ctx.workspaceMock;
         const originalQmlBase = qmlBase;
@@ -410,7 +408,8 @@
         check(ctx, "tab: display tabbed", [{ focus: ctx.w }]);
         press(ctx, "column-move-right");
         check(ctx, "tab: column move right", [{ focus: ctx.w }]);
-        press(ctx, "window-consume-or-expel-right"); // (expel-from-column takes the bottom window out and, like niri, the focus goes to the one above)
+        // (expel-from-column takes the bottom window out and, like niri, the focus goes to the one above)
+        press(ctx, "window-consume-or-expel-right");
         return { focus: ctx.w };
     });
 
@@ -561,7 +560,8 @@
         return { focus: ctx.w };
     });
 
-    // ---- the pointer: windows moving under a resting pointer must not take the focus --------------------------------------
+    // ---- the pointer: windows moving under a resting pointer must not take the focus
+    // --------------------------------------
 
     register("pointer rests while the grid moves under it", ctx => {
         for (const key of ["window-move-right", "window-move-left", "column-width-increase", "window-toggle-floating", "window-toggle-floating"]) {
@@ -572,7 +572,8 @@
         return { focus: ctx.w };
     });
 
-    // ---- the runner --------------------------------------------------------------------------------------------------------
+    // ---- the runner
+    // --------------------------------------------------------------------------------------------------------
 
     tests.register("Focus stays on the focused window through every action and setting", 1, () => {
         const variants = makeVariants();
@@ -608,7 +609,7 @@
     // The focus ring and the borders (package/contents/ui/Ring.qml and the kiri_decorations effect) are hidden while
     // the window's frame covers its whole output, like niri's full-screen and maximize-window-to-edges, and are back
     // when it shrinks. Both go by the frame geometry, which has to be exact in every state, with and without title bars.
-    tests.register("Ring rule: maximized and full-screen frames cover the screen, windowed ones do not", 5, () => {
+    tests.register("Ring rule: maximized and full-screen frames cover the screen", 5, () => {
         const covers = (client: MockKwinClient) => {
             const frame = client.getActualFrameGeometry();
             return frame.width >= screen.width - 0.5 && frame.height >= screen.height - 0.5;
@@ -633,7 +634,8 @@
                     w.fullScreen = false;
                     Assert.assert(!covers(w), { message: "windowed again " + message });
                     Assert.assert(before.width === w.getActualFrameGeometry().width && before.height === w.getActualFrameGeometry().height, { message: "same size again " + message });
-                    // the title bar going away and coming back with the floating toggle moves neither the focus nor the window out of its slot
+                    // the title bar going away and coming back with the floating toggle moves neither the focus nor the
+                    // window out of its slot
                     press(ctx, "window-toggle-floating");
                     Assert.equal(Workspace.activeWindow, w, { message: message });
                     press(ctx, "window-toggle-floating");

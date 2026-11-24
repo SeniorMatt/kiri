@@ -409,7 +409,8 @@ const configDef = [
     },
     {
         // the wheel and mouse button binds of the compiled effect, one per line (";" works too, older configs have it):
-        // "Meta+WheelScrollDown=desktop-next@150", each "<modifiers>+<trigger>=<Kiri action>[@<cooldown ms>]" like niri's binds (the default is niri's default wheel binds)
+        // "Meta+WheelScrollDown=desktop-next@150", each "<modifiers>+<trigger>=<Kiri action>[@<cooldown ms>]" like
+        // niri's binds (the default is niri's default wheel binds)
         name: "pointerBinds",
         type: "String",
         default: [
@@ -458,7 +459,8 @@ const configDef = [
         default: 0,
     },
     // niri's `animations` block. Every animation is one text: "off", "spring <damping-ratio> <stiffness> <epsilon>",
-    // "<linear|ease-out-quad|ease-out-cubic|ease-out-expo> <duration-ms>" or "cubic-bezier <duration-ms> <x1> <y1> <x2> <y2>".
+    // "<linear|ease-out-quad|ease-out-cubic|ease-out-expo> <duration-ms>" or "cubic-bezier <duration-ms> <x1> <y1> <x2>
+    // <y2>".
     // The compiled effects read them from kwinrc ([Script-kiri]); defaults are niri's.
     {
         name: "animationsOff",
@@ -718,7 +720,9 @@ const configDef = [
     {
         name: "outputOverrides",
         type: "String",
-        default: "", // niri's `output "name" { layout {} backdrop-color hot-corners }`: a JSON object, the output's name -> { layout, backdropColor, hotCorners }
+        // niri's `output "name" { layout {} backdrop-color hot-corners }`: a JSON object, the output's name -> { layout,
+        // backdropColor, hotCorners }
+        default: "",
     },
     {
         name: "desktopBindNames",

@@ -32,7 +32,7 @@ const shellKinds: [string, object][] = [
     ["org.kde.plasmashell", { normalWindow: false, dock: true }],
 ];
 
-tests.register("Shell windows: opening KRunner or a popup takes the focus without moving the pointer", 1, () => {
+tests.register("Shell windows: KRunner or a popup takes the focus without moving the pointer", 1, () => {
     for (const [resourceClass, props] of shellKinds) {
         const { workspaceMock, a, b, inside } = shellSetup();
         const pointer = inside(b);
@@ -49,7 +49,7 @@ tests.register("Shell windows: opening KRunner or a popup takes the focus withou
     }
 });
 
-tests.register("Shell windows: closing KRunner gives the focus back to the previous window, not the hovered one, without a warp", 1, () => {
+tests.register("Shell windows: closing KRunner gives the focus back without a warp", 1, () => {
     for (const ffm of [false, true]) {
         for (const [resourceClass, props] of shellKinds) {
             const { workspaceMock, a, b, inside } = shellSetup(ffm);
@@ -79,7 +79,7 @@ tests.register("Shell windows: closing KRunner gives the focus back to the previ
     }
 });
 
-tests.register("Shell windows: closing KRunner with the pointer over nothing gives the focus back too", 1, () => {
+tests.register("Shell windows: closing KRunner over nothing gives the focus back", 1, () => {
     for (const [resourceClass, props] of shellKinds) {
         const { workspaceMock, a, b, c } = shellSetup();
         workspaceMock.activeWindow = b;

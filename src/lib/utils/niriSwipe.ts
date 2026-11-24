@@ -1,18 +1,15 @@
-// niri's touchpad view gesture, as pure functions: the release spring (src/animation/spring.rs) and the choice of
-// where the view comes to rest (src/layout/scrolling.rs view_offset_gesture_end). Positions are niri's: the x of
-// the view's left edge in the strip of columns, where a column at screen x = p has view position col_x - p.
+// like niri's touchpad view gesture: the release spring and the choice of where the view comes to rest
 
-// critically damped or not: niri's closed-form damped spring, value only depends on the time since the start
 class NiriSpring implements NiriAnimation {
     private readonly damping: number;
     private readonly stiffness: number;
     private readonly epsilon: number;
-    public readonly duration: number; // seconds until at rest
+    public readonly duration: number;
 
     constructor(
         private readonly from: number,
         private readonly to: number,
-        private readonly velocity: number, // per second
+        private readonly velocity: number,
         dampingRatio: number,
         stiffness: number,
         epsilon: number,
@@ -91,7 +88,7 @@ interface NiriAnimation {
     value(t: number): number;
 }
 
-// niri's easing curves (niri-config Curve, src/animation/{mod,bezier}.rs)
+// like niri's easing curves
 function niriCurve(name: string, points: number[]): (x: number) => number {
     const point = (t: number, a: number, b: number) => {
         const omt = 1 - t;
@@ -148,10 +145,8 @@ class NiriEasing implements NiriAnimation {
     }
 }
 
-// the animation of one setting text ("off", "spring 1 800 0.0001", "ease-out-expo 150", "cubic-bezier 150 0.05 0.7 0.1 1";
-// src/lib/config/definition.ts, animWindowOpen and the others). `timeFactor` stretches time like niri's slowdown does:
-// a spring gets 1 / factor^2 of its stiffness and the velocity shrinks with it, an easing lasts factor times as long.
-// Text that is not understood leaves `fallback`.
+// the animation of one setting text ("off", "spring 1 800 0.0001", "ease-out-expo 150"); `timeFactor` stretches time
+// like niri's slowdown; text that is not understood leaves `fallback`
 function niriAnimation(text: string, fallback: string, from: number, to: number, velocity: number, timeFactor = 1): NiriAnimation {
     const parse = (value: string) => {
         const words = value.trim().split(/\s+/);
@@ -193,16 +188,16 @@ namespace NiriSnap {
     export interface Column { x: number, width: number }
     export interface Input {
         columns: Column[];
-        viewWidth: number;       // niri's working area width
+        viewWidth: number;
         gaps: number;
         center: "never" | "always" | "on-overflow";
-        currentView: number;     // view position at the release
-        targetView: number;      // view position after the release velocity decelerated
+        currentView: number;
+        targetView: number;
     }
     export interface Result {
-        column: number;          // the column that becomes active
-        view: number;            // where the view comes to rest
-        retargeted: boolean;     // niri's animate_view_offset_to_column moved the target and dropped the velocity
+        column: number;
+        view: number;
+        retargeted: boolean;
     }
 
     function padding(input: Input, width: number) {
@@ -295,8 +290,7 @@ namespace NiriSnap {
                 }
             }
         }
-        // niri then calls animate_view_offset_to_column for the new column; if the target does not show it
-        // fully (a pixel off or more), the animation starts over towards that, without the velocity
+        // like niri, the animation starts over towards a target that does not show the column fully, without the velocity
         const c = columns[column];
         const fitted = centering && w > c.width ? c.x - (w - c.width) / 2 : fit(input, target.view, c.x, c.width);
         if (Math.abs(fitted - target.view) >= 1) {

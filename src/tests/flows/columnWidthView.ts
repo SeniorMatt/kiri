@@ -58,7 +58,7 @@ tests.register("Width change of a centered column keeps it centered", 2, () => {
     Assert.between(Math.abs((fb.x - tilingArea.x) - (tilingArea.x + tilingArea.width - rectRight(fb))), 0, 1, { message: "B stays centered" });
 });
 
-tests.register("A column that grows past the screen is left aligned, one that overflows a little scrolls the shortest way", 4, () => {
+tests.register("Column width: left aligned past the screen, else the shortest way", 4, () => {
     {
         const { qtMock, b } = widthViewSetup();
         qtMock.fireShortcut("column-width-maximize");

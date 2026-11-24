@@ -14,7 +14,7 @@ odd = ["", " ", "{", "}", "a {", "a }", "\"unterminated", "#\"raw", "/*", "/-", 
        "window-rule { match app-id=\"(\" ; open-floating true }", "window-rule { }", "window-rule { match; exclude; geometry-corner-radius -1 }",
        "window-rule { geometry-corner-radius 1e99 }", "output \"X\" { scale 0 mode \"0x0@0\" }", "animations { off slowdown 0 }",
        "input { touchpad { accel-speed 1e999 } keyboard { repeat-delay -1 repeat-rate 0 xkb { layout \"\" } } }", "input { touchpad { tap; natural-scroll; accel-profile \"x\" } }",
-       "﻿binds {}", "\u0000\u0001\u0002", "a 0x10 0o7 0b101 1_000 1.5e3", "x" * 100000, "{" * 3000 + "}" * 3000, "binds {" + " Mod+H { focus-column-left; }" * 3000 + "}",
+       "\ufeffbinds {}", "\u0000\u0001\u0002", "a 0x10 0o7 0b101 1_000 1.5e3", "x" * 100000, "{" * 3000 + "}" * 3000, "binds {" + " Mod+H { focus-column-left; }" * 3000 + "}",
        "binds { Mod+Return { spawn \"a\" \"b\"; } Mod+E { spawn-sh \"x | y\"; } Mod+X { spawn; } }"]
 
 import time

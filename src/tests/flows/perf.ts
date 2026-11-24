@@ -89,7 +89,8 @@
         return results;
     }
 
-    // one operation: how many windows got a new geometry and how often the busiest one did (more than once is a layout that ran twice)
+    // one operation: how many windows got a new geometry and how often the busiest one did (more than once is a layout
+    // that ran twice)
     function probe(name: string, clients: MockKwinClient[], f: () => void) {
         const before = clients.map(client => client.assignedGeometries.length);
         f();

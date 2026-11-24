@@ -196,7 +196,8 @@ class MockKwinClient {
             },
             () => {
                 if (oldFullScreen && !fullScreen) {
-                    // when switching from full-screen to windowed, Kwin sometimes first adds the frame before changing the frameGeometry to the final value
+                    // when switching from full-screen to windowed, Kwin sometimes first adds the frame before changing
+                    // the frameGeometry to the final value
                     if (!rectEquals(this.frameGeometry, screen)) {
                         // already has windowed frame geometry, don't undo that
                         return;
@@ -290,7 +291,8 @@ class MockKwinClient {
             this._frameGeometry.y + randomJitter(),
             this._frameGeometry.width + randomJitter(),
             this._frameGeometry.height + randomJitter(),
-            this.slowClient ? () => {} : this.frameGeometryChanged.fire.bind(this.frameGeometryChanged), // a slow client's change waits for its commit
+            // a slow client's change waits for its commit
+            this.slowClient ? () => {} : this.frameGeometryChanged.fire.bind(this.frameGeometryChanged),
         );
     }
 

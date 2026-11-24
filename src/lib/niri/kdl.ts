@@ -44,7 +44,7 @@ namespace Kdl {
             } else if (c === "\n") {
                 tokens.push({ kind: "\n", value: "" });
                 i++;
-            } else if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "\v" || c === "﻿") {
+            } else if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "\v" || c === "\uFEFF") {
                 i++;
             } else if (c === "\\" && (text[i + 1] === "\n" || text[i + 1] === "\r")) {
                 const end = text.indexOf("\n", i);

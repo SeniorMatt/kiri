@@ -1,16 +1,10 @@
-// The script's side of the compiled effect kiri_overview (niri's overview).
-//
-// The effect draws; this class tells it what there is to draw. It sends the layout of every desktop (rects per
-// window, computed from the grid the same way arrange() places the windows, so nothing is guessed), opens and
-// closes the overview, follows the 4-finger swipe, and applies what the user did in it (the effect cannot call the
-// script, so main.qml polls it and hands the answers to poll()).
+// the script's side of the compiled effect kiri_overview (niri's overview): sends the layout of every desktop, opens and
+// closes it, follows the 4-finger swipe and applies what the user did in it
 class Overview {
-    // niri OVERVIEW_GESTURE_MOVEMENT: units of finger travel from closed to open
     public static readonly GESTURE_MOVEMENT = 300;
-    private static readonly RAW_DECELERATION = 0.997; // niri DECELERATION_TOUCHPAD, per millisecond
-    private static readonly RAW_HISTORY_MS = 150; // niri HISTORY_LIMIT
+    private static readonly RAW_DECELERATION = 0.997;
+    private static readonly RAW_HISTORY_MS = 150;
 
-    // niri OVERVIEW_GESTURE_RUBBER_BAND: past the ends the progress follows the fingers a little (stiffness 0.5, limit 0.05)
     private static readonly RUBBER_STIFFNESS = 0.5;
     private static readonly RUBBER_LIMIT = 0.05;
 
@@ -34,7 +28,6 @@ class Overview {
         if (!overviewEffectLoaded()) {
             return false;
         }
-        // a swipe whose end never came must not keep the script in gesture mode
         this.gesture = null;
         this.lastLayout = this.buildLayout();
         overviewCall("toggle", this.lastLayout);
@@ -44,7 +37,6 @@ class Overview {
         return true;
     }
 
-    // asks the effect to build its scene invisibly once, so that the first real open does not stutter
     public warm() {
         if (!overviewEffectLoaded() || this.open || this.gesture !== null) {
             return;
@@ -60,7 +52,6 @@ class Overview {
         }
     }
 
-    // ---- the layout, as JSON -------------------------------------------------------------------------------
 
     public buildLayout() {
         const desktops: unknown[] = [];
@@ -120,9 +111,7 @@ class Overview {
         };
     }
 
-    // ---- what the effect reports ----------------------------------------------------------------------------
 
-    // the answer of the effect's poll(): {"open":bool,"p":progress,"events":[...]}
     public poll(json: string) {
         let answer: { open: boolean, run?: boolean, p: number, events: any[] };
         try {
@@ -141,11 +130,9 @@ class Overview {
         if (this.gesture === null) {
             this.open = answer.open;
         }
-        // while the scene is still up (its close animation) the layout keeps flowing: a desktop switched meanwhile moves the scene
         if (this.open || changed || answer.run === true) {
             this.sendLayout();
         }
-        // the effect is back to the normal view: stop asking (after a moment: the open call may still be on its way)
         if (!answer.open && answer.run !== true && answer.p < 0.005 && this.gesture === null && Date.now() - this.openedAt > 400) {
             this.open = false;
             setOverviewPolling(false);
@@ -155,7 +142,6 @@ class Overview {
         }
     }
 
-    // sends the layout again if something in it changed
     public sendLayout() {
         const layout = this.buildLayout();
         if (layout !== this.lastLayout) {
@@ -199,8 +185,6 @@ class Overview {
             return true;
         }
         case "focuscol": {
-            // niri's focus-column-left/right-under-mouse (wheel in the overview): the active column of the desktop
-            // under the pointer, not necessarily the current one
             const kwinDesktop = Workspace.desktops.find(d => d.id === event.d);
             const desktop = kwinDesktop === undefined ? undefined : this.desktopManager.getDesktopInCurrentActivity(kwinDesktop);
             if (kwinDesktop === undefined || desktop === undefined) {
@@ -247,10 +231,8 @@ class Overview {
         return false;
     }
 
-    // ---- the 4-finger swipe ----------------------------------------------------------------------------------
 
-    // niri's overview gesture: vertical finger travel moves the progress 1 per 300 units (up opens), and when the
-    // fingers lift the velocity is projected to decide whether it ends open or closed. `events` are [ms, dy].
+    // niri's overview gesture: 300 units of vertical finger travel per progress; the release velocity decides open or closed
     public gestureUpdate(events: number[][]) {
         if (events.length === 0) {
             return;
@@ -286,7 +268,7 @@ class Overview {
         }
         this.gesture = null;
         const history = gesture.history;
-        let velocity = 0; // units per second
+        let velocity = 0;
         if (history.length > 1 && history[history.length - 1].time > history[0].time) {
             const total = history.reduce((sum, e) => sum + e.delta, 0);
             velocity = total / ((history[history.length - 1].time - history[0].time) / 1000);

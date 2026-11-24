@@ -1,16 +1,12 @@
-// Like niri, every output has a strip of columns of its own. KWin's virtual desktops are shared by all outputs, so a
-// desktop of Kiri is a KWin desktop on one output (activity|desktopId|outputName).
+// like niri, every output has a strip of columns of its own; a desktop of Kiri is a KWin desktop on one output
 class DesktopManager {
-    private readonly desktops: Map<string, Desktop>; // key is activity|desktopId|outputName
-    private forcedOutputName: string | null = null; // an output that was focused while it had no window, until a window is focused
-    // KWin builds the list of screens at every read, and the desktops ask for it all the time: it is read again when the
-    // outputs change (and when a name is not in it)
+    private readonly desktops: Map<string, Desktop>;
+    private forcedOutputName: string | null = null;
+    // KWin builds the list of screens at every read: it is read again when the outputs change
     private screenList: Output[] = [];
     private kwinActivities: Set<string>;
     private kwinDesktops: Set<KwinDesktop>;
 
-    // `getFocusedOutputName` tells the output of the strip that the focused window is a tile of (null when it is not
-    // a tile): a tile that is scrolled out of view may be on another output than the one its strip is on
     constructor(
         private readonly pinManager: PinManager,
         private readonly profiles: LayoutProfiles,
@@ -25,13 +21,12 @@ class DesktopManager {
         this.screenList = Workspace.screens;
     }
 
-    // ---- outputs ---------------------------------------------------------------------------------------------
 
     private hasScreen(name: string) {
         if (this.screenList.some(screen => screen.name === name)) {
             return true;
         }
-        this.screenList = Workspace.screens; // an output that came without a signal yet
+        this.screenList = Workspace.screens;
         return this.screenList.some(screen => screen.name === name);
     }
 
@@ -39,7 +34,6 @@ class DesktopManager {
         return this.screenList.length;
     }
 
-    // the name of an output that exists: a window that is on an output that is gone or not known yet uses the active one
     private existingOutputName(name: string | undefined) {
         if (name !== undefined && this.hasScreen(name)) {
             return name;
@@ -64,7 +58,6 @@ class DesktopManager {
         return this.activeOutputName();
     }
 
-    // the focus goes to an output that has no window to take it (niri's focus-monitor)
     public setForcedOutput(outputName: string | null) {
         this.forcedOutputName = outputName;
     }
@@ -78,7 +71,6 @@ class DesktopManager {
         return this.screenList.find(screen => screen.name === outputName) ?? Workspace.activeScreen ?? this.screenList[0];
     }
 
-    // ---- desktops --------------------------------------------------------------------------------------------
 
     public getDesktop(activity: string, kwinDesktop: KwinDesktop, outputName?: string) {
         if (!this.desktopFilter.shouldWorkOnDesktop(kwinDesktop)) {
@@ -94,7 +86,6 @@ class DesktopManager {
         }
     }
 
-    // the desktop on the output that has the focus
     public getCurrentDesktop() {
         return this.getDesktop(Workspace.currentActivity, Workspace.currentDesktop);
     }
@@ -103,7 +94,6 @@ class DesktopManager {
         return this.getDesktop(Workspace.currentActivity, kwinDesktop, outputName);
     }
 
-    // `outputName`: the output of the strip the window is a tile of; without it the output the window is on
     public getDesktopForClient(kwinClient: KwinClient, outputName?: string) {
         if (kwinClient.activities.length !== 1 || kwinClient.desktops.length !== 1) {
             return undefined;
@@ -126,7 +116,6 @@ class DesktopManager {
         return desktop;
     }
 
-    // the layout options of a desktop: niri's global layout, the layout {} of its output and the layout {} of its name over it
     public getProfile(desktop: Desktop): LayoutProfile {
         if (this.profiles.isEmpty()) {
             return this.profiles.getBase();
@@ -159,10 +148,8 @@ class DesktopManager {
         this.kwinDesktops = newDesktops;
     }
 
-    // ---- outputs come and go ---------------------------------------------------------------------------------
 
-    // niri's focus-monitor-*, move-*-to-monitor-*: the output next to the active one in a direction (outputs are
-    // compared by the centres of their screens), null when there is none
+    // niri's focus-monitor-*: the output next to the active one in a direction
     public getOutputInDirection(fromName: string, dx: number, dy: number) {
         const kwinDesktop = Workspace.currentDesktop;
         const center = (screen: Output) => {
@@ -186,7 +173,7 @@ class DesktopManager {
                 continue;
             }
             const across = Math.abs((c.x - origin.x) * dy) + Math.abs((c.y - origin.y) * dx);
-            const score = along + across * 2; // the closest in the direction, a little aside costs more
+            const score = along + across * 2;
             if (score < bestScore) {
                 bestScore = score;
                 best = screen;
@@ -195,7 +182,6 @@ class DesktopManager {
         return best;
     }
 
-    // niri's focus-monitor-next / -previous: the outputs in the order of the screen list
     public getAdjacentOutput(fromName: string, step: 1 | -1) {
         const screens = Workspace.screens;
         const index = screens.findIndex(screen => screen.name === fromName);
@@ -205,7 +191,6 @@ class DesktopManager {
         return screens[(index + step + screens.length) % screens.length];
     }
 
-    // All the columns of `from` (a desktop on an output) go to the strip of the same desktop on another output.
     private moveAllColumns(from: Desktop, to: Desktop, home: string | undefined) {
         for (const column of from.grid.getColumns()) {
             if (home !== undefined && column.homeOutput === undefined) {
@@ -215,15 +200,13 @@ class DesktopManager {
         }
     }
 
-    // The outputs changed (hot-plug, lock, sleep, wake). Like niri, the strips of an output that is gone are added to
-    // the strips of another output (the first one that is there; the active one is no guide, it is briefly wrong on wake),
-    // and the columns go back to their own output when it reappears.
+    // like niri, the strips of an output that is gone are added to another output and go back when it reappears
     public onScreensChanged() {
         const screens = Workspace.screens;
         this.screenList = screens;
         const names = new Set(screens.map(screen => screen.name));
         if (names.size === 0) {
-            return; // no outputs at all (KWin makes a placeholder): everything stays as it is until some come back
+            return;
         }
         const active = Workspace.activeWindow;
         const survivor = screens.some(screen => screen.name === Workspace.activeScreen?.name) ? Workspace.activeScreen.name : screens[0].name;
@@ -241,7 +224,6 @@ class DesktopManager {
                 this.desktops.delete(key);
             }
         }
-        // outputs that are back
         for (const [key, desktop] of Array.from(this.desktops)) {
             const [activity] = key.split("|");
             for (const column of desktop.grid.getColumns()) {
@@ -257,7 +239,7 @@ class DesktopManager {
             }
         }
         if (active !== null && Workspace.activeWindow !== active && !active.minimized) {
-            Workspace.activeWindow = active; // moving the columns passed the focus on
+            Workspace.activeWindow = active;
         }
         if (active !== null) {
             this.keepInView(active);
@@ -265,7 +247,6 @@ class DesktopManager {
         this.forcedOutputName = null;
     }
 
-    // the strip that the focused window ended up in shows it, like after any focus change
     private keepInView(kwinClient: KwinClient) {
         for (const desktop of this.desktops.values()) {
             for (const column of desktop.grid.getColumns()) {
@@ -278,7 +259,6 @@ class DesktopManager {
         }
     }
 
-    // niri's move-workspace-to-monitor, for the whole of KWin's desktops: all the columns of every output come to one
     public gatherOnOutput(outputName: string) {
         for (const [key, desktop] of Array.from(this.desktops)) {
             if (desktop.outputName === outputName) {
@@ -296,7 +276,6 @@ class DesktopManager {
         this.forcedOutputName = outputName;
     }
 
-    // ---- bookkeeping -----------------------------------------------------------------------------------------
 
     private removeActivity(activity: string) {
         for (const kwinDesktop of this.kwinDesktops) {
@@ -342,7 +321,6 @@ class DesktopManager {
         }
     }
 
-    // the desktops of one KWin desktop on every output
     public *getOutputDesktops(activity: string, kwinDesktop: KwinDesktop) {
         const prefix = activity + "|" + kwinDesktop.id + "|";
         for (const [key, desktop] of this.desktops) {
@@ -357,7 +335,6 @@ class DesktopManager {
         return desktops;
     }
 
-    // empty array means all; the desktops of every output
     public *getDesktops(activities: string[], kwinDesktops: KwinDesktop[]) {
         const matchedActivities = activities.length > 0 ? activities : this.kwinActivities.keys();
         const matchedDesktops = kwinDesktops.length > 0 ? kwinDesktops : this.kwinDesktops.keys();

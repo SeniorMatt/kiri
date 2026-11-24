@@ -1,11 +1,9 @@
-// Every bind and option of the owner's niri config and of niri's default config is mapped, or skipped with a reason,
-// and tools/niri2kiri.py (the importer that runs outside KWin) comes to the same result.
 tests.register("NiriImport accounts for every bind and option of real configs", 1, () => {
     const fs = require("fs");
     const kiriActions = new Set(getShortcuts({} as any, {} as any).map(shortcut => shortcut.name));
     const generic = ["Kiri has no such action", "key or modifier Kiri does not know", "not supported by Kiri"];
 
-    for (const file of ["niri-owner.kdl", "niri-default.kdl"]) {
+    for (const file of ["niri-custom.kdl", "niri-default.kdl"]) {
         const path = "src/tests/fixtures/" + file;
         const text = fs.readFileSync(path, "utf8");
         const nodes = Kdl.parse(text);
@@ -84,7 +82,8 @@ tests.register("NiriImport accounts for every bind and option of real configs", 
             const withoutInclude = (lines: string[]) => lines.filter(line => !line.startsWith("include")).sort();
             Assert.equalArrays(withoutInclude(json.skipped), withoutInclude(result.skipped), { message: where + "skipped lines of tools/niri2kiri.py" });
 
-            // and tells what it skipped on stderr (the spawn binds are made into Plasma shortcuts by --apply, not skipped there)
+            // and tells what it skipped on stderr (the spawn binds are made into Plasma shortcuts by --apply, not
+            // skipped there)
             const run = require("child_process").spawnSync("python3", ["-I", "tools/niri2kiri.py", path, "--settings"], { encoding: "utf8", env: Object.assign({}, process.env, { PYTHONDONTWRITEBYTECODE: "1" }) });
             const told = new Set((run.stderr as string).split("\n"));
             for (const line of json.skipped) {
@@ -93,8 +92,8 @@ tests.register("NiriImport accounts for every bind and option of real configs", 
         }
     }
 
-    // the owner's config in particular
-    const mine = NiriImport.parse(fs.readFileSync("src/tests/fixtures/niri-owner.kdl", "utf8"));
+    // a custom config
+    const mine = NiriImport.parse(fs.readFileSync("src/tests/fixtures/niri-custom.kdl", "utf8"));
     Assert.equal(mine.settings["gapsInnerHorizontal"], 8);
     Assert.equal(mine.settings["alwaysCenterSingleColumn"], true);
     Assert.equal(mine.settings["focusRingWidth"], 2);
@@ -113,7 +112,7 @@ tests.register("NiriImport accounts for every bind and option of real configs", 
     Assert.equal(mine.settings["pointerBinds"], getConfigDef().find(entry => entry.name === "pointerBinds")!.default, { message: "the wheel binds are niri's default ones, like Kiri's default" });
 });
 
-tests.register("NiriImport: size binds, focus=false, mod-key, pointer binds, focus-window-previous", 1, () => {
+tests.register("NiriImport: size binds, focus=false, mod-key, pointer binds", 1, () => {
     const result = NiriImport.parse(`
         input { mod-key "Alt" }
         binds {

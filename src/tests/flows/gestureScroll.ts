@@ -127,7 +127,7 @@ tests.register("Gesture scroll: a column's right edge is a snap point too", 1, (
     Assert.assert(aligned || leftAligned, { message: "settles on an edge-aligned view" });
 });
 
-tests.register("Gesture scroll (raw swipe): no cap, 1:1 at working width / 1200 per unit, and back", 1, () => {
+tests.register("Gesture scroll (raw swipe): no cap, 1:1 at working width / 1200", 1, () => {
     const config = getDefaultConfig();
     config.gestureScroll = true;
     config.gestureSettleDuration = 0;
@@ -152,7 +152,7 @@ tests.register("Gesture scroll (raw swipe): no cap, 1:1 at working width / 1200 
     Assert.assert(Math.abs((x0 - clients[0].getActualFrameGeometry().x) - 460 * perUnit) < 1, { message: "reverse follows at once" });
 });
 
-tests.register("Gesture scroll (raw swipe): wobble before the axis lock and vertical swipes do nothing", 1, () => {
+tests.register("Gesture scroll (raw swipe): wobble and vertical swipes do nothing", 1, () => {
     const config = getDefaultConfig();
     config.gestureScroll = true;
     config.gestureSettleDuration = 0;

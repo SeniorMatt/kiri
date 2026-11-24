@@ -1,4 +1,5 @@
-// niri's set-column-width, set-window-height and the explicit set/unset actions, the focus=false moves, focus-window-previous props
+// niri's set-column-width, set-window-height and the explicit set/unset actions, the focus=false moves, focus-window-
+// previous props
 
 tests.register("niri set-column-width and set-window-height by size", 10, () => {
     const config = getDefaultConfig();

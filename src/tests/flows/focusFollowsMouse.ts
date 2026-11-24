@@ -39,7 +39,7 @@ function ffmTestHover(workspaceMock: MockWorkspace, x: number, y: number) {
     workspaceMock.cursorPosChanged.fire();
 }
 
-tests.register("Focus follows mouse: a window that slid under a still pointer is not entered by a small move", 1, () => {
+tests.register("Focus follows mouse: a window that slid under a still pointer is not entered", 1, () => {
     // niri recomputes the window under the previous pointer position with the current layout; remembering the last
     // hovered window instead made the first nudge after a scroll focus the window that moved under the pointer
     const { workspaceMock } = init(getDefaultConfig());
@@ -68,7 +68,7 @@ tests.register("Focus follows mouse: a window that slid under a still pointer is
     }
 });
 
-tests.register("Focus follows mouse: a cursor warp does not focus what is above the focused window", 1, () => {
+tests.register("Focus follows mouse: a cursor warp does not focus the window above", 1, () => {
     // niri's warp-mouse-to-focus moves the pointer without running focus-follows-mouse
     const config = getDefaultConfig();
     config.cursorFollowsFocus = true;
@@ -90,7 +90,7 @@ tests.register("Focus follows mouse: a cursor warp does not focus what is above 
     }
 });
 
-tests.register("Focus follows mouse: the pointer leaving before the button check finishes cancels the focus", 1, () => {
+tests.register("Focus follows mouse: the pointer leaving cancels the focus", 1, () => {
     const { workspaceMock } = init(getDefaultConfig());
     const [client1, client2, client3] = workspaceMock.createClients(3);
     workspaceMock.stackingOrder.push(client1, client2, client3);
@@ -112,7 +112,7 @@ tests.register("Focus follows mouse: the pointer leaving before the button check
     }
 });
 
-tests.register("Focus follows mouse: a late answer does not take away a focus given after the pointer event", 1, () => {
+tests.register("Focus follows mouse: a late answer does not take away a newer focus", 1, () => {
     const { workspaceMock } = init(getDefaultConfig());
     const [client1, client2, client3] = workspaceMock.createClients(3);
     workspaceMock.stackingOrder.push(client1, client2, client3);
@@ -133,7 +133,7 @@ tests.register("Focus follows mouse: a late answer does not take away a focus gi
     }
 });
 
-tests.register("Focus follows mouse: a still pointer never changes the focus when the layout moves, with or without a warp", 1, () => {
+tests.register("Focus follows mouse: a still pointer never changes the focus", 1, () => {
     const { qtMock, workspaceMock } = init(getDefaultConfig());
     const clients = workspaceMock.createClients(4);
     workspaceMock.stackingOrder.push(...clients);
@@ -152,7 +152,7 @@ tests.register("Focus follows mouse: a still pointer never changes the focus whe
     }
 });
 
-tests.register("Focus follows mouse: max-scroll-amount stops hovering a window that needs a big scroll", 1, () => {
+tests.register("Focus follows mouse: max-scroll-amount stops a big scroll", 1, () => {
     const { workspaceMock } = init(getDefaultConfig());
     const [client1, client2] = workspaceMock.createClientsWithWidths(500, 500);
     workspaceMock.stackingOrder.push(client1, client2);

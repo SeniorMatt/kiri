@@ -1,6 +1,4 @@
-// A seeded random stress test: random sequences of everything a user, KWin and the clients can do, and invariants of the
-// layout checked after every operation. A failure names the seed and the step; `FUZZ_SEEDS=2000 FUZZ_STEPS=300 make fuzz`
-// runs a long one, `FUZZ_ONLY=<seed>` replays one seed.
+// A seeded random stress test with invariants checked after every operation; `FUZZ_SEEDS=2000 make fuzz`, `FUZZ_ONLY=<seed>` replays one seed
 // Kiri's journal lines ("Kiri: desktop 1 -> 2 (KWin)") are not wanted in the output of a stress run
 function withoutKiriLog<T>(f: () => T): T {
     const original = console.log;
@@ -444,7 +442,8 @@ function withoutKiriLog<T>(f: () => T): T {
                     && this.viewDetached !== this.signature() && !active.minimized && !active.fullScreen && !active.maximizedHorizontally && !overviewActive()) {
                     const column = tiled.column;
                     const range = currentDesktop.getCurrentVisibleRange();
-                    // a column with a full-screen or maximized window reaches past its edges by the margins, which are not content
+                    // a column with a full-screen or maximized window reaches past its edges by the margins, which are
+                    // not content
                     const slack = column.getOverflow().reduce((a, b) => a + b, 0);
                     if (column.getWidth() <= range.getWidth() && (column.getLeft() < range.getLeft() - slack || column.getRight() > range.getRight() + slack)) {
                         fail(`the focused column [${column.getLeft()}, ${column.getRight()}] is outside the view [${range.getLeft()}, ${range.getRight()}]`);
@@ -487,7 +486,9 @@ function withoutKiriLog<T>(f: () => T): T {
             for (step = 0; step < steps; step++) {
                 last = "?";
                 const r = Math.random();
-                clock += r < 0.7 ? 300 : r < 0.95 ? 700 : 5000; // a person is not quicker than the 200 ms in which Kiri treats a focus change as KWin's pick of a closing window
+                // a person is not quicker than the 200 ms in which Kiri treats a focus change as KWin's pick of a
+                // closing window
+                clock += r < 0.7 ? 300 : r < 0.95 ? 700 : 5000;
                 last = run.step();
                 run.log.push(last);
                 if (process.env.FUZZ_TRACE !== undefined) { console.log(`${step}: ${last}\n${run.dump()}`); }

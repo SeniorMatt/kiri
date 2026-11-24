@@ -853,7 +853,7 @@ def collect_shots(p, prefix, n):
 
 @scn
 def s_ovleak(h):
-    """OWNER BUG: desktop 1 empty, desktop 2 has one window, stand on desktop 1, spam Meta+O ~1 s, stop: a window of desktop 2
+    """Bug: desktop 1 empty, desktop 2 has one window, stand on desktop 1, spam Meta+O ~1 s, stop: a window of desktop 2
     flickers on desktop 1. Screenshots in a tight loop after the spam; the window's colour must not show while the overview
     is closed (and, with the overview open, must not show on desktop 1's row)."""
     h.visual = False

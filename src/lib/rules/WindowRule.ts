@@ -1,9 +1,5 @@
-// What a rule or an exclude line matches (niri's match / exclude lines). All the conditions of one line must hold.
-// `class` and `caption` are regexes that match the whole string (Kiri's own rules). `appId` and `title` are niri's:
-// Rust regexes that match anywhere in the window's app id (resource class) and title (see RustRegex).
-// The dynamic matchers (isFloating, isActive, isFocused, isActiveInColumn, isUrgent, atStartup) are checked whenever
-// the rules are evaluated: when a window opens, and again when its title, app id or one of these states changes.
-// isWindowCastTarget can never be true, KWin does not tell which windows are screen cast targets.
+// what a rule or an exclude line matches (niri's match / exclude lines); all conditions of one line must hold; `class`
+// and `caption` are Kiri's own regexes, `appId` and `title` are Rust regexes (see RustRegex)
 interface WindowMatch {
     class?: string | undefined;
     caption?: string | undefined;
@@ -15,7 +11,7 @@ interface WindowMatch {
     isActiveInColumn?: boolean;
     isUrgent?: boolean;
     isWindowCastTarget?: boolean;
-    atStartup?: boolean; // true for the first 60 s after Kiri started
+    atStartup?: boolean;
 }
 
 // niri's default-floating-position: x and y are measured from the corner or edge `relativeTo` names
@@ -25,27 +21,24 @@ interface FloatingPositionRule {
     relativeTo?: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "top" | "bottom" | "left" | "right";
 }
 
-// A rule's look fields (cornerRadius, focusRing, border, shadow, tabIndicator) are those of WindowDecorationRule (Kiri.ts): the
-// merged result for a window goes to the compiled decorations effect through setWindowDecorations. A missing field means "the
-// global setting". geometry-corner-radius is one number (niri's four-corner form takes its largest corner); clip-to-geometry
-// needs no field, the effect clips every window with a radius to its rounded corners.
+// the look fields are those of WindowDecorationRule (Kiri.ts); a missing field means the global setting
 interface WindowRule extends WindowMatch, WindowDecorationRule {
-    tile?: boolean; // niri's open-floating (false = floating, true = tiled); omit to leave the decision to Kiri's heuristics
-    width?: string; // column width for new windows (niri's default-column-width), like "50%" or "800px"; "" lets the window pick; floating windows get it too
-    height?: string; // niri's default-window-height, like "50%" or "920px"; "" lets the window pick
-    fullscreen?: boolean; // niri's open-fullscreen
-    maximized?: boolean; // niri's open-maximized: the new column opens at the full width
-    maximizedToEdges?: boolean; // niri's open-maximized-to-edges
-    focused?: boolean; // niri's open-focused; false keeps the focus where it was
-    workspace?: string; // niri's open-on-workspace: the name of a desktop
-    columnDisplay?: "normal" | "tabbed"; // niri's default-column-display, for a column the window opens
-    floatingPosition?: FloatingPositionRule; // niri's default-floating-position
-    minWidth?: number; // niri's min-width, min-height, max-width and max-height; 0 for max means no limit
+    tile?: boolean;
+    width?: string;
+    height?: string;
+    fullscreen?: boolean;
+    maximized?: boolean;
+    maximizedToEdges?: boolean;
+    focused?: boolean;
+    workspace?: string;
+    columnDisplay?: "normal" | "tabbed";
+    floatingPosition?: FloatingPositionRule;
+    minWidth?: number;
     minHeight?: number;
     maxWidth?: number;
     maxHeight?: number;
-    opacity?: number; // niri's opacity (0 to 1); toggle-window-rule-opacity turns it off for the focused window
-    exclude?: WindowMatch[]; // the rule does not apply to windows that match one of these
+    opacity?: number;
+    exclude?: WindowMatch[];
 }
 
 // Window rules from the simple fields of the settings dialog: one entry per line.
@@ -67,7 +60,6 @@ function getSimpleWindowRules(floatClasses: string, tileClasses: string, columnW
             width: entry.slice(separator + 1).trim(),
         });
     }
-    // the last matching rule wins, so a class in both lists is tiled
     for (const windowClass of splitRuleList(floatClasses)) {
         rules.push({ class: windowClass, caption: undefined, tile: false });
     }

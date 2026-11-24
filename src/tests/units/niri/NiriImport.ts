@@ -172,7 +172,7 @@ tests.register("NiriImport", 1, () => {
     Assert.equal(def.shortcutKeys["window-maximize-to-edges"].join(), "Meta+M");
 });
 
-tests.register("NiriImport window rules: open-fullscreen, default-window-height, matchers and exclude", 1, () => {
+tests.register("NiriImport window rules: open-fullscreen, default-window-height, matchers", 1, () => {
     const result = NiriImport.parse(`
         window-rule {
             match app-id=r#"^fl64\\.exe$"#

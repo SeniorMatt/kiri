@@ -10,7 +10,7 @@
         });
     }
 
-    tests.register("Swapping a maximized window into a narrower column keeps the focused column in view", 1, () => {
+    tests.register("Swapping a maximized window into a narrower column keeps the view", 1, () => {
         const config = getDefaultConfig();
         const { qtMock, workspaceMock, world } = init(config);
         const [a, b, c] = workspaceMock.createClientsWithWidths(300, 300, 300);
@@ -24,7 +24,7 @@
         assertFocusedColumnInView(world, workspaceMock);
     });
 
-    tests.register("A script reload keeps the focused window in view when it was not in the saved layout", 1, () => {
+    tests.register("A script reload keeps a focused window that was not saved in view", 1, () => {
         const config = getDefaultConfig();
         const { workspaceMock, world } = init(config);
         const [a, b, c] = workspaceMock.createClientsWithWidths(400, 400, 400);
@@ -78,7 +78,7 @@
         Assert.assert(second.y >= first.y + first.height && third.y >= second.y + second.height, { message: "the windows stay in order" });
     });
 
-    tests.register("The focus KWin gives to a floating window on the next desktop is not taken back by the warp check", 5, () => {
+    tests.register("The warp check does not take back a floating window's focus", 5, () => {
         const config = getDefaultConfig();
         config.cursorFollowsFocus = true;
         const { qtMock, workspaceMock } = init(config);

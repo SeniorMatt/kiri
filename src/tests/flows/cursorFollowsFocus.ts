@@ -70,7 +70,7 @@ tests.register("Cursor follows focus: a newly opened window gets the cursor", 5,
 });
 
 // niri's move_cursor_to_rect (default mode): only the coordinate that is outside the window is fixed
-tests.register("Cursor follows focus: only the coordinate outside the window moves (niri's default mode)", 1, () => {
+tests.register("Cursor follows focus: only the coordinate outside the window moves", 1, () => {
     const config = getDefaultConfig();
     config.cursorFollowsFocus = true;
     const { qtMock, workspaceMock } = init(config);
@@ -94,7 +94,7 @@ tests.register("Cursor follows focus: only the coordinate outside the window mov
     Assert.equal((workspaceMock as any).warps.length, warps);
 });
 
-tests.register("Cursor follows focus: a key that does not change the focus still brings the pointer back (niri)", 1, () => {
+tests.register("Cursor follows focus: a key that keeps the focus brings the pointer back", 1, () => {
     const config = getDefaultConfig();
     config.cursorFollowsFocus = true;
     const { qtMock, workspaceMock } = init(config);
@@ -126,7 +126,7 @@ tests.register("Cursor follows focus: moving a column warps, resizing and toggli
     Assert.assert(pointEquals(Workspace.cursorPos, park), { message: "centring does not warp" });
 });
 
-tests.register("Cursor follows focus: a window that opens and takes the focus gets the pointer, one in the background does not", 1, () => {
+tests.register("Cursor follows focus: a new focused window gets the pointer", 1, () => {
     const config = getDefaultConfig();
     config.cursorFollowsFocus = true;
     const { workspaceMock } = init(config);
@@ -140,7 +140,7 @@ tests.register("Cursor follows focus: a window that opens and takes the focus ge
     Assert.assert(pointEquals(Workspace.cursorPos, new MockQmlPoint(5, 5)), { message: "a window that opens in the background does not move the pointer" });
 });
 
-tests.register("Cursor follows focus: the window that gets the focus when one closes gets the pointer", 1, () => {
+tests.register("Cursor follows focus: the window that gets the focus on a close", 1, () => {
     const config = getDefaultConfig();
     config.cursorFollowsFocus = true;
     const { qtMock, workspaceMock } = init(config);
@@ -155,7 +155,7 @@ tests.register("Cursor follows focus: the window that gets the focus when one cl
     Assert.assert(Math.abs(Workspace.cursorPos.x - (f.x + f.width / 2)) < 60 && Math.abs(Workspace.cursorPos.y - (f.y + f.height / 2)) < 60, { message: "the pointer goes to the window that got the focus" });
 });
 
-tests.register("Cursor follows focus: the warp goes to the visible part of a window that is partly off screen", 1, () => {
+tests.register("Cursor follows focus: the warp goes to the visible part of a window", 1, () => {
     const config = getDefaultConfig();
     config.cursorFollowsFocus = true;
     const { workspaceMock } = init(config);

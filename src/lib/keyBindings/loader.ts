@@ -9,7 +9,7 @@ interface NumKeyBinding {
     name: string;
     description: string;
     defaultModifiers?: string;
-    count?: number; // how many numbered actions there are, 12 if not given
+    count?: number;
     action: (i: number) => void;
 }
 
@@ -31,10 +31,7 @@ function catchWrap(f: () => void) {
     };
 }
 
-// The actions after which niri calls maybe_warp_cursor_to_focus (input/mod.rs, every `Action::` arm that does), by the name
-// of Kiri's shortcut. The others never move the pointer: width and height changes, centring, full-screen and
-// maximize, floating toggles, consume-into-column, the overview. Closing a window and opening one warp too, through
-// the focus they hand out (see ClientManager).
+// the actions after which niri calls maybe_warp_cursor_to_focus; the others never move the pointer
 const WARPING_SHORTCUTS = new Set([
     "focus-left", "focus-right", "focus-up", "focus-down", "focus-next", "focus-previous", "focus-start", "focus-end",
     "focus-column-right-or-first", "focus-column-left-or-last", "focus-window-down-or-column-left",
@@ -57,7 +54,6 @@ const WARPING_SHORTCUTS = new Set([
 ]);
 const WARPING_PREFIXES = ["desktop-", "focus-", "focus-window-in-column-", "window-move-to-column-", "column-move-to-column-", "column-move-to-desktop-", "window-move-to-desktop-",
     "column-move-to-column-no-focus-", "column-move-to-desktop-no-focus-", "window-move-to-desktop-no-focus-"];
-// niri's maybe_warp_cursor_to_focus_centered: after a move to another screen
 const WARPING_BOTH = new Set(["screen-switch"]);
 for (const direction of ["left", "right", "up", "down", "next", "previous"]) {
     WARPING_BOTH.add(`focus-monitor-${direction}`);
@@ -75,13 +71,12 @@ function warpAfter(name: string, action: () => void) {
         return action;
     }
     return () => {
-        // asked for before the action, so that the action's own arrange does it (niri warps to where the window ends up)
         requestCursorWarp(WARPING_BOTH.has(name));
         try {
             action();
         } finally {
-            // actions that do not arrange anything still warp; one that handed the focus to another desktop is waited
-            // for (flushCursorWarp keeps the request until the focused window is on the desktop shown)
+            // actions that do not arrange anything still warp; flushCursorWarp keeps the request until the window is on
+            // the desktop shown
             flushCursorWarp();
         }
     };
@@ -110,8 +105,7 @@ function getShortcuts(world: World, actions: Actions): Shortcut[] {
     return shortcuts;
 }
 
-// Holding a key repeats its action like in niri (binds repeat by default there). Close, overview and the toggles
-// do not repeat (niri's default config has repeat=false for close-window), a held key would flip them back and forth.
+// holding a key repeats its action like in niri, except close, overview and the toggles
 const NO_REPEAT = new Set([
     "window-close", "overview", "window-toggle-floating", "window-toggle-fullscreen", "window-toggle-windowed-fullscreen", "window-move-to-floating",
     "window-move-to-tiling", "column-toggle-tabbed", "column-display-normal", "column-display-tabbed",
@@ -119,13 +113,11 @@ const NO_REPEAT = new Set([
     "desktop-previous-used", "screen-switch", "overview-open", "overview-close",
 ]);
 
-// Actions that had no default keys in earlier versions (kglobalacceld stored them as "no key" and never applies a new default)
 const GAINED_DEFAULT_KEYS = new Set([
     "window-height-cycle-presets", "window-height-reset", "column-width-expand", "cycle-preset-widths-reverse",
 ]);
 
-// The kiri-mode switch (tools/install.sh): no Kiri action takes it, or the switch could not leave Kiri mode. dev builds
-// stored it for column-move-to-monitor-up (niri's default) and a niri config import can bring it too.
+// the kiri-mode switch (tools/install.sh): no Kiri action takes it
 const RESERVED_KEYS = ["Meta+Ctrl+Shift+K"];
 function withoutReserved(keys: number[]) {
     const reserved = parseKeys(RESERVED_KEYS);
@@ -139,7 +131,6 @@ namespace KGlobalAccel {
     export const component = "kiri";
     export const componentFriendly = "Kiri";
 
-    // KGlobalAccel::SetShortcutFlag
     export const setPresent = 2;
     export const noAutoloading = 4;
     export const isDefault = 8;
@@ -149,8 +140,8 @@ namespace KGlobalAccel {
     }
 }
 
-// Kiri's settings have two key fields per action (primary and alternate), stored as "key1_<name>" and "key2_<name>"
-// with "-" replaced by "_". A key typed there wins over what the Shortcuts settings page has stored.
+// every action has two key fields (primary and alternate), "key1_<name>" and "key2_<name>"; a key typed there wins over
+// the Shortcuts page
 function shortcutConfigName(slot: number, shortcutName: string) {
     return `key${slot}_${shortcutName.replace(/-/g, "_")}`;
 }
@@ -180,9 +171,8 @@ function readShortcutKeys(readConfig: (name: string) => string): Record<string, 
     return result;
 }
 
-// Registers Kiri's shortcuts in their own "Kiri" group in Plasma's Shortcuts settings.
-// While Kiri runs, Plasma shortcuts that use the same keys are switched off, so Kiri's win.
-// That only changes kglobalaccel's state in memory, nothing is saved, and they're switched back on when Kiri stops.
+// registers Kiri's shortcuts in their own group in Plasma's Shortcuts settings; Plasma shortcuts with the same keys are
+// switched off in memory while Kiri runs
 class KeyBindings {
     private readonly actions = new Map<string, () => void>();
     private readonly activeKeys = new Set<number>();
@@ -194,7 +184,6 @@ class KeyBindings {
     constructor(world: World, config: Actions.Config, shortcutKeys: Record<string, string[]> = {}) {
         const shortcuts = this.setActions(world, config);
 
-        // Plasma's own shortcuts are registered again when plasmashell or kded start, which can happen after Kiri starts
         this.priorityDelayer = new Delayer(3000, () => this.takePriority());
 
         removeOldShortcuts();
@@ -205,23 +194,22 @@ class KeyBindings {
             const defaultKeys = withoutReserved(parseKeys(shortcut.defaultKeys));
             KGlobalAccel.call("doRegister", ["as"], [actionId]);
             KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.isDefault]);
-            // keys typed in Kiri's own settings replace the stored ones (NoAutoloading), so they also show up in Plasma's Shortcuts page
-            // without them, keys the user already set in Plasma's settings are kept (autoloading)
+            // keys typed in Kiri's settings replace the stored ones (NoAutoloading); otherwise stored keys are kept
+            // (autoloading)
             const userKeys = withoutReserved(parseKeys(shortcutKeys[shortcut.name] ?? []));
             const flags = userKeys.length > 0 ? KGlobalAccel.setPresent | KGlobalAccel.noAutoloading : KGlobalAccel.setPresent;
             KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, userKeys.length > 0 ? userKeys : defaultKeys, flags], (storedKeys: number[]|undefined) => {
                 if (this.destroyed) {
-                    return; // the script stopped before kglobalaccel answered
+                    return;
                 }
                 let keys = plainKeys(storedKeys);
                 if (withoutReserved(keys).length < keys.length) {
-                    // a stored key is the kiri-mode switch: give it back
                     keys = withoutReserved(keys);
                     KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, keys, KGlobalAccel.setPresent | KGlobalAccel.noAutoloading]);
                 }
                 if (userKeys.length === 0 && defaultKeys.length > 0 && keys.length === 0 && GAINED_DEFAULT_KEYS.has(shortcut.name)) {
-                    // kglobalacceld keeps what it stored, and older versions stored "no key" for these actions
-                    // (their default keys came later), so the default never took effect: set it once more
+                    // kglobalacceld stored "no key" for these actions earlier, so the default never took effect: set it
+                    // once more
                     KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.setPresent | KGlobalAccel.noAutoloading], (newKeys: number[]|undefined) => {
                         for (const key of newKeys ?? []) {
                             this.activeKeys.add(key);
@@ -234,7 +222,6 @@ class KeyBindings {
                 this.kiriKeys.set(shortcut.name, keys);
                 pending--;
                 if (pending === 0) {
-                    // the twins first, so that taking priority also switches off KWin's twin actions
                     syncTwins(this.kiriKeys, () => this.destroyed, () => {
                         this.takePriority();
                         this.priorityDelayer.run();
@@ -244,8 +231,7 @@ class KeyBindings {
         }
     }
 
-    // Points the shortcuts at a new world, keeping the registrations in kglobalaccel as they are.
-    // Used when Kiri reloads its settings, so shortcuts are neither registered twice nor lose priority.
+    // points the shortcuts at a new world, keeping the registrations
     public setActions(world: World, config: Actions.Config) {
         const shortcuts = getShortcuts(world, new Actions(config));
         this.actions.clear();
@@ -290,7 +276,6 @@ class KeyBindings {
         }
     }
 
-    // Puts back the default keys of actions whose key fields (or niri binds) were removed
     public static resetToDefaultKeys(names: string[]) {
         const empty: any = {};
         for (const shortcut of getShortcuts(empty, empty)) {
@@ -311,7 +296,6 @@ class KeyBindings {
             KGlobalAccel.call("setInactive", ["as"], [[KGlobalAccel.component, name, "", ""]]);
         }
         for (const actionId of this.borrowed.values()) {
-            // with autoloading, this only marks the shortcut as present again, its keys stay as they are
             KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, [], KGlobalAccel.setPresent]);
         }
     }
@@ -335,8 +319,7 @@ function parseKeys(keySequences: string[]) {
 }
 
 
-// Plasma-mode twins: KWin's own action for what a Kiri action does gets the same keys, so the key still works after
-// `kiri-mode plasma` (when the script is unloaded). Only actions that do the same thing are paired.
+// Plasma-mode twins: KWin's own action for what a Kiri action does gets the same keys, so they work after `kiri-mode plasma`
 const KWIN_TWINS: Record<string, string> = {
     "grid-scroll-focused": "Window Move Center",
     "window-close": "Window Close",
@@ -352,8 +335,7 @@ function twinOf(kiriName: string): string|undefined {
     return desktop !== null ? "Switch to Desktop " + desktop[1] : KWIN_TWINS[kiriName];
 }
 
-// What Kiri gave to KWin's actions, kept in ~/.config/kiri-twins.conf: "action name~key.key|action name~key". The keys
-// are Qt key codes. An action whose keys are not exactly these any more was changed by the user.
+// what Kiri gave to KWin's actions, kept in ~/.config/kiri-twins.conf: "action name~key.key|action name~key" (Qt key codes)
 function readTwinRecord(): Map<string, number[]> {
     const record = new Map<string, number[]>();
     for (const entry of String(twinStore.given ?? "").split("|")) {
@@ -373,7 +355,6 @@ function writeTwinRecord(record: Map<string, number[]>) {
     }
 }
 
-// D-Bus replies come as list-like objects (not real arrays) whose items can still be wrapped in an object with a `value`
 function plainKeys(keys: any): number[] {
     const result: number[] = [];
     for (let i = 0; i < (keys?.length ?? 0); i++) {
@@ -389,8 +370,7 @@ function sameKeys(a: number[], b: number[]) {
     return a.length === b.length && a.every(key => b.includes(key));
 }
 
-// Gives the twins their keys. kiriKeys: the keys each Kiri action ended up with. Keys that another action uses are
-// never taken.
+// gives the twins their keys; keys that another action uses are never taken
 function syncTwins(kiriKeys: Map<string, number[]>, isDestroyed: () => boolean, done: () => void) {
     kglobalshortcutsrc.sync();
     kglobalaccel.call("/component/kwin", KGlobalAccel.componentIface, "shortcutNames", [], [], (names: string[]|undefined) => {
@@ -417,9 +397,7 @@ function syncTwins(kiriKeys: Map<string, number[]>, isDestroyed: () => boolean, 
     });
 }
 
-// KWin's own default keys of an action, from ~/.config/kglobalshortcutsrc: [kwin] "Name=current,default,description" (keys
-// of one entry are separated by a tab). It is read through a QtCore Settings object on that file (kglobalshortcutsrc in
-// main.qml). The default D-Bus reports follows every change, this one only changes when KWin registers the action.
+// KWin's own default keys of an action, from ~/.config/kglobalshortcutsrc, read through a Settings object in main.qml
 function kwinDefaultKeys(twin: string): number[]|undefined {
     const entry = kglobalshortcutsrc.value(twin, undefined);
     const fields: string[] = typeof entry === "string" ? [entry] : Array.from(entry ?? []);
@@ -440,15 +418,12 @@ function syncTwin(twin: string, wanted: number[], record: Map<string, number[]>,
     const id = ["kwin", twin, "", ""];
     KGlobalAccel.call("shortcut", ["as"], [id], (current: number[]|undefined) => {
         if (current === undefined) {
-            // the call failed: the action's keys are unknown, and setting them would replace the user's
             done();
             return;
         }
         const now = plainKeys(current);
-        // what the action has apart from the keys Kiri gave it earlier
         const given = record.get(twin) ?? [];
         const base = given.length > 0 && given.every(key => now.includes(key)) ? now.filter(key => !given.includes(key)) : now;
-        // Kiri adds its keys next to KWin's defaults (or to an action that has none); an action the user changed, even by removing its keys, is left alone
         if (!sameKeys(base, kwinDefaultKeys(twin) ?? [])) {
             record.delete(twin);
             done();
@@ -459,7 +434,6 @@ function syncTwin(twin: string, wanted: number[], record: Map<string, number[]>,
         const check = (i: number) => {
             if (i < candidates.length) {
                 KGlobalAccel.call("getGlobalShortcutsByKey", ["i"], [candidates[i]], (infos: string[][]|undefined) => {
-                    // a failed lookup says nothing about the key: it is not taken then
                     const taken = infos === undefined || Array.from(infos).some(info => String(info[2]) !== KGlobalAccel.component && !(String(info[2]) === "kwin" && String(info[0]) === twin));
                     if (!taken) {
                         free.push(candidates[i]);
@@ -484,8 +458,7 @@ function syncTwin(twin: string, wanted: number[], record: Map<string, number[]>,
     });
 }
 
-// Earlier versions registered their shortcuts in KWin's group as "kiri-*"
-// actions that were taken out (show-hotkey-overlay: 0.10.10 dev builds only), so they don't linger on Plasma's Shortcuts page
+// actions that were taken out, so they don't linger on Plasma's Shortcuts page
 const RETIRED_ACTIONS = ["show-hotkey-overlay"];
 
 function removeOldShortcuts() {

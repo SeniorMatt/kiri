@@ -11,21 +11,19 @@ class Column {
     public gridX: number;
     public widthBeforeMaximize: number|undefined;
     private width: number; // TODO: increase column width to contain transients
-    private presetIndex: number|undefined; // like niri's preset_width_idx: where the preset cycling stands; any other width change forgets it
-    private presetWidth: number|undefined; // the width that was asked for when `presetIndex` was set; clients may snap to a smaller one
+    private presetIndex: number|undefined;
+    private presetWidth: number|undefined;
     private readonly windows: LinkedList<Window>;
     private tabbed: boolean;
-    private normalSizing = true; // niri's sizing_mode is normal: no window is full-screen or maximized in the grid
+    private normalSizing = true;
     private focusTaker: Window|null;
-    // the output this column was on before its output was unplugged: it goes back there when the output returns
     public homeOutput: string | undefined = undefined;
-    private minHeightsSeen: number[] = []; // the minimum heights the last height distribution was made with
-    // while the user resizes one of the windows: the geometry the pointer asks for, before the client has committed
-    // it. The other windows of the column are sent there at once (niri sends all the configures of a resize together)
+    private minHeightsSeen: number[] = [];
+    // while the user resizes: the geometry the pointer asks for, before the client has committed it
     private userResizeTarget: { window: Window, width: number, leftEdge: boolean } | null = null;
-    private beyondView = false; // a width step made the column wider than the view (niri allows it)
+    private beyondView = false;
     private static readonly minWidth = 40;
-    private static readonly maxWidthBeyondView = 4; // times the view width: keeps the window under the GPU's texture size
+    private static readonly maxWidthBeyondView = 4;
     private static readonly minHeight = 40;
 
     constructor(grid: Grid, leftColumn: Column|null) {
@@ -48,10 +46,7 @@ class Column {
             for (const window of this.windows.iterator()) {
                 window.client.kwinClient.desktops = [targetGrid.desktop.kwinDesktop];
             }
-            // A column that was alone on its desktop has no neighbour to hand the focus to, so its window is still the
-            // active one. KWin does not announce the activation of the active window again, so the focus that
-            // follows the move would never reach the new grid: the view would stay where it was and the column
-            // could sit off-centre or half off the screen. The new grid learns of the focus here.
+            // KWin does not announce the activation of the active window again, so the new grid learns of the focus here
             const focused = this.getWindows().find(window => window.isFocused());
             if (focused !== undefined) {
                 this.onWindowFocused(focused);
@@ -109,7 +104,6 @@ class Column {
         return this.fillsWidth() ? this.grid.desktop.tilingArea.width : this.width;
     }
 
-    // whether the column contains a maximized or full-screen window that fills the width of the screen
     private fillsWidth() {
         for (const window of this.windows.iterator()) {
             if (window.fillsWidth()) {
@@ -128,8 +122,7 @@ class Column {
         return true;
     }
 
-    // A window of the column changed its full-screen or maximized state while the view was at `scrollX`.
-    // Returns true when the column is back to its normal size, then the caller restores the view once the layout is updated.
+    // a window changed its full-screen or maximized state; returns true when the column is back to its normal size
     public updateSizingMode(scrollX: number) {
         const normal = this.isNormalSizing();
         if (normal === this.normalSizing) {
@@ -142,7 +135,6 @@ class Column {
         return normal;
     }
 
-    // returns how far the column's windows reach past its left and right edges
     public getOverflow(): [number, number] {
         let overflowLeft = 0;
         let overflowRight = 0;
@@ -165,7 +157,6 @@ class Column {
         return Math.min(maxMinWidth, this.grid.desktop.tilingArea.width); // min width mustn't exceed tilingArea width
     }
 
-    // `beyondView`: the limit for niri's width steps (Meta+=), which may make a column wider than the screen
     public getMaxWidth(beyondView = false) {
         let minMaxWidth = this.grid.desktop.tilingArea.width * (beyondView ? Column.maxWidthBeyondView : 1);
         for (const window of this.windows.iterator()) {
@@ -177,8 +168,7 @@ class Column {
         return Math.max(minMaxWidth, this.getMinWidth()); // max width mustn't be lower than min width
     }
 
-    // `beyondView`: the width was asked for by a width step and may exceed the screen; once a column is that
-    // wide, later updates (the client's own frame) may keep it so until it is narrowed back into the view
+    // the width was asked for by a width step and may exceed the screen
     public setWidth(width: number, setPreferred: boolean, keepPreset = false, beyondView = false) {
         const viewMax = this.getMaxWidth();
         if (beyondView) {
@@ -205,7 +195,6 @@ class Column {
         this.grid.onColumnWidthChanged(this);
     }
 
-    // remembers that the width was just set to `widths[index]` where `widths` is the list of presets that is cycled through
     public setPresetIndex(index: number, widths: number[]) {
         this.presetIndex = index >= 0 && index < widths.length ? index : undefined;
         this.presetWidth = this.presetIndex === undefined ? undefined : widths[this.presetIndex];
@@ -215,7 +204,7 @@ class Column {
         return this.fillsWidth() ? undefined : this.presetIndex;
     }
 
-    // the width the user asked for with the last preset; the client may have snapped to a slightly smaller one
+    // the width of the last preset; the client may have snapped to a smaller one
     public getNominalWidth() {
         return this.getPresetIndex() !== undefined ? this.presetWidth! : this.getWidth();
     }
@@ -271,16 +260,12 @@ class Column {
         this.grid.desktop.recenterWhileResizing(this, this.grid.getLastFocusedColumn() === this);
     }
 
-    // the pointer asks for `requested` (the window had `previous` at the last step; `leftEdge`: the left edge is dragged): the
-    // column's windows get the new sizes now, without waiting for the resized client's commit. Other columns still follow
-    // the committed geometry. Returns the geometry the layout allows the dragged window, which is `requested` unless the
-    // pointer asks for more than the column can give (a size limit of this or another window of the column).
+    // the pointer asks for `requested`: the column's windows get the new sizes now; returns the geometry the layout allows
     public onUserResizeRequested(window: Window, requested: QmlRect, previous: QmlRect, leftEdge: boolean) {
         const width = clamp(requested.width, this.getMinWidth(), this.getMaxWidth());
         this.userResizeTarget = { window: window, width: width, leftEdge: leftEdge };
         if (requested.height !== previous.height) {
-            // like niri: the dragged window gets the height under the pointer and the rest of the column shares what is
-            // left; the top edge of the first window does nothing
+            // like niri: the dragged window gets the height under the pointer, the rest shares what is left
             const top = requested.y !== previous.y;
             if (!(top && this.isTopWindow(window))) {
                 this.setFixedHeight(window, requested.height, null);
@@ -290,7 +275,6 @@ class Column {
         if (this.tabbed || window.height <= 0) {
             return requested;
         }
-        // the pointer-driven frame keeps the edge that is not dragged where it is
         const height = Math.min(requested.height, window.height);
         const clampedWidth = Math.min(requested.width, width);
         const y = requested.y !== previous.y ? requested.y + requested.height - height : requested.y;
@@ -306,14 +290,12 @@ class Column {
         return this.windows.getPrev(window) === null;
     }
 
-    // Karousel's keys that trade height with the neighbouring window; all heights become weights again afterwards
     public tradeWindowHeight(window: Window, heightDelta: number, top: boolean) {
         const otherWindow = top ? this.windows.getPrev(window) : this.windows.getNext(window);
         if (otherWindow === null) {
             return;
         }
 
-        // neither window gets smaller than its minimum
         heightDelta = Math.min(heightDelta, otherWindow.height - this.getMinWindowHeight(otherWindow));
         heightDelta = Math.max(heightDelta, this.getMinWindowHeight(window) - window.height);
         if (heightDelta === 0) {
@@ -328,7 +310,6 @@ class Column {
         this.grid.desktop.onLayoutChanged();
     }
 
-    // niri's convert_heights_to_auto: the weights keep the current heights, centred on the median height
     private convertHeightsToAuto() {
         const windows = Array.from(this.windows.iterator());
         const sorted = windows.map(window => window.height).sort((a, b) => a - b);
@@ -342,7 +323,6 @@ class Column {
         return Math.max(1, window.client.getMinHeight());
     }
 
-    // like niri's set-window-height: the window gets this height, the others share the rest by their weights
     public setFixedHeight(window: Window, height: number, presetIndex: number|null) {
         window.client.forgetLearnedHeight();
         if (window.fixedHeight === null) {
@@ -366,7 +346,6 @@ class Column {
         this.resizeWindows();
     }
 
-    // niri's reset-window-height: the window is auto-sized again (all windows of a tabbed column)
     public resetWindowHeight(window: Window) {
         window.client.forgetLearnedHeight();
         if (this.tabbed) {
@@ -379,7 +358,6 @@ class Column {
         this.resizeWindows();
     }
 
-    // returns the heights of the column's windows relative to the available height
     public getHeightRatios() {
         const heights = Array.from(this.windows.iterator()).map(window => window.height);
         const total = heights.reduce((a, b) => a + b, 0);
@@ -411,8 +389,7 @@ class Column {
         this.grid.desktop.onLayoutChanged();
     }
 
-    // niri runs update_tile_sizes again whenever a window commits new size limits; KWin has no signal for that, so the
-    // layout asks: a window whose minimum height changed (Chromium and Konsole report theirs late) gets a new distribution
+    // like niri's update_tile_sizes: a window whose minimum height changed gets a new distribution
     public minHeightsChanged() {
         const seen = this.minHeightsSeen;
         let i = 0;
@@ -430,8 +407,7 @@ class Column {
         }
     }
 
-    // Gives the windows their heights like niri's update_tile_sizes: fixed windows first, the rest of the column
-    // is shared by the weights of the auto windows (windows that need more than their share keep their minimum)
+    // like niri's update_tile_sizes: fixed windows first, the rest shared by the weights of the auto windows
     public resizeWindows() {
         const windows = Array.from(this.windows.iterator());
         const nWindows = windows.length;
@@ -446,8 +422,7 @@ class Column {
         let heightLeft = totalHeight;
         let weightLeft = 0;
         windows.forEach((window, i) => {
-            // niri: a window with an exact height (its minimum and maximum height are the same, from the client or
-            // from min-height and max-height rules) is a fixed one; the maximum also caps a fixed height
+            // niri: a window with an exact height (minimum equals maximum) is a fixed one
             const clientMax = window.client.getMaxHeight();
             const exact = clientMax > 0 && minHeights[i] === clientMax;
             if (window.fixedHeight !== null || exact) {
@@ -469,7 +444,6 @@ class Column {
             }
         });
 
-        // auto windows that don't get their minimum are fixed at it, which leaves less for the others
         let again = true;
         while (again) {
             again = false;
@@ -549,8 +523,7 @@ class Column {
         const target = this.userResizeTarget;
         for (const window of this.windows.iterator()) {
             if (target !== null && window !== target.window) {
-                // like niri, a tile that is not as wide as the column starts at the column's left edge, but when the left edge is
-                // dragged the column grows to the left (what the pointer asks for may not be committed yet)
+                // like niri, a tile narrower than the column starts at its left edge
                 window.arrange(target.leftEdge ? x + this.getWidth() - target.width : x, y, target.width, window.height, parked);
             } else {
                 window.arrange(x, y, this.getWidth(), window.height, parked);
@@ -559,14 +532,11 @@ class Column {
         }
     }
 
-    // Completely out of the view while the outputs are more than one (see Desktop.parkTop). Not while the user resizes.
     private isParked(visibleRange: Range, forceOpaque: boolean) {
         return !forceOpaque && this.grid.desktop.getParkOffset() !== null &&
             (this.getRight() <= visibleRange.getLeft() || this.getLeft() >= visibleRange.getRight());
     }
 
-    // every window gets the whole column (less the room of a tab indicator placed within the column), only the active one is
-    // raised above the others
     private arrangeTabbed(x: number, parked: boolean) {
         const area = this.grid.desktop.tilingArea;
         const width = this.getWidth();
@@ -583,7 +553,6 @@ class Column {
         this.grid.desktop.addTabIndicator(this.getTabIndicator(x + toLeft, area.y + toTop, width - toWidth, area.height - toHeight));
     }
 
-    // niri's tab_indicator.rs `extra_size`: room the windows give up to a tab indicator with `place-within-column`
     private tabIndicatorExtra() {
         const config = this.grid.config;
         if (!config.tabIndicatorEnabled || !config.tabIndicatorPlaceWithinColumn || (config.tabIndicatorHideWhenSingleTab && this.windows.length() === 1)) {
@@ -592,10 +561,8 @@ class Column {
         return Math.max(0, Math.round(config.tabIndicatorWidth) + Math.round(config.tabIndicatorGap));
     }
 
-    // niri's tab_indicator.rs `tab_rects`, for a column area (x, y, width, height) with the indicator fully open: the rectangle
-    // of every tab, in screen coordinates. Physical pixels are logical ones here (the effect rounds to physical pixels itself).
+    // niri's tab_rects for a column area with the indicator fully open, in screen coordinates
     public static tabRects(config: TabRectsConfig, count: number, x: number, y: number, width: number, height: number, progress = 1): { x: number, y: number, width: number, height: number }[] {
-        // Rust's f64::round: halves go away from zero
         const round = (value: number) => Math.sign(value) * Math.round(Math.abs(value));
         const max1 = (value: number) => Math.max(1, round(value));
         const tabWidth = max1(config.tabIndicatorWidth);
@@ -613,8 +580,8 @@ class Column {
         perTab = Math.max(1, Math.floor(perTab));
         const flooredLength = count * (perTab + gapsBetween) - gapsBetween;
         let onesLeft = Math.max(0, round(length - flooredLength));
-        const a = -gap - tabWidth; // across the tabs
-        const b = round((side - length) / 2); // along them
+        const a = -gap - tabWidth;
+        const b = round((side - length) / 2);
         let lx: number;
         let ly: number;
         switch (position) {
@@ -716,7 +683,7 @@ class Column {
         } else {
             this.windows.insertEnd(window);
         }
-        window.setAutoHeight(); // like niri, a window that enters a column gets an auto height
+        window.setAutoHeight();
 
         if (this.width === 0) {
             this.setWidth(window.client.preferredWidth, false);
@@ -725,9 +692,9 @@ class Column {
         }
 
         this.resizeWindows();
-        this.normalSizing = this.isNormalSizing(); // a window that arrives full-screen has no view offset to restore
+        this.normalSizing = this.isNormalSizing();
         if (widthBefore > 0 && this.getWidth() !== widthBefore) {
-            this.grid.onColumnWidthChanged(this); // a maximized window makes the column as wide as the screen
+            this.grid.onColumnWidthChanged(this);
         }
 
         if (window.isFocused()) {
@@ -739,14 +706,12 @@ class Column {
 
     public onWindowRemoved(window: Window, passFocus: FocusPassing.Type) {
         const lastWindow = this.windows.length() === 1;
-        // like niri: the window below takes the place of the removed one, the one above if it was the bottom one
         const windowToFocus = this.getBelowWindow(window) ?? this.getAboveWindow(window);
         const widthBefore = this.getWidth();
         const overflowBefore = this.getOverflow();
 
         this.windows.remove(window);
         if (!lastWindow) {
-            // niri: when the column gets back to its normal size because a tile left it, nothing is restored
             const normal = this.isNormalSizing();
             if (normal && !this.normalSizing) {
                 this.grid.clearViewRestore(this);
@@ -765,19 +730,19 @@ class Column {
             if (this.windows.length() === 1) {
                 const remaining = this.getFirstWindow();
                 if (remaining.fixedHeight === null) {
-                    remaining.heightWeight = 1; // niri: a lone auto window gets weight 1 again
+                    remaining.heightWeight = 1;
                 }
             }
             this.resizeWindows();
             const overflow = this.getOverflow();
             if (this.getWidth() !== widthBefore || overflow[0] !== overflowBefore[0] || overflow[1] !== overflowBefore[1]) {
-                this.grid.onColumnWidthChanged(this); // the maximized window that filled the screen left (the column keeps its width, the overflow past its edges goes)
+                this.grid.onColumnWidthChanged(this);
             }
             if (windowToFocus !== null) {
                 switch (passFocus) {
                 case FocusPassing.Type.Immediate:
                     windowToFocus.focus();
-                    this.grid.focusPasser.request(windowToFocus.client.kwinClient); // KWin may still drop the focus while closing
+                    this.grid.focusPasser.request(windowToFocus.client.kwinClient);
                     break;
                 case FocusPassing.Type.OnUnfocus:
                     this.grid.focusPasser.request(windowToFocus.client.kwinClient);
@@ -793,7 +758,7 @@ class Column {
         this.grid.onColumnFocused(this, window);
         this.focusTaker = window;
         if (this.tabbed) {
-            this.grid.desktop.forceArrange(); // the active tab changed
+            this.grid.desktop.forceArrange();
         }
     }
 

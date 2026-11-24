@@ -38,24 +38,23 @@
 #include <epoxy/gl.h>
 
 Q_LOGGING_CATEGORY(KIRI_DECO, "kiri.decorations", QtWarningMsg)
-Q_LOGGING_CATEGORY(KIRI_PAINT, "kiri.decorations.paint", QtWarningMsg) // per-frame painted geometry, for measuring
+Q_LOGGING_CATEGORY(KIRI_PAINT, "kiri.decorations.paint", QtWarningMsg)
 
 namespace KiriDecorations
 {
 
 namespace
 {
-constexpr int CaptureRole = 0x4B495249; // set by kiri_motion while it snapshots a window
-// set here on a parked window (see setParkedPositions): the QPointF from its real top-left corner to where it is painted
+constexpr int CaptureRole = 0x4B495249;
+// set on a parked window (see setParkedPositions): the offset from its real top-left corner to where it is painted
 constexpr int ParkedOffsetRole = 0x4B495250;
-constexpr double DraggedAlpha = 0.75; // niri's INTERACTIVE_MOVE_ALPHA
+constexpr double DraggedAlpha = 0.75;
 QString shaderPath(const QString &name)
 {
     return QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("kwin/shaders/") + name);
 }
 
-// niri's colours are CSS ones: "#rgb", "#rgba", "#rrggbb", "#rrggbbaa" (the alpha comes last, Qt's own parser takes it first),
-// rgb()/rgba()/hsl()/hsla(), and names
+// niri's colours are CSS ones: "#rgb", "#rgba", "#rrggbb", "#rrggbbaa" (alpha last), rgb()/rgba()/hsl()/hsla() and names
 bool parseColor(const QString &text, QColor &out)
 {
     const QString s = text.trimmed().toLower();
@@ -134,7 +133,6 @@ Gradient solid(const QColor &color)
     return g;
 }
 
-// niri's gradient properties on one line: "from=#80c8ff to=#bbddff angle=45 relative-to=workspace-view in=oklch longer hue"
 bool parseGradient(const QString &text, Gradient &out)
 {
     static const QRegularExpression key(QStringLiteral("(?:^|\\s)(from|to|angle|relative-to|in)="));
@@ -217,7 +215,6 @@ Gradient paint(const QVariantMap &m, const QString &colorKey, const QString &gra
     return solid(colorOr(m.value(colorKey).toString(), fallback));
 }
 
-// the two triangles of the parts of `rect` that KWin is repainting
 void appendQuads(std::vector<QVector2D> &vertices, const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion, const KWin::RectF &rect)
 {
     for (const KWin::Rect &deviceRect : deviceRegion.rects()) {
@@ -247,8 +244,7 @@ void renderBlended(const std::vector<QVector2D> &vertices)
     glDisable(GL_BLEND);
 }
 
-// niri's tab_indicator.rs `tab_rects`: the rectangle of every tab of an indicator beside `area` (a column's tile), in the
-// coordinates of `area`. `scale` is the output scale (niri rounds to physical pixels), `progress` the open animation.
+// like niri's tab_rects: the rectangle of every tab of an indicator beside `area`; `progress` is the open animation
 QList<QRectF> tabRects(const Settings &s, int count, const QRectF &area, double scale, double progress)
 {
     auto round = [scale](double v) { return std::round(v * scale) / scale; };
@@ -261,7 +257,7 @@ QList<QRectF> tabRects(const Settings &s, int count, const QRectF &area, double 
     const double side = vertical ? area.height() : area.width();
     const double minLength = round(side * std::clamp(s.tabLength, 0.0, 2.0));
     const double pixel = 1 / scale;
-    // px_per_tab is worked out before the animation touches gaps_between, so that it does not grow and shrink over the animation
+    // px_per_tab is worked out before the animation touches gaps_between
     const double shortest = count * (pixel + gapsShortest) - gapsShortest;
     const double requested = std::max(minLength, shortest);
     double perTab = (requested + gapsShortest) / count - gapsShortest;
@@ -313,11 +309,9 @@ double Effect::clock() const
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - m_clockStart).count();
 }
 
-// niri's expanded_progress: a spring (window-resize parameters) from 0 to 1 when the window becomes full screen or
-// reaches the screen edges, from 1 to 0 when it stops being so
+// like niri's expanded_progress: a spring from 0 to 1 when the window becomes full screen or reaches the screen edges
 double Effect::expandedProgress(KWin::EffectWindow *w) const
 {
-    // a window that is only told it is full-screen (niri's toggle-windowed-fullscreen) stays a tile: expanded needs the frame to cover the screen
     bool expanded = w->isFullScreen() && !w->screen();
     if (!expanded) {
         if (const auto *output = w->screen()) {
@@ -325,7 +319,6 @@ double Effect::expandedProgress(KWin::EffectWindow *w) const
             const KWin::RectF frame = w->frameGeometry();
             expanded = frame.width() >= screen.width() - 0.5 && frame.height() >= screen.height() - 0.5;
             if (!expanded && w->isNormalWindow()) {
-                // maximized next to a panel: the frame fills the work area, not the screen
                 const auto area = KWin::effects->clientArea(KWin::MaximizeArea, w);
                 expanded = area.width() > 0 && frame.width() >= area.width() - 0.5 && frame.height() >= area.height() - 0.5
                     && frame.left() <= area.left() + 0.5 && frame.top() <= area.top() + 0.5;
@@ -351,8 +344,7 @@ double Effect::expandedProgress(KWin::EffectWindow *w) const
     return value();
 }
 
-// niri's tab indicator open animation: the tabs grow from nothing, with window-movement's spring when a column
-// becomes tabbed, with window-open's 150 ms ease-out-expo when its first window appears as a tab
+// niri's tab indicator open animation
 double Effect::tabProgress(const TabGroup &group) const
 {
     const auto it = m_tabOpen.constFind(group.windows.first());
@@ -368,7 +360,7 @@ double Effect::tabProgress(const TabGroup &group) const
     if (it->second) {
         return std::max(0.0, NiriAnim::openAnim().value(t));
     }
-    return std::max(0.0, 1.0 - NiriAnim::moveSpring().value(t)); // the move spring runs 1 -> 0
+    return std::max(0.0, 1.0 - NiriAnim::moveSpring().value(t));
 }
 
 void Effect::prePaintScreen(KWin::ScreenPrePaintData &data)
@@ -377,9 +369,7 @@ void Effect::prePaintScreen(KWin::ScreenPrePaintData &data)
     KWin::OffscreenEffect::prePaintScreen(data);
 }
 
-// The first draw with a shader makes the driver finish compiling it for the render target in use, which costs
-// 10-30 ms in the middle of the first window's paint. Done once, a few seconds after load (the first frames at login are
-// not touched), into a 64x64 texture that is thrown away. The GL context is current in postPaintScreen.
+// the first draw with a shader makes the driver compile it, which costs 10-30 ms: done once a few seconds after load into a throwaway texture
 void Effect::warmShaders()
 {
     m_warmed = true;
@@ -447,8 +437,7 @@ void Effect::warmShaders()
     glDisable(GL_BLEND);
     KWin::GLFramebuffer::popFramebuffer();
     glViewport(viewportBefore[0], viewportBefore[1], viewportBefore[2], viewportBefore[3]);
-    // leave the framebuffer bindings exactly as they were (popFramebuffer has nothing to go back to when KWin has none
-    // pushed between frames), and say so in the journal if anything was off
+    // leave the framebuffer bindings as they were, and log if anything was off
     GLint drawFboAfter = 0, readFboAfter = 0;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFboAfter);
     glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &readFboAfter);
@@ -471,7 +460,7 @@ void Effect::postPaintScreen()
     const double speed = factor > 0 ? 1.0 / factor : 0;
     bool again = false;
     for (auto it = m_expanded.begin(); it != m_expanded.end();) {
-        if (it.key()->isDeleted() && it->to == 1) { // closed but still fading out
+        if (it.key()->isDeleted() && it->to == 1) {
             it = m_expanded.erase(it);
             continue;
         }
@@ -485,7 +474,7 @@ void Effect::postPaintScreen()
         if (it->toReal && done) {
             m_parkPainted.remove(it.key());
             it = m_park.erase(it);
-            again = true; // one more frame at the real place
+            again = true;
             continue;
         }
         if (!done) {
@@ -497,7 +486,7 @@ void Effect::postPaintScreen()
         const bool done = speed <= 0 || NiriAnim::moveSpring().isDone((m_frameTime - it->start) * speed);
         if (done && it->to == 1.0) {
             it = m_alpha.erase(it);
-            again = true; // one more frame at full opacity
+            again = true;
         } else {
             again = again || !done;
             ++it;
@@ -507,7 +496,7 @@ void Effect::postPaintScreen()
         const double length = it->second ? NiriAnim::openAnim().duration() : NiriAnim::moveSpring().duration();
         if (speed <= 0 || (m_frameTime - it->first) * speed >= length) {
             it = m_tabOpen.erase(it);
-            again = true; // one more frame with the finished indicator
+            again = true;
         } else {
             again = true;
             ++it;
@@ -515,11 +504,11 @@ void Effect::postPaintScreen()
     }
     for (auto it = m_releasing.begin(); it != m_releasing.end();) {
         if (it->start < 0 && m_frameTime - it->created > 0.3) {
-            it->start = m_frameTime; // the window never moved: the offset runs out where it is
+            it->start = m_frameTime;
         }
         if (it->start >= 0 && (speed <= 0 || NiriAnim::moveSpring().isDone((m_frameTime - it->start) * speed))) {
             it = m_releasing.erase(it);
-            again = true; // one more frame at the real place
+            again = true;
         } else {
             again = true;
             ++it;
@@ -569,7 +558,6 @@ Effect::Effect()
         }
     });
     auto watch = [this](KWin::EffectWindow *w) {
-        // the contents of a parked window are painted far from where KWin thinks they are: the damage must follow
         connect(w, &KWin::EffectWindow::windowDamaged, this, [this](KWin::EffectWindow *w) {
             if (!m_park.isEmpty()) {
                 if (const auto it = m_parkPainted.constFind(w->internalId()); it != m_parkPainted.constEnd()) {
@@ -577,9 +565,7 @@ Effect::Effect()
                 }
             }
         });
-        // The pointer was let go: Kiri puts the window in its place and clears the visual position by D-Bus, which can arrive
-        // after the real geometry has changed (and kiri_motion has started to animate it). The offset between where the
-        // window was painted and its real place is taken here, while that real place is still the one it was painted for.
+        // the pointer was let go: Kiri clears the visual position by D-Bus, which can arrive after the real geometry changed; the offset to the old place is taken here
         connect(w, &KWin::EffectWindow::windowFinishUserMovedResized, this, [this](KWin::EffectWindow *w) {
             const QUuid id = w->internalId();
             if (m_visualPositions.contains(id) && m_lastVisualOffset.contains(id)) {
@@ -589,8 +575,6 @@ Effect::Effect()
                 KWin::effects->addRepaintFull();
             }
         });
-        // the ring is outside of the window: when the window stops being painted (minimized, hidden, on another desktop)
-        // KWin repaints the window's own area only, and the ring stays on the screen
         auto stateChanged = [this](KWin::EffectWindow *w) {
             repaintAround(w);
         };
@@ -603,10 +587,9 @@ Effect::Effect()
         });
         connect(w, &KWin::EffectWindow::windowFrameGeometryChanged, this, [this](KWin::EffectWindow *w, const KWin::RectF &old) {
             if (auto release = m_releasing.find(w->internalId()); release != m_releasing.end() && release->start < 0 && old.topLeft() != w->frameGeometry().topLeft()) {
-                release->start = clock(); // the real window is where it belongs now: the offset to the old place runs out from here
+                release->start = clock();
             }
-            // Kiri has parked the window (moved it to the bottom-right corner): it stays painted where it was until the place
-            // Kiri wants for it arrives (by D-Bus, a moment later)
+            // Kiri has parked the window: it stays painted where it was until the place Kiri wants for it arrives
             if (w->isX11Client() && w->isFullScreen() && !m_park.contains(w->internalId())) {
                 const QRectF screen = w->screen() ? QRectF(w->screen()->geometry()) : QRectF();
                 const QPointF parkPoint(screen.right() - 1, screen.bottom() - 1);
@@ -615,7 +598,6 @@ Effect::Effect()
                     m_park.insert(w->internalId(), ParkAnim{there, there, false, clock()});
                 }
             }
-            // the ring is outside of what KWin repaints for the window itself
             const double reach = this->reach();
             KWin::effects->addRepaint(old.adjusted(-reach, -reach, reach, reach));
             repaintPainted(w);
@@ -659,7 +641,7 @@ Effect::Effect()
         m_parkPainted.remove(w->internalId());
         m_painted.remove(w);
         m_alpha.remove(w->internalId());
-        m_expanded.remove(w); // KWin frees the window right after this
+        m_expanded.remove(w);
     });
 }
 
@@ -668,7 +650,6 @@ Effect::~Effect()
     QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/KiriDecorations"));
 }
 
-// asks Kiri's own shortcut of that name to run (the script has no other way to hear from this effect)
 void Effect::invokeShortcut(const QString &shortcut)
 {
     QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/component/kiri"),
@@ -684,9 +665,7 @@ void Effect::invokeShortcut(const QString &shortcut)
     qCDebug(KIRI_DECO) << "invoked" << shortcut;
 }
 
-// Mouse wheel and mouse button binds like niri's (Mod+WheelScrollDown, Mod+MouseMiddle). KWin scripts can't bind them,
-// so this effect does and asks Kiri's own shortcuts to do the work through kglobalaccel. Every bind has its own
-// cooldown like niri's `cooldown-ms` (150 ms on the workspace binds in niri's default config, none on the others).
+// mouse wheel and button binds like niri's; KWin scripts can't bind them, so this effect does and runs Kiri's shortcuts, with a cooldown per bind like `cooldown-ms`
 void Effect::bind(Qt::KeyboardModifiers modifiers, const QString &trigger, const QString &shortcut, int cooldownMs)
 {
     static const QHash<QString, KWin::PointerAxisDirection> axes = {
@@ -726,15 +705,13 @@ void Effect::debugWheel(int i)
     }
 }
 
-// The binds are the `pointerBinds` setting: one per line: "Meta+Ctrl+WheelScrollDown=column-move-to-next-desktop@150" (";" separates too)
-// (<modifiers>+<trigger>=<Kiri shortcut>[@<cooldown ms>], separated by ; or new lines). KWin drops a shortcut when
-// its QAction is destroyed, so a changed setting just starts over.
+// the binds are the `pointerBinds` setting: "<modifiers>+<trigger>=<Kiri shortcut>[@<cooldown ms>]", separated by ; or new lines
 void Effect::registerPointerBinds()
 {
     m_wheelActions.clear();
     m_pointerBindsRegistered = true;
     if (!m_settings.kiriEnabled) {
-        return; // a bind that nothing answers must not take the wheel and the buttons from other applications
+        return;
     }
     for (const QString &entry : m_settings.pointerBinds.split(QRegularExpression(QStringLiteral("[;\r\n]")), Qt::SkipEmptyParts)) {
         const int equals = entry.indexOf(QLatin1Char('='));
@@ -777,7 +754,6 @@ bool Effect::supported()
     return KWin::effects->isOpenGLCompositing();
 }
 
-// the look of a window from a settings map: the keys of Kiri's config (src/lib/config/definition.ts)
 Look Effect::parseLook(const QVariantMap &m) const
 {
     Look look;
@@ -818,7 +794,6 @@ Look Effect::parseLook(const QVariantMap &m) const
     return look;
 }
 
-// niri's window-rule merge: the rule's fields replace the look's, a colour replaces a gradient and the other way round
 void Effect::applyOverride(Look &look, const QVariantMap &rule) const
 {
     if (QColor c; parseColor(rule.value(QStringLiteral("fullscreenBackdropColor")).toString(), c)) {
@@ -894,7 +869,6 @@ Settings Effect::parseSettings(const QVariantMap &m, bool kiriEnabled) const
     s.tabGapsBetween = std::max(0, integer(m, "tabIndicatorGapsBetweenTabs", 0));
     s.tabCornerRadius = std::max(0, integer(m, "tabIndicatorCornerRadius", 0));
     s.tabLength = std::clamp(real(m, "tabIndicatorLength", 0.5), 0.0, 2.0);
-    // an enum is stored by the name of its choice, or by its number
     static const QStringList positions = {QStringLiteral("left"), QStringLiteral("right"), QStringLiteral("top"), QStringLiteral("bottom")};
     const QString position = str(m, "tabIndicatorPosition", QStringLiteral("left"));
     bool isNumber = false;
@@ -914,7 +888,6 @@ Settings Effect::parseSettings(const QVariantMap &m, bool kiriEnabled) const
             s.outputBackgrounds.insert(it.key(), c);
         }
     }
-    // the default is niri's default config's wheel binds (keep in step with `pointerBinds` in src/lib/config/definition.ts)
     s.pointerBinds = str(m, "pointerBinds", QStringLiteral(
         "Meta+WheelScrollDown=desktop-next@150\n"
         "Meta+WheelScrollUp=desktop-previous@150\n"
@@ -933,7 +906,7 @@ Settings Effect::parseSettings(const QVariantMap &m, bool kiriEnabled) const
 
 void Effect::loadSettings()
 {
-    NiriAnim::load(); // niri's `animations` block
+    NiriAnim::load();
     auto config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
     config->reparseConfiguration();
     const bool enabled = config->group(QStringLiteral("Plugins")).readEntry("kiriEnabled", false);
@@ -950,7 +923,6 @@ void Effect::loadSettings()
     if (!m_pointerBindsRegistered || m_settings.pointerBinds != oldBinds || enabled != oldEnabled) {
         registerPointerBinds();
     }
-    // the looks of the windows with overrides follow the global one
     m_looks.clear();
     m_anyBaba = false;
     for (auto it = m_overrides.constBegin(); it != m_overrides.constEnd(); ++it) {
@@ -1003,8 +975,7 @@ void Effect::setUrgentWindows(const QString &json)
     }
 }
 
-// niri's baba_is_float_offset: amplitude * (sin(2 pi t / 3.6 s) - 1), the amplitude a 96th of the output's height, rounded to
-// a device pixel; the window only ever moves up
+// niri's baba_is_float_offset: amplitude * (sin(2 pi t / 3.6 s) - 1), the amplitude a 96th of the output's height
 double Effect::babaOffset(KWin::EffectWindow *w) const
 {
     if (!lookOf(w).baba || !decorated(w) || !w->screen()) {
@@ -1027,7 +998,6 @@ const Look &Effect::lookOf(KWin::EffectWindow *w) const
     return m_settings.look;
 }
 
-// how far the decorations reach beyond a window's frame: the repaint area around it
 void Effect::updateReach()
 {
     auto reachOf = [](const Look &look) {
@@ -1089,7 +1059,6 @@ bool Effect::isX11Window(const QString &id)
 
 void Effect::setInsertHint(const QString &json)
 {
-    // {"r": [x, y, w, h], "w": "{uuid}"}: the hint rectangle and the window being dragged; anything else clears it
     const QJsonObject object = QJsonDocument::fromJson(json.toUtf8()).object();
     const QJsonArray a = object.value(QStringLiteral("r")).toArray();
     const KWin::RectF hint = a.size() == 4 ? KWin::RectF(a[0].toDouble(), a[1].toDouble(), a[2].toDouble(), a[3].toDouble()) : KWin::RectF();
@@ -1115,8 +1084,7 @@ void Effect::setInsertHint(const QString &json)
     }
 }
 
-// niri's insert hint (config insert-hint): filled with a colour or gradient, with the dragged window's corner radius plus
-// its border width, drawn like niri does it (insert_hint_element.rs is a focus ring of width 0 that fills its rectangle).
+// niri's insert hint: filled with a colour or gradient, drawn like a focus ring of width 0
 void Effect::drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion)
 {
     if (m_insertHint.isEmpty() || deviceRegion.isEmpty() || !m_settings.insertHintEnabled) {
@@ -1135,7 +1103,6 @@ void Effect::drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Re
     m_ringShader->setUniform("alpha", 1.0f);
     QRectF area(m_insertHint.x(), m_insertHint.y(), m_insertHint.width(), m_insertHint.height());
     if (m_settings.insertHint.viewRelative) {
-        // niri: the view of the workspace, which is the screen the hint is on
         for (KWin::LogicalOutput *output : KWin::effects->screens()) {
             if (QRectF(output->geometry()).intersects(area)) {
                 area = QRectF(output->geometry());
@@ -1150,7 +1117,6 @@ void Effect::drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Re
     KWin::ShaderManager::instance()->popShader();
 }
 
-// niri's border.rs gradient parameters: the gradient vector for an angle over the gradient area, the colours and the space
 void Effect::setGradient(KWin::GLShader *shader, int layer, const Gradient &g, const QRectF &area) const
 {
     const double angle = (g.angle - 90) * M_PI / 180;
@@ -1159,7 +1125,7 @@ void Effect::setGradient(KWin::GLShader *shader, int layer, const Gradient &g, c
     if ((dir.x() < 0 && 0 <= dir.y()) || (0 <= dir.x() && dir.y() < 0)) {
         diag.setX(-area.width());
     }
-    const double along = diag.x() * dir.x() + diag.y() * dir.y(); // dir has length 1
+    const double along = diag.x() * dir.x() + diag.y() * dir.y();
     QPointF vec(dir.x() * along, dir.y() * along);
     if (dir.y() < 0) {
         vec = -vec;
@@ -1171,8 +1137,7 @@ void Effect::setGradient(KWin::GLShader *shader, int layer, const Gradient &g, c
     shader->setUniform(("gMisc[" + n + "]").constData(), QVector4D(vec.x(), vec.y(), g.space, g.hue));
 }
 
-// The hint is drawn over everything except the dragged window (drawWindow draws it under that one, so the
-// window, translucent while it is loose, stays on top of its own hint like in niri).
+// the hint is drawn under the dragged window, which stays on top of it like in niri
 KIRI_PAINT_RET Effect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, int mask, const KWin::Region &deviceRegion, KWin::LogicalOutput *screen)
 {
     const bool result = KIRI_CALL(OffscreenEffect::paintScreen(renderTarget, viewport, mask, deviceRegion, screen));
@@ -1237,7 +1202,6 @@ void Effect::setTabGroups(const QString &json)
         }
         groups.push_back(group);
     }
-    // repaint the columns that changed, and the ones that are gone
     auto repaint = [this](const QList<TabGroup> &list) {
         for (const TabGroup &group : list) {
             for (const QUuid &uuid : group.windows) {
@@ -1249,7 +1213,6 @@ void Effect::setTabGroups(const QString &json)
     };
     if (groups.size() != m_tabGroups.size() || !std::equal(groups.begin(), groups.end(), m_tabGroups.begin(), [](const TabGroup &a, const TabGroup &b) { return a.windows == b.windows && a.active == b.active; })) {
         repaint(m_tabGroups);
-        // a column that was not tabbed before (none of its windows had an indicator) gets the open animation
         for (const TabGroup &group : std::as_const(groups)) {
             const bool known = std::any_of(group.windows.begin(), group.windows.end(), [this](const QUuid &id) { return m_tabGroupOf.contains(id); });
             if (!known && m_frameTime > 0) {
@@ -1270,7 +1233,6 @@ QPointF Effect::parkedPosition(KWin::EffectWindow *w, const ParkAnim &anim) cons
 {
     const QPointF target = anim.toReal ? w->frameGeometry().topLeft() : anim.to;
     const double factor = NiriAnim::timeFactor();
-    // niri's spring runs from 1 (at the start) to 0: the part of the way that is still to go
     const double k = factor > 0 ? NiriAnim::moveSpring().value((m_frameTime - anim.start) / factor) : 0.0;
     return target + (anim.from - target) * k;
 }
@@ -1281,8 +1243,7 @@ bool Effect::isParked(KWin::EffectWindow *w) const
     return it != m_park.constEnd() && !it->toReal;
 }
 
-// A parked window has no place of its own on the screen, so a click on where it is painted goes to nothing: focus it
-// (Kiri scrolls it into view when it is activated), unless another window is above it there.
+// a click on a parked window's painted place focuses it, unless another window is above it
 void Effect::clickOnParked(const QPointF &pos)
 {
     const auto windows = KWin::effects->stackingOrder();
@@ -1320,7 +1281,6 @@ void Effect::setParkedPositions(const QString &json)
         if (old != m_park.constEnd() && !old->toReal && old->to == to) {
             continue;
         }
-        // while kiri_swipe paints a touchpad swipe it compensates for every change of the real places at once: so must this
         const bool instant = KWin::effects->property("kiriSwipeVisual").toBool();
         const QPointF from = instant ? to : (m_parkPainted.contains(uuid) ? m_parkPainted.value(uuid) : w->frameGeometry().topLeft());
         m_park.insert(uuid, ParkAnim{from, to, false, clock()});
@@ -1359,8 +1319,7 @@ void Effect::setVisualPositions(const QString &json)
         }
     };
     repaint(m_visualPositions);
-    // niri's animate_move_from: when the painted place stops being decided by Kiri (the pointer let go, or the window
-    // left the grid), what is left of the offset to the real place is animated away
+    // niri's animate_move_from: what is left of the offset to the real place is animated away
     for (auto it = m_visualPositions.cbegin(); it != m_visualPositions.cend(); ++it) {
         if (!positions.contains(it.key()) && m_lastVisualOffset.contains(it.key())) {
             m_releasing.insert(it.key(), VisualRelease{m_lastVisualOffset.value(it.key()), -1, clock()});
@@ -1407,7 +1366,7 @@ bool Effect::provides(Feature feature)
 
 int Effect::requestedEffectChainPosition() const
 {
-    return 99; // late, so it sees the final position and scale other effects give the window
+    return 99;
 }
 
 bool Effect::blocksDirectScanout() const
@@ -1415,9 +1374,7 @@ bool Effect::blocksDirectScanout() const
     return false;
 }
 
-// Windows that get a ring, a border and rounded corners. Kiri tiles most normal windows and floats the
-// rest; niri decorates floating windows too, so this does not try to tell them apart. Menus, panels,
-// pop-ups and windows that skip the taskbar (krunner and the like) are left alone.
+// windows that get a ring, a border and rounded corners; like niri, floating windows too. Menus, panels, pop-ups and windows that skip the taskbar are left alone
 bool Effect::decorated(KWin::EffectWindow *w) const
 {
     if (!isActive() || w->isSpecialWindow()) {
@@ -1427,10 +1384,8 @@ bool Effect::decorated(KWin::EffectWindow *w) const
         return false;
     }
     if (w->caption().startsWith(QLatin1String("kiri-ring-"))) {
-        return false; // the fallback ring windows of the Kiri script
+        return false;
     }
-    // a window that is full screen or fills its screen (maximized, or Kiri's "maximized in grid" without gaps) has no
-    // corners, ring or border once the fade out is done
     return expandedProgress(w) < 1.0;
 }
 
@@ -1457,7 +1412,6 @@ void Effect::repaintAround(KWin::EffectWindow *w)
 {
     if (!w->isDeleted()) {
         KWin::effects->addRepaint(outerBounds(w));
-        // a tab indicator can be longer than the window (length total-proportion up to 2)
         if (const TabGroup *group = tabGroupOf(w)) {
             if (const auto it = m_tabHits.constFind(group->windows.first()); it != m_tabHits.constEnd()) {
                 for (const QRectF &rect : it->rects) {
@@ -1466,22 +1420,20 @@ void Effect::repaintAround(KWin::EffectWindow *w)
             }
         }
     }
-    repaintPainted(w); // where the ring was drawn last may be somewhere else (an animation moves the window)
+    repaintPainted(w);
 }
 
 void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data)
 {
     if (radiusFor(w) > 0 || (decorated(w) && lookOf(w).shadow.on)) {
-        data.setTranslucent(); // the cut corners show what is behind the window, and so does a shadow that is not under it
+        data.setTranslucent();
     }
     if (decorated(w)) {
-        // The ring, border and tab indicator are outside of the window. KWin paints a window that is not transformed
-        // only inside its bounding rect (the frame and its shadow, and a window without a title bar has none), which
-        // cut the ring away whenever the window had no shadow, as a window that is dragged out of the layout has not.
+        // KWin clips a window that is not transformed to its bounding rect, which cut the ring away
         data.setTransformed();
     }
     if (m_visualPositions.contains(w->internalId()) || m_releasing.contains(w->internalId()) || m_park.contains(w->internalId())) {
-        data.setTransformed(); // painted somewhere else than where KWin thinks it is
+        data.setTransformed();
     }
     if (m_alpha.contains(w->internalId())) {
         data.setTranslucent();
@@ -1489,8 +1441,7 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     if (m_anyBaba && babaOffset(w) != 0) {
         data.setTransformed();
     }
-    // kiri_swipe (which paints before this effect) reads where a parked window is painted: it has to be this frame's place, not
-    // the last frame's, or the window jumps for one frame when it gets parked or unparked or its place changes
+    // kiri_swipe reads where a parked window is painted: it has to be this frame's place, not the last one's
     if (const auto parkIt = m_park.constFind(w->internalId()); parkIt != m_park.constEnd()) {
         w->setData(ParkedOffsetRole, parkedPosition(w, *parkIt) - w->frameGeometry().topLeft());
     } else if (w->data(ParkedOffsetRole).isValid()) {
@@ -1501,7 +1452,6 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
 
 KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
 {
-    // niri's layout background-color: the wallpaper is Plasma's desktop window, which is painted as a solid colour instead
     QColor background = m_settings.background;
     if (w->isDesktop() && w->screen()) {
         background = m_settings.outputBackgrounds.value(w->screen()->name(), background);
@@ -1537,7 +1487,6 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
     } else if (w->data(ParkedOffsetRole).isValid()) {
         w->setData(ParkedOffsetRole, QVariant());
     }
-    // Kiri moves the painted window instead of the real one while the user resizes it
     const auto visualIt = m_visualPositions.constFind(w->internalId());
     if (visualIt != m_visualPositions.constEnd()) {
         data.setXTranslation(data.xTranslation() + visualIt->x() - w->frameGeometry().x());
@@ -1557,7 +1506,6 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
         data.multiplyOpacity(alphaOf(w->internalId()));
     }
     if (isActive() && !w->data(CaptureRole).toBool() && (w->isNormalWindow() || w->isDialog())) {
-        // under the window, where the window is painted now (other effects may be moving or scaling it)
         const KWin::RectF f = w->frameGeometry();
         const KWin::RectF painted(f.x() + data.xTranslation(), f.y() + data.yTranslation(), f.width() * data.xScale(), f.height() * data.yScale());
         drawBackdrop(viewport, w, painted, deviceRegion, data.opacity());
@@ -1566,10 +1514,9 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
         }
     }
     if (!m_insertHint.isEmpty() && !m_hintWindow.isNull() && w->internalId() == m_hintWindow && isActive() && !w->data(CaptureRole).toBool()) {
-        drawInsertHint(viewport, deviceRegion); // under the dragged window
+        drawInsertHint(viewport, deviceRegion);
     }
     if (KIRI_PAINT().isDebugEnabled() && w->isNormalWindow() && !w->data(CaptureRole).toBool()) {
-        // where the window really ends up on screen (after the visual position and kiri_motion's animation), for measuring
         const KWin::RectF f = w->frameGeometry();
         qCDebug(KIRI_PAINT).noquote() << "PD" << QDateTime::currentMSecsSinceEpoch() << qint64(m_frameTime * 1000) << w->caption()
                                       << qRound(f.x() + data.xTranslation()) << qRound(f.y() + data.yTranslation())
@@ -1589,12 +1536,11 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
     }
     const bool result = KIRI_CALL(OffscreenEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data));
     if (w->data(CaptureRole).toBool()) {
-        KIRI_RET(result); // kiri_motion is taking a snapshot of the window: the ring and tab indicator are not part of it
+        KIRI_RET(result);
     }
 
     {
-        // where the window and its ring are drawn this frame; when that changes (a resize, the visual offset,
-        // another effect moving it), the old place is cleared, or the ring stays behind as a trail
+        // where the window and its ring are drawn this frame; when that changes the old place is cleared
         const KWin::RectF frame = w->frameGeometry();
         const double reach = this->reach();
         const KWin::RectF painted = KWin::RectF(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
@@ -1610,13 +1556,11 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
     const double fade = decorated(w) ? 1.0 - expandedProgress(w) : 0.0;
     const Look &look = lookOf(w);
     if (decorated(w) && ((look.border.enabled && look.border.width > 0) || (w == m_active && look.ring.enabled && look.ring.width > 0))) {
-        // where the window really is painted right now, other effects may be moving or scaling it
         const KWin::RectF frame = w->frameGeometry();
         const KWin::RectF visual(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
                                  frame.width() * data.xScale(), frame.height() * data.yScale());
         drawRing(viewport, w, visual, deviceRegion, data.opacity() * fade);
     }
-    // the tab indicator of a tabbed column belongs to its shown window
     if (m_settings.tabEnabled && isActive() && fade > 0) {
         if (const TabGroup *group = tabGroupOf(w); group && group->windows.value(group->active) == w->internalId()
             && (group->windows.size() >= 2 || !m_settings.tabHideWhenSingle)) {
@@ -1660,9 +1604,7 @@ void Effect::fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &r
     KWin::ShaderManager::instance()->popShader();
 }
 
-// niri's tab indicator (tab_indicator.rs): one rectangle per window beside the column, each with the gradient of its window's
-// state (urgent, active, inactive), dimmed when the column is not the active one. `frame` is where the shown window is painted
-// now, which is niri's tab indicator area.
+// niri's tab indicator: one rectangle per window beside the column, in the gradient of its state, dimmed when the column is not active; `frame` is where the shown window is painted
 void Effect::drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, KWin::EffectWindow *active, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, double progress)
 {
     const int count = group.windows.size();
@@ -1692,13 +1634,11 @@ void Effect::drawTabIndicator(const KWin::RenderViewport &viewport, const TabGro
         KWin::EffectWindow *tabWindow = KWin::effects->findWindow(group.windows[i]);
         const Look &look = tabWindow ? lookOf(tabWindow) : m_settings.look;
         const int state = m_urgent.contains(group.windows[i]) ? 2 : (i == group.active ? 0 : 1);
-        // the rule's colour, then the tab indicator's, then the focus ring's (or the border's when the ring is off)
         Gradient g = look.tabColors.set[state] ? look.tabColors.colors[state] : (look.ring.enabled ? look.ring.colors[state] : look.border.colors[state]);
         if (!columnActive) {
             g.from.setAlphaF(g.from.alphaF() * 0.5);
             g.to.setAlphaF(g.to.alphaF() * 0.5);
         }
-        // tabs that touch share the rounded corners: only the ends of the strip are round
         double tl = r, tr = r, br = r, bl = r;
         if (shared) {
             if (i == 0) {
@@ -1717,7 +1657,6 @@ void Effect::drawTabIndicator(const KWin::RenderViewport &viewport, const TabGro
                 tl = tr = br = bl = 0;
             }
         }
-        // CornerRadius::fit_to
         const double reduction = std::min(1.0, std::min(std::min(rect.width() / std::max(tl + tr, 1e-6), rect.width() / std::max(bl + br, 1e-6)),
                                                         std::min(rect.height() / std::max(tl + bl, 1e-6), rect.height() / std::max(tr + br, 1e-6))));
         m_ringShader->setUniform("rect", QVector4D(rect.x(), rect.y(), rect.width(), rect.height()));
@@ -1730,7 +1669,6 @@ void Effect::drawTabIndicator(const KWin::RenderViewport &viewport, const TabGro
     KWin::ShaderManager::instance()->popShader();
 }
 
-// a click on a tab of the indicator shows that window
 void Effect::clickOnTab(const QPointF &pos)
 {
     for (auto it = m_tabHits.constBegin(); it != m_tabHits.constEnd(); ++it) {
@@ -1738,7 +1676,6 @@ void Effect::clickOnTab(const QPointF &pos)
             if (!it->rects[i].contains(pos)) {
                 continue;
             }
-            // only a tab that is shown: its column is on the current desktop and not minimized
             KWin::EffectWindow *shown = KWin::effects->findWindow(it->windows.first());
             if (!shown || shown->isDeleted() || shown->isMinimized() || !shown->isOnCurrentDesktop() || !shown->isVisible()) {
                 continue;
@@ -1751,21 +1688,19 @@ void Effect::clickOnTab(const QPointF &pos)
     }
 }
 
-// niri's focus ring and border (focus_ring.rs, border.frag): the border is a band along the window's rounded frame, the ring a
-// band around it (and around the border), both filled with the gradient of the window's state
+// niri's focus ring and border: the border is a band along the window's rounded frame, the ring a band around it
 void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, bool fill)
 {
     const Look &look = lookOf(w);
     const bool active = w == m_active;
     const bool urgent = m_urgent.contains(w->internalId());
-    // like in niri, the ring goes around the border; a hidden tab right under the active window must not cover its border
     bool border = look.border.enabled && look.border.width > 0;
     if (border && !active && m_active && m_active->frameGeometry() == w->frameGeometry()) {
         border = false;
     }
     bool ring = active && look.ring.enabled && look.ring.width > 0;
     if (fill && border) {
-        ring = false; // niri: the focus ring has a background only when there is no border
+        ring = false;
     }
     if (!border && !ring) {
         return;
@@ -1785,8 +1720,7 @@ void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *
     m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, viewport.projectionMatrix());
     m_ringShader->setUniform("rect", QVector4D(frame.x(), frame.y(), frame.width(), frame.height()));
     m_ringShader->setUniform("radii", QVector4D(radius, radius, radius, radius));
-    m_ringShader->setUniform("bands", QVector2D(borderWidth, ringWidth)); // the ring starts where the border ends, shown or not
-    // a fill is one rectangle in the colour of the border, or of the ring when there is no border, as wide as the window
+    m_ringShader->setUniform("bands", QVector2D(borderWidth, ringWidth));
     m_ringShader->setUniform("layers", fill ? QVector3D(0, 0, 1) : QVector3D(border ? 1 : 0, ring ? 1 : 0, 0));
     m_ringShader->setUniform("pixel", float(1.0 / viewport.scale()));
     m_ringShader->setUniform("alpha", float(opacity));
@@ -1804,7 +1738,6 @@ void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *
         const int outer = (border ? borderWidth : 0) + ringWidth;
         setGradient(m_ringShader.get(), 1, g, g.viewRelative ? viewArea : frameF.adjusted(-outer, -outer, outer, outer));
     }
-    // only the parts of the ring KWin is repainting right now, so nothing is blended twice
     std::vector<QVector2D> vertices;
     if (KIRI_PAINT().isDebugEnabled()) {
         const auto r = viewport.mapFromDeviceCoordinates(KWin::RectF(deviceRegion.boundingRect()));
@@ -1816,19 +1749,17 @@ void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *
     KWin::ShaderManager::instance()->popShader();
 }
 
-// niri's shadow (layout/shadow.rs and shadow.frag): a blurred rounded box under the window, offset and grown by the spread
 void Effect::drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity)
 {
     const Look &look = lookOf(w);
     const ShadowStyle &sh = look.shadow;
     const bool active = w == m_active;
-    // a hidden tab under the active window casts the same shadow again
     if (!sh.on || opacity <= 0 || (!active && m_active && m_active->frameGeometry() == w->frameGeometry())) {
         return;
     }
     const double scale = viewport.scale();
     auto ceilPx = [scale](double v) { return std::ceil(v * scale) / scale; };
-    const double sigma = sh.softness / 2; // like CSS box-shadow
+    const double sigma = sh.softness / 2;
     const double width = ceilPx(sigma * 3);
     double offX = ceilPx(sh.offsetX), offY = ceilPx(sh.offsetY);
     const double spread = std::copysign(ceilPx(std::abs(sh.spread)), sh.spread);
@@ -1842,7 +1773,6 @@ void Effect::drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow
     const QRectF bounds = box.adjusted(-width, -width, width, width);
     QColor color = sh.color;
     if (!active) {
-        // niri: slightly more transparent by default
         if (sh.hasInactiveColor) {
             color = sh.inactiveColor;
         } else {
@@ -1869,8 +1799,6 @@ void Effect::drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow
     if (sh.drawBehindWindow) {
         appendQuads(vertices, viewport, deviceRegion, KWin::RectF(bounds));
     } else {
-        // not under the window: the shader cuts the rounded frame out, so only the part around the frame (without the
-        // part that is surely inside it) has to be shaded
         const double inset = std::ceil(radius) + 1;
         const QRectF inner = QRectF(frame.x(), frame.y(), frame.width(), frame.height()).adjusted(inset, inset, -inset, -inset);
         const QRectF i = inner.intersected(bounds);
@@ -1887,10 +1815,7 @@ void Effect::drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow
     KWin::ShaderManager::instance()->popShader();
 }
 
-// niri's fullscreen-backdrop-color: a solid rectangle behind a full-screen window, the size of the window's own tile (niri's
-// tile.rs resizes it to the animated tile size and draws it at the tile's location), so the wallpaper and the other columns
-// stay visible when the view scrolls away from it. The tile of a full-screen window is screen-sized, with a window that
-// is smaller than the screen centred in it; it grows from the window's own rect with the expand animation and fades in
+// niri's fullscreen-backdrop-color: a solid rectangle behind a full-screen window, the size of the window's own tile
 void Effect::drawBackdrop(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &painted, const KWin::Region &deviceRegion, double opacity)
 {
     const QColor &color = lookOf(w).fullscreenBackdrop.isValid() ? lookOf(w).fullscreenBackdrop : m_settings.fullscreenBackdrop;

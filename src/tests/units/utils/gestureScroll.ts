@@ -32,7 +32,6 @@ tests.register("gestureScroll", 1, () => {
 // niri's animations block for the view: the release settles with horizontal-view-movement, whatever it is configured to
 tests.register("niriAnimation: springs, easings, off and slowdown (niri's animations block)", 1, () => {
     const close = (a: number, b: number, message: string) => Assert.assert(Math.abs(a - b) < 1e-6, { message: `${message}: ${a} vs ${b}` });
-    // the default is the spring that used to be hard-coded
     const spring = new NiriSpring(0, 100, 50, 1, 800, 0.0001);
     const def = niriAnimation("spring 1 800 0.0001", "off", 0, 100, 50);
     Assert.equal(def.duration, spring.duration);

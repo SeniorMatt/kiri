@@ -1,6 +1,4 @@
-// SDL on X11 unmaps and maps its window again when a game goes full-screen: KWin deletes the window and makes a new
-// one. Kiri treats that as one window: it keeps the place, the full-screen state and the focus, and does not pass the
-// focus to the neighbour or scroll to it unless no window comes back within 300 ms.
+// SDL on X11 unmaps and maps its window again on full-screen: Kiri treats that as one window
 {
     function setup() {
         const config = getDefaultConfig();

@@ -62,7 +62,7 @@ tests.register("Dynamic desktops: empty ones go away when left, ids of the other
     Assert.assert(!getClientManager(world).isDesktopOccupied(workspaceMock.desktops[workspaceMock.desktops.length - 1]));
 });
 
-tests.register("Dynamic desktops: desktop numbers past the last one go to the empty desktop at the bottom", 3, () => {
+tests.register("Dynamic desktops: a number past the last goes to the empty desktop", 3, () => {
     const config = getDefaultConfig();
     config.dynamicDesktops = true;
     const { qtMock, workspaceMock } = init(config);

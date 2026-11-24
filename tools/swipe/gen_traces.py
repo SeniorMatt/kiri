@@ -44,7 +44,7 @@ LAYOUTS = {
     "L2fit": dict(cols=[600, 700], start=0),
     "L3wide": dict(cols=[900, 1568, 900, 700], start=1),
     "L1": dict(cols=[1000], start=0),
-    # the owner's laptop: 1872 px working width, gaps 8, mixed widths and 50% columns
+    # a laptop: 1872 px working width, gaps 8, mixed widths and 50% columns
     "O1": dict(cols=[920, 1050, 936, 936, 920], start=1, width=1872, gaps=8),
     "O2": dict(cols=[936, 936, 936, 936], start=0, width=1872, gaps=8),
     "O3": dict(cols=[936, 936, 936, 936], start=2, width=1872, gaps=8),

@@ -1,6 +1,6 @@
 // KWin may leave nothing focused after a full-screen or maximized window closes without a signal that arrives in time:
 // the focus request is retried on a timer, and the actions meanwhile work on the window that had the focus last
-tests.register("Close a full-screen window: a focus that KWin dropped without a signal is passed on again", 10, () => {
+tests.register("Close a full-screen window: a focus KWin dropped is passed on", 10, () => {
     const { qtMock, workspaceMock, world } = init(getDefaultConfig());
     const b = new MockKwinClient(new MockQmlRect(10, 10, 300, 400));
     b.x11 = false; // an X11 window that may come back is held for a moment instead

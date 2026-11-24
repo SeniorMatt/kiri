@@ -32,7 +32,7 @@ tests.register("A later rule can turn open-fullscreen off", 1, () => {
     Assert.equal(launcher.fullScreen, false);
 });
 
-tests.register("Float rule sizes and centers a new window (default-window-height, default-column-width)", 3, () => {
+tests.register("Float rule sizes and centers a new window", 3, () => {
     const config = getDefaultConfig();
     config.windowRules = '[{ "class": "settings", "tile": false, "width": "600px", "height": "50%" }, { "class": "plain", "tile": false }]';
     const { workspaceMock, world } = init(config);
@@ -149,7 +149,7 @@ function windowOf(world: World, client: MockKwinClient) {
     return window as Window|null;
 }
 
-tests.register("open-maximized: the column opens at the full width, maximize-column goes back to the default", 4, () => {
+tests.register("open-maximized: the column opens at the full width", 4, () => {
     const config = getDefaultConfig();
     config.windowRules = '[{ "appId": "big", "maximized": true, "width": "25%" }]';
     const { qtMock, workspaceMock } = init(config);
@@ -197,7 +197,7 @@ tests.register("open-focused false keeps the focus where it was, true takes it",
     Assert.equal(Workspace.activeWindow, loud);
 });
 
-tests.register("open-on-workspace puts the window on the desktop with that name and leaves the focus", 6, () => {
+tests.register("open-on-workspace puts the window on the named desktop", 6, () => {
     const config = getDefaultConfig();
     config.windowRules = '[{ "appId": "chat", "workspace": "Desktop 2" }, { "appId": "mail", "workspace": "Desktop 2", "focused": true }, { "appId": "ghost", "workspace": "nowhere" }]';
     const { workspaceMock, world } = init(config);
@@ -287,7 +287,7 @@ tests.register("min-width and max-width rules limit a tiled column", 4, () => {
     Assert.equal(wide.getActualFrameGeometry().width >= 300, true);
 });
 
-tests.register("A fixed-height window floats, a rule can tile it, min and max height rules keep its height", 5, () => {
+tests.register("A fixed-height window floats, a rule can tile it", 5, () => {
     const config = getDefaultConfig();
     config.windowRules = '[{ "appId": "short", "tile": true, "maxHeight": 250, "minHeight": 250 }, { "appId": "pinned", "maxHeight": 200, "minHeight": 200 }]';
     const { qtMock, workspaceMock, world } = init(config);
@@ -327,7 +327,7 @@ tests.register("A floating window opens within the limits of min and max rules",
     Assert.equal(pop.getActualFrameGeometry().height, 400);
 });
 
-tests.register("opacity rule, and toggle-window-rule-opacity switches it off for the focused window", 6, () => {
+tests.register("opacity rule and toggle-window-rule-opacity", 6, () => {
     const config = getDefaultConfig();
     config.windowRules = '[{ "appId": "glass", "opacity": 0.5 }]';
     const { qtMock, workspaceMock } = init(config);
@@ -391,7 +391,7 @@ tests.register("Rules with dynamic matchers are evaluated again when the state c
     Assert.equal(app.opacity, 0.6);
 });
 
-tests.register("is-active-in-column: the rule holds for the windows of a column that are not its active one", 3, () => {
+tests.register("is-active-in-column: the rule holds for the other windows of a column", 3, () => {
     const config = getDefaultConfig();
     config.windowRules = '[{ "maxWidth": 150, "isActiveInColumn": false }]';
     const { qtMock, workspaceMock, world } = init(config);
@@ -499,7 +499,7 @@ tests.register("min/max size rules force the dimensions of a window", 3, () => {
     Assert.assert(Math.round(plain.getActualFrameGeometry().height) > 300, { message: "a window without a rule has the whole height" });
 });
 
-tests.register("A max-height rule leaves the rest of the slot empty, the other windows keep theirs", 3, () => {
+tests.register("A max-height rule leaves the rest of the slot empty", 3, () => {
     const config = getDefaultConfig();
     config.windowRules = '[{ "appId": "small", "maxHeight": 150 }]';
     const { qtMock, workspaceMock } = init(config);

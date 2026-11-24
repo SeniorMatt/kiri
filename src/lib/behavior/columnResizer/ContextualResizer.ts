@@ -32,7 +32,8 @@ class ContextualResizer {
                 column.getWidth() + leftSpace + rightSpace + rightVisibleColumn.getWidth() + grid.config.gapsInnerHorizontal,
                 ...presets,
             ],
-            // presets are compared with the width that was asked for and with niri's 1 px allowance, the client may have rounded it down
+            // presets are compared with the width that was asked for and with niri's 1 px allowance, the client may have
+            // rounded it down
             width => presets.includes(width) ? width - nominalWidth - 1 : width - column.getWidth(),
         );
         if (newWidth === undefined) {

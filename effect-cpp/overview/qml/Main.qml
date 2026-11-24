@@ -15,17 +15,14 @@ import org.kde.plasma.extras as PlasmaExtras
 FocusScope {
     id: root
     focus: true
-    // the first build of the scene right after login is invisible (the effect's warm())
     opacity: effect.warming ? 0.003 : 1
-    // and takes no clicks or keys meant for the windows under it
     enabled: !effect.warming
 
     readonly property QtObject effect: KWinComponents.SceneView.effect
     readonly property QtObject targetScreen: KWinComponents.SceneView.screen
     property QtObject currentDesktop: KWinComponents.SceneView.currentDesktop
 
-    // niri constants
-    // niri's output { backdrop-color } wins over the overview's; `effect.backdropColor` is read for the binding to follow the settings
+    // niri's output { backdrop-color } wins over the overview's
     readonly property color backdropColor: { effect.backdropColor; return effect.backdropFor(targetScreen.name); }
     readonly property color hintColor: Qt.rgba(127 / 255, 200 / 255, 255 / 255, 128 / 255)
     readonly property color ringColor: "#7fc8ff"
@@ -33,7 +30,6 @@ FocusScope {
     readonly property real moveAlpha: 0.75
 
     property var lay: ({ screen: { x: 0, y: 0, w: 1, h: 1 }, current: 0, active: "", desktops: [] })
-    // may overshoot 0..1 a little (niri's rubber band); `pc` is the clamped one
     readonly property real p: effect.progress
     readonly property real pc: Math.max(0, Math.min(1, effect.progress))
     readonly property real zm: 1 - p * (1 - effect.zoom)
@@ -54,7 +50,6 @@ FocusScope {
         return o === undefined ? scroll : o;
     }
 
-    // ---- the window model, kept in step with the layout by id so thumbnails are not recreated ----
     ListModel { id: winModel }
     property var modelIndex: ({})
 
@@ -116,9 +111,7 @@ FocusScope {
     }
 
     function reload() {
-        // the dropped window is still where the pointer let go; the new layout moves its place (maybe to another
-        // desktop), so the offset that keeps it where it is now is worked out first and then eased away together
-        // with the layout's own animation: it glides to its new place instead of jumping back to the old one first
+        // the dropped window is still where the pointer let go: the offset that keeps it there eases away with the layout's animation
         const held = dropHold !== "" ? tileOf(dropHold) : null;
         const hx = held ? held.x : 0, hy = held ? held.y : 0;
         try {
@@ -144,8 +137,6 @@ FocusScope {
     Connections {
         target: root.effect
         function onLayoutChanged() { root.reload(); }
-        // the views are kept between runs: each open needs the keyboard focus again, and nothing of a drag may be left
-        // windows that were still animating when the overview opened start from where they were painted
         function onStartRectsChanged() { Qt.callLater(root.applyStartRects); }
         function onClosingChanged() {
             if (!root.effect.closing) {
@@ -163,9 +154,7 @@ FocusScope {
         forceActiveFocus();
     }
 
-    // The windows of column `c` without the dragged one, the gap closed like niri does while a tile is out of its
-    // column: the rest share the column's height in proportion to what they had. The hint is worked out from these
-    // rects and the tiles are drawn at them, so what the hint shows is where the drop goes.
+    // the windows of column `c` without the dragged one share the column's height as in niri; the hint and the tiles use these rects
     function filled(d, c, dragWid) {
         const rest = c.wins.filter(w => w.id !== dragWid);
         if (rest.length === c.wins.length || rest.length === 0 || c.tab) {
@@ -181,8 +170,7 @@ FocusScope {
         });
     }
 
-    // ---- niri's insert position (the same as the script's ClientManager.insertTarget), in layout space ----
-    // `cur` is the pointer in the desktop's unzoomed space relative to the screen; the dragged window is out of the grid
+    // niri's insert position (like ClientManager.insertTarget), in layout space
     function insertTarget(d, cur, dragWid) {
         const sx = lay.screen.x, sy = lay.screen.y;
         const gapH = d.gapH, gapV = d.gapV;
@@ -242,7 +230,6 @@ FocusScope {
             const count = c.tab ? 1 : c.wins.length;
             let h = 150, y = tileGap.y;
             if (tileGap.index === 0) {
-                // 150 at the top
             } else if (tileGap.index === count) {
                 y = tileGap.y - 150 - gapV;
                 if (c.tab) {
@@ -263,15 +250,13 @@ FocusScope {
         return { col: closest, tile: -1, rect: { x: hx, y: ay + gapV, w: 300, h: ah - gapV * 2 } };
     }
 
-    // ---- dragging ----
     property string dragWid: ""
     property string dropHold: ""
-    property bool dropPending: false // dropped, the script's new layout has not arrived yet
+    property bool dropPending: false
     Timer {
         id: holdTimer
         interval: 700
         onTriggered: {
-            // no new layout came (dropped back in place, or the drop was refused): the window glides back
             const t = root.dropHold !== "" ? root.tileOf(root.dropHold) : null;
             root.dropPending = false;
             root.dropHold = "";
@@ -283,9 +268,9 @@ FocusScope {
         }
     }
     property bool dragFloating: false
-    property real dragX: 0 // pointer position, root coordinates
+    property real dragX: 0
     property real dragY: 0
-    property var hint: null // { di, rect }
+    property var hint: null
 
     function desktopAt(y) {
         for (let i = 0; i < lay.desktops.length; i++) {
@@ -297,7 +282,7 @@ FocusScope {
     }
     function updateHint() {
         if (dragWid === "" || (tileOf(dragWid) && tileOf(dragWid).floating)) {
-            hint = null; // a floating window has no insert position
+            hint = null;
             return;
         }
         const di = desktopAt(dragY);
@@ -306,7 +291,7 @@ FocusScope {
             return;
         }
         const d = lay.desktops[di];
-        const shift = d.scroll - offsetOf(d.id, d.scroll); // hint rects are in layout space
+        const shift = d.scroll - offsetOf(d.id, d.scroll);
         const cur = { x: (dragX - x0) / zm - shift, y: (dragY - wsY(di)) / zm };
         const t = insertTarget(d, cur, dragWid);
         hint = { di: di, did: d.id, col: t.col, tile: t.tile, rect: t.rect, shift: shift };
@@ -314,13 +299,11 @@ FocusScope {
     onDragXChanged: updateHint()
     onDragYChanged: updateHint()
 
-    // ---- scene ----
     Rectangle {
         anchors.fill: parent
         color: root.backdropColor
         opacity: root.pc
-        // niri: a click that is on no desktop and no window (the gaps, the sides) does nothing (src/input/mod.rs,
-        // the click handler only reacts to a window or workspace under the pointer)
+        // niri: a click on no desktop and no window does nothing
     }
 
     Repeater {
@@ -339,9 +322,7 @@ FocusScope {
                 anchors.fill: parent
                 color: "black"
                 visible: root.effect.shadowOn
-                // niri workspace-shadow (softness, spread, offset, color), normalised to 1080 px
-                // sized for the open zoom: resizing the shadow every frame of the zoom rebuilds its geometry, the fade
-                // with the progress is enough
+                // niri's workspace-shadow, normalised to 1080 px; sized for the open zoom
                 shadow.size: Math.max(0, root.effect.shadowSoftness + root.effect.shadowSpread) * (root.height / 1080) * root.effect.zoom
                 shadow.xOffset: root.effect.shadowOffsetX * (root.height / 1080) * root.effect.zoom
                 shadow.yOffset: root.effect.shadowOffsetY * (root.height / 1080) * root.effect.zoom
@@ -362,7 +343,6 @@ FocusScope {
 
     KWinComponents.VirtualDesktopModel { id: desktopModel }
 
-    // windows
     Repeater {
         id: tiles
         model: winModel
@@ -384,13 +364,9 @@ FocusScope {
 
             property bool ready: false
             Component.onCompleted: Qt.callLater(() => { ready = true; })
-            // layout-driven changes (reflow, resize) animate; zoom and scrolling do not. ax is in content space (the
-            // position without the view scroll), so a scroll change (focus moving) never goes through the Behavior: the
-            // effect's offset spring moves every tile smoothly instead of the tile jumping and then animating back.
-            // a floating window stays where it is when the strip scrolls
+            // layout-driven changes animate; zoom and scrolling do not, the effect's offset spring moves the tiles on a scroll
             readonly property real lsc: floating ? 0 : lscroll
             property real ax: rx + lsc
-            // while another tile of its column is dragged out, this one grows into the gap (see filled())
             readonly property var fillRect: {
                 const wid = root.dragWid !== "" ? root.dragWid : (root.dropPending ? root.dropHold : "");
                 if (wid === "" || wid === tile.wid || tile.floating) {
@@ -416,7 +392,6 @@ FocusScope {
             Behavior on aw { enabled: tile.ready; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
             Behavior on ah { enabled: tile.ready; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
-            // starts from a rect (screen coordinates) and animates to the layout's place
             function startFrom(r) {
                 ready = false;
                 ax = r.x - root.lay.screen.x + lsc;
@@ -439,7 +414,6 @@ FocusScope {
             property bool settleAnim: false
             Behavior on offX { enabled: tile.settleAnim; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
             Behavior on offY { enabled: tile.settleAnim; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-            // when a column leaves (a window is dragged out of a single-window column) the columns to its right close up
             property real closeUp: {
                 if ((root.dragWid === "" && !root.dropPending) || tile.floating) {
                     return 0;
@@ -471,8 +445,7 @@ FocusScope {
                 wId: tile.wid
             }
             Rectangle {
-                // niri: the ring belongs to the focused window and goes with it, also while it is dragged (a click focuses
-                // the window it picks up) and while it settles into its drop
+                // niri: the ring belongs to the focused window and goes with it while it is dragged and dropped
                 visible: tile.active || tile.dragging || tile.held
                 anchors.fill: parent
                 anchors.margins: -border.width
@@ -482,7 +455,6 @@ FocusScope {
             }
 
             TapHandler {
-                // exclusive: the desktop and the backdrop under the tile must not see the same click
                 gesturePolicy: TapHandler.ReleaseWithinBounds
                 acceptedButtons: Qt.LeftButton
                 onTapped: root.effect.activateWindow(tile.wid, tile.did, tile.di)
@@ -496,14 +468,12 @@ FocusScope {
                         return;
                     }
                     const dist = Math.hypot(translation.x, translation.y);
-                    // niri: a floating window follows the pointer at once, a tiled one after a threshold
                     const thr = tile.floating ? 0 : root.moveThreshold * root.effect.zoom;
                     tile.settleAnim = false;
                     if (root.dragWid === "" && dist >= thr) {
                         root.dragWid = tile.wid;
                         root.dragFloating = tile.floating;
                     }
-                    // rubber band before the window leaves the grid (niri), then it follows the pointer
                     const f = thr === 0 ? 1 : 0.5 + 0.5 * Math.min(1, dist / thr);
                     tile.offX = translation.x * f;
                     tile.offY = translation.y * f;
@@ -523,7 +493,6 @@ FocusScope {
                         root.dragWid = "";
                         root.hint = null;
                         if (tile.floating) {
-                            // niri: stays floating, on the desktop under the pointer, where it was let go
                             if (fdi >= 0) {
                                 const fd = root.lay.desktops[fdi];
                                 root.dropHold = tile.wid;
@@ -545,7 +514,6 @@ FocusScope {
                             holdTimer.interval = 700;
                             holdTimer.restart();
                         } else {
-                            // not a place to drop: back where it was
                             tile.settleAnim = true;
                             tile.offX = 0;
                             tile.offY = 0;
@@ -559,9 +527,7 @@ FocusScope {
         }
     }
 
-    // niri gestures { dnd-edge-view-scroll, dnd-edge-workspace-switch }: while a window is dragged, the pointer near the
-    // left/right edge scrolls the view of the desktop under it, near the top/bottom edge the desktops move (monitor.rs
-    // dnd_scroll_gesture_scroll, scrolling.rs dnd_scroll_gesture_scroll)
+    // niri's dnd-edge-view-scroll and dnd-edge-workspace-switch: near the left/right edge the view scrolls, near the top/bottom the desktops move
     Timer {
         id: dndEdge
         interval: 16
@@ -585,7 +551,6 @@ FocusScope {
             const o = root.effect.dnd;
             const speed = 1 / root.zm;
             let moved = false;
-            // desktops, at the top/bottom of the screen, inside the strip of desktops
             {
                 const h = root.height;
                 const strip = root.wsW;
@@ -613,7 +578,6 @@ FocusScope {
                     }
                 }
             }
-            // columns, at the left/right edge, only for a tiled window
             const di = root.desktopAt(root.dragY);
             if (!root.dragFloating && di >= 0) {
                 const w = root.width;
@@ -641,9 +605,7 @@ FocusScope {
         }
     }
 
-    // niri DnD hold (layout/mod.rs advance_animations): a drag-and-drop from another application held for 750 ms (gnome-shell's
-    // delay) over a window activates it, over a desktop switches to it; the overview closes. Moving to another target
-    // restarts the time. KWin sends no pointer events during a drag-and-drop, so the pointer is polled.
+    // niri's DnD hold: a drag-and-drop from another application held for 750 ms over a window activates it, over a desktop switches to it; the pointer is polled because KWin sends no pointer events
     Timer {
         id: dndHold
         interval: 50
@@ -698,7 +660,6 @@ FocusScope {
         }
     }
 
-    // niri's insert hint
     Rectangle {
         visible: root.hint !== null && root.hint.rect !== null
         color: root.hintColor
@@ -710,7 +671,6 @@ FocusScope {
         z: 50
     }
 
-    // the panels (docks) fade out as the view zooms out, like in Plasma's overview
     Repeater {
         model: KWinComponents.WindowFilterModel {
             desktop: root.currentDesktop
@@ -731,7 +691,6 @@ FocusScope {
     }
     KWinComponents.WindowModel { id: stackModel }
 
-    // Plasma's search field: filters (dims) the windows by title and class
     PlasmaExtras.SearchField {
         id: searchField
         anchors.horizontalCenter: parent.horizontalCenter
@@ -746,13 +705,10 @@ FocusScope {
         z: 200
     }
 
-    // ---- input ----
     property real wheelY: 0
     property real wheelX: 0
     property real wheelLast: 0
-    // niri (input/mod.rs on_pointer_axis, should_handle_in_overview): the mouse wheel steps the desktops (one tick per
-    // notch, 50 ms cooldown), Shift+wheel and the horizontal wheel focus the column left/right under the pointer;
-    // touchpad scrolling is the overview scroll swipe (see OverviewEffect::touchpadScroll). Other modifiers: nothing.
+    // niri: the wheel steps the desktops (50 ms cooldown), Shift+wheel and the horizontal wheel focus columns; touchpad scrolling is the overview scroll swipe
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: event => {
@@ -769,7 +725,6 @@ FocusScope {
             if (mods !== Qt.NoModifier && mods !== Qt.ShiftModifier) {
                 return;
             }
-            // Shift turns the vertical wheel into columns; some stacks swap the axes themselves
             let vertical = -inv * event.angleDelta.y, horizontal = inv * event.angleDelta.x;
             if (mods === Qt.ShiftModifier) {
                 horizontal = vertical !== 0 ? vertical : -horizontal;
@@ -795,7 +750,6 @@ FocusScope {
             }
         }
     }
-    // niri: right button drag scrolls the view of the desktop under it
     DragHandler {
         id: rightDrag
         target: null
@@ -827,7 +781,6 @@ FocusScope {
             root.effect.requestClose();
             event.accepted = true;
         } else if (event.key === Qt.Key_Left && (event.modifiers & ~Qt.KeypadModifier) === Qt.NoModifier) {
-            // niri hardcoded overview binds: Left/Right focus a column, Up/Down a window or the desktop above/below
             root.effect.invokeKiriAction("focus-left");
             event.accepted = true;
         } else if (event.key === Qt.Key_Right && (event.modifiers & ~Qt.KeypadModifier) === Qt.NoModifier) {

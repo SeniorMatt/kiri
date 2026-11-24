@@ -42,7 +42,8 @@ class OverviewEffect : public QuickSceneEffect
     Q_PROPERTY(QVariantMap viewOffsets READ viewOffsets NOTIFY viewOffsetsChanged)
     // niri's overview { zoom; backdrop-color; workspace-shadow } from the Kiri settings
     Q_PROPERTY(qreal zoom READ zoom NOTIFY optionsChanged)
-    // niri gestures { dnd-edge-view-scroll; dnd-edge-workspace-switch }: viewWidth/viewDelay/viewSpeed, wsHeight/wsDelay/wsSpeed
+    // niri gestures { dnd-edge-view-scroll; dnd-edge-workspace-switch }: viewWidth/viewDelay/viewSpeed,
+    // wsHeight/wsDelay/wsSpeed
     Q_PROPERTY(QVariantMap dnd READ dnd NOTIFY optionsChanged)
     Q_PROPERTY(QColor backdropColor READ backdropColor NOTIFY optionsChanged)
     Q_PROPERTY(bool shadowOn READ shadowOn NOTIFY optionsChanged)

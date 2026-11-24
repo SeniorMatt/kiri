@@ -31,8 +31,7 @@ namespace KWin
 
 namespace
 {
-// niri's animations: overview-open-close (the progress), workspace-switch (the desktops), horizontal-view-movement
-// (the view of a desktop); the defaults are springs 1.0 / 800, 1.0 / 1000 and 1.0 / 800, all with epsilon 0.0001
+// niri's animations: overview-open-close, workspace-switch and horizontal-view-movement, by default springs
 NiriAnim::Anim makeProgress(double from, double to, double velocity)
 {
     return NiriAnim::config().overviewOpenClose.make(from, to, velocity);
@@ -54,8 +53,7 @@ QString jsonString(const QJsonObject &object)
 
 OverviewEffect::OverviewEffect()
 {
-    // keep the views (the QML scene, thumbnails, wallpapers) alive after the overview closes: opening it again right
-    // away reuses them instead of building everything again
+    // keep the views alive after the overview closes, so opening it again right away reuses them
     setViewCachingEnabled(true);
     m_clock.start();
     QDBusConnection::sessionBus().registerObject(QStringLiteral("/KiriOverview"), this, QDBusConnection::ExportScriptableSlots);
@@ -68,7 +66,6 @@ OverviewEffect::OverviewEffect()
     connect(effects, &EffectsHandler::windowDeleted, this, [this](EffectWindow *w) {
         m_visibleRefs.erase(w);
     });
-    // the drag-and-drop of Wayland clients (and Xwayland's) goes through KWin's seat, which no effect hook reports
     if (waylandServer() && waylandServer()->seat()) {
         auto *seat = waylandServer()->seat();
         connect(seat, &SeatInterface::dragStarted, this, [this]() { setSeatDrag(true); });
@@ -101,14 +98,7 @@ OverviewEffect::OverviewEffect()
     });
 }
 
-// ---- hot corner --------------------------------------------------------------------------------------------
-// niri's hot corner (src/input/mod.rs, Niri::is_inside_hot_corner): the 1x1 logical pixel at the top-left of an output
-// toggles the overview the moment the pointer enters it, once per entry (it re-arms when the pointer has been outside).
-// No button may be held (niri: a click grab keeps the pointer focus on the window, so the corner does not fire; a
-// window drag does, which is why a held button is not checked once the overview is up: a drag-and-drop across
-// desktops needs it) and a full-screen window on the output covers it (niri: render_above_top_layer). It is a pointer
-// check, not KWin's screen edge, which has an activation delay and a pushback, and would clash with Plasma's own corner.
-// The toggle goes through Kiri's "overview" shortcut so that the script supplies the layout, like Meta+O does.
+// niri's hot corner: the 1x1 pixel at the top-left of an output toggles the overview once per entry; no button may be held, a full-screen window covers it; a pointer check, not KWin's screen edge; the toggle goes through Kiri's "overview" shortcut
 // "#RRGGBB" or "#RRGGBBAA" (Kiri's settings) -> QColor; `fallback` when it does not parse
 static QColor kiriColor(const QString &text, const QColor &fallback)
 {
@@ -151,7 +141,7 @@ void OverviewEffect::loadHotCorner()
             options.corners[2] = corners.value(QStringLiteral("bottomLeft")).toBool(false);
             options.corners[3] = corners.value(QStringLiteral("bottomRight")).toBool(false);
             if (options.cornersOn && config->group(QStringLiteral("Plugins")).readEntry("kiriEnabled", false)) {
-                m_hotCorner = true; // an output may have corners that the global setting does not
+                m_hotCorner = true;
             }
         }
         m_outputs.push_back(options);
@@ -159,7 +149,6 @@ void OverviewEffect::loadHotCorner()
     if (!m_hotCorner) {
         m_insideCorner = false;
     }
-    // niri's overview options; the zoom is applied from the next opening, not while it is up
     const qreal zoom = std::clamp(kiri.readEntry("overviewZoom", 0.5), 0.0, 1.0);
     m_backdrop = kiriColor(kiri.readEntry("overviewBackdropColor", QStringLiteral("#262626")), QColor(0x26, 0x26, 0x26));
     m_shadowOn = kiri.readEntry("overviewShadowEnabled", true);
@@ -183,7 +172,6 @@ void OverviewEffect::loadHotCorner()
     Q_EMIT optionsChanged();
 }
 
-// the first block of the `outputOverrides` setting that is for this output (niri: the first output block that matches)
 const OverviewEffect::OutputOptions *OverviewEffect::optionsOf(const QString &outputName) const
 {
     for (const OutputOptions &options : m_outputs) {
@@ -204,9 +192,7 @@ bool OverviewEffect::inHotCorner(const QPointF &pos) const
 {
     for (LogicalOutput *output : effects->screens()) {
         const RectF g = output->geometry();
-        // niri (Niri::is_inside_hot_corner): the 1x1 logical pixel at each enabled corner of the output
         const QPointF corners[4] = {g.topLeft(), QPointF(g.right() - 1, g.top()), QPointF(g.left(), g.bottom() - 1), QPointF(g.right() - 1, g.bottom() - 1)};
-        // niri: an output's own hot-corners replace the global ones as a whole
         const OutputOptions *options = optionsOf(output->name());
         const bool *flags = options && options->hasCorners ? options->corners : m_corners;
         const bool on = options && options->hasCorners ? options->cornersOn : m_cornersOn;
@@ -240,11 +226,7 @@ void OverviewEffect::pointerMoved(const QPointF &pos, const QPointF &, Qt::Mouse
     invokeKiriAction(QStringLiteral("overview"));
 }
 
-// ---- DnD hold ----------------------------------------------------------------------------------------------
-// niri (layout/mod.rs, advance_animations): while a drag-and-drop is on, the pointer held over a window for 750 ms
-// (the delay is gnome-shell's) activates it; moving to another target restarts the time, there is no distance
-// threshold. Only a real drag-and-drop counts, not a window being moved. In the overview the same hold (a window, or
-// a desktop) is run by qml/Main.qml; here is the normal view.
+// niri's DnD hold: the pointer held over a window for 750 ms during a drag-and-drop activates it; in the overview qml/Main.qml does the same
 void OverviewEffect::setSeatDrag(bool on)
 {
     if (m_seatDrag == on) {
@@ -271,7 +253,6 @@ void OverviewEffect::dndHoldTick()
         m_dndHoldTarget.clear();
         return;
     }
-    // like niri, the hold is only checked when the pointer moves
     const QPointF pos = effects->cursorPos();
     if (pos == m_dndHoldPos) {
         return;
@@ -300,7 +281,6 @@ void OverviewEffect::dndHoldTick()
     }
     if (now() - m_dndHoldSince >= 750) {
         m_dndHoldTarget.clear();
-        // the script sees the activation like any other and scrolls the window into view
         qCDebug(KIRI_OVERVIEW) << "dnd hold activates" << hit->caption();
         effects->activateWindow(hit);
     }
@@ -320,9 +300,7 @@ void OverviewEffect::invokeKiriAction(const QString &action)
     });
 }
 
-// KWin hides the windows of the other desktops: no frame callbacks, so a video or terminal there freezes. While the
-// overview runs every window stays visible to KWin (it is not painted by KWin itself, the scene draws thumbnails of
-// them), so the clients keep committing frames from the first frame the overview paints them (niri: live workspaces).
+// KWin hides the windows of other desktops, which freezes their clients: while the overview runs every window stays visible to KWin
 void OverviewEffect::run(bool on)
 {
     setRunning(on);
@@ -355,10 +333,8 @@ void OverviewEffect::setSearchText(const QString &text)
     }
 }
 
-// ---- animation ---------------------------------------------------------------------------------------------
 
-// the speed of the zoom right now, so that a toggle during the animation turns it around smoothly (in progress
-// units per second of spring time, what the Spring takes)
+// the speed of the zoom now, so that a toggle during the animation turns it around smoothly
 double OverviewEffect::progressVelocity() const
 {
     if (!m_progressAnimating) {
@@ -386,8 +362,7 @@ void OverviewEffect::startWorkspace(double to)
     effects->addRepaintFull();
 }
 
-// seconds on a spring that started at `start`; the global animation speed setting scales niri's times
-// ("instant" jumps to the end)
+// seconds on a spring that started at `start`, scaled by the global animation speed
 double OverviewEffect::seconds(qint64 start) const
 {
     const double factor = NiriAnim::timeFactor();
@@ -398,7 +373,7 @@ double OverviewEffect::seconds(qint64 start) const
 void OverviewEffect::logFrames()
 {
     if (m_frames > 0) {
-        // one line per animation, so that a lag on the owner's machine can be read from the journal
+        // one line per animation, so that lag can be read from the journal
         qCInfo(KIRI_OVERVIEW).nospace() << (m_warm ? "warm-up" : "animation") << ": first frame " << m_firstFrameMs << " ms, "
                                         << m_frames << " frames, average " << double(m_frameSum) / m_frames << " ms, max "
                                         << m_frameMax << " ms, " << m_frameSlow << " over 25 ms, slowest frame took " << m_costMax << " ms";
@@ -413,7 +388,6 @@ void OverviewEffect::logFrames()
     m_lastFrame = 0;
 }
 
-// returns true while something still moves
 bool OverviewEffect::tick()
 {
     const qint64 t = now();
@@ -472,25 +446,19 @@ bool OverviewEffect::tick()
     if (offsetsChanged) {
         Q_EMIT viewOffsetsChanged();
     }
-    // closed, but the script has not yet moved to the desktop the user chose in the overview: the real screen would
-    // show the old one when the scene goes (a jump); wait for it (setLayout moves the scene's desktop to the real one)
+    // closed, but the script has not yet moved to the chosen desktop: wait for it, or the real screen would jump
     if (m_closedZoom && !m_open && !m_gesture && m_pendingCurrent >= 0 && t < m_pendingUntil) {
         more = true;
     }
     if (m_closedZoom && !more && !m_open && !m_gesture && !m_warm) {
-        // closed, and the desktops sit where they are on the real screen (the view offsets and the desktop spring have
-        // arrived: handing back earlier would show them jumping): hand the screen back
-        // Let KWin hide the windows of the other desktops first, a frame while the scene still covers the screen: when the
-        // references go in the same frame that takes the scene away, that frame paints those windows at their own place,
-        // on top of the current desktop (a window of desktop 2 flashing on empty desktop 1 after rapid Meta+O)
+        // closed and the desktops sit where they are on the real screen: hand the screen back, after KWin hid the windows of the other desktops for a frame
         if (!m_visibleRefs.empty()) {
             m_visibleRefs.clear();
             return true;
         }
         m_closedZoom = false;
         run(false);
-        // the real windows come back on a screen the scene covered: repaint all of it now and once more after this
-        // frame, so no region keeps what the overview left
+        // repaint all of the screen now and once more after this frame
         effects->addRepaintFull();
         m_repaintAfter = true;
         logFrames();
@@ -499,8 +467,7 @@ bool OverviewEffect::tick()
     return more;
 }
 
-// the invisible warm-up must not take the screen out of direct scan-out: switching the output to composition and back
-// is what can blink a real display
+// the invisible warm-up must not take the screen out of direct scan-out
 bool OverviewEffect::blocksDirectScanout() const
 {
     return m_warm && !m_open && !m_gesture ? false : QuickSceneEffect::blocksDirectScanout();
@@ -509,11 +476,8 @@ bool OverviewEffect::blocksDirectScanout() const
 void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
 {
     if (isRunning()) {
-        // frame times while the overview moves, logged per animation (see logFrames); a hitch of up to 2 s counts
         const qint64 t = now();
-        // Only frames the animation asked for count: while the overview sits open nothing is repainted, and the next
-        // repaint (a key, the pointer) arrives whenever it arrives. That idle gap used to show up as "max" (166 to
-        // 223 ms in the journal) although no frame was late.
+        // only frames the animation asked for count; an idle gap while the overview is open is not a late frame
         if (m_lastFrame > 0 && m_moving && t - m_lastFrame < 2000) {
             m_frames++;
             m_frameSum += t - m_lastFrame;
@@ -522,8 +486,7 @@ void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
                 m_frameSlow++;
             }
         }
-        // The springs run on their own clock that advances at most 100 ms per frame: building the scene
-        // on the first frame, or any hitch, must not make the zoom skip ahead (it would look like a teleport).
+        // the springs run on their own clock of at most 100 ms per frame, so a hitch does not make the zoom skip ahead
         m_anim += (m_lastFrame > 0) ? std::min<qint64>(t - m_lastFrame, 100) : 0;
         m_prePaint = t;
         if (m_lastFrame == 0 && m_openCall > 0) {
@@ -543,7 +506,6 @@ void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
     QuickSceneEffect::prePaintScreen(data);
 }
 
-// diagnostics (KIRI_OVERVIEW_TRACE=1): a window that is not on the current desktop is about to be painted by KWin itself
 void OverviewEffect::prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data)
 {
     static const bool trace = qEnvironmentVariableIsSet("KIRI_OVERVIEW_TRACE");
@@ -554,13 +516,10 @@ void OverviewEffect::prePaintWindow(RenderView *view, EffectWindow *w, WindowPre
     QuickSceneEffect::prePaintWindow(view, w, data);
 }
 
-// The next frame is asked for once this one is painted. Asked for in prePaintScreen, the repaint belongs to the
-// frame being painted and is used up by it: KWin then draws the next frame only when something else on screen
-// changes (an app that redraws all the time, like OBS's preview), and the animation stutters.
+// the next frame is asked for once this one is painted, or KWin draws it only when something else changes
 void OverviewEffect::postPaintScreen()
 {
     if (isRunning() && m_prePaint > 0) {
-        // what this frame cost the compositor (the QML scene is rendered inside it): a real stall, unlike the interval
         const qint64 cost = now() - m_prePaint;
         m_costMax = std::max(m_costMax, cost);
         m_prePaint = 0;
@@ -572,7 +531,6 @@ void OverviewEffect::postPaintScreen()
     QuickSceneEffect::postPaintScreen();
 }
 
-// ---- layout ------------------------------------------------------------------------------------------------
 
 void OverviewEffect::applyLayout(const QString &layout)
 {
@@ -601,8 +559,7 @@ void OverviewEffect::applyLayout(const QString &layout)
             it = m_scrolls.insert(id, sc);
             m_viewOffsets.insert(id, scroll);
         } else if (idle) {
-            // nothing of the overview is on screen: the windows are where the script put them, so the first frame
-            // must show the strip there too (the offset of the last run is stale once the script scrolled meanwhile)
+            // nothing of the overview is on screen: the first frame must show the strip where the script put it
             it->target = it->shown = scroll;
             it->animating = false;
             it->localUntil = 0;
@@ -630,7 +587,6 @@ void OverviewEffect::applyLayout(const QString &layout)
         if (current == m_pendingCurrent) {
             m_pendingCurrent = -1;
         }
-        // else: the script has not caught up with the desktop the user scrolled to yet
     } else if (first || current != m_layoutCurrent) {
         m_pendingCurrent = -1;
         if (first && !isRunning()) {
@@ -649,22 +605,18 @@ void OverviewEffect::applyLayout(const QString &layout)
     effects->addRepaintFull();
 }
 
-// ---- D-Bus -------------------------------------------------------------------------------------------------
 
-// Starts the scene. Another full-screen effect (the desktop switch animation) would make KWin refuse it, and niri
-// cuts such animations short when the overview opens: take its place, it ends itself when it sees that (see
-// DesktopSwitchEffect, activeFullScreenEffectChanged).
+// starts the scene; another full-screen effect (the desktop switch) is taken over, like niri cuts it short
 bool OverviewEffect::acquire()
 {
     if (isRunning()) {
         return true;
     }
     if (m_zoom != m_zoomConfig) {
-        m_zoom = m_zoomConfig; // the warm-up scene may have been built with an older value; the bindings follow
+        m_zoom = m_zoomConfig;
         Q_EMIT optionsChanged();
     }
-    // The property change tells the effects that animate (kiri_motion, kiri_desktop_switch) to say where their
-    // pictures are right now (they listen for it, see their eventFilter); the zoom starts from there instead of from the end positions, so nothing jumps.
+    // the zoom starts from where the animating effects' pictures are now, so nothing jumps
     effects->setProperty("kiriOverviewOpening", true);
     effects->setProperty("kiriOverviewOpening", QVariant());
     if (effects->hasActiveFullScreenEffect() && effects->activeFullScreenEffect() != this) {
@@ -676,7 +628,7 @@ bool OverviewEffect::acquire()
     effects->setProperty("kiriSwitchVisual", QVariant());
     m_openCall = now();
     m_closedZoom = false;
-    m_events.clear(); // answers to an earlier run (a key pressed in its last frames) must not act on this one
+    m_events.clear();
     m_pendingCurrent = -1;
     run(true);
     if (!isRunning()) {
@@ -705,7 +657,6 @@ void OverviewEffect::startOpen()
     if (!wasRunning) {
         m_progress = 0;
         if (!acquire()) {
-            // refused: never stay in a state that thinks it is open (Meta+O would then do nothing)
             m_open = false;
             return;
         }
@@ -717,13 +668,7 @@ void OverviewEffect::startOpen()
     Q_EMIT closingChanged();
 }
 
-// Builds the scene once, invisibly, shortly after login: the first real open otherwise pays for the QML and shader
-// compilation, the wallpapers and the window textures while the zoom is running.
-//
-// This blanks the screen: while the scene is up the windows are not painted by KWin and the (invisible, opacity 0.003)
-// scene draws nothing at progress 0, so the whole output is black for the length of the warm-up plus the stall of
-// building the scene (0.4 to 1.5 s measured in the test session, longer on a slower GPU). The script asks 15 s after
-// every load of the effect, so it showed as a random black screen. It is off unless KIRI_OVERVIEW_WARM is set.
+// builds the scene once, invisibly, shortly after login; it blanks the screen for the length of the warm-up, so it is off unless KIRI_OVERVIEW_WARM is set
 QString OverviewEffect::warm(const QString &layout)
 {
     if (!qEnvironmentVariableIsSet("KIRI_OVERVIEW_WARM")) {
@@ -746,7 +691,7 @@ QString OverviewEffect::warm(const QString &layout)
     effects->addRepaintFull();
     QTimer::singleShot(500, this, [this]() {
         if (m_warm && isRunning() && !m_open && !m_gesture) {
-            logFrames(); // while m_warm is still set: the line says "warm-up", not "animation"
+            logFrames();
             m_warm = false;
             m_progressAnimating = false;
             run(false);
@@ -763,7 +708,7 @@ QString OverviewEffect::open(const QString &layout)
         m_layoutCurrent = -1;
     }
     applyLayout(layout);
-    // not running counts as closed whatever m_open says (a gesture let go at p = 0 used to leave it set: no open ever)
+    // not running counts as closed whatever m_open says
     if (!isRunning() || !m_open || m_gesture) {
         startOpen();
     }
@@ -835,7 +780,6 @@ QString OverviewEffect::gesture(const QString &json)
             m_open = open;
             startProgress(open ? 1.0 : 0.0, v);
         } else if (open && !effects->isScreenLocked()) {
-            // let go at p = 0 on "open": the scene is not up yet
             startOpen();
         } else {
             m_open = false;
@@ -848,7 +792,6 @@ QString OverviewEffect::gesture(const QString &json)
 void OverviewEffect::queue(const QString &json)
 {
     m_events << json;
-    // never grow without bound if nobody polls
     while (m_events.size() > 256) {
         m_events.removeFirst();
     }
@@ -866,12 +809,11 @@ QString OverviewEffect::poll()
     return out;
 }
 
-// ---- from QML ---------------------------------------------------------------------------------------------
 
 void OverviewEffect::activateWindow(const QString &windowId, const QString &desktopId, int desktopIndex)
 {
     if (now() < m_noCloseUntil) {
-        return; // the release of a drag, not a click
+        return;
     }
     queue(jsonString({{"t", "activate"}, {"w", windowId}, {"d", desktopId}}));
     m_pendingCurrent = desktopIndex;
@@ -908,7 +850,6 @@ void OverviewEffect::goToDesktop(int index)
     startWorkspace(index);
 }
 
-// Up/Down/wheel: one desktop from where the view is heading, so fast presses move on instead of repeating the target
 void OverviewEffect::stepDesktop(int direction)
 {
     goToDesktop(int(std::lround(m_wsTarget)) + direction);
@@ -920,7 +861,6 @@ void OverviewEffect::dropWindow(const QString &windowId, const QString &desktopI
     queue(jsonString({{"t", "drop"}, {"w", windowId}, {"d", desktopId}, {"c", column}, {"i", tile}}));
 }
 
-// a floating window let go in the overview: it stays floating, on the desktop under the pointer, at x/y (screen space)
 void OverviewEffect::dropFloating(const QString &windowId, const QString &desktopId, qreal x, qreal y)
 {
     m_noCloseUntil = now() + 700;
@@ -956,10 +896,7 @@ void OverviewEffect::focusColumn(const QString &desktopId, int direction)
     queue(jsonString({{"t", "focuscol"}, {"d", desktopId}, {"dir", direction}}));
 }
 
-// niri's overview_scroll_swipe_gesture + workspace_switch_gesture_* / view_offset_gesture_* for a touchpad: the first
-// event of a scroll decides the direction (vertical when dy != 0); a vertical scroll drags the desktops (rubber band
-// past the ends, momentum on release), a horizontal one scrolls the view of the desktop under the pointer. A scroll
-// ends when the fingers lift, which Qt reports as a pause in the events.
+// niri's overview_scroll_swipe_gesture for a touchpad: a vertical scroll drags the desktops, a horizontal one scrolls the view; a scroll ends after a pause in the events
 void OverviewEffect::touchpadScroll(qreal right, qreal down, const QString &desktopId)
 {
     if (!m_open || m_desktopCount < 1) {
@@ -980,7 +917,7 @@ void OverviewEffect::touchpadScroll(qreal right, qreal down, const QString &desk
     }
     m_swipeEnd.start();
     if (m_swipeVertical) {
-        // monitor.rs workspace_switch_gesture_update: the zoom reduces the effect somewhat
+        // like niri's workspace_switch_gesture_update: the zoom reduces the effect somewhat
         const double zoom = m_zoom;
         const double scale = (zoom - 1.0) / 2.5 + 1.0;
         m_swipeTracker.push(down / scale, now());
@@ -1004,7 +941,7 @@ void OverviewEffect::endTouchpadScroll()
     if (!m_swipeVertical) {
         return;
     }
-    // monitor.rs workspace_switch_gesture_end
+    // like niri's workspace_switch_gesture_end
     m_swipeTracker.push(0.0, now());
     const double zoom = m_zoom;
     NiriSwipe::RubberBand band = NiriSwipe::WorkspaceGesture::Band;
@@ -1026,8 +963,7 @@ void OverviewEffect::endTouchpadScroll()
     effects->addRepaintFull();
 }
 
-// niri dnd_scroll_gesture_scroll of the monitor: the desktops follow the drag at the top/bottom edge; the gesture
-// ends (snaps to the nearest desktop, animated) with dndEdgeEnd
+// like niri's dnd_scroll_gesture_scroll: the desktops follow the drag at the top/bottom edge
 void OverviewEffect::dndEdgeWorkspace(qreal delta)
 {
     if (m_desktopCount < 1) {

@@ -20,23 +20,18 @@ namespace KiriMotion
 
 namespace
 {
-// the decorations effect leaves its ring and tab indicator out of the old-contents snapshot when this is set
 constexpr int CaptureRole = 0x4B495249;
-constexpr double ResizeThreshold = 10; // px, niri's RESIZE_ANIMATION_THRESHOLD
-constexpr double StreamGap = 0.030; // changes closer than this count as one continuous stream (touchpad scrolling)
+constexpr double ResizeThreshold = 10;
+constexpr double StreamGap = 0.030;
 constexpr int StreamLength = 2;
-constexpr double StreamMinDuration = 0.060; // a chain shorter than this is a few layout passes of one action, not a scroll
-constexpr double SettleAfterUserResize = 0.3; // clients still commit the last sizes of an interactive resize this long after the button is released
-constexpr double SettleAfterOpen = 0.05; // Kiri places a new window right after it appears; that is no movement
-// SDL on X11 unmaps and maps a window again when a game goes full-screen: KWin closes the window and opens a new one.
-// An X11 window that is full-screen or was opened a moment ago keeps its last picture, unchanged, this long before it
-// closes (a Wayland window never does); a window of the same process and class that is mapped meanwhile replaces it without any animation.
+constexpr double StreamMinDuration = 0.060;
+constexpr double SettleAfterUserResize = 0.3;
+constexpr double SettleAfterOpen = 0.05;
+// SDL on X11 unmaps and maps a window when a game goes full-screen: a full-screen or just opened X11 window keeps its last picture this long before it closes, and a window of the same process mapped meanwhile replaces it
 constexpr double RemapHold = 0.3;
 constexpr double RemapRecent = 2.0;
 } // namespace
 
-// the Kiri overview is the full-screen effect that is running (not the desktop switch, which comes and goes with
-// every desktop change and moves nothing but its own picture)
 static bool overviewUp()
 {
     const KWin::Effect *e = KWin::effects->activeFullScreenEffect();
@@ -59,9 +54,7 @@ Effect::Effect()
             m_resizedWindow = nullptr;
         }
     });
-    // A full-screen effect (the overview) takes over: it zooms out from what is on screen at this moment, so it is told
-    // where each animated window is painted now. Changes of the windows while it is up are not animated here: it
-    // animates the thumbnails itself.
+    // a full-screen effect (the overview) takes over: it is told where each animated window is painted now
     KWin::effects->installEventFilter(this);
     for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
         manage(w);
@@ -70,8 +63,6 @@ Effect::Effect()
 
 Effect::~Effect()
 {
-    // dropping the last reference to a closed window deletes it and emits windowDeleted, which must not reach
-    // this half-destroyed effect
     disconnect(KWin::effects, nullptr, this, nullptr);
     QHash<KWin::EffectWindow *, WindowState> windows = std::exchange(m_windows, {});
     for (auto it = windows.begin(); it != windows.end(); ++it) {
@@ -90,8 +81,7 @@ bool Effect::supported()
 
 void Effect::reconfigure(ReconfigureFlags)
 {
-    // the global animation speed setting and niri's slowdown scale niri's times; "instant" and `off` turn the animations off
-    NiriAnim::load(); // KWin calls this when kwinrc changes (and on `qdbus org.kde.KWin /KWin reconfigure`)
+    NiriAnim::load();
     const double factor = NiriAnim::timeFactor();
     m_speed = factor > 0 ? 1.0 / factor : 0;
     qCDebug(KIRI_MOTION) << "animation time factor" << factor;
@@ -109,7 +99,7 @@ bool Effect::isActive() const
 
 int Effect::requestedEffectChainPosition() const
 {
-    return 98; // just before kiri_decorations (99), which then paints the ring around the animated window
+    return 98;
 }
 
 bool Effect::blocksDirectScanout() const
@@ -117,9 +107,7 @@ bool Effect::blocksDirectScanout() const
     return false;
 }
 
-// A window that is entirely off every screen cannot be seen, so neither a snapshot of it nor an animation is needed.
-// Kiri parks most of the columns off screen and moves them with every scroll.
-// a window that is told it is full-screen but stays a tile (niri's toggle-windowed-fullscreen) is not one of the parked ones
+// a window entirely off every screen needs no snapshot or animation
 static bool coversScreen(const KWin::EffectWindow *w)
 {
     const auto *output = w->screen();
@@ -138,7 +126,7 @@ bool Effect::animatable(KWin::EffectWindow *w) const
         return false;
     }
     if (w->caption().startsWith(QLatin1String("kiri-ring-"))) {
-        return false; // the fallback ring and tab indicator windows follow their target themselves
+        return false;
     }
     const QString windowClass = w->windowClass();
     if (windowClass == QLatin1String("plasmashell plasmashell") || windowClass == QLatin1String("plasmashell org.kde.plasmashell")) {
@@ -203,7 +191,6 @@ void Effect::stopWindow(KWin::EffectWindow *w, WindowState &s)
         qCDebug(KIRI_MOTION) << "stop" << w->caption() << "moving" << s.moving << "resizing" << s.resizing << "swipe" << KWin::effects->property("kiriSwipeVisual").toBool();
     }
     if (s.moving || s.resizing) {
-        // the window was painted somewhere else than its real place: KWin only knows the real place, so the painted one is cleared here
         KWin::effects->addRepaintFull();
     }
     s.moving = false;
@@ -228,12 +215,11 @@ void Effect::takeSnapshot(KWin::EffectWindow *w, WindowState &s)
     s.snapshotSince = now();
 }
 
-// Kiri has asked for a new geometry. A resize only takes effect when the client commits a buffer of the new size,
-// and by then the old contents are gone, so they are saved now, while the old buffer is still there.
+// Kiri asked for a new geometry: the old contents are saved now, while the old buffer is still there
 void Effect::onAboutToChange(KWin::EffectWindow *w)
 {
     if (KWin::effects->property("kiriSwipeVisual").toBool()) {
-        return; // kiri_swipe paints a touchpad swipe itself, frame by frame
+        return;
     }
     auto it = m_windows.find(w);
     if (it == m_windows.end()) {
@@ -245,8 +231,8 @@ void Effect::onAboutToChange(KWin::EffectWindow *w)
     s.lastRequest = t;
     s.requestStreak = fast ? s.requestStreak + 1 : 0;
     if (m_speed <= 0 || s.snapshot || s.closeStart >= 0 || s.requestStreak >= StreamLength || t - s.created < SettleAfterOpen
-        || anyUserResize() || resizeSettling(t) // the other windows get their sizes at once while a resize goes on
-        || (w->isX11Client() && w->isFullScreen() && coversScreen(w)) // Kiri parks these and kiri_decorations paints them (see setParkedPositions)
+        || anyUserResize() || resizeSettling(t)
+        || (w->isX11Client() && w->isFullScreen() && coversScreen(w))
         || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()
         || (!s.moving && !s.resizing && offScreen(w->frameGeometry()))) {
         return;
@@ -257,7 +243,6 @@ void Effect::onAboutToChange(KWin::EffectWindow *w)
 void Effect::onAdded(KWin::EffectWindow *w)
 {
     manage(w);
-    // the same window mapped again: the old picture goes at once and the new window does not animate its opening
     const double t = now();
     KWin::EffectWindow *old = nullptr;
     for (auto it = m_windows.begin(); it != m_windows.end(); ++it) {
@@ -272,8 +257,8 @@ void Effect::onAdded(KWin::EffectWindow *w)
         o.closeStart = -1;
         o.itemEffect.reset();
         old->setData(KWin::WindowClosedGrabRole, QVariant());
-        o.deletedRef.reset(); // windowDeleted erases the state
-        KWin::effects->addRepaintFull(); // the old picture goes at once
+        o.deletedRef.reset();
+        KWin::effects->addRepaintFull();
         return;
     }
     if (m_speed <= 0 || NiriAnim::openAnim().isOff() || !animatable(w) || !w->isVisible() || KWin::effects->activeFullScreenEffect()) {
@@ -296,7 +281,6 @@ void Effect::onClosed(KWin::EffectWindow *w)
         return;
     }
     WindowState &s = *it;
-    // a window that was opening is just closed
     s.openStart = -1;
     if (m_speed <= 0 || NiriAnim::closeAnim().isOff() || !animatable(w) || !w->isVisible() || w->skipsCloseAnimation() || KWin::effects->activeFullScreenEffect()
         || w->data(KWin::WindowClosedGrabRole).value<void *>()) {
@@ -305,14 +289,12 @@ void Effect::onClosed(KWin::EffectWindow *w)
         KWin::effects->addRepaintFull();
         return;
     }
-    // a movement or resize that is running goes on under the closing animation, so the window does not jump to its
-    // real place for the first frame of the close
     s.deletedRef.emplace(w);
     s.closeStart = now();
     s.pid = w->pid();
     s.windowClass = w->windowClass();
     if (s.pid > 0 && w->isX11Client() && (w->isFullScreen() || s.closeStart - s.created < RemapRecent)) {
-        s.closeStart += RemapHold; // painted as it was until then: the close animation starts when no window came back
+        s.closeStart += RemapHold;
     }
     if (!s.itemEffect) {
         s.itemEffect = std::make_shared<KWin::ItemEffect>(w->windowItem());
@@ -340,8 +322,7 @@ QSizeF Effect::paintedSize(const WindowState &s, const KWin::RectF &frame, doubl
                   std::max(1.0, s.sizeFrom.height() + (frame.height() - s.sizeFrom.height()) * p));
 }
 
-// the sizes that the windows around a resized one still have to commit after the pointer is let go are not animated: like
-// niri's interactive resize, they just are the new size (the view moving to show the column afterwards still is animated)
+// like niri's interactive resize, the sizes still to be committed after the pointer is let go are not animated
 bool Effect::resizeSettling(double t) const
 {
     return m_userResizeEnd >= 0 && t - m_userResizeEnd < SettleAfterUserResize;
@@ -367,8 +348,7 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
     const double t = now();
     const KWin::RectF frame = w->frameGeometry();
     if (KWin::effects->property("kiriSwipeVisual").toBool()) {
-        // kiri_swipe paints the scrolling view. A window that only moves with the view keeps the animation it has (niri: the
-        // view offset gesture never touches the tiles' move and resize animations; they run on under the moving view)
+        // kiri_swipe paints the scrolling view; a window that only moves with the view keeps its animation
         if (frame.size() != old.size() || !(s.moving || s.resizing)) {
             stopWindow(w, s);
         }
@@ -385,16 +365,15 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
     }
 
     if (m_speed <= 0 || !animatable(w) || !w->isVisible() || !w->isOnCurrentDesktop() || w->isMinimized() || w->isUserMove() || w->isUserResize()
-        || (w->isX11Client() && w->isFullScreen() && coversScreen(w)) // parked by Kiri and painted by kiri_decorations
-        || (!s.moving && !s.resizing && offScreen(old) && offScreen(frame)) // moving between two places nobody sees
-        || overviewUp() || anyUserResize() // like niri's interactive resize (animate = false): the neighbours follow the mouse at once
+        || (w->isX11Client() && w->isFullScreen() && coversScreen(w))
+        || (!s.moving && !s.resizing && offScreen(old) && offScreen(frame))
+        || overviewUp() || anyUserResize()
         || s.closeStart >= 0 || t - s.created < SettleAfterOpen || (s.streak >= StreamLength && t - s.streamStart >= StreamMinDuration) || old.isEmpty() || frame.isEmpty()) {
         stopWindow(w, s);
         return;
     }
 
     qCDebug(KIRI_MOTION) << "geometry" << w->caption() << old << "->" << frame << "snapshot" << s.snapshot;
-    // where the window is painted right now, by the old animation
     const QPointF offset = moveOffset(s, t);
     static const bool trace = qEnvironmentVariableIsSet("KIRI_MOTION_TRACE");
     if (trace) {
@@ -403,11 +382,8 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
     }
     const QSizeF visualSize = s.resizing ? paintedSize(s, old, t) : old.size();
 
-    // move: niri's animate_move_from: the new offset is the jump of the layout position plus what is left of the old offset
     const QPointF newOffset = old.topLeft() - frame.topLeft() + offset;
-    // a move that is only horizontal and keeps the size is the view moving (or a column shifting with it): niri's
-    // horizontal-view-movement; any other is window-movement. The windows of a layout change that only slides columns
-    // cannot be told from a scroll here, so they use the first one too.
+    // a move that is only horizontal and keeps the size is the view moving: horizontal-view-movement; any other is window-movement
     const bool horizontalOnly = std::fabs(old.y() - frame.y()) < 0.5 && old.size() == frame.size();
     const NiriAnim::Anim &moveAnim = horizontalOnly ? NiriAnim::viewMoveSpring() : NiriAnim::moveSpring();
     if ((std::fabs(newOffset.x()) >= 0.5 || std::fabs(newOffset.y()) >= 0.5) && !moveAnim.isOff()) {
@@ -419,7 +395,6 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
         s.moving = false;
     }
 
-    // resize: only when the size changed by more than niri's threshold; the old contents are kept as a snapshot
     const double change = std::max(std::fabs(frame.width() - visualSize.width()), std::fabs(frame.height() - visualSize.height()));
     if (resizeSettling(t)) {
         s.resizing = false;
@@ -429,7 +404,7 @@ void Effect::onGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &old)
         }
     } else if (change > ResizeThreshold && !NiriAnim::resizeSpring().isOff()) {
         if (!s.snapshot) {
-            takeSnapshot(w, s); // no request was seen: this is as good as it gets (the new buffer may already be in)
+            takeSnapshot(w, s);
         }
         s.resizing = true;
         s.sizeFrom = visualSize;
@@ -487,12 +462,11 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
     double height = size.height();
     double opacity = 1;
 
-    // window-open: scale (progress / 2 + 0.5) around the centre and fade in with the progress, 150 ms ease-out-expo
-    // window-close: scale ((1 - progress) / 5 + 0.8) around the centre and fade out, 150 ms ease-out-quad
+    // window-open: scale (progress / 2 + 0.5) and fade in, 150 ms ease-out-expo; window-close: scale ((1 - progress) / 5 + 0.8) and fade out, 150 ms ease-out-quad
     double zoom = 1;
     if (s.closeStart >= 0) {
         const double passed = (t - s.closeStart) * m_speed;
-        const double p = std::clamp(NiriAnim::closeAnim().clampedValue(passed), 0.0, 1.0); // niri: clamped_progress
+        const double p = std::clamp(NiriAnim::closeAnim().clampedValue(passed), 0.0, 1.0);
         opacity = 1 - p;
         zoom = std::max((1 - p) / 5 + 0.8, 0.0);
     } else if (s.openStart >= 0) {
@@ -508,7 +482,7 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
     }
 
     {
-        static const bool trace = qEnvironmentVariableIsSet("KIRI_MOTION_TRACE"); // painted rect per frame; xs0/xt0 is what the effects before this one left in the paint data
+        static const bool trace = qEnvironmentVariableIsSet("KIRI_MOTION_TRACE");
         if (trace && w->isNormalWindow()) {
             qCWarning(KIRI_MOTION).nospace() << "TRACE paint " << qint64(QDateTime::currentMSecsSinceEpoch()) << " " << w->caption() << " ft=" << t << " frame=" << frame << " off=" << offset
                                              << " size=" << size << " sizeFrom=" << s.sizeFrom << " rs=" << s.resizeStart << " ms=" << s.moveStart << " xs0=" << data.xScale() << " xt0=" << data.xTranslation()
@@ -521,7 +495,6 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
     data.setYTranslation(data.yTranslation() + y - frame.y());
     data.multiplyOpacity(opacity);
     if (s.snapshot) {
-        // before the client's new contents are there only the old ones show; then they cross-fade with the resize spring
         data.setCrossFadeProgress(s.resizing ? NiriAnim::resizeSpring().clampedValue((t - s.resizeStart) * m_speed) : 1.0);
     }
     return KWin::CrossFadeEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
@@ -536,7 +509,7 @@ void Effect::postPaintScreen()
         KWin::EffectWindow *w = it.key();
         if (s.moving && (t - s.moveStart) * m_speed >= (s.viewMove ? NiriAnim::viewMoveSpring() : NiriAnim::moveSpring()).duration()) {
             s.moving = false;
-            again = true; // one more frame with the window exactly in place
+            again = true;
         }
         if (s.resizing && (t - s.resizeStart) * m_speed >= NiriAnim::resizeSpring().duration()) {
             s.resizing = false;
@@ -546,8 +519,6 @@ void Effect::postPaintScreen()
                 s.snapshot = false;
             }
         }
-        // a snapshot that was taken for a request and not used by a resize: the request changed nothing or the
-        // client is not answering any more
         if (!s.resizing && s.snapshot && t - s.snapshotSince > 4.0) {
             unredirect(w);
             s.snapshot = false;
@@ -565,7 +536,7 @@ void Effect::postPaintScreen()
             s.closeStart = -1;
             s.itemEffect.reset();
             w->setData(KWin::WindowClosedGrabRole, QVariant());
-            s.deletedRef.reset(); // the window is gone for real now; windowDeleted erases its state, so stop here
+            s.deletedRef.reset();
             again = true;
             break;
         }

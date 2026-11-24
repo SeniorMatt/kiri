@@ -27,7 +27,8 @@ tests.register("Drag tiled window, keep tiled", 20, () => {
     Assert.grid(config, tilingArea, 100, [[client0], [client1]], true);
 
     const move = new MockQmlPoint(10, 10);
-    workspaceMock.moveWindow(client0, move, move, move, move, move, move, move, move, move); // many moves in order to trigger externalFrameGeometryChangedRateLimiter
+    // many moves in order to trigger externalFrameGeometryChangedRateLimiter
+    workspaceMock.moveWindow(client0, move, move, move, move, move, move, move, move, move);
     Assert.tiledClient(clientManager, client0);
     Assert.tiledClient(clientManager, client1);
     Assert.grid(config, tilingArea, 100, [[client0], [client1]], true);
@@ -74,8 +75,7 @@ tests.register("Drag tiled window out past the screen edge, no jump (niri)", 10,
 
     const [client0, client1] = workspaceMock.createClients(2);
     const width = client0.getActualFrameGeometry().width;
-    // the pointer takes the window over the right edge of the screen in one step; once it has left the grid it stays
-    // where the pointer puts it (it used to be pushed back inside the screen for a moment)
+    // once the pointer takes the window over the right edge of the screen, it stays where the pointer puts it
     const target = screen.width - width / 2;
     const dx = target - client0.getActualFrameGeometry().x;
     workspaceMock.moveWindow(client0, new MockQmlPoint(dx, 0));

@@ -4,25 +4,23 @@ class Desktop {
     private scrollX: number;
     private gestureScrollXInitial: number | null;
     private readonly gestureVelocity = new VelocityTracker(100, 120);
-    private static readonly GESTURE_PROJECTION_MS = 333; // niri: 1 / (1000 * -ln 0.997) seconds of the release velocity
-    // KWin starts a horizontal handler on the first few units of every swipe, before it has locked the axis;
-    // a swipe that ends up vertical cancels it again. Less than this much progress (0.05 = 10 units) is not a swipe.
+    private static readonly GESTURE_PROJECTION_MS = 333;
+    // KWin starts a horizontal handler on the first units of every swipe; less than 0.05 progress is not a swipe
     private static readonly GESTURE_MIN_PROGRESS = 0.05;
     private gestureMaxAmount = 0;
     private gestureRight = true;
-    // raw-swipe mode (compiled effect kiri_swipe): finger travel in units, like niri's SwipeTracker
     private gestureRaw = false;
-    private gestureRawPointer = false; // a Mod+middle drag of the pointer: 1:1 in pixels, niri's non-touchpad view gesture
+    private gestureRawPointer = false;
     private gestureRawPos = 0;
     private gestureTargetColumn: Column|null = null;
     private gestureRawHistory: { delta: number, time: number }[] = [];
-    private static readonly RAW_HISTORY_MS = 150; // niri HISTORY_LIMIT
-    private static readonly RAW_DECELERATION = 0.997; // niri DECELERATION_TOUCHPAD, per millisecond
-    private static readonly RAW_WORKING_AREA_MOVEMENT = 1200; // niri VIEW_GESTURE_WORKING_AREA_MOVEMENT
+    private static readonly RAW_HISTORY_MS = 150;
+    private static readonly RAW_DECELERATION = 0.997;
+    private static readonly RAW_WORKING_AREA_MOVEMENT = 1200;
     private dirty: boolean;
     private dirtyScroll: boolean;
     private dirtyPins: boolean;
-    private margins = ""; // the outer gaps the tiling area was worked out with (they change with the desktop's name)
+    private margins = "";
     public clientArea: QmlRect;
     public fullScreenArea: QmlRect;
     public tilingArea: QmlRect;
@@ -30,8 +28,8 @@ class Desktop {
     constructor(
         public readonly kwinDesktop: KwinDesktop,
         private readonly pinManager: PinManager,
-        private readonly getProfile: (desktop: Desktop) => LayoutProfile, // the layout options of this desktop on this output
-        public readonly outputName: string, // like niri's per-monitor workspaces, every output has a strip of its own
+        private readonly getProfile: (desktop: Desktop) => LayoutProfile,
+        public readonly outputName: string,
         private readonly getScreen: () => Output,
         private readonly getOutputCount: () => number,
         focusPasser: FocusPassing.Passer,
@@ -49,7 +47,6 @@ class Desktop {
         this.tilingArea = Desktop.getTilingArea(this.clientArea, kwinDesktop, pinManager, config);
     }
 
-    // the layout options that apply here: the global ones with the layout {} of the output and of the desktop's name over them
     public get profile(): LayoutProfile {
         return this.getProfile(this);
     }
@@ -58,7 +55,6 @@ class Desktop {
         return this.getProfile(this).desktop;
     }
 
-    // the time of the latest screen size or dock change; windows are resized by KWin around it
     private screenChangedAt = -Infinity;
 
     public onScreenChanged() {
@@ -126,21 +122,18 @@ class Desktop {
         this.setScroll(targetScrollX, false);
     }
 
-    // niri: center-focused-column "always", or a lone column with always-center-single-column
     public isCenteringFocusedColumn() {
         return this.config.scroller instanceof CenteredScroller ||
             (this.config.alwaysCenterSingleColumn && this.grid.getFirstColumn() === this.grid.getLastColumn());
     }
 
-    // niri leaves the view offset alone unless the focused column is centered; the scroll clamping to the grid's ends
-    // and the centering of a grid that fits are not niri's
+    // niri leaves the view offset alone unless the focused column is centered
     public keepsViewOffset() {
         const clamper = this.config.clamper;
         return !this.isCenteringFocusedColumn() && clamper instanceof EdgeClamper && !clamper.centerWhenFits;
     }
 
-    // niri's compute_new_view_offset: a column wider than the view is left aligned, a visible one leaves the view alone,
-    // otherwise the view moves the shorter way
+    // niri's compute_new_view_offset
     public fitColumnInView(column: Column) {
         const view = this.getCurrentVisibleRange();
         if (this.tilingArea.width <= column.getWidth()) {
@@ -174,9 +167,7 @@ class Desktop {
         this.recenterLoneColumn();
     }
 
-    // niri: a lone column stays centered whatever happened to the view before (a closed neighbour, a held scroll).
-    // Columns that all fit on the screen stay centered as a group the same way with "center when everything fits" (and
-    // the centering scrollers), so a closed window doesn't leave them off-center until the focus moves.
+    // niri: a lone column stays centered whatever happened to the view before
     public recenterLoneColumn() {
         if (this.config.alwaysCenterSingleColumn && this.grid.getFirstColumn() !== null && this.grid.getFirstColumn() === this.grid.getLastColumn()) {
             this.setScroll(this.scrollX, false);
@@ -189,11 +180,8 @@ class Desktop {
         }
     }
 
-    // While the user resizes a column (and when they let go): like niri, the view only keeps the resized column centered
-    // when niri would center it (center-focused-column "always", or a lone column with always-center-single-column).
-    // Otherwise the view stays where it is, apart from following the left edge; the focused column is brought into
-    // view when the pointer is released (niri's interactive_resize_end). The "center when everything fits" setting and
-    // the centering scrollers (not niri's) also keep the columns that fit on the screen centered as a group.
+    // while the user resizes a column the view keeps it centered only when niri would; the focused column is brought
+    // into view on release
     public recenterWhileResizing(column: Column, focused: boolean) {
         const clamper = this.config.clamper;
         if ((clamper instanceof CenterClamper || (clamper instanceof EdgeClamper && clamper.centerWhenFits)) && this.grid.getWidth() <= this.tilingArea.width) {
@@ -207,7 +195,6 @@ class Desktop {
         }
     }
 
-    // `previous` is the column that was active before `column` took the focus
     public scrollToColumn(column: Column, force: boolean, previous: Column|null = null) {
         if (force || this.dirtyScroll || this.config.scroller.alwaysScroll === true || !Range.contains(this.getCurrentVisibleRange(), column)) {
             this.config.scroller.scrollToColumn(this, column, previous);
@@ -218,12 +205,10 @@ class Desktop {
         return Range.create(scrollX, this.tilingArea.width);
     }
 
-    // the width niri calls the working area: the tiling area plus the outer gaps
     public getWorkingWidth() {
         return this.tilingArea.width + this.config.marginLeft + this.config.marginRight;
     }
 
-    // the left edge of the working area (niri's working area: the tiling area plus the outer gaps)
     public getWorkingLeft() {
         return this.tilingArea.x - this.config.marginLeft;
     }
@@ -269,19 +254,16 @@ class Desktop {
         if (this.config.gestureScrollInvert) {
             amount = -amount;
         }
-        // like niri, the view follows the fingers freely, past the ends too; releasing snaps it back
         this.setScroll(this.gestureScrollXInitial + this.config.gestureScrollStep * amount, true);
         this.gestureVelocity.add(now, this.scrollX);
     }
 
-    // niri's view_offset_gesture_update for a touchpad: the view moves working_width / 1200 per unit of finger
-    // travel, with no cap, and follows the fingers past the ends
+    // niri's view_offset_gesture_update for a touchpad: working_width / 1200 per unit of finger travel, no cap
     public gestureRawUpdate(delta: number, time: number, startOffset = 0, pointer = false) {
         if (!this.config.gestureScroll) {
             return;
         }
         if (this.gestureScrollXInitial === null) {
-            // the view starts where it is painted: the compiled effect may still show a settle that the layout is ahead of
             this.gestureScrollXInitial = this.scrollX + startOffset;
             this.gestureRaw = true;
             this.gestureRawPointer = pointer;
@@ -297,8 +279,6 @@ class Desktop {
         this.setScroll(this.gestureScrollXInitial + this.getRawScale() * this.gestureRawPos, true);
     }
 
-    // what the compiled effect needs to paint a raw swipe at frame rate: the scroll per unit of finger travel and the
-    // windows that scroll
     public getRawVisual() {
         const ids: string[] = [];
         for (const column of this.grid.getColumns()) {
@@ -309,20 +289,17 @@ class Desktop {
         return { scale: this.getRawScale(), ids: ids };
     }
 
-    // scroll pixels per unit of finger travel, signed by the invert setting
     private getRawScale() {
         if (this.gestureRawPointer) {
-            return 1; // niri: norm_factor 1 for the pointer, the delta is in pixels
+            return 1;
         }
         return (this.config.gestureScrollInvert ? -1 : 1) * this.getWorkingWidth() / Desktop.RAW_WORKING_AREA_MOVEMENT;
     }
 
-    // niri's view_offset_gesture_end: project the release velocity, pick the closest snapping point, focus the
-    // furthest column towards the swipe that is fully on screen there. Returns where the view should settle
-    // (a scroll position) and how fast the view moves at the release (scroll pixels per second).
+    // niri's view_offset_gesture_end: project the release velocity, pick the closest snapping point
     public getRawRelease(): { from: number, to: number, velocity: number } {
         const history = this.gestureRawHistory;
-        let velocity = 0; // units per second
+        let velocity = 0;
         if (history.length > 1 && history[history.length - 1].time > history[0].time) {
             const total = history.reduce((sum, e) => sum + e.delta, 0);
             velocity = total / ((history[history.length - 1].time - history[0].time) / 1000);
@@ -333,7 +310,6 @@ class Desktop {
         this.gestureRight = projected >= 0;
 
         const marginLeft = this.config.marginLeft;
-        // niri's view position: the column at screen x = p has view position gridX - p
         const columns = this.grid.getColumns();
         const result = NiriSnap.choose({
             columns: columns.map(c => ({ x: c.getLeft(), width: c.getWidth() })),
@@ -349,7 +325,6 @@ class Desktop {
         this.gestureTargetColumn = columns[result.column];
         let to = result.view + marginLeft;
         if (this.centersGridWhenFits()) {
-            // Kiri's own option (not niri's): a grid that fits the screen stays centered, a swipe does not park it at an edge
             to = this.clampScrollX(to);
         }
         return { from: this.scrollX, to: to, velocity: to !== result.view + marginLeft || result.retargeted ? 0 : viewVelocity };
@@ -368,16 +343,13 @@ class Desktop {
         return this.gestureScrollXInitial !== null;
     }
 
-    // Fingers lifted: the column-aligned scroll position to settle on, taking the swipe velocity into account.
     public getGestureSettleTarget(now: number) {
         if (this.gestureRaw) {
             return this.getRawRelease().to;
         }
-        // niri-style: a column's left edge at the left edge of the screen, or the ends of the grid
         const candidates: number[] = [this.clampScrollX(-Infinity), this.clampScrollX(Infinity)];
         for (const column of this.grid.getColumns()) {
             candidates.push(this.clampScrollX(column.getLeft()));
-            // niri also snaps with a column's right edge at the right edge of the screen
             candidates.push(this.clampScrollX(column.getRight() - this.tilingArea.width));
         }
         const velocity = this.gestureVelocity.getVelocity(now);
@@ -386,7 +358,6 @@ class Desktop {
         return pickSnapTarget(candidates, this.scrollX, velocity, Desktop.GESTURE_PROJECTION_MS);
     }
 
-    // A gesture that never got past a few units was KWin guessing the axis of a vertical swipe: put it back, no focus change.
     public gestureScrollAbortIfAccidental() {
         if (this.gestureRaw || this.gestureScrollXInitial === null || this.gestureMaxAmount >= Desktop.GESTURE_MIN_PROGRESS) {
             return false;
@@ -400,8 +371,7 @@ class Desktop {
         return this.scrollX;
     }
 
-    // niri: after a swipe, the column furthest in the swipe's direction that is fully on screen gets focus,
-    // also when all columns fit on the screen and the view did not move
+    // niri: after a swipe the furthest column in its direction that is fully on screen gets the focus
     public gestureScrollFinish(focusedWindow: Window|null, focusedUntiled = false, mayFocus = true) {
         if (this.gestureScrollXInitial === null) {
             return;
@@ -423,8 +393,6 @@ class Desktop {
         }
     }
 
-    // With more than one output, the part of a strip that is scrolled out of the view lies on the next output (the windows
-    // are not clipped to their output). Columns that are completely out of the view are parked below all the outputs.
     private parkTop: number | null = null;
 
     public getParkOffset() {
@@ -565,7 +533,6 @@ namespace Desktop {
     }
 
     export interface Scroller {
-        // always called, also for columns that are already visible (niri centers those too)
         readonly alwaysScroll?: boolean;
         scrollToColumn(desktop: Desktop, column: Column, previous: Column|null): void;
     }

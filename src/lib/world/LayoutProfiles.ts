@@ -1,14 +1,7 @@
-// niri's per-workspace and per-output `layout {}` (niri-config/src/workspace.rs WorkspaceLayoutPart, output.rs). niri
-// merges them over the global layout in this order (layout/monitor.rs with_merged_layout, workspace.rs 230):
-// global layout, then the output's layout, then the workspace's layout; the later one wins field by field.
-//
-// Both settings are JSON objects of Kiri's own config keys, the same names the settings page uses:
-//   desktopLayouts:  { "web": { "gapsInnerHorizontal": 0, "presetWidths": "1/3, 2/3" } }          (key: the desktop's name)
-//   outputOverrides: { "DP-1": { "layout": { ... same keys ... }, "backdropColor": "#101010",
-//                                "hotCorners": { "enabled": true, "topLeft": false, "bottomRight": true } } }
-// An output is named by its connector ("DP-1") or by "Make Model Serial", compared without case, like niri does.
-// Only the keys of niri's LayoutPart count (LayoutProfiles.KEYS); the others are dropped. niri's workspace layout does not
-// take empty-workspace-above-first or insert-hint; Kiri's output layouts do not either (both are global here).
+// niri's per-workspace and per-output `layout {}`: global layout, then the output's, then the desktop's; the later one
+// wins field by field
+// the settings are JSON objects of Kiri's own config keys: desktopLayouts by desktop name, outputOverrides by output
+// (connector or "Make Model Serial"); only the keys of niri's LayoutPart count
 interface LayoutProfile {
     desktop: Desktop.Config;
     layout: LayoutConfig;
@@ -16,20 +9,18 @@ interface LayoutProfile {
     presetHeights: { getOrdered: (tilingAreaHeight: number) => number[] };
     columnResizer: Actions.ColumnResizer;
     defaultColumnWidth: ((tilingAreaWidth: number) => number) | null;
-    // the appearance keys of the layout, as the per-window look of the decorations effect; null when none is set
     look: WindowDecorationRule | null;
     fullscreenBackdropColor: string | undefined;
     backgroundColor: string | undefined;
 }
 
 class LayoutProfiles {
-    // the keys of niri's LayoutPart that Kiri can apply per desktop and output
     public static readonly KEYS = /^(gapsInnerHorizontal|gapsInnerVertical|gapsOuter(Top|Bottom|Left|Right)|presetWidths|presetHeights|defaultColumnWidth|scrolling(Lazy|Centered|Grouped|OnOverflow)|alwaysCenterSingleColumn|tabbedColumnsByDefault|tabIndicator.*|focusRing.*|border.*|shadow.*|backgroundColor|fullscreenBackdropColor)$/;
     private static readonly LOOK_BANDS = ["focusRing", "border"] as const;
 
     private readonly base: LayoutProfile;
-    private readonly desktops = new Map<string, Record<string, any>>(); // lower case name -> keys
-    private readonly outputs: { id: string, layout: Record<string, any> }[] = []; // lower case id
+    private readonly desktops = new Map<string, Record<string, any>>();
+    private readonly outputs: { id: string, layout: Record<string, any> }[] = [];
     private readonly cache = new Map<string, LayoutProfile>();
 
     constructor(private readonly config: Config, private readonly build: (config: Config) => LayoutProfile) {
@@ -80,7 +71,6 @@ class LayoutProfiles {
         return this.base;
     }
 
-    // the layout of a desktop on an output; `outputIds` are the names the output answers to
     public resolve(desktopName: string, outputIds: string[]): LayoutProfile {
         if (this.isEmpty()) {
             return this.base;
@@ -95,7 +85,7 @@ class LayoutProfiles {
         for (const output of this.outputs) {
             if (ids.includes(output.id)) {
                 merged = Object.assign(merged, output.layout);
-                break; // niri uses the first output block that matches
+                break;
             }
         }
         merged = Object.assign(merged, this.desktops.get(desktopName.toLowerCase()) ?? {});
@@ -110,14 +100,11 @@ class LayoutProfiles {
         return profile;
     }
 
-    // true when some override sets one of the appearance keys of the windows
     public hasLooks() {
         const sets = [...this.desktops.values(), ...this.outputs.map(output => output.layout)];
         return sets.some(set => Object.keys(set).some(key => /^(focusRing|border|shadow|tabIndicator(Active|Inactive|Urgent)|fullscreenBackdrop)/.test(key)));
     }
 
-    // the keys in `config`-style names to a WindowDecorationRule (Kiri.ts); the colours of the tab indicator only
-    // (its geometry is the script's own, see Desktop)
     private static lookOf(set: Record<string, any>): WindowDecorationRule | null {
         const rule: Record<string, any> = {};
         const take = (group: string, prefix: string, fields: string[]) => {
@@ -144,7 +131,6 @@ class LayoutProfiles {
         return Object.keys(rule).length === 0 ? null : rule as WindowDecorationRule;
     }
 
-    // the names an output answers to in the settings: its connector, and niri's "make model serial"
     public static outputIds(screen: Output | undefined, name: string): string[] {
         const ids = [name];
         const s = screen as any;

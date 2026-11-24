@@ -1,8 +1,6 @@
 const ringCaption = "kiri-ring";
 
-// A tiled X11 window that is closed and mapped again right away by the same process is the same window to the user: SDL
-// on X11 unmaps and maps its window when a game goes full-screen, and KWin deletes the old window and makes a new one.
-// The place, the full-screen state and the focus of the closed window wait this long for such a window.
+// a closed tiled X11 window that is mapped again right away (SDL full-screen) keeps its place, full-screen state and focus
 const remapHoldMs = 300;
 // only windows that are, were or just became full-screen are expected to come back
 const remapRecentMs = 2000;
@@ -17,9 +15,9 @@ interface ClosedSlot {
     windowedFullScreen: boolean;
     maximizedMode: MaximizedMode;
     viewRestoreOffset: number|null;
-    focused: boolean; // had the focus, or lost it to KWin's pick a moment before the close was reported
+    focused: boolean;
     grid: Grid;
-    scrollX: number; // where the view was while the window had the focus
+    scrollX: number;
     focusCounter: number;
 }
 
@@ -27,21 +25,19 @@ class ClientManager {
     private readonly config: ClientManager.Config;
     private readonly clientMap: Map<KwinClient, ClientWrapper>;
     private lastFocusedClient: KwinClient|null;
-    // the window that had the focus before the current one, and when and how the current one got it: KWin picks the
-    // next window itself just before it reports a closed one, which must not pass for the user's choice
+    // the window that had the focus before the current one, and when the current one got it
     private focusedBefore: KwinClient|null = null;
     private lastActivationTime = 0;
     private lastActivationByKiri = false;
-    // the shell window (KRunner, a panel popup) that had the focus last, and when its closing hands the focus back:
-    // to the app window that had it before (niri)
+    // the shell window (KRunner, a panel popup) that had the focus last
     private lastShellFocused: KwinClient|null = null;
     private shellReturnUntil = 0;
-    private floatingFocusOrder: KwinClient[] = []; // most recently focused last
+    private floatingFocusOrder: KwinClient[] = [];
     private focusStamps = new Map<KwinClient, number>(); // for focus-window-previous
     private focusCounter = 0;
     private readonly floatingFrames = new Map<KwinClient, { x: number, y: number, width: number, height: number }>();
-    private drag: ClientManager.Drag | null = null; // the window that is being dragged out of the grid, or a floating one
-    private dragPending: { client: ClientWrapper, start: () => void } | null = null; // a tiled window within the first 256 px
+    private drag: ClientManager.Drag | null = null;
+    private dragPending: { client: ClientWrapper, start: () => void } | null = null;
     private readonly windowRuleEnforcer: WindowRuleEnforcer;
     private closedSlot: ClosedSlot|null = null;
     private readonly remapTimer: Delayer;
@@ -86,8 +82,7 @@ class ClientManager {
             config.gapsInnerVertical);
     }
 
-    // niri's at-startup matcher stops matching 60 s after the start: the rules are evaluated again then (the world calls
-    // this once it is built)
+    // niri's at-startup matcher stops matching 60 s after the start
     public armStartupTimer() {
         const startupLeft = WindowRuleEnforcer.startupRemainingMs();
         if (this.startupTimer === null && this.windowRuleEnforcer.hasStartupRules() && startupLeft > 0) {
@@ -96,7 +91,7 @@ class ClientManager {
         }
     }
 
-    // niri's is-active-in-column: the window its column gives the focus to (a floating window is always the active one)
+    // niri's is-active-in-column
     private isActiveInColumn(kwinClient: KwinClient) {
         if (this.isFloating(kwinClient)) {
             return true;
@@ -105,7 +100,7 @@ class ClientManager {
         return window === null || window.column.getWindowToFocus() === window;
     }
 
-    // niri's is-active: the window that is active on its desktop (the one that has the focus there, or got it last)
+    // niri's is-active
     private isActiveWindow(kwinClient: KwinClient) {
         if (Workspace.activeWindow === kwinClient) {
             return true;
@@ -115,18 +110,16 @@ class ClientManager {
         return column !== null && column.getWindowToFocus().client.kwinClient === kwinClient;
     }
 
-    // `existing` is for windows that were already open when Kiri started, they keep their width
     public addClient(kwinClient: KwinClient, existing = false, outputName?: string) {
         if (kwinClient.caption.startsWith(ringCaption)) {
-            return; // our own focus ring window
+            return;
         }
         console.assert(!this.hasClient(kwinClient));
 
-        // niri's rules of a window that opens (it is not focused, not floating, ... yet)
         const open = this.windowRuleEnforcer.resolve(kwinClient, true);
         let wantedDesktop: KwinDesktop|undefined;
         if (!existing && !kwinClient.dock && open.workspace !== undefined) {
-            wantedDesktop = this.world.dynamicDesktops.findByName(open.workspace); // niri's find_workspace_by_name
+            wantedDesktop = this.world.dynamicDesktops.findByName(open.workspace);
             if (wantedDesktop !== undefined && !(kwinClient.desktops.length === 1 && kwinClient.desktops[0] === wantedDesktop)) {
                 kwinClient.desktops = [wantedDesktop];
             }
@@ -138,7 +131,6 @@ class ClientManager {
         if (kwinClient.dock) {
             constructState = () => new ClientState.Docked(this.world, kwinClient);
         } else if (existing && this.restoredFloating.has(String(kwinClient.internalId))) {
-            // the user floated it before the script was reloaded
             constructState = (client: ClientWrapper) => new ClientState.Floating(this.world, client, this.config, false);
         } else if (
             Clients.canTileEver(kwinClient) &&
@@ -153,8 +145,7 @@ class ClientManager {
                 } else if (!existing) {
                     const width = this.windowRuleEnforcer.getColumnWidth(kwinClient, desktop!.tilingArea.width, open, desktop!.profile);
                     if (open.maximized === true) {
-                        // niri's open-maximized: the column opens at the full width, the width it would have is what
-                        // maximize-column goes back to
+                        // niri's open-maximized
                         widthBeforeMaximize = width ?? client.preferredWidth;
                         client.preferredWidth = desktop!.tilingArea.width;
                     } else if (width !== null) {
@@ -166,10 +157,9 @@ class ClientManager {
                     state.window.column.widthBeforeMaximize = widthBeforeMaximize;
                 }
                 if (!existing && open.columnDisplay !== undefined && state.window.column.getWindowCount() === 1) {
-                    state.window.column.setTabbed(open.columnDisplay === "tabbed"); // niri's default-column-display
+                    state.window.column.setTabbed(open.columnDisplay === "tabbed");
                 }
                 if (!existing) {
-                    // niri's default-window-height
                     const height = this.windowRuleEnforcer.getWindowHeight(kwinClient, desktop!.tilingArea.height, open, desktop!.profile);
                     if (height !== null) {
                         state.window.column.setFixedHeight(state.window, height, null);
@@ -190,7 +180,7 @@ class ClientManager {
 
         const stateOfRules = constructState;
         constructState = (client: ClientWrapper) => {
-            client.ruleLimits = ClientManager.limitsOf(open); // before the layout looks at the window's limits
+            client.ruleLimits = ClientManager.limitsOf(open); // before the layout reads them
             return stateOfRules(client);
         };
         const client = new ClientWrapper(
@@ -211,7 +201,7 @@ class ClientManager {
             }
         }
         if (slot !== null) {
-            client.x11 = true; // the same X11 window again
+            client.x11 = true;
         } else {
             queryX11Window(kwinClient, x11 => { client.x11 = x11; });
         }
@@ -220,11 +210,9 @@ class ClientManager {
         if (!existing) {
             this.applyOpenRules(client, open, wantedDesktop);
             if (!Clients.isShellUi(kwinClient)) {
-                // niri warps the cursor to a newly opened window that it activates (warp-mouse-to-focus)
                 KiriFocus.mark(kwinClient);
                 if (Workspace.activeWindow === kwinClient) {
-                    // KWin activates a new window before it tells the script about it, so onClientFocused has
-                    // already run without knowing it was Kiri's focus; the pointer goes to the window now
+                    // KWin activates a new window before the script knows it, so the pointer goes to it now
                     KiriFocus.take(kwinClient);
                     requestCursorWarp();
                 }
@@ -235,8 +223,7 @@ class ClientManager {
         }
     }
 
-    // niri's open-fullscreen, open-maximized-to-edges, open-focused, default-floating-position, and the size and the
-    // centering of a new window that a float rule (open-floating) matches
+    // niri's open-fullscreen, open-maximized-to-edges, open-focused and default-floating-position
     private applyOpenRules(client: ClientWrapper, open: ResolvedRules, wantedDesktop: KwinDesktop|undefined) {
         const kwinClient = client.kwinClient;
         const state = client.stateManager.getState();
@@ -268,7 +255,7 @@ class ClientManager {
             if (open.fullscreen === true) {
                 client.setFullScreen(true);
             } else if (open.fullscreen === false && kwinClient.fullScreen) {
-                client.setFullScreen(false); // open-fullscreen false: the window's own request to open full-screen is refused
+                client.setFullScreen(false);
             } else if (open.maximizedToEdges === true) {
                 client.setMaximize(true, true);
             }
@@ -276,8 +263,7 @@ class ClientManager {
         this.applyOpenFocus(kwinClient, open, wantedDesktop);
     }
 
-    // niri's open-focused: false keeps the focus where it was. A window that opens on a desktop other than the current
-    // one does not take the focus either, unless open-focused is true.
+    // niri's open-focused; a window that opens on another desktop does not take the focus either
     private applyOpenFocus(kwinClient: KwinClient, open: ResolvedRules, wantedDesktop: KwinDesktop|undefined) {
         if (kwinClient.dock) {
             return;
@@ -289,7 +275,6 @@ class ClientManager {
                 activateWindow(kwinClient, "open-focused");
             }
         } else if (open.focused === false || elsewhere) {
-            // KWin activated the window before the script knew it: the focus goes back to the window that had it
             const previous = kwinClient === this.lastFocusedClient ? this.focusedBefore : this.lastFocusedClient;
             if (previous !== null && previous !== kwinClient && this.clientMap.has(previous) && !previous.minimized &&
                 Clients.isOnVirtualDesktop(previous, Workspace.currentDesktop) && Workspace.activeWindow === kwinClient) {
@@ -299,7 +284,7 @@ class ClientManager {
         }
     }
 
-    // niri's default-floating-position: x and y from the corner or edge `relativeTo` (stored_or_default_tile_pos)
+    // niri's default-floating-position
     public static floatingPositionIn(area: QmlRect, position: FloatingPositionRule, width: number, height: number) {
         const relativeTo = position.relativeTo ?? "top-left";
         let x = position.x;
@@ -332,8 +317,7 @@ class ClientManager {
         return this.windowRuleEnforcer.hasDynamicRules();
     }
 
-    // niri's recompute_window_rules: the rules that apply all the time (limits, opacity, the look) are worked out again
-    // for one window, or for all of them, and applied when they changed
+    // niri's recompute_window_rules
     public refreshRules(kwinClient?: KwinClient) {
         if (kwinClient !== undefined) {
             const client = this.clientMap.get(kwinClient);
@@ -359,23 +343,21 @@ class ClientManager {
         const limitsChanged = JSON.stringify(limits) !== JSON.stringify(client.ruleLimits);
         client.ruleLimits = limits;
         client.setRuleOpacity(opacity);
-        setWindowDecorations(String(client.kwinClient.internalId), style); // the effect takes the rule's fields over the global look
+        setWindowDecorations(String(client.kwinClient.internalId), style);
         if (limitsChanged) {
             const window = this.findTiledWindow(client.kwinClient);
             if (window !== null) {
-                window.column.setWidth(window.column.getWidth(), false, true); // the width may be outside the new limits
+                window.column.setWidth(window.column.getWidth(), false, true);
                 window.column.resizeWindows();
             }
         }
     }
 
-    // the appearance keys of the layout {} of the desktop (and output) the window is on (LayoutProfiles)
     private layoutLookOf(kwinClient: KwinClient): WindowDecorationRule | null {
         const desktop = this.findTiledWindow(kwinClient)?.column.grid.desktop ?? this.desktopManager.getDesktopForClient(kwinClient);
         return desktop === undefined ? null : desktop.profile.look;
     }
 
-    // a window rule's fields win over the layout's, group by group
     private static mergeLooks(layout: WindowDecorationRule | null, rule: WindowDecorationRule | null | undefined): WindowDecorationRule | null {
         if (layout === null) {
             return rule ?? null;
@@ -391,12 +373,11 @@ class ClientManager {
         return merged as WindowDecorationRule;
     }
 
-    // niri's toggle-window-rule-opacity for the focused window
     public toggleRuleOpacity(kwinClient: KwinClient) {
         this.clientMap.get(kwinClient)?.toggleRuleOpacity();
     }
 
-    // niri's center_preferring_top_left_in_area: centered, but a window larger than the area keeps its top-left corner
+    // niri's center_preferring_top_left_in_area
     public static centerInArea(area: QmlRect, width: number, height: number) {
         return {
             x: Math.round(area.x + Math.max((area.width - width) / 2, 0)),
@@ -404,7 +385,6 @@ class ClientManager {
         };
     }
 
-    // niri's center-window / center-column on the floating layer
     public centerFloatingClient(kwinClient: KwinClient) {
         const client = this.clientMap.get(kwinClient);
         if (client === undefined || !this.isFloating(kwinClient)) {
@@ -418,7 +398,6 @@ class ClientManager {
         client.place(x, y, width, height);
     }
 
-    // The window just came back: it takes the state and the focus of the one that was closed, and the view stays
     private fillClosedSlot(slot: ClosedSlot, kwinClient: KwinClient, client: ClientWrapper) {
         this.remapTimer.stop();
         this.world.releaseArrangeHold();
@@ -436,7 +415,7 @@ class ClientManager {
             );
         }
         if (slot.viewRestoreOffset !== null) {
-            window.column.grid.setViewRestoreOffset(window.column, slot.viewRestoreOffset); // the view before the window went full-screen
+            window.column.grid.setViewRestoreOffset(window.column, slot.viewRestoreOffset);
         }
         if (slot.focused) {
             window.focus();
@@ -464,7 +443,6 @@ class ClientManager {
         return this.closedSlot !== null;
     }
 
-    // No window came back: the focus goes where it would have gone when the window was closed
     private expireClosedSlot() {
         const slot = this.closedSlot;
         this.closedSlot = null;
@@ -475,7 +453,7 @@ class ClientManager {
         }
         const grid = slot.grid;
         if (slot.focused && this.focusCounter === slot.focusCounter) {
-            const target = grid.getLastFocusedWindow(); // the grid has picked the window that takes the place
+            const target = grid.getLastFocusedWindow();
             if (target !== null) {
                 target.focus();
             }
@@ -483,7 +461,6 @@ class ClientManager {
         grid.desktop.autoAdjustScroll();
     }
 
-    // Remembers the place of a window that is being closed and that may come back. Returns false for any other window.
     private rememberClosed(kwinClient: KwinClient, client: ClientWrapper, kwinPicked: boolean) {
         const window = this.findTiledWindow(kwinClient);
         const now = Date.now();
@@ -522,7 +499,6 @@ class ClientManager {
         return true;
     }
 
-    // `mayReturn`: the window was closed by KWin, and a window of the same process may be mapped right away
     public removeClient(kwinClient: KwinClient, passFocus: FocusPassing.Type, mayReturn = false) {
         if (!this.hasClient(kwinClient)) {
             return;
@@ -531,25 +507,20 @@ class ClientManager {
         if (client === undefined) {
             return;
         }
-        // KWin may already have dropped the focus (e.g. a closing full-screen window with focus-follows-mouse
-        // over empty space): then a neighbour must get it as well
+        // KWin may have dropped the focus already; a neighbour must get it
         const focusLost = Workspace.activeWindow === null || Workspace.activeWindow === kwinClient;
-        // KWin's own pick of a window (a panel, the desktop, anything from its focus history) right before the close
-        // is reported does not count: niri's rule decides. Only a pick the user made (a click) stays.
+        // KWin's own pick right before the close is reported does not count, only a click does
         const kwinPicked = this.focusedBefore === kwinClient && !this.lastActivationByKiri && Date.now() - this.lastActivationTime < ClientManager.kwinPickMs;
         if (kwinClient !== this.lastFocusedClient && !focusLost && !kwinPicked) {
             passFocus = FocusPassing.Type.None;
         }
         if (kwinPicked) {
-            // the grid goes by the window that was focused when it closed, not by KWin's pick
             const window = this.findTiledWindow(kwinClient);
             if (window !== null) {
                 window.column.onWindowFocused(window);
             }
         }
-        // niri (workspace.rs remove_tile, floating.rs remove_tile_by_idx): when the focused floating window closes, the
-        // topmost floating window that is left gets the focus, and without one the tiling layer's active window; never
-        // the window under the pointer, which is what KWin's own pick can be
+        // like niri, the topmost floating window that is left gets the focus, else the tiling layer's active window
         const floatingFocusLost = this.isUserFloating(kwinClient) && (kwinClient === this.lastFocusedClient || kwinPicked);
         const closedStamp = this.focusStamps.get(kwinClient) ?? Infinity;
         const floatingDesktop = floatingFocusLost ? this.desktopManager.getDesktopForClient(kwinClient) : undefined;
@@ -564,7 +535,7 @@ class ClientManager {
         this.focusStamps.delete(kwinClient);
         this.floatingFrames.delete(kwinClient);
         this.floatingFocusOrder = this.floatingFocusOrder.filter(c => c !== kwinClient);
-        setVisualPosition(String(kwinClient.internalId), null); // a window that closes in the middle of a resize
+        setVisualPosition(String(kwinClient.internalId), null);
         if (shellClosed) {
             this.returnFocusFromShell();
         }
@@ -573,15 +544,13 @@ class ClientManager {
         }
         if (held) {
             const slot = this.closedSlot!;
-            // like the window being still there: the focus stays, the view stays and nothing moves
             slot.grid.desktop.setScroll(slot.scrollX, true);
             this.world.holdArrange();
             this.remapTimer.run();
         }
     }
 
-    // KRunner or a panel popup that had the focus is gone: the focus goes back to the app window that had it before
-    // (not to the one under the pointer). Never a warp. A window that opened meanwhile (KRunner launched an app) keeps the focus it took.
+    // KRunner or a panel popup is gone: the focus goes back to the app window that had it, never a warp
     private returnFocusFromShell() {
         const active = Workspace.activeWindow;
         const now = Date.now();
@@ -589,7 +558,7 @@ class ClientManager {
             this.shellReturnUntil = now + ClientManager.kwinPickMs;
         } else if (!Clients.isShellUi(active) && active === this.lastFocusedClient && !this.lastActivationByKiri &&
             now - this.lastActivationTime < ClientManager.kwinPickMs && !this.isNewClient(active)) {
-            this.shellReturnUntil = now + ClientManager.kwinPickMs; // KWin has picked a window already
+            this.shellReturnUntil = now + ClientManager.kwinPickMs;
         } else {
             return;
         }
@@ -605,8 +574,7 @@ class ClientManager {
         if (overviewActive()) {
             return;
         }
-        // niri (update_keyboard_focus): when the layer-shell surface lets go, the keyboard focus goes back to the layout's
-        // active window; focus-follows-mouse only acts on the next pointer motion, never on a close
+        // like niri, the focus goes back to the layout's active window
         const previous = this.lastFocusedClient;
         const target = previous !== null && this.clientMap.has(previous) && !previous.minimized &&
             Clients.isOnVirtualDesktop(previous, Workspace.currentDesktop) ? previous : null;
@@ -616,7 +584,6 @@ class ClientManager {
     }
 
     private focusAfterFloatingClose(kwinClient: KwinClient, desktop: Desktop|undefined, kwinPicked: boolean, closedStamp: number) {
-        // a dialog opens from the window that had the focus, so that one is also what niri's rule gives it back to
         const parent = kwinClient.transientFor;
         if (parent !== null && this.clientMap.has(parent) && !parent.minimized) {
             KiriFocus.mark(parent);
@@ -640,8 +607,7 @@ class ClientManager {
         } else {
             let window = desktop === undefined ? null : desktop.grid.getLastFocusedWindow();
             if (kwinPicked && desktop !== undefined) {
-                // KWin's pick already moved the grid's focus: the tiled window that was focused before the floating
-                // one got the focus is the one that goes back
+                // KWin's pick already moved the grid's focus: the window focused before the floating one goes back
                 let bestStamp = -1;
                 for (const [other, stamp] of this.focusStamps) {
                     const candidate = this.findTiledWindow(other);
@@ -656,7 +622,6 @@ class ClientManager {
             }
             window.client.focus();
         }
-        // niri warps after the focused window closed (cursor-follows-focus); a no-op when the pointer is inside already
         requestCursorWarp();
     }
 
@@ -680,7 +645,6 @@ class ClientManager {
         }
         if (client.stateManager.getState() instanceof ClientState.Tiled) {
             const passFocus = kwinClient === this.lastFocusedClient ? FocusPassing.Type.Immediate : FocusPassing.Type.None;
-            // restoring the window from the task bar puts it back in its old place if the neighbours are still there
             const window = this.findTiledWindow(kwinClient);
             const slot = window === null ? null : {
                 grid: window.column.grid,
@@ -698,26 +662,21 @@ class ClientManager {
         }
     }
 
-    // niri's interactive move: the window leaves the grid after INTERACTIVE_MOVE_START_THRESHOLD (256 px) of pointer
-    // travel (floating windows move at once), keeps its size and follows the pointer; the insert hint shows where it
-    // lands and it is tiled again there on release.
+    // niri's interactive move: the window leaves the grid after 256 px of pointer travel and is tiled again on release
     public static readonly dragStartDistance = 256;
     public static readonly dragOpacity = 0.75;
 
-    // `floating` is niri's move_.is_floating: a window dragged as a floating one stays opaque, shows no insert hint and
-    // is dropped as a floating window. The other mouse button during the drag toggles it (toggleDragFloating).
+    // `floating` is niri's move_.is_floating: the window stays opaque, shows no insert hint and drops as floating
     public floatForDrag(client: ClientWrapper, floating = false) {
         this.floatDragged(client, floating);
     }
 
-    // a tiled window that has not yet travelled 256 px: `start` takes it out of the grid right away (niri's
-    // toggle-floating while the move grab is still recognizing the gesture)
+    // a tiled window that has not yet travelled 256 px: `start` takes it out of the grid right away
     public setDragPending(client: ClientWrapper, start: (() => void) | null) {
         this.dragPending = start === null ? null : { client: client, start: start };
     }
 
-    // niri's move grab: the other mouse button toggles floating while a window is dragged (input/move_grab.rs
-    // on_toggle_floating, layout toggle_window_floating while interactive_move is Moving)
+    // niri's move grab: the other mouse button toggles floating during a drag
     public toggleDragFloating() {
         const pending = this.dragPending;
         if (pending !== null) {
@@ -737,7 +696,6 @@ class ClientManager {
         drag.apply();
     }
 
-    // a window that is floating when its drag starts is dragged as a floating one (niri: is_floating)
     public floatingDragStarted(client: ClientWrapper) {
         if (this.drag !== null || !this.config.dropToTile) {
             return;
@@ -747,11 +705,10 @@ class ClientManager {
 
     public floatDragged(client: ClientWrapper, floating = false) {
         const kwinClient = client.kwinClient;
-        setVisualPosition(String(kwinClient.internalId), null); // the rubber band is over
+        setVisualPosition(String(kwinClient.internalId), null);
         setInsertHint(null, String(kwinClient.internalId));
-        // no limitHeight: the dragged window keeps the size it had in the grid, like niri's moving tile
         if (!(client.stateManager.getState() instanceof ClientState.Floating)) {
-            // niri never shows a title bar, so the dragged window keeps it hidden; only a drop as floating brings it back
+            // niri never shows a title bar while dragging
             client.keepTitlebarHidden = true;
             try {
                 client.stateManager.setState(() => new ClientState.Floating(this.world, client, this.config, false), FocusPassing.Type.None);
@@ -762,11 +719,10 @@ class ClientManager {
         this.startDrag(client, floating);
     }
 
-    // the drag session of a window that is Floating now: the insert hint, the edge scroll and the drop
     private startDrag(client: ClientWrapper, floating: boolean) {
         const kwinClient = client.kwinClient;
         const opacityBefore = kwinClient.opacity;
-        const fadedByEffect = canParkWindows(); // kiri_decorations fades the dragged window with niri's movement spring
+        const fadedByEffect = canParkWindows();
         const id = String(kwinClient.internalId);
         const manager = new SignalManager();
         let edgeScroll: DndEdgeScroll | null = null;
@@ -778,7 +734,6 @@ class ClientManager {
         };
         drag.apply = () => {
             if (drag.floating) {
-                // niri: back to opaque, no hint, the view is unlocked, the window gets its floating size back
                 stopEdgeScroll();
                 setInsertHint(null);
                 if (!fadedByEffect) {
@@ -788,10 +743,10 @@ class ClientManager {
                 return;
             }
             if (!fadedByEffect) {
-                kwinClient.opacity = ClientManager.dragOpacity; // niri's INTERACTIVE_MOVE_ALPHA
+                kwinClient.opacity = ClientManager.dragOpacity;
             }
             if (edgeScroll === null && this.config.dropToTile) {
-                // niri dnd-edge-view-scroll: the columns scroll while the pointer is held at the left or right edge
+                // niri's dnd-edge-view-scroll
                 edgeScroll = new DndEdgeScroll(
                     this.config,
                     () => Workspace.cursorPos,
@@ -800,7 +755,7 @@ class ClientManager {
                 );
                 edgeScroll.start();
             }
-            setInsertHint(null, id); // the effect fades the window to niri's moving alpha
+            setInsertHint(null, id);
             if (this.config.dropToTile) {
                 update();
             }
@@ -828,12 +783,11 @@ class ClientManager {
                 this.world.do(() => this.dropTile(kwinClient));
             }
             if (!(client.stateManager.getState() instanceof ClientState.Tiled)) {
-                client.restoreTitlebar(); // dropped as a floating window
+                client.restoreTitlebar();
             }
         });
     }
 
-    // niri remembers the size a window had as a floating one and asks for it when the dragged tile goes floating
     private restoreFloatingSize(client: ClientWrapper) {
         const kwinClient = client.kwinClient;
         const saved = this.floatingFrames.get(kwinClient);
@@ -842,14 +796,12 @@ class ClientManager {
         }
         const frame = kwinClient.frameGeometry;
         const cursor = Workspace.cursorPos;
-        // the pointer keeps its place within the window (niri: pointer_ratio_within_window)
         const ratioX = frame.width > 0 ? (cursor.x - frame.x) / frame.width : 0.5;
         const ratioY = frame.height > 0 ? (cursor.y - frame.y) / frame.height : 0.5;
         client.place(Math.round(cursor.x - ratioX * saved.width), Math.round(cursor.y - ratioY * saved.height), saved.width, saved.height);
     }
 
-    // niri's scrolling insert_position: the closest gap between columns, or between the windows of the column
-    // under the pointer, whichever is nearer. Coordinates are screen coordinates.
+    // niri's insert_position: the closest gap between columns or between the windows of the column under the pointer
     private insertTarget(desktop: Desktop, columns: Column[], cursor: { x: number, y: number }): InsertTarget | null {
         if (columns.length === 0) {
             return { column: 0, tile: null, rect: null };
@@ -867,7 +819,7 @@ class ClientManager {
                 closest = i;
             }
         }
-        let columnIndex = -1; // the column the cursor is over
+        let columnIndex = -1;
         for (let i = 0; i < columns.length; i++) {
             if (cursor.x >= xs[i]) {
                 columnIndex = i;
@@ -899,14 +851,13 @@ class ClientManager {
         }
         const columnDistance = Math.abs(xs[closest] - cursor.x);
         if (tileGap !== null && columnDistance > tileGap.distance) {
-            // InColumn hint (niri insert_hint_area): 150 px tall at the top or bottom of the column, 300 px between windows
+            // like niri's insert_hint_area: 150 px tall at the top or bottom of a column, 300 px between windows
             const column = columns[columnIndex];
             const count = column.getWindows().length;
             const x = column.getLeft() + offsetX;
             const w = column.getWidth();
             let h = 150, y = tileGap.y;
             if (tileGap.windowIndex === 0) {
-                // 150 at the top
             } else if (tileGap.windowIndex === count) {
                 y = tileGap.y - 150 - gapV;
                 if (column.isTabbed()) {
@@ -918,7 +869,6 @@ class ClientManager {
             }
             return { column: columnIndex, tile: tileGap.windowIndex, rect: { x: x, y: y, width: w, height: h } };
         }
-        // NewColumn hint: 300 px wide, centred on the gap, inset by the gap at the top and bottom
         const gapsOuter = gapV;
         let hx = xs[closest] + gap / 2 - 150 - gap / 2;
         if (closest === 0) {
@@ -955,7 +905,7 @@ class ClientManager {
         }
         const grid = desktop.grid;
         const columns = grid.getColumns();
-        const target = this.insertTarget(desktop, columns, Workspace.cursorPos); // before the window joins the grid
+        const target = this.insertTarget(desktop, columns, Workspace.cursorPos);
         this.tileClient(client, grid);
         const window = this.findTiledWindow(kwinClient);
         if (window === null || target === null || columns.length === 0) {
@@ -978,7 +928,6 @@ class ClientManager {
         client.stateManager.setState(() => new ClientState.Tiled(this.world, client, grid, placement), FocusPassing.Type.None);
     }
 
-    // `recoverTiling`: the window is only floated because it is on no single desktop right now; it goes back to the grid
     public floatClient(client: ClientWrapper, recoverTiling = false) {
         if (client.stateManager.getState() instanceof ClientState.Floating) {
             return;
@@ -1050,7 +999,6 @@ class ClientManager {
     }
 
     private readonly toggledManually = new Set<KwinClient>();
-    // from a saved layout (the script was reloaded): windows to put back on the floating layer when they are added
     private restoredFloating = new Set<string>();
     private restoredManual = new Set<string>();
     private restoredFrames = new Map<string, { x: number, y: number, width: number, height: number }>();
@@ -1078,7 +1026,6 @@ class ClientManager {
         return { floating, manual, floatingFrames };
     }
 
-    // the user floated or tiled this window with the toggle: caption rules leave it alone
     public wasToggledManually(kwinClient: KwinClient) {
         return this.toggledManually.has(kwinClient);
     }
@@ -1097,7 +1044,6 @@ class ClientManager {
             if (desktop === undefined) {
                 return;
             }
-            // niri remembers the floating size and position of a window that goes to the tiling layout
             const frame = kwinClient.frameGeometry;
             this.floatingFrames.set(kwinClient, { x: frame.x.round(), y: frame.y.round(), width: frame.width.round(), height: frame.height.round() });
             client.stateManager.setState(() => new ClientState.Tiled(this.world, client, desktop.grid), FocusPassing.Type.None);
@@ -1116,44 +1062,38 @@ class ClientManager {
         return this.clientMap.has(kwinClient);
     }
 
-    // where a tiled window ends up (niri warps to the final place of the window), null while Kiri has not placed it yet;
-    // undefined for a window that is not tiled
+    // where a tiled window ends up (niri warps to it), null while Kiri has not placed it yet
     public getWarpFrame(kwinClient: KwinClient) {
         const window = this.findTiledWindow(kwinClient);
         return window === null ? undefined : window.client.getPlacement();
     }
 
-    // Kiri warped the cursor to this tiled window just now (see onClientFocused)
     private warpedToTiled: { client: KwinClient, time: number }|null = null;
 
     public onClientFocused(kwinClient: KwinClient) {
-        this.desktopManager.setForcedOutput(null); // a window has the focus: it decides which output is the active one
+        this.desktopManager.setForcedOutput(null);
         if (Clients.isShellUi(kwinClient)) {
-            // KRunner, panels and their popups keep the keyboard focus but are no focus change for the layout: no
-            // scroll, no pointer warp (the user wants to type, not to point), and the window that had the focus
-            // before stays the layout's focus
+            // KRunner, panels and their popups are no focus change for the layout: no scroll, no warp
             this.lastShellFocused = this.clientMap.has(kwinClient) ? kwinClient : null;
             return;
         }
         if (this.shellReturnUntil > 0) {
-            // KWin picks a window when the shell window closed (maybe the one under the pointer): the previous one gets it
             const armed = Date.now() <= this.shellReturnUntil;
             this.shellReturnUntil = 0;
             if (armed && !KiriFocus.peek(kwinClient) && !this.isNewClient(kwinClient)) {
                 const before = Workspace.activeWindow;
                 this.activateShellReturn(kwinClient);
                 if (Workspace.activeWindow !== before) {
-                    return; // the nested activation did the bookkeeping for the window that got the focus
+                    return;
                 }
             }
         }
-        // With focus follows mouse, the warp to a tiled window that sits under a floating window (which is always on
-        // top) makes KWin focus the floating one. Floating and tiled windows only swap focus with the switch key
-        // (niri's layers), so a floating window that gets the focus right after the warp, not from Kiri, gives it back.
+        // a floating window that gets the focus right after a warp to a tiled window under it gives it back
         const warped = this.warpedToTiled;
         this.warpedToTiled = null;
         if (warped !== null && warped.client !== kwinClient && Date.now() - warped.time < 800 &&
-            Clients.isOnVirtualDesktop(warped.client, Workspace.currentDesktop) && !warped.client.minimized && // not after a switch to another desktop or a minimize, where KWin's pick is the user's
+            // not after a switch to another desktop or a minimize, where KWin's pick is the user's
+            Clients.isOnVirtualDesktop(warped.client, Workspace.currentDesktop) && !warped.client.minimized &&
 
             this.isFloating(kwinClient) && !KiriFocus.peek(kwinClient) && this.clientMap.has(warped.client)) {
             KiriFocus.mark(warped.client);
@@ -1167,10 +1107,7 @@ class ClientManager {
         this.lastActivationByKiri = KiriFocus.peek(kwinClient);
         this.lastFocusedClient = kwinClient;
         this.focusStamps.set(kwinClient, ++this.focusCounter);
-        // Like niri, only focus changes made by Kiri move the cursor, never pointer focus or an app activating
-        // itself. Floating windows too: with focus follows mouse, a cursor left on the tiled window would take the
-        // focus back. Whether the cursor is already on the window is decided once the layout has settled (niri
-        // compares with the place the window ends up in), see flushCursorWarp.
+        // like niri, only focus changes made by Kiri move the cursor
         const focusedByKiri = KiriFocus.take(kwinClient);
         const warp = this.config.cursorFollowsFocus && focusedByKiri;
         if (this.isFloating(kwinClient)) {
@@ -1179,7 +1116,6 @@ class ClientManager {
         }
         const window = this.findTiledWindow(kwinClient);
         if (window !== null) {
-            // a window that may come back keeps the view; KWin's pick of a neighbour must not scroll to it
             const held = this.closedSlot !== null ? window.column.grid.desktop.getScrollX() : null;
             window.onFocused();
             if (held !== null) {
@@ -1194,9 +1130,7 @@ class ClientManager {
         }
     }
 
-    // niri's focus-window-previous: the window that had the focus before the current one. `scope` "workspace" and
-    // "output" keep to the windows of the current desktop and screen, `appOnly` (filter="app-id") to the windows of the
-    // application of the current one.
+    // niri's focus-window-previous (`scope`, `appOnly` filters)
     public findPreviousFocused(scope: "all"|"output"|"workspace" = "all", appOnly = false): KwinClient|null {
         const active = Workspace.activeWindow;
         const activeApp = appOnly && active !== null ? active.resourceClass : null;
@@ -1221,7 +1155,6 @@ class ClientManager {
         return best;
     }
 
-    // whether a window lives on the desktop (niri's workspaces are empty when they have no windows)
     public isDesktopOccupied(kwinDesktop: KwinDesktop) {
         for (const kwinClient of this.clientMap.keys()) {
             if (kwinClient.normalWindow && kwinClient.desktops.includes(kwinDesktop)) {
@@ -1236,14 +1169,12 @@ class ClientManager {
         return client !== undefined && client.stateManager.getState() instanceof ClientState.Floating;
     }
 
-    // a floating window the user's keys may move, resize and focus: niri's floating layer holds only app windows, never
-    // the desktop (wallpaper), panels or Plasma's popups, which Kiri also keeps as floating clients
+    // a floating window the user's keys may move, resize and focus; not the desktop, panels or popups
     public isUserFloating(kwinClient: KwinClient) {
         return this.isFloating(kwinClient) && !Clients.placesItself(kwinClient);
     }
 
-    // The floating window that was focused last on the current desktop and screen; like niri's floating layer,
-    // which always has an active window when it isn't empty, any floating window there if none was focused yet
+    // the floating window that was focused last on the current desktop and screen (niri's active window)
     public findLastFocusedFloating(): KwinClient|null {
         const candidates = [
             ...this.floatingFocusOrder.slice().reverse(),
@@ -1265,9 +1196,7 @@ class ClientManager {
             kwinClient.output === Workspace.activeScreen;
     }
 
-    // niri's focus-left/right/up/down in the floating layer: the nearest other floating window in that direction
-    // (by the distance between window centers); nothing happens if there is none, the focus doesn't leave the layer
-    // (only the floating/tiling switch keys cross the layers). Returns whether the focus moved.
+    // niri's focus-left/right/up/down in the floating layer: the nearest window in that direction
     public focusFloatingDirectional(active: KwinClient, dx: number, dy: number) {
         let others = 0;
         const center = (c: KwinClient) => {
@@ -1296,7 +1225,6 @@ class ClientManager {
         return best !== null;
     }
 
-    // the floating window on an output that was focused last (niri's focus-monitor focuses the active window there)
     public getTopFloatingOnOutput(output: Output) {
         for (const kwinClient of this.floatingFocusOrder.slice().reverse()) {
             if (this.isFloatingOnCurrentDesktop(kwinClient) && kwinClient.output.name === output.name && !kwinClient.minimized) {
@@ -1306,7 +1234,6 @@ class ClientManager {
         return null;
     }
 
-    // niri's move-window-to-monitor-* on a floating window: the same relative place on the other output
     public moveFloatingToOutput(kwinClient: KwinClient, target: Output) {
         const client = this.clientMap.get(kwinClient);
         if (client === undefined || !this.isFloating(kwinClient)) {
@@ -1325,7 +1252,6 @@ class ClientManager {
         activateWindow(kwinClient, "move-to-monitor");
     }
 
-    // niri's focus_leftmost/rightmost/topmost/bottommost of the floating layer (by the windows' top-left corners)
     public focusFloatingExtreme(active: KwinClient, edge: "left"|"right"|"top"|"bottom") {
         let best: KwinClient|null = null;
         let bestValue = Infinity;
@@ -1346,8 +1272,7 @@ class ClientManager {
         }
     }
 
-    // niri's Data::recompute_logical_pos: a floating window may go partly off-screen, but at least a quarter of it
-    // (10 to 75 px) stays inside the work area, on every side
+    // niri's recompute_logical_pos: at least a quarter of the window (10 to 75 px) stays in the work area
     private static clampFloatingPosition(area: QmlRect, x: number, y: number, width: number, height: number) {
         const minOnScreenX = Math.min(Math.max(width / 4, 10), 75);
         const minOnScreenY = Math.min(Math.max(height / 4, 10), 75);
@@ -1357,7 +1282,6 @@ class ClientManager {
         };
     }
 
-    // niri moves floating windows by a fixed step (move-window-* on the floating layer)
     public moveFloatingClient(kwinClient: KwinClient, dx: number, dy: number) {
         const client = this.clientMap.get(kwinClient);
         if (client === undefined || !this.isUserFloating(kwinClient)) {
@@ -1372,8 +1296,7 @@ class ClientManager {
         return true;
     }
 
-    // niri's floating layer resizes a window by size changes relative to the work area; the top-left corner stays
-    // (the position is only pulled back so that at least a part of the window is on screen, like niri does)
+    // niri resizes a floating window relative to the work area; the top-left corner stays
     private resizeFloatingClient(kwinClient: KwinClient, horizontal: boolean, size: number) {
         const client = this.clientMap.get(kwinClient);
         if (client === undefined) {
@@ -1401,7 +1324,6 @@ class ClientManager {
 
     private readonly floatingPresetIndex = { width: new Map<KwinClient, number>(), height: new Map<KwinClient, number>() };
 
-    // niri's set-column-width / set-window-height "+10%" on a floating window: the size changes by a share of the work area
     public adjustFloatingSize(kwinClient: KwinClient, horizontal: boolean, percent: number) {
         const available = this.floatingAreaSize(kwinClient, horizontal);
         const frame = kwinClient.frameGeometry;
@@ -1410,7 +1332,6 @@ class ClientManager {
         this.resizeFloatingClient(kwinClient, horizontal, current + available * percent / 100);
     }
 
-    // niri's set-column-width / set-window-width / set-window-height with any size change on a floating window
     public setFloatingSize(kwinClient: KwinClient, horizontal: boolean, change: SizeChange) {
         const frame = kwinClient.frameGeometry;
         const current = horizontal ? frame.width : frame.height;
@@ -1418,9 +1339,7 @@ class ClientManager {
         this.resizeFloatingClient(kwinClient, horizontal, change.resolve(current, this.floatingAreaSize(kwinClient, horizontal), 0));
     }
 
-    // niri's switch-preset-column-width / switch-preset-window-height on a floating window (Floating::toggle_window_width):
-    // a window that was set to a preset goes to the next one, otherwise to the first preset larger than it
-    // (the last smaller one when going back). `presets` are the sizes in pixels in the configured order.
+    // niri's toggle_window_width: next preset, else the first preset larger than the window (`presets` are in pixels)
     public cycleFloatingSizePreset(kwinClient: KwinClient, horizontal: boolean, forwards: boolean, presets: number[]) {
         const len = presets.length;
         if (len === 0) {
@@ -1459,7 +1378,6 @@ class ClientManager {
         return undefined;
     }
 
-    // the floating windows to show for a desktop in the overview; a window on every desktop is shown on the current one
     public getFloatingOnDesktop(kwinDesktop: KwinDesktop) {
         const result: KwinClient[] = [];
         for (const kwinClient of this.clientMap.keys()) {
@@ -1474,9 +1392,7 @@ class ClientManager {
         return result;
     }
 
-    // A tiled window dropped in the overview. `columnIndex` and `tile` count the target desktop's columns without
-    // the dragged window (a column it leaves alone is gone): `tile` >= 0 is a gap inside that column, -1 a new
-    // column to the left of the column at `columnIndex`. The window may come from another desktop.
+    // a tiled window dropped in the overview: `columnIndex` and `tile` count the target's columns without the dragged window
     public overviewDrop(kwinClient: KwinClient, kwinDesktop: KwinDesktop, columnIndex: number, tile: number) {
         const window = this.findTiledWindow(kwinClient);
         const desktop = this.desktopManager.getDesktopInCurrentActivity(kwinDesktop);
@@ -1506,8 +1422,7 @@ class ClientManager {
         } else {
             const left = columnIndex <= 0 || others.length === 0 ? null : others[Math.min(columnIndex, others.length) - 1];
             if (oldColumn.getWindowCount() === 1) {
-                // the column itself moves: an empty new column next to it would be the one to take the focus when the
-                // old one is removed, and the window would end up in no column at all
+                // the column itself moves; an empty new column would take the focus when the old one is removed
                 oldColumn.moveToGrid(grid, left);
             } else {
                 window.moveToColumn(new Column(grid, left), true, FocusPassing.Type.None);
@@ -1519,8 +1434,7 @@ class ClientManager {
         window.focus();
     }
 
-    // A floating window dropped in the overview (niri: InsertPosition::Floating): it stays floating, on the desktop
-    // under the pointer, where it was let go (x/y are its top left corner in screen space) and takes the focus.
+    // niri's InsertPosition::Floating: it stays floating on the desktop under the pointer and takes the focus
     public overviewDropFloating(kwinClient: KwinClient, kwinDesktop: KwinDesktop, x: number, y: number) {
         const client = this.clientMap.get(kwinClient);
         if (client === undefined || !this.isFloating(kwinClient) || !Number.isFinite(x) || !Number.isFinite(y)) {
@@ -1573,8 +1487,8 @@ class ClientManager {
 namespace ClientManager {
     export interface Drag {
         client: ClientWrapper;
-        floating: boolean; // niri's move_.is_floating
-        apply: () => void; // puts the window into the mode `floating` says
+        floating: boolean;
+        apply: () => void;
     }
 
     export interface Config {
@@ -1592,6 +1506,6 @@ namespace ClientManager {
 
 interface InsertTarget {
     column: number;
-    tile: number | null; // index of the gap inside the column, or null for a new column
+    tile: number | null;
     rect: { x: number, y: number, width: number, height: number } | null;
 }
