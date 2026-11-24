@@ -173,6 +173,8 @@ function readShortcutKeys(readConfig: (name: string) => string): Record<string, 
 
 // registers Kiri's shortcuts in their own group in Plasma's Shortcuts settings; Plasma shortcuts with the same keys are
 // switched off in memory while Kiri runs
+const SHORTCUT_BATCH = 12;
+
 class KeyBindings {
     private readonly actions = new Map<string, () => void>();
     private readonly activeKeys = new Set<number>();
@@ -180,55 +182,75 @@ class KeyBindings {
     private readonly kiriKeys = new Map<string, number[]>();
     private readonly priorityDelayer: Delayer;
     private destroyed = false;
+    private registerDelayer: Delayer | null = null;
 
     constructor(world: World, config: Actions.Config, shortcutKeys: Record<string, string[]> = {}) {
         const shortcuts = this.setActions(world, config);
 
         this.priorityDelayer = new Delayer(3000, () => this.takePriority());
 
-        removeOldShortcuts();
-
+        // ~200 shortcuts are ~600 D-Bus calls on KWin's main thread, so they go in small batches after the first layout
+        let next = 0;
         let pending = shortcuts.length;
-        for (const shortcut of shortcuts) {
-            const actionId = [KGlobalAccel.component, shortcut.name, KGlobalAccel.componentFriendly, shortcut.description];
-            const defaultKeys = withoutReserved(parseKeys(shortcut.defaultKeys));
-            KGlobalAccel.call("doRegister", ["as"], [actionId]);
-            KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.isDefault]);
-            // keys typed in Kiri's settings replace the stored ones (NoAutoloading); otherwise stored keys are kept
-            // (autoloading)
-            const userKeys = withoutReserved(parseKeys(shortcutKeys[shortcut.name] ?? []));
-            const flags = userKeys.length > 0 ? KGlobalAccel.setPresent | KGlobalAccel.noAutoloading : KGlobalAccel.setPresent;
-            KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, userKeys.length > 0 ? userKeys : defaultKeys, flags], (storedKeys: number[]|undefined) => {
-                if (this.destroyed) {
-                    return;
-                }
-                let keys = plainKeys(storedKeys);
-                if (withoutReserved(keys).length < keys.length) {
-                    keys = withoutReserved(keys);
-                    KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, keys, KGlobalAccel.setPresent | KGlobalAccel.noAutoloading]);
-                }
-                if (userKeys.length === 0 && defaultKeys.length > 0 && keys.length === 0 && GAINED_DEFAULT_KEYS.has(shortcut.name)) {
-                    // kglobalacceld stored "no key" for these actions earlier, so the default never took effect: set it
-                    // once more
-                    KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.setPresent | KGlobalAccel.noAutoloading], (newKeys: number[]|undefined) => {
-                        for (const key of newKeys ?? []) {
-                            this.activeKeys.add(key);
-                        }
-                    });
-                }
-                for (const key of keys) {
-                    this.activeKeys.add(key);
-                }
-                this.kiriKeys.set(shortcut.name, keys);
-                pending--;
-                if (pending === 0) {
-                    syncTwins(this.kiriKeys, () => this.destroyed, () => {
-                        this.takePriority();
-                        this.priorityDelayer.run();
-                    });
-                }
-            });
-        }
+        const batchDelayer = new Delayer(1, () => registerBatch());
+        this.registerDelayer = batchDelayer;
+        const registerBatch = () => {
+            if (this.destroyed) {
+                return;
+            }
+            if (next === 0) {
+                removeOldShortcuts();
+            }
+            const end = Math.min(next + SHORTCUT_BATCH, shortcuts.length);
+            for (; next < end; next++) {
+                this.registerShortcut(shortcuts[next], shortcutKeys, () => {
+                    pending--;
+                    if (pending === 0) {
+                        syncTwins(this.kiriKeys, () => this.destroyed, () => {
+                            this.takePriority();
+                            this.priorityDelayer.run();
+                        });
+                    }
+                });
+            }
+            if (next < shortcuts.length) {
+                batchDelayer.run();
+            }
+        };
+        batchDelayer.run();
+    }
+
+    private registerShortcut(shortcut: Shortcut, shortcutKeys: Record<string, string[]>, registered: () => void) {
+        const actionId = [KGlobalAccel.component, shortcut.name, KGlobalAccel.componentFriendly, shortcut.description];
+        const defaultKeys = withoutReserved(parseKeys(shortcut.defaultKeys));
+        KGlobalAccel.call("doRegister", ["as"], [actionId]);
+        KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.isDefault]);
+        // keys typed in Kiri's settings replace the stored ones (NoAutoloading); otherwise stored keys are kept (autoloading)
+        const userKeys = withoutReserved(parseKeys(shortcutKeys[shortcut.name] ?? []));
+        const flags = userKeys.length > 0 ? KGlobalAccel.setPresent | KGlobalAccel.noAutoloading : KGlobalAccel.setPresent;
+        KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, userKeys.length > 0 ? userKeys : defaultKeys, flags], (storedKeys: number[]|undefined) => {
+            if (this.destroyed) {
+                return;
+            }
+            let keys = plainKeys(storedKeys);
+            if (withoutReserved(keys).length < keys.length) {
+                keys = withoutReserved(keys);
+                KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, keys, KGlobalAccel.setPresent | KGlobalAccel.noAutoloading]);
+            }
+            if (userKeys.length === 0 && defaultKeys.length > 0 && keys.length === 0 && GAINED_DEFAULT_KEYS.has(shortcut.name)) {
+                // kglobalacceld stored "no key" for these actions earlier, so the default never took effect: set it once more
+                KGlobalAccel.call("setShortcut", ["as", "ai", "u"], [actionId, defaultKeys, KGlobalAccel.setPresent | KGlobalAccel.noAutoloading], (newKeys: number[]|undefined) => {
+                    for (const key of newKeys ?? []) {
+                        this.activeKeys.add(key);
+                    }
+                });
+            }
+            for (const key of keys) {
+                this.activeKeys.add(key);
+            }
+            this.kiriKeys.set(shortcut.name, keys);
+            registered();
+        });
     }
 
     // points the shortcuts at a new world, keeping the registrations
@@ -288,6 +310,7 @@ class KeyBindings {
 
     public destroy() {
         this.destroyed = true;
+        this.registerDelayer?.destroy();
         this.priorityDelayer.destroy();
         kglobalaccel.onPressed = null;
         kglobalaccel.onRepeated = null;
