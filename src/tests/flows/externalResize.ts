@@ -139,19 +139,21 @@ tests.register("A window that snaps to its own height is not asked for the same 
 // A game that is maximized and answers the size it is given with another one (SDL clients choose their own size) is not
 // asked for the same size again and again: the layout passes of a focus change must not resize it each time
 tests.register("A maximized window that snaps to its height is not asked again", 1, () => {
-    const config = getDefaultConfig();
-    const { qtMock, workspaceMock } = init(config);
-    const [first, game] = workspaceMock.createClientsWithWidths(300, 300);
-    game.heightStep = 37;
-    qtMock.fireShortcut("window-maximize-to-edges");
-    const sizeAsks = () => game.assignedGeometries.filter(g => Math.round(g.height) % 37 !== 0).length;
-    for (let i = 0; i < 8; i++) {
-        qtMock.fireShortcut(i % 2 === 0 ? "focus-left" : "focus-right");
-    }
-    const asked = sizeAsks();
-    for (let i = 0; i < 8; i++) {
-        qtMock.fireShortcut(i % 2 === 0 ? "focus-left" : "focus-right");
-    }
-    Assert.equal(sizeAsks(), asked, { message: "the layout passes do not ask the game for a size it does not take again" });
-    Assert.assert(first.getActualFrameGeometry().width > 0);
+    timeControl(() => { // the rate limiter would let more through when a real interval ends mid-test
+        const config = getDefaultConfig();
+        const { qtMock, workspaceMock } = init(config);
+        const [first, game] = workspaceMock.createClientsWithWidths(300, 300);
+        game.heightStep = 37;
+        qtMock.fireShortcut("window-maximize-to-edges");
+        const sizeAsks = () => game.assignedGeometries.filter(g => Math.round(g.height) % 37 !== 0).length;
+        for (let i = 0; i < 8; i++) {
+            qtMock.fireShortcut(i % 2 === 0 ? "focus-left" : "focus-right");
+        }
+        const asked = sizeAsks();
+        for (let i = 0; i < 8; i++) {
+            qtMock.fireShortcut(i % 2 === 0 ? "focus-left" : "focus-right");
+        }
+        Assert.equal(sizeAsks(), asked, { message: "the layout passes do not ask the game for a size it does not take again" });
+        Assert.assert(first.getActualFrameGeometry().width > 0);
+    });
 });

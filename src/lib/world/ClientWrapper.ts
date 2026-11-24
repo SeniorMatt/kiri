@@ -181,8 +181,8 @@ class ClientWrapper {
             const refusal = this.refusal;
             if (refusal !== null && refusal.askedWidth === width && refusal.askedHeight === height &&
                 Math.round(refusal.width) === Math.round(current.width) && Math.round(refusal.height) === Math.round(current.height)) {
-                frameWidth = current.width;
-                frameHeight = current.height;
+                frameWidth = refusal.width; // the answer, not the read size, so fractions don't add up
+                frameHeight = refusal.height;
             }
             this.lastPlacement = Qt.rect(x, y, width, height);
             if (current.x === x && current.y === y && current.width === frameWidth && current.height === frameHeight) {
