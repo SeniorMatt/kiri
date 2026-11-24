@@ -89,7 +89,9 @@ struct Look
     BandStyle border{false, 4, {}};
     ShadowStyle shadow;
     TabColors tabColors;
-    QColor fullscreenBackdrop; // invalid: the global one (a layout {} of a desktop or output may set it)
+    QColor fullscreenBackdrop; // invalid: the global one
+    int background = -1; // draw-border-with-background: -1 default, 0 no, 1 yes
+    bool baba = false;
 };
 
 struct Settings
@@ -193,6 +195,7 @@ private:
     Look parseLook(const QVariantMap &map) const;
     void applyOverride(Look &look, const QVariantMap &rule) const;
     const Look &lookOf(KWin::EffectWindow *w) const;
+    double babaOffset(KWin::EffectWindow *w) const;
     void updateReach();
     void registerPointerBinds();
     void invokeShortcut(const QString &shortcut);
@@ -212,13 +215,15 @@ private:
     void setGradient(KWin::GLShader *shader, int layer, const Gradient &gradient, const QRectF &area) const;
     void clickOnTab(const QPointF &pos);
     void fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &rect, const QColor &color, const KWin::Region &deviceRegion, double opacity);
-    void drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity);
+    // fill: niri's draw-border-with-background, the border (or the ring) as a rectangle under the window instead of an outline
+    void drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, bool fill = false);
 
     Settings m_settings;
     double m_reach = 12;
     QVariantMap m_config;      // the settings the script sent (setConfig); empty: read kwinrc
     bool m_haveConfig = false;
     QVariantMap m_overrides;   // setWindowDecorations, by window id
+    bool m_anyBaba = false;     // a window has baba-is-float: keep repainting
     QHash<QUuid, Look> m_looks; // m_settings.look with the override of each window applied
     QSet<QUuid> m_urgent;
     // where the tabs of a tab indicator were last drawn, for clicks: the group's windows in tab order and their rectangles

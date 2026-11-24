@@ -11,7 +11,6 @@ Status: **done** = same behaviour; **partial** = works but differs or lacks opti
 Kiri places: `TS` = `src/lib/...`; `FX` = `effect-cpp/<name>/`; `QML` = `package/contents/ui/` or `effect-cpp/overview/qml/`.
 Tests: names are files in `src/tests/flows/` (`units/` for units); "-" = no test (visual or KWin-only).
 
-Counts: done 151, partial 20, missing 4, impossible 9, n/a 29 (213 rows).
 
 The subtle behaviours are in these rows: focus after close, new-window placement and column width rounding (3.1), scroll
 animations and gesture scrolling (3.1), interactive move and resize (3.2), workspace creation, removal and back-and-forth (4),
@@ -218,7 +217,7 @@ Action list = niri `Action` enum, `niri-config/src/binds.rs` 240-540 (every vari
 | Drop a window onto the space between workspaces: new workspace | | layout/mod.rs `InsertWorkspace` | partial | needs dynamic desktops: not done (old doc: "no new desktop by dropping between desktops") | - |
 | DnD edge workspace switch (`dnd-edge-workspace-switch`: trigger-height 50, delay-ms 100, max-speed 1500) | | gestures.rs; layout/mod.rs `dnd_update` 4517 | done | `dndEdgeWorkspaceSwitch{TriggerHeight,Delay,MaxSpeed}`; Main.qml Timer `dndEdge` + `dndEdgeWorkspace`/`dndEdgeEnd`, overview drags only (niri: only when the overview is open) | - |
 | DnD edge view scroll (`dnd-edge-view-scroll`: trigger-width 30, delay-ms 100, max-speed 1500) | | gestures.rs; scrolling.rs 3204 | done | `dndEdgeViewScroll{TriggerWidth,Delay,MaxSpeed}`; DndEdgeScroll.ts for a window dragged on the strip, Main.qml `dndEdge` for a drag in the overview. A drag from another application (a real DnD) is not seen by KWin scripts: not done | DndEdgeScroll zone |
-| DnD hold to activate (a window, a workspace) | | wiki Gestures | missing | | - |
+| DnD hold to activate (a window, a workspace) | 750 ms (gnome-shell's), no config key in niri, only a real drag-and-drop (not a window move), moving to another target restarts the time | layout/mod.rs `DndHold` 2757-2840 | done | OverviewEffect `dndHoldTick` (seat `isDrag` via dragStarted/dragEnded, polls the cursor every 50 ms, `activateWindow` of the window under it) in the normal view; Main.qml Timer `dndHold` in the overview (window tile: activate + close; desktop: go there + close). Tested in nested KWin with a QML drag source (normal view); the overview half was seen closing with the right window active, not asserted. No mock test: it is C++/QML only | - |
 | Hot corners | top-left default; `off`, `top-left/right`, `bottom-left/right`; toggles overview, works while dragging | gestures.rs `HotCorners`; input/mod.rs 3081 | done | `hotCorner` (all off) + `hotCornerTopLeft/TopRight/BottomLeft/BottomRight`, importer sets them like niri (none named = top-left); FX overview/ `inHotCorner`; works while dragging in the overview | NiriImport hot corners |
 | Keys while the overview is open (all binds keep working) | | wiki Overview | done | Left/Right/Up/Down run focus-left/right, focus-window-or-desktop-up/down; Enter/Escape/Meta+O close; other binds are kglobalaccel shortcuts and keep working | - |
 | Floating windows in the overview | | | done | Main.qml | overview |
@@ -279,7 +278,7 @@ Properties:
 | focus-ring / border / shadow / tab-indicator rules | per-window overrides of the global options | window_rule.rs; tile.rs 190 | done | the rules are merged per window (colour replaces gradient and the other way round) and given to the effect with `setWindowDecorations(id, rule)` (Kiri.ts, D-Bus `setWindowDecorations` of kiri_decorations) | windowRules, decorations |
 | geometry-corner-radius | per window | layout/mod.rs 318 | partial | same channel, one radius per window; niri's four corners give their largest one (the effect's corner shader and ring have one radius). A rule without match lines is the global `cornerRadius` | windowRules |
 | clip-to-geometry | clips the window to its rounded corners | tile.rs 1115 | partial | the effect clips every window that has a corner radius, whether the rule says so or not; the importer accepts the property | - |
-| draw-border-with-background, baba-is-float | | | missing | the importer lists them; the effect draws no background under the border and has no bobbing animation | - |
+| draw-border-with-background, baba-is-float | border or ring drawn as a rectangle under the window; the window bobs up and down | tile.rs update_render_elements, bob_offset | done | border or ring fills under the window (default: only for a window without a KWin title bar, niri: without SSD); baba bobs by output height/96, period 3.6 s, like niri on every window with the rule | NiriImport, windowRules |
 | scroll-factor, pinch-sensitivity | | window_rule.rs | n/a | Plasma's input settings; KWin has no per-window scroll scaling. The importer lists them | - |
 | variable-refresh-rate | | window_rule.rs `VrrRule` | n/a | Plasma's display settings (adaptive sync is per output); the importer lists it | - |
 | block-out-from (screencast, screen-capture) | | | impossible | KWin offers no per-window exclusion from screen casts | - |

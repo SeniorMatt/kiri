@@ -641,6 +641,63 @@ FocusScope {
         }
     }
 
+    // niri DnD hold (layout/mod.rs advance_animations): a drag-and-drop from another application held for 750 ms (gnome-shell's
+    // delay) over a window activates it, over a desktop switches to it; the overview closes. Moving to another target
+    // restarts the time. KWin sends no pointer events during a drag-and-drop, so the pointer is polled.
+    Timer {
+        id: dndHold
+        interval: 50
+        repeat: true
+        running: root.mine && root.effect.seatDrag && !root.effect.closing && root.dragWid === ""
+        property string target: ""
+        property real since: 0
+        onRunningChanged: target = ""
+        onTriggered: {
+            const g = root.targetScreen.geometry;
+            const c = root.effect.cursorPosition();
+            const px = c.x - g.x;
+            const py = c.y - g.y;
+            if (px < 0 || py < 0 || px >= root.width || py >= root.height) {
+                target = "";
+                return;
+            }
+            let hit = null;
+            for (let i = 0; i < tiles.count; i++) {
+                const t = tiles.itemAt(i);
+                if (t && t.visible && px >= t.x && px < t.x + t.width && py >= t.y && py < t.y + t.height
+                    && (hit === null || t.z >= hit.z)) {
+                    hit = t;
+                }
+            }
+            let key = "";
+            if (hit !== null) {
+                key = "w" + hit.wid;
+            } else {
+                const di = root.desktopAt(py);
+                if (di >= 0 && px >= root.x0 && px < root.x0 + root.wsW
+                    && py >= root.wsY(di) && py < root.wsY(di) + root.wsH) {
+                    key = "d" + di;
+                }
+            }
+            if (key === "") {
+                target = "";
+                return;
+            }
+            const t = Date.now();
+            if (key !== target) {
+                target = key;
+                since = t;
+            } else if (t - since >= 750) {
+                target = "";
+                if (hit !== null) {
+                    root.effect.activateWindow(hit.wid, hit.did, hit.di);
+                } else {
+                    root.effect.activateDesktop(root.desktopAt(py));
+                }
+            }
+        }
+    }
+
     // niri's insert hint
     Rectangle {
         visible: root.hint !== null && root.hint.rect !== null

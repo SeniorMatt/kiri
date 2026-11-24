@@ -56,6 +56,8 @@ class OverviewEffect : public QuickSceneEffect
     Q_PROPERTY(bool warming READ isWarming NOTIFY warmingChanged)
     // window id -> rect where kiri_motion paints it at the moment the overview opens (see acquire())
     Q_PROPERTY(QVariantMap startRects READ startRects NOTIFY startRectsChanged)
+    // KWin's seat has a drag-and-drop going on (a file, text, ... dragged between clients)
+    Q_PROPERTY(bool seatDrag READ seatDrag NOTIFY seatDragChanged)
     Q_PROPERTY(QString searchText MEMBER m_searchText WRITE setSearchText NOTIFY searchTextChanged)
 
 public:
@@ -81,6 +83,7 @@ public:
     bool isWarming() const { return m_warm; }
     QVariantMap startRects() const { return m_startRects; }
     void setSearchText(const QString &text);
+    bool seatDrag() const { return m_seatDrag; }
 
     void prePaintScreen(ScreenPrePaintData &data) override;
     bool blocksDirectScanout() const override;
@@ -123,8 +126,11 @@ public Q_SLOTS:
     // niri dnd-edge-workspace-switch: moves the desktops by `delta` indices while a window is dragged at the top/bottom edge
     void dndEdgeWorkspace(qreal delta);
     void dndEdgeEnd();
+    // the pointer in global logical coordinates (the QML scene polls it during a drag-and-drop, which sends it no events)
+    QPointF cursorPosition() const;
 
 Q_SIGNALS:
+    void seatDragChanged();
     void layoutChanged();
     void progressChanged();
     void wsIndexChanged();
@@ -150,6 +156,15 @@ private:
     void loadHotCorner();
     bool inHotCorner(const QPointF &pos) const;
     QVariantMap m_dnd;
+    // niri DnD hold (layout/mod.rs, 750 ms like gnome-shell): holding a drag-and-drop over a window activates it. The
+    // overview's own hold (a window, a desktop) is in qml/Main.qml
+    void setSeatDrag(bool on);
+    void dndHoldTick();
+    bool m_seatDrag = false;
+    QTimer m_dndHoldTimer;
+    QString m_dndHoldTarget;
+    qint64 m_dndHoldSince = 0;
+    QPointF m_dndHoldPos;
     bool m_dndWs = false;
     // niri overview_scroll_swipe_gesture (two-finger touchpad scroll in the overview)
     bool m_swipeOn = false;

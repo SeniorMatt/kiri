@@ -724,7 +724,7 @@ namespace NiriImport {
                 out[kiri] = size(node) ?? ""; // an empty block lets the window pick its own size
             }
         }
-        for (const [niri, kiri] of [["open-fullscreen", "fullscreen"], ["open-maximized", "maximized"], ["open-maximized-to-edges", "maximizedToEdges"], ["open-focused", "focused"]]) {
+        for (const [niri, kiri] of [["open-fullscreen", "fullscreen"], ["open-maximized", "maximized"], ["open-maximized-to-edges", "maximizedToEdges"], ["open-focused", "focused"], ["draw-border-with-background", "drawBorderWithBackground"], ["baba-is-float", "babaIsFloat"]]) {
             const value = flag(Kdl.child(rule, niri));
             if (value !== undefined) {
                 out[kiri] = value;
@@ -1228,6 +1228,7 @@ namespace NiriImport {
         "window-rule/default-column-display", "window-rule/default-floating-position", "window-rule/min-width", "window-rule/min-height",
         "window-rule/max-width", "window-rule/max-height", "window-rule/opacity", "window-rule/focus-ring", "window-rule/border",
         "window-rule/shadow", "window-rule/tab-indicator",
+        "window-rule/draw-border-with-background", "window-rule/baba-is-float",
         "window-rule/clip-to-geometry", // Kiri's effect clips every window that has a corner radius to its rounded corners
         "animations/off", "animations/on", "animations/slowdown", "animations/window-open", "animations/window-close",
         "animations/window-movement", "animations/window-resize", "animations/horizontal-view-movement",
@@ -1274,8 +1275,6 @@ namespace NiriImport {
         "window-rule/tiled-state": "KWin gives scripts no xdg tiled state",
         "window-rule/background-effect": "the blur effect has no per-window script setting",
         "window-rule/popups": "KWin draws popups itself",
-        "window-rule/draw-border-with-background": "the effect draws no background under a border",
-        "window-rule/baba-is-float": "the effect has no bobbing animation",
     };
 
     // the paths of the options in a config that the importer has to account for: the top-level nodes, and one level down

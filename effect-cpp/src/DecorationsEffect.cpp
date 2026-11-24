@@ -525,6 +525,9 @@ void Effect::postPaintScreen()
             ++it;
         }
     }
+    if (m_anyBaba) {
+        again = true;
+    }
     if (again) {
         KWin::effects->addRepaintFull();
     }
@@ -848,6 +851,12 @@ void Effect::applyOverride(Look &look, const QVariantMap &rule) const
             colors(g, names[i], set, b.colors[i]);
         }
     };
+    if (rule.contains(QStringLiteral("drawBorderWithBackground"))) {
+        look.background = flag(rule, "drawBorderWithBackground", false) ? 1 : 0;
+    }
+    if (rule.contains(QStringLiteral("babaIsFloat"))) {
+        look.baba = flag(rule, "babaIsFloat", false);
+    }
     band(look.ring, rule.value(QStringLiteral("focusRing")).toMap());
     band(look.border, rule.value(QStringLiteral("border")).toMap());
     if (const QVariantMap g = rule.value(QStringLiteral("shadow")).toMap(); !g.isEmpty()) {
@@ -943,11 +952,13 @@ void Effect::loadSettings()
     }
     // the looks of the windows with overrides follow the global one
     m_looks.clear();
+    m_anyBaba = false;
     for (auto it = m_overrides.constBegin(); it != m_overrides.constEnd(); ++it) {
         const QUuid id(it.key());
         if (!id.isNull()) {
             Look look = m_settings.look;
             applyOverride(look, it.value().toMap());
+            m_anyBaba = m_anyBaba || look.baba;
             m_looks.insert(id, look);
         }
     }
@@ -990,6 +1001,19 @@ void Effect::setUrgentWindows(const QString &json)
             repaintAround(w);
         }
     }
+}
+
+// niri's baba_is_float_offset: amplitude * (sin(2 pi t / 3.6 s) - 1), the amplitude a 96th of the output's height, rounded to
+// a device pixel; the window only ever moves up
+double Effect::babaOffset(KWin::EffectWindow *w) const
+{
+    if (!lookOf(w).baba || !decorated(w) || !w->screen()) {
+        return 0;
+    }
+    const double scale = w->screen()->scale();
+    const double amplitude = w->screen()->geometry().height() / 96.0;
+    const double y = amplitude * (std::sin(2 * M_PI * m_frameTime / 3.6) - 1);
+    return std::round(y * scale) / scale;
 }
 
 const Look &Effect::lookOf(KWin::EffectWindow *w) const
@@ -1462,6 +1486,9 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     if (m_alpha.contains(w->internalId())) {
         data.setTranslucent();
     }
+    if (m_anyBaba && babaOffset(w) != 0) {
+        data.setTransformed();
+    }
     // kiri_swipe (which paints before this effect) reads where a parked window is painted: it has to be this frame's place, not
     // the last frame's, or the window jumps for one frame when it gets parked or unparked or its place changes
     if (const auto parkIt = m_park.constFind(w->internalId()); parkIt != m_park.constEnd()) {
@@ -1523,6 +1550,9 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
         data.setYTranslation(data.yTranslation() + releaseIt->offset.y() * k);
     }
 
+    if (m_anyBaba && !w->data(CaptureRole).toBool()) {
+        data.setYTranslation(data.yTranslation() + babaOffset(w));
+    }
     if (!m_alpha.isEmpty()) {
         data.multiplyOpacity(alphaOf(w->internalId()));
     }
@@ -1546,6 +1576,16 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
                                       << qRound(f.width() * data.xScale()) << qRound(f.height() * data.yScale())
                                       << "frame" << qRound(f.x()) << qRound(f.y()) << qRound(f.width()) << qRound(f.height())
                                       << "cur" << qRound(KWin::effects->cursorPos().x()) << qRound(KWin::effects->cursorPos().y());
+    }
+    if (decorated(w) && !w->data(CaptureRole).toBool()) {
+        const Look &fillLook = lookOf(w);
+        const bool withBackground = fillLook.background >= 0 ? fillLook.background == 1 : !w->hasDecoration();
+        if (withBackground && ((fillLook.border.enabled && fillLook.border.width > 0) || (w == m_active && fillLook.ring.enabled && fillLook.ring.width > 0))) {
+            const KWin::RectF frame = w->frameGeometry();
+            const KWin::RectF visual(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
+                                     frame.width() * data.xScale(), frame.height() * data.yScale());
+            drawRing(viewport, w, visual, deviceRegion, data.opacity() * (1.0 - expandedProgress(w)), true);
+        }
     }
     const bool result = KIRI_CALL(OffscreenEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data));
     if (w->data(CaptureRole).toBool()) {
@@ -1713,7 +1753,7 @@ void Effect::clickOnTab(const QPointF &pos)
 
 // niri's focus ring and border (focus_ring.rs, border.frag): the border is a band along the window's rounded frame, the ring a
 // band around it (and around the border), both filled with the gradient of the window's state
-void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity)
+void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, bool fill)
 {
     const Look &look = lookOf(w);
     const bool active = w == m_active;
@@ -1723,7 +1763,10 @@ void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *
     if (border && !active && m_active && m_active->frameGeometry() == w->frameGeometry()) {
         border = false;
     }
-    const bool ring = active && look.ring.enabled && look.ring.width > 0;
+    bool ring = active && look.ring.enabled && look.ring.width > 0;
+    if (fill && border) {
+        ring = false; // niri: the focus ring has a background only when there is no border
+    }
     if (!border && !ring) {
         return;
     }
@@ -1743,14 +1786,20 @@ void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *
     m_ringShader->setUniform("rect", QVector4D(frame.x(), frame.y(), frame.width(), frame.height()));
     m_ringShader->setUniform("radii", QVector4D(radius, radius, radius, radius));
     m_ringShader->setUniform("bands", QVector2D(borderWidth, ringWidth)); // the ring starts where the border ends, shown or not
-    m_ringShader->setUniform("layers", QVector3D(border ? 1 : 0, ring ? 1 : 0, 0));
+    // a fill is one rectangle in the colour of the border, or of the ring when there is no border, as wide as the window
+    m_ringShader->setUniform("layers", fill ? QVector3D(0, 0, 1) : QVector3D(border ? 1 : 0, ring ? 1 : 0, 0));
     m_ringShader->setUniform("pixel", float(1.0 / viewport.scale()));
     m_ringShader->setUniform("alpha", float(opacity));
-    if (border) {
+    if (fill) {
+        const Gradient &g = border ? look.border.colors[urgent ? 2 : (active ? 0 : 1)] : look.ring.colors[urgent ? 2 : 0];
+        const int outer = border ? borderWidth : ringWidth;
+        setGradient(m_ringShader.get(), 2, g, g.viewRelative ? viewArea : frameF.adjusted(-outer, -outer, outer, outer));
+    }
+    if (border && !fill) {
         const Gradient &g = look.border.colors[urgent ? 2 : (active ? 0 : 1)];
         setGradient(m_ringShader.get(), 0, g, g.viewRelative ? viewArea : frameF.adjusted(-borderWidth, -borderWidth, borderWidth, borderWidth));
     }
-    if (ring) {
+    if (ring && !fill) {
         const Gradient &g = look.ring.colors[urgent ? 2 : 0];
         const int outer = (border ? borderWidth : 0) + ringWidth;
         setGradient(m_ringShader.get(), 1, g, g.viewRelative ? viewArea : frameF.adjusted(-outer, -outer, outer, outer));

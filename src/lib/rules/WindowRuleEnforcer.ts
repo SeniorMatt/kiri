@@ -106,7 +106,7 @@ const plainRuleKeys = [
     "tile", "width", "height", "fullscreen", "maximized", "maximizedToEdges", "focused", "workspace", "columnDisplay",
     "floatingPosition", "minWidth", "minHeight", "maxWidth", "maxHeight", "opacity",
 ] as const;
-const plainStyleKeys = ["cornerRadius"] as const;
+const plainStyleKeys = ["cornerRadius", "drawBorderWithBackground", "babaIsFloat"] as const;
 const mergedStyleKeys = ["focusRing", "border", "shadow", "tabIndicator"] as const;
 
 class WindowRuleEnforcer {

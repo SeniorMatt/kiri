@@ -187,7 +187,7 @@ FIELDS = [
     F("windowRules", "Window Rules", "JSON rules", "Rules", "A JSON array of rule objects like niri's window-rule, applied together with the simple rules; the last rule that sets a property wins. "
       "Match: class, caption (regexes for the whole string), appId, title (niri's regexes, matching anywhere), isFloating, isActive, isFocused, isActiveInColumn, isUrgent, atStartup; "
       "exclude: a list of such matches. Properties: tile (false = open-floating), width, height, fullscreen, maximized, maximizedToEdges, focused, workspace, columnDisplay, "
-      "floatingPosition {x, y, relativeTo}, minWidth, minHeight, maxWidth, maxHeight, opacity, and the looks focusRing, border, shadow, tabIndicator, cornerRadius, clipToGeometry. "
+      "floatingPosition {x, y, relativeTo}, minWidth, minHeight, maxWidth, maxHeight, opacity, and the looks focusRing, border, shadow, tabIndicator, cornerRadius, clipToGeometry, drawBorderWithBackground (false: the border and focus ring are outlines only; true: a solid rectangle in their colour under the window, which shows through a see-through window; unset: true for a window that has no KWin title bar), babaIsFloat (the window bobs up and down). "
       "Example: {\"appId\": \"^steam$\", \"title\": \"Friends List\", \"tile\": false}", lines=12, above=True),
 
     # Advanced

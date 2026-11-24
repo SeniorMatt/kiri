@@ -7,6 +7,8 @@
 #include "effect/effectwindow.h"
 
 #include "core/output.h"
+#include "wayland/seat.h"
+#include "wayland_server.h"
 
 #include <KConfigGroup>
 #include <KSharedConfig>
@@ -66,6 +68,14 @@ OverviewEffect::OverviewEffect()
     connect(effects, &EffectsHandler::windowDeleted, this, [this](EffectWindow *w) {
         m_visibleRefs.erase(w);
     });
+    // the drag-and-drop of Wayland clients (and Xwayland's) goes through KWin's seat, which no effect hook reports
+    if (waylandServer() && waylandServer()->seat()) {
+        auto *seat = waylandServer()->seat();
+        connect(seat, &SeatInterface::dragStarted, this, [this]() { setSeatDrag(true); });
+        connect(seat, &SeatInterface::dragEnded, this, [this]() { setSeatDrag(false); });
+        m_dndHoldTimer.setInterval(50);
+        connect(&m_dndHoldTimer, &QTimer::timeout, this, &OverviewEffect::dndHoldTick);
+    }
     loadHotCorner();
     NiriAnim::load();
     m_watcher = KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("kwinrc")));
@@ -228,6 +238,72 @@ void OverviewEffect::pointerMoved(const QPointF &pos, const QPointF &, Qt::Mouse
         return;
     }
     invokeKiriAction(QStringLiteral("overview"));
+}
+
+// ---- DnD hold ----------------------------------------------------------------------------------------------
+// niri (layout/mod.rs, advance_animations): while a drag-and-drop is on, the pointer held over a window for 750 ms
+// (the delay is gnome-shell's) activates it; moving to another target restarts the time, there is no distance
+// threshold. Only a real drag-and-drop counts, not a window being moved. In the overview the same hold (a window, or
+// a desktop) is run by qml/Main.qml; here is the normal view.
+void OverviewEffect::setSeatDrag(bool on)
+{
+    if (m_seatDrag == on) {
+        return;
+    }
+    m_seatDrag = on;
+    m_dndHoldTarget.clear();
+    if (on) {
+        m_dndHoldTimer.start();
+    } else {
+        m_dndHoldTimer.stop();
+    }
+    Q_EMIT seatDragChanged();
+}
+
+QPointF OverviewEffect::cursorPosition() const
+{
+    return effects->cursorPos();
+}
+
+void OverviewEffect::dndHoldTick()
+{
+    if (!m_seatDrag || isRunning() || effects->isScreenLocked()) {
+        m_dndHoldTarget.clear();
+        return;
+    }
+    // like niri, the hold is only checked when the pointer moves
+    const QPointF pos = effects->cursorPos();
+    if (pos == m_dndHoldPos) {
+        return;
+    }
+    m_dndHoldPos = pos;
+    EffectWindow *hit = nullptr;
+    QString target;
+    const auto windows = effects->stackingOrder();
+    for (auto it = windows.crbegin(); it != windows.crend(); ++it) {
+        EffectWindow *w = *it;
+        if (w->isNormalWindow() && !w->isMinimized() && w->isOnCurrentDesktop() && w->isOnCurrentActivity()
+            && w->frameGeometry().contains(pos)) {
+            target = w->internalId().toString();
+            hit = w;
+            break;
+        }
+    }
+    if (target.isEmpty()) {
+        m_dndHoldTarget.clear();
+        return;
+    }
+    if (target != m_dndHoldTarget) {
+        m_dndHoldTarget = target;
+        m_dndHoldSince = now();
+        return;
+    }
+    if (now() - m_dndHoldSince >= 750) {
+        m_dndHoldTarget.clear();
+        // the script sees the activation like any other and scrolls the window into view
+        qCDebug(KIRI_OVERVIEW) << "dnd hold activates" << hit->caption();
+        effects->activateWindow(hit);
+    }
 }
 
 void OverviewEffect::invokeKiriAction(const QString &action)

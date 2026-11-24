@@ -431,6 +431,8 @@ tests.register("The look rules go to the effect per window", 7, () => {
     config.windowRules = JSON.stringify([
         { appId: "round", cornerRadius: 12, shadow: { enabled: true, softness: 40, color: "#00000064" }, border: { activeGradient: "from=#f00 to=#00f angle=45" } },
         { appId: "round", border: { activeColor: "#ff0000", width: 6 } }, // a colour replaces a gradient of an earlier rule
+        { appId: "round", drawBorderWithBackground: false, babaIsFloat: true },
+        { appId: "round", drawBorderWithBackground: true },
         { appId: "round", title: "Active", focusRing: { activeColor: "#ff0000" } },
     ]);
     const { workspaceMock } = init(config);
@@ -440,6 +442,8 @@ tests.register("The look rules go to the effect per window", 7, () => {
     const id = String(round.internalId);
     const rule = windowDecorations.get(id)!;
     Assert.equal(rule.cornerRadius, 12);
+    Assert.equal(rule.drawBorderWithBackground, true); // the last rule that sets it wins
+    Assert.equal(rule.babaIsFloat, true);
     Assert.equal(rule.shadow!.softness, 40);
     Assert.equal(rule.border!.width, 6);
     Assert.equal(rule.border!.activeColor, "#ff0000");

@@ -296,7 +296,7 @@ tests.register("NiriImport window rules: every property and matcher of niri's wi
         border: { enabled: true, width: 3, inactiveGradient: "from=#505050 to=#808080 angle=45" },
         shadow: { enabled: true, softness: 40, spread: 5, offsetX: 1, offsetY: -2, drawBehindWindow: true, color: "#00000064", inactiveColor: "#0000ff80" },
         tabIndicator: { activeColor: "#ff0000", urgentColor: "#ff000080" },
-        cornerRadius: 7,
+        cornerRadius: 7, drawBorderWithBackground: false, babaIsFloat: true,
         exclude: [{ isUrgent: true, isWindowCastTarget: false }],
     };
     const sorted = (value: any): any => {
@@ -315,8 +315,8 @@ tests.register("NiriImport window rules: every property and matcher of niri's wi
     Assert.equal(rules[3].fullscreen, false);
     // what KWin and Plasma own is reported once, the rest of the rule still works
     Assert.equal(result.skipped.filter(line => line.includes("variable-refresh-rate")).length, 1);
-    Assert.equal(result.skipped.filter(line => line.includes("draw-border-with-background")).length, 1);
-    Assert.equal(result.skipped.filter(line => line.includes("baba-is-float")).length, 1);
+    Assert.equal(result.skipped.filter(line => line.includes("draw-border-with-background")).length, 0);
+    Assert.equal(result.skipped.filter(line => line.includes("baba-is-float")).length, 0);
     Assert.equal(result.skipped.filter(line => line.includes("different corners")).length, 1);
     Assert.equal(result.skipped.filter(line => line.includes("clip-to-geometry")).length, 0);
     Assert.equal(result.skipped.filter(line => line.includes("block-out-from")).length, 1);

@@ -89,7 +89,9 @@ function setRingConfig(config: Config) {
 // the global setting. The effect (DecorationsEffect.cpp, D-Bus `setWindowDecorations`) merges it over the settings per window.
 interface WindowDecorationRule {
     cornerRadius?: number;
-    fullscreenBackdropColor?: string; // only from a layout {} of a desktop or output (niri's layout.fullscreen-backdrop-color)
+    fullscreenBackdropColor?: string;
+    drawBorderWithBackground?: boolean; // missing: on for windows without server decoration
+    babaIsFloat?: boolean;
     focusRing?: { enabled?: boolean, width?: number, activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
     border?: { enabled?: boolean, width?: number, activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
     shadow?: { enabled?: boolean, offsetX?: number, offsetY?: number, softness?: number, spread?: number, drawBehindWindow?: boolean, color?: string, inactiveColor?: string };

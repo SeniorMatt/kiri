@@ -835,7 +835,8 @@ def rule_properties(rule, warn, radius_is_global):
         if node is not None:
             out[kiri] = size(node) or ""  # an empty block lets the window pick its own size
     for niri, kiri in (("open-fullscreen", "fullscreen"), ("open-maximized", "maximized"),
-                       ("open-maximized-to-edges", "maximizedToEdges"), ("open-focused", "focused")):
+                       ("open-maximized-to-edges", "maximizedToEdges"), ("open-focused", "focused"),
+                       ("draw-border-with-background", "drawBorderWithBackground"), ("baba-is-float", "babaIsFloat")):
         value = flag(child(rule, niri))
         if value is not None:
             out[kiri] = value
@@ -984,6 +985,7 @@ MAPPED_OPTIONS = {
     "window-rule/default-column-display", "window-rule/default-floating-position", "window-rule/min-width", "window-rule/min-height",
     "window-rule/max-width", "window-rule/max-height", "window-rule/opacity", "window-rule/focus-ring", "window-rule/border",
     "window-rule/shadow", "window-rule/tab-indicator",
+    "window-rule/draw-border-with-background", "window-rule/baba-is-float",
     "window-rule/clip-to-geometry",  # Kiri's effect clips every window that has a corner radius to its rounded corners
 }
 LOOKED_INTO = ["layout", "input", "gestures", "window-rule", "overview", "animations", "hotkey-overlay", "debug"]
@@ -1027,8 +1029,6 @@ SKIPPED_OPTIONS = {
     "window-rule/tiled-state": "KWin gives scripts no xdg tiled state",
     "window-rule/background-effect": "the blur effect has no per-window script setting",
     "window-rule/popups": "KWin draws popups itself",
-    "window-rule/draw-border-with-background": "the effect draws no background under a border",
-    "window-rule/baba-is-float": "the effect has no bobbing animation",
 }
 
 
