@@ -171,17 +171,21 @@ void OverviewEffect::loadHotCorner()
     m_shadowColor = kiriColor(kiri.readEntry("overviewShadowColor", QStringLiteral("#00000050")), QColor(0, 0, 0, 0x50));
     // niri's overview shows the layout zoomed, so the ring is the normal one, scaled; off when the focus ring is off.
     // A gradient has no single colour here: its first colour stands in for it
-    m_ringOn = kiri.readEntry("focusRingEnabled", true);
-    m_ringWidth = kiri.readEntry("focusRingWidth", 4);
-    m_ringColor = kiriColor(kiri.readEntry("focusRingActiveColor", QStringLiteral("#7fc8ff")), QColor(0x7f, 0xc8, 0xff));
-    if (kiri.readEntry("focusRingUseAccent", false) && m_accent.isValid()) {
+    // the script's look (setStyle) wins over kwinrc, which is only the first guess: the settings page saves without telling KWin's watchers
+    const auto style = [&](const char *key, const QVariant &fallback) {
+        return m_styleSet && m_style.contains(QLatin1String(key)) ? m_style.value(QLatin1String(key)).toVariant() : kiri.readEntry(key, fallback);
+    };
+    m_ringOn = style("focusRingEnabled", true).toBool();
+    m_ringWidth = style("focusRingWidth", 4).toInt();
+    m_ringColor = kiriColor(style("focusRingActiveColor", QStringLiteral("#7fc8ff")).toString(), QColor(0x7f, 0xc8, 0xff));
+    if (style("focusRingUseAccent", false).toBool() && m_accent.isValid()) {
         m_ringColor = m_accent;
     }
     static const QRegularExpression fromColor(QStringLiteral("from=(#[0-9a-fA-F]{6,8})"));
-    if (const auto g = fromColor.match(kiri.readEntry("focusRingActiveGradient", QString())); g.hasMatch()) {
+    if (const auto g = fromColor.match(style("focusRingActiveGradient", QString()).toString()); g.hasMatch()) {
         m_ringColor = kiriColor(g.captured(1), m_ringColor);
     }
-    m_hintColor = kiriColor(kiri.readEntry("insertHintColor", QStringLiteral("#7fc8ff80")), QColor(127, 200, 255, 128));
+    m_hintColor = kiriColor(style("insertHintColor", QStringLiteral("#7fc8ff80")).toString(), QColor(127, 200, 255, 128));
     qCInfo(KIRI_OVERVIEW) << "overview ring" << m_ringOn << m_ringWidth << m_ringColor.name();
     m_dnd = {
         {QStringLiteral("viewWidth"), kiri.readEntry("dndEdgeViewScrollTriggerWidth", 30.0)},
@@ -980,6 +984,17 @@ void OverviewEffect::scrollView(const QString &desktopId, qreal delta, const QSt
     queue(jsonString({{"t", "scroll"}, {"d", desktopId}, {"x", it->target}, {"o", output}}));
     Q_EMIT viewOffsetsChanged();
     effects->addRepaintFull();
+}
+
+QString OverviewEffect::setStyle(const QString &json)
+{
+    const QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
+    if (doc.isObject()) {
+        m_style = doc.object();
+        m_styleSet = true;
+        loadHotCorner();
+    }
+    return QString();
 }
 
 void OverviewEffect::requestClose()

@@ -469,7 +469,16 @@ Item {
     onTabGroupsChanged: if (decorationsEffect) sendTabGroups()
     onVisualPositionsChanged: if (decorationsEffect) sendVisualPositions()
     onInsertHintChanged: if (decorationsEffect) sendInsertHint()
-    onDecorationsConfigChanged: if (decorationsEffect && decorationsConfig !== "") sendToDecorations("setConfig", decorationsConfig)
+    onDecorationsConfigChanged: {
+        if (decorationsEffect && decorationsConfig !== "") sendToDecorations("setConfig", decorationsConfig);
+        sendOverviewStyle();
+    }
+    onOverviewEffectChanged: sendOverviewStyle()
+    function sendOverviewStyle() {
+        if (overviewEffect && decorationsConfig !== "") {
+            qmlBase.overviewCall = JSON.stringify({ m: "setStyle", a: decorationsConfig, n: -1 });
+        }
+    }
     onWindowDecorationsChanged: if (decorationsEffect) sendToDecorations("setWindowDecorations", windowDecorations)
     onUrgentWindowsChanged: if (decorationsEffect) sendToDecorations("setUrgentWindows", urgentWindows)
     onDecorationsEffectChanged: if (decorationsEffect) {

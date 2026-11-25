@@ -21,6 +21,7 @@
 #include <vector>
 #include <QElapsedTimer>
 #include <QHash>
+#include <QJsonObject>
 #include <memory>
 #include <unordered_map>
 #include <QStringList>
@@ -115,6 +116,8 @@ public Q_SLOTS:
     Q_SCRIPTABLE QString warm(const QString &layout);
     Q_SCRIPTABLE QString close();
     Q_SCRIPTABLE QString setLayout(const QString &layout);
+    // the script's appearance settings (the same JSON the decorations get): the ring and the insert hint
+    Q_SCRIPTABLE QString setStyle(const QString &json);
     // {"p":0..1,"layout":{...}} follows the fingers; {"settle":true|false,"v":units/s} lets go
     Q_SCRIPTABLE QString gesture(const QString &json);
     // {"open":bool,"p":progress,"events":[...]}; drains the events
@@ -168,6 +171,8 @@ private:
 
     void run(bool on);
     void loadHotCorner();
+    QJsonObject m_style;
+    bool m_styleSet = false;
     bool inHotCorner(const QPointF &pos) const;
     QVariantMap m_dnd;
     // niri DnD hold (layout/mod.rs, 750 ms like gnome-shell): holding a drag-and-drop over a window activates it. The
