@@ -479,3 +479,23 @@ tests.register("Overview: dragging a window out of a column re-lays out the othe
     overviewPoll(world, [{ t: "drop", w: String(b.internalId), d: desktop0.id, c: 0, i: 1 }]);
     Assert.equal(overviewCalls[overviewCalls.length - 1].member, "setLayout");
 });
+
+tests.register("Overview: a tabbed column draws only the shown tab", 1, () => {
+    const config = getDefaultConfig();
+    const { qtMock, workspaceMock, world } = init(config);
+    overviewCalls.length = 0;
+
+    const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
+    qtMock.fireShortcut("window-consume-or-expel-left"); // [a b]
+    qtMock.fireShortcut("column-toggle-tabbed");
+    workspaceMock.activeWindow = b;
+    qtMock.fireShortcut("overview");
+    let wins = overviewLastLayout().desktops[0].cols[0].wins;
+    Assert.equal(wins.length, 2);
+    Assert.equal(wins.filter((w: any) => w.top).map((w: any) => w.id).join(","), String(b.internalId));
+
+    workspaceMock.activeWindow = a;
+    overviewPoll(world, []);
+    wins = overviewLastLayout().desktops[0].cols[0].wins;
+    Assert.equal(wins.filter((w: any) => w.top).map((w: any) => w.id).join(","), String(a.internalId));
+});

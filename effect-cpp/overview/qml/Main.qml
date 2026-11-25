@@ -63,11 +63,11 @@ FocusScope {
             d.cols.forEach((c, ci) => {
                 c.wins.forEach((w, wi) => out.push({ wid: w.id, did: d.id, di: di, lscroll: d.scroll,
                     rx: w.x - l.screen.x, ry: w.y - l.screen.y, rw: w.w, rh: w.h, col: ci, row: wi,
-                    colw: c.w, floating: false, active: w.id === l.active, title: w.t || "", cls: w.c || "" }));
+                    colw: c.w, floating: false, shown: !c.tab || w.top === true, active: w.id === l.active, title: w.t || "", cls: w.c || "" }));
             });
             (d.floats || []).forEach((w, wi) => out.push({ wid: w.id, did: d.id, di: di, lscroll: d.scroll,
                 rx: w.x - l.screen.x, ry: w.y - l.screen.y, rw: w.w, rh: w.h, col: -1, row: wi,
-                colw: 0, floating: true, active: w.id === l.active, title: w.t || "", cls: w.c || "" }));
+                colw: 0, floating: true, shown: true, active: w.id === l.active, title: w.t || "", cls: w.c || "" }));
         });
         return out;
     }
@@ -424,6 +424,7 @@ FocusScope {
             required property real rh
             required property int col
             required property bool floating
+            required property bool shown
             required property bool active
             required property string title
             required property string cls
@@ -504,7 +505,7 @@ FocusScope {
             z: dragging || held ? 100 : (floating ? 10 : 0)
             opacity: ((dragging || held) && !floating ? root.moveAlpha : 1)
                 * (root.query === "" || title.toLowerCase().indexOf(root.query) !== -1 || cls.toLowerCase().indexOf(root.query) !== -1 ? 1 : 0.2)
-            visible: root.mine && x < root.width && x + width > 0 && y < root.height && y + height > 0
+            visible: root.mine && (shown || dragging || held) && x < root.width && x + width > 0 && y < root.height && y + height > 0
 
             KWinComponents.WindowThumbnail {
                 anchors.fill: parent

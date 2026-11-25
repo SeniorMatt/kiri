@@ -91,10 +91,16 @@ class Overview {
                 const width = column.getWidth();
                 let y = area.y;
                 const tabbed = column.isTabbed();
+                const shownTab = column.getWindowToFocus();
                 const wins = column.getWindows().map(window => {
                     const rect = tabbed ? [x, area.y, width, area.height] : [x, y, width, window.height];
                     y += window.height + config.gapsInnerVertical;
-                    return Overview.windowJson(window.client.kwinClient, window.getFilledRect(rect[0], rect[1], rect[2], rect[3]));
+                    const json = Overview.windowJson(window.client.kwinClient, window.getFilledRect(rect[0], rect[1], rect[2], rect[3]));
+                    // in a tabbed column only the shown tab is drawn
+                    if (tabbed) {
+                        json.top = window === shownTab;
+                    }
+                    return json;
                 });
                 return { x: x, w: width, tab: tabbed, wins: wins };
             });
@@ -126,7 +132,7 @@ class Overview {
         }
     }
 
-    private static windowJson(kwinClient: KwinClient, rect: number[]) {
+    private static windowJson(kwinClient: KwinClient, rect: number[]): { id: string, x: number, y: number, w: number, h: number, t: string, c: string, top?: boolean } {
         return {
             id: String(kwinClient.internalId),
             x: Math.round(rect[0]), y: Math.round(rect[1]), w: Math.round(rect[2]), h: Math.round(rect[3]),
