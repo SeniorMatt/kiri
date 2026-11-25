@@ -57,6 +57,9 @@ ACCENT_LINKS = "".join(
     f"<connection><sender>kcfg_{b}UseAccent</sender><signal>toggled(bool)</signal>"
     f"<receiver>kcfg_{b}ActiveColor</receiver><slot>setDisabled(bool)</slot></connection>"
     for b in ("focusRing", "border"))
+ACCENT_LINKS += (
+    "<connection><sender>kcfg_insertHintUseAccent</sender><signal>toggled(bool)</signal>"
+    "<receiver>kcfg_insertHintColor</receiver><slot>setDisabled(bool)</slot></connection>")
 
 FMT = " Format: off, or spring DAMPING STIFFNESS EPSILON (niri's spring: 1 800 0.0001), or CURVE MS with the curve one of linear, ease-out-quad, ease-out-cubic, ease-out-expo (ease-out-expo 150), or cubic-bezier MS X1 Y1 X2 Y2"
 
@@ -157,6 +160,7 @@ FIELDS = [
     F("shadowInactiveColor", "Appearance", "Shadow", "Inactive color", "Shadow of unfocused windows. Empty uses the color above", placeholder="same as color"),
     F("shadowDrawBehindWindow", "Appearance", "Shadow", "", "Also draw the shadow under the window itself, for see-through windows", label_text="Draw behind the window too"),
     F("insertHintEnabled", "Appearance", "Insert hint", "", "Shows where a dragged window will land", label_text="Show the insert hint"),
+    F("insertHintUseAccent", "Appearance", "Insert hint", "", "The color follows the accent color chosen in System Settings, keeping the transparency set below. A gradient below still wins", label_text="Use the Plasma accent color"),
     F("insertHintColor", "Appearance", "Insert hint", "Color", "#RRGGBBAA, alpha allowed", placeholder="#7fc8ff80"),
     F("insertHintGradient", "Appearance", "Insert hint", "Gradient", "Overrides the color. Format: from=COLOR to=COLOR [angle=DEG]", placeholder="from=#80c8ff to=#bbddff angle=45"),
     F("backgroundColor", "Appearance", "Background", "Desktop color", "Paints the desktop in one color instead of the wallpaper. Empty keeps the wallpaper", placeholder="wallpaper"),

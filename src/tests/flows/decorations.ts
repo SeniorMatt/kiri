@@ -160,14 +160,18 @@ tests.register("Decorations: Plasma accent color options", 10, () => {
     const config = getDefaultConfig();
     Assert.equal(config.focusRingUseAccent, false);
     Assert.equal(config.borderUseAccent, false);
+    Assert.equal(config.insertHintUseAccent, false);
     setRingConfig(config);
     let json = JSON.parse(lastDecorationsConfigJson);
     Assert.equal(json.focusRingUseAccent, false);
     Assert.equal(json.focusRingActiveColor, "#7fc8ff");
+    Assert.equal(json.insertHintUseAccent, false);
 
     // on: the flag goes to the effect, which reads the accent itself; the saved colour and gradient stay as they are
-    setRingConfig(Object.assign({}, config, { focusRingUseAccent: true, borderUseAccent: true, borderActiveGradient: "from=#000000 to=#ffffff" }));
+    setRingConfig(Object.assign({}, config, { focusRingUseAccent: true, borderUseAccent: true, borderActiveGradient: "from=#000000 to=#ffffff", insertHintUseAccent: true }));
     json = JSON.parse(lastDecorationsConfigJson);
+    Assert.equal(json.insertHintUseAccent, true);
+    Assert.equal(json.insertHintColor, "#7fc8ff80");
     Assert.equal(json.focusRingUseAccent, true);
     Assert.equal(json.borderUseAccent, true);
     Assert.equal(json.focusRingActiveColor, "#7fc8ff");

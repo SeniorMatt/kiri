@@ -901,6 +901,12 @@ Settings Effect::parseSettings(const QVariantMap &m, bool kiriEnabled) const
     s.tabHideWhenSingle = flag(m, "tabIndicatorHideWhenSingleTab", false);
     s.insertHintEnabled = flag(m, "insertHintEnabled", true);
     s.insertHint = paint(m, QStringLiteral("insertHintColor"), QStringLiteral("insertHintGradient"), QColor(127, 200, 255, 128));
+    // the accent gives the colour and the configured colour keeps its transparency; a gradient still wins
+    if (Gradient unused; flag(m, "insertHintUseAccent", false) && m_accent.isValid() && !parseGradient(str(m, "insertHintGradient"), unused)) {
+        QColor c = m_accent;
+        c.setAlpha(colorOr(str(m, "insertHintColor", QStringLiteral("#7fc8ff80")), QColor(127, 200, 255, 128)).alpha());
+        s.insertHint = solid(c);
+    }
     s.fullscreenBackdrop = colorOr(str(m, "fullscreenBackdropColor", QStringLiteral("#000000")), QColor(Qt::black));
     QColor background;
     if (parseColor(str(m, "backgroundColor"), background)) {

@@ -663,6 +663,11 @@ const configDef = [
         default: true,
     },
     {
+        name: "insertHintUseAccent",
+        type: "Bool",
+        default: false,
+    },
+    {
         name: "insertHintColor",
         type: "String",
         default: "#7fc8ff80",

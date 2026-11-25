@@ -97,6 +97,7 @@ interface Config {
     shadowColor: string;
     shadowInactiveColor: string;
     insertHintEnabled: boolean;
+    insertHintUseAccent: boolean;
     insertHintColor: string;
     insertHintGradient: string;
     fullscreenBackdropColor: string;

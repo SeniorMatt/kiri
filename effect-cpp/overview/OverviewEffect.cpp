@@ -186,6 +186,12 @@ void OverviewEffect::loadHotCorner()
         m_ringColor = kiriColor(g.captured(1), m_ringColor);
     }
     m_hintColor = kiriColor(style("insertHintColor", QStringLiteral("#7fc8ff80")).toString(), QColor(127, 200, 255, 128));
+    // the accent gives the colour, the configured colour keeps its transparency; a gradient still wins
+    if (style("insertHintUseAccent", false).toBool() && m_accent.isValid() && style("insertHintGradient", QString()).toString().isEmpty()) {
+        const int alpha = m_hintColor.alpha();
+        m_hintColor = m_accent;
+        m_hintColor.setAlpha(alpha);
+    }
     qCInfo(KIRI_OVERVIEW) << "overview ring" << m_ringOn << m_ringWidth << m_ringColor.name();
     m_dnd = {
         {QStringLiteral("viewWidth"), kiri.readEntry("dndEdgeViewScrollTriggerWidth", 30.0)},
