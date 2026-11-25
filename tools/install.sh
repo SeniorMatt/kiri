@@ -5,7 +5,9 @@
 # update), installs the Kiri script for your user (and the kiri_animations effect if the build fails) and the
 # kiri-mode switch (Meta+Ctrl+Shift+K), and starts in Kiri mode. Plasma's own settings stay as they are in kwinrc.
 # If the build fails, Kiri still works: it draws its rings itself.
+# It lists what it is going to do and asks first, and asks to log out at the end when KWin needs a new session.
 #   ./install.sh --no-build    skip the compiled effects
+#   ./install.sh --yes         no questions
 set -e
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -15,7 +17,14 @@ root=$here
 effect=$root/effect
 cpp=$root/effect-cpp
 build=true
-[ "$1" = --no-build ] && build=false
+yes=false
+for arg in "$@"; do
+    case $arg in
+        --no-build) build=false ;;
+        --yes) yes=true ;;
+        *) echo "install.sh: unknown option $arg" >&2; exit 2 ;;
+    esac
+done
 
 SUDO=sudo
 [ "$(id -u)" = 0 ] && SUDO=
@@ -76,16 +85,45 @@ if [ -n "$kwinver" ] && [ "$(printf '%s\n6.7.0\n' "$kwinver" | sort -V | head -1
     build=false
 fi
 
-# ---- the compiled effects ----------------------------------------------------------------------------
-compiled=false
+tty=false
+[ -r /dev/tty ] && (: </dev/tty) 2>/dev/null && tty=true
+
+missing=
 if $build && [ -d "$cpp" ]; then
-    missing=
     command -v cmake >/dev/null 2>&1 || missing="$missing cmake"
     command -v g++ >/dev/null 2>&1 || command -v c++ >/dev/null 2>&1 || missing="$missing a-C++-compiler"
     [ -d /usr/share/ECM ] || missing="$missing extra-cmake-modules"
     [ -f /usr/include/kwin/effect/effecthandler.h ] || missing="$missing kwin-headers"
     [ -f /usr/include/epoxy/gl.h ] || missing="$missing libepoxy"
     [ -n "$plugindir" ] || missing="$missing qtpaths6/qmake6"
+fi
+# effects of an earlier install: KWin keeps the loaded ones until the next login
+old_effects=$(find "$effectdir" -name 'kiri_*.so' 2>/dev/null | head -1)
+data=${XDG_DATA_HOME:-$HOME/.local/share}
+
+# ---- what is going to happen ---------------------------------------------------------------------------
+if [ -d "$data/kwin/scripts/kiri" ]; then echo "This updates Kiri. It will:"; else echo "This installs Kiri. It will:"; fi
+if $build && [ -d "$cpp" ] && { [ -z "$missing" ] || command -v pacman >/dev/null 2>&1; }; then
+    [ -n "$missing" ] && echo "  - install the build tools and KWin headers it needs with pacman (sudo)"
+    echo "  - build Kiri's effects (borders, animations, gestures, overview, desktop switch) for your KWin"
+    echo "    and put them in ${plugindir:-Qt's plugin folder}/kwin/effects/plugins (sudo)"
+elif $build && [ -d "$cpp" ]; then
+    echo "  - skip Kiri's compiled effects, these are missing:$missing"
+fi
+echo "  - install the Kiri KWin script into $data/kwin/scripts/kiri"
+echo "  - add the kiri-mode command to ~/.local/bin and a \"Switch Kiri / Plasma\" shortcut (Meta+Ctrl+Shift+K)"
+echo "  - switch to Kiri mode. Your Plasma settings stay as they are; Kiri's own apply only in Kiri mode,"
+echo "    and kiri-mode plasma (or uninstall.sh) brings Plasma's back"
+if ! $yes && $tty; then
+    printf 'Go on? [Y/n] '
+    read -r answer </dev/tty || answer=
+    case $answer in [nN]*) echo "Nothing changed."; exit 0 ;; esac
+fi
+echo
+
+# ---- the compiled effects ----------------------------------------------------------------------------
+compiled=false
+if $build && [ -d "$cpp" ]; then
     if [ -n "$missing" ]; then
         if command -v pacman >/dev/null 2>&1; then
             echo "Installing build tools and KWin headers (sudo pacman -S --needed) ..."
@@ -244,12 +282,19 @@ if [ ! -e "$icons/scalable/apps/kiri.svg" ]; then
     fi
 fi
 
+relogin=false
+$applied || relogin=true
+$compiled && [ -n "$old_effects" ] && relogin=true
 if $applied; then
     echo "Kiri installed and running. Switch between Kiri and Plasma with Meta+Ctrl+Shift+K or: kiri-mode toggle"
-    exit 0
 fi
-echo "Done. Log out and log back in to finish."
-if [ -r /dev/tty ] && (: </dev/tty) 2>/dev/null; then
+$relogin || exit 0
+if $applied; then
+    echo "KWin keeps the old effects until you log in again: log out and back in to use the new ones."
+else
+    echo "Done. Log out and log back in to finish."
+fi
+if ! $yes && $tty; then
     printf 'Log out now? [y/N] '
     read -r answer </dev/tty || answer=
     case $answer in

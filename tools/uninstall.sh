@@ -1,8 +1,9 @@
 #!/bin/sh
 # Removes what install.sh put on this machine: the Kiri script, the kiri_animations effect, the compiled
 # effects (kiri_decorations, kiri_desktop_switch, kiri_motion, kiri_swipe, kiri_overview) and the build cache, and turns Plasma's own effects back on.
-# It asks first, then asks again whether to delete your Kiri settings and shortcuts too. Keep them if you only
-# want Kiri gone for a while: installing it again brings everything back as it was.
+# It lists what it is going to do and asks first, then asks again whether to delete your Kiri settings and
+# shortcuts too. Keep them if you only want Kiri gone for a while: installing it again brings everything back as
+# it was. At the end it asks to log out when KWin needs a new session.
 #   ./uninstall.sh
 #   ./uninstall.sh --yes            no questions, keep the settings
 #   ./uninstall.sh --yes --purge    no questions, delete the settings too
@@ -24,9 +25,22 @@ ask() {
     case $answer in [yY]*) return 0 ;; *) return 1 ;; esac
 }
 
+data=${XDG_DATA_HOME:-$HOME/.local/share}
+echo "This removes Kiri. It will:"
+echo "  - switch back to Plasma mode: Plasma's effects, your focus policy, wrap-around and desktop rows come back"
+echo "  - give back the keys Kiri put on KWin's own actions (keys you set yourself stay)"
+echo "  - remove the Kiri KWin script, the kiri-mode command and its shortcut"
+echo "  - remove Kiri's compiled effects from Qt's plugin folder (sudo) and the build files in ~/.cache/kiri-build"
+ls "$data"/applications/kiri-bind-*.desktop >/dev/null 2>&1 &&
+    echo "  - remove the command shortcuts niri2kiri.py made from niri's spawn binds"
+if [ "$purge" = true ]; then
+    echo "  - delete Kiri's settings and shortcuts"
+elif [ "$purge" = ask ] && ! $yes; then
+    echo "  - and, if you say so, delete Kiri's settings and shortcuts"
+fi
 if ! $yes; then
     [ -r /dev/tty ] || { echo "uninstall.sh: no terminal to ask on; run it with --yes" >&2; exit 2; }
-    ask "Remove Kiri (the script, its effects, the compiled plugins and the build files)?" || { echo "Nothing removed."; exit 0; }
+    ask "Go on?" || { echo "Nothing removed."; exit 0; }
     if [ "$purge" = ask ]; then
         if ask "Also delete Kiri's settings and shortcuts? (No keeps them for a reinstall)"; then purge=true; else purge=false; fi
     fi
@@ -36,7 +50,6 @@ fi
 SUDO=sudo
 [ "$(id -u)" = 0 ] && SUDO=
 config=${XDG_CONFIG_HOME:-$HOME/.config}
-data=${XDG_DATA_HOME:-$HOME/.local/share}
 qdbus=
 for c in qdbus6 qdbus-qt6 qdbus; do
     command -v "$c" >/dev/null 2>&1 && { qdbus=$c; break; }
@@ -65,6 +78,10 @@ delete_group() {
     [ -f "$1" ] || return 0
     awk -v g="[$2]" '/^\[/ { skip = ($0 == g) } !skip' "$1" >"$1.kiri-tmp" && mv "$1.kiri-tmp" "$1"
 }
+
+# KWin keeps loaded effects until the next login, and changes it can't be told about wait for one too
+relogin=false
+"${qdbus:-false}" org.kde.KWin /KWin >/dev/null 2>&1 || relogin=true
 
 # ---- Plasma mode first: the script and the kiri_* effects stop, Plasma's effects and your focus policy, wrap-around
 # and rows come back (the script gives Plasma's borrowed shortcuts back when it stops) ----------------------------
@@ -139,6 +156,7 @@ if [ -n "$plugins" ]; then
     echo "Removing the compiled effects (sudo rm):"
     echo "$plugins"
     for f in $plugins; do $SUDO rm -f "$f"; done
+    relogin=true
 fi
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/kiri-build"
 for icon in "$data/icons/hicolor/scalable/apps/kiri.svg" "$data/icons/hicolor/48x48/apps/kiri.png"; do
@@ -175,3 +193,11 @@ fi
 rows=$(kreadconfig6 --file kwinrc --group Desktops --key Rows --default 1)
 [ "$rows" -gt 1 ] && echo "Your desktops stay one above the other ($rows rows); change it in System Settings > Virtual Desktops."
 echo "Kiri removed."
+$relogin || exit 0
+echo "Log out and log back in to finish (KWin keeps Kiri's effects loaded until then)."
+if ! $yes && [ -r /dev/tty ] && ask "Log out now?"; then
+    qb=${qdbus:-false}
+    "$qb" org.kde.Shutdown /Shutdown org.kde.Shutdown.logout >/dev/null 2>&1 ||
+        "$qb" org.kde.ksmserver /KSMServer org.kde.KSMServerInterface.logout 0 0 0 >/dev/null 2>&1 ||
+        echo "Couldn't log out automatically; please log out yourself." >&2
+fi

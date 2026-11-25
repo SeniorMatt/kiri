@@ -12,7 +12,7 @@ Grab the latest tarball from [Releases](https://github.com/SeniorMatt/kiri/relea
 
     ./install.sh
 
-and log back in.
+It shows what it's going to change and asks first. `./uninstall.sh` does the same to remove Kiri.
 
 `kiri-mode toggle` switches between Kiri and plain Plasma.
 
