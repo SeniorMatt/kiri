@@ -24,6 +24,10 @@ if(NOT KDE_INSTALL_QTPLUGINDIR)
     endif()
 endif()
 
+# Qt's version-less CMake functions need this; some systems leave it unset when KF6 pulls in Qt6Qml
+set(QT_MAJOR_VERSION 6)
+set(QT_DEFAULT_MAJOR_VERSION 6)
+
 find_package(ECM REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${ECM_MODULE_PATH} ${ECM_KDE_MODULE_DIR})
 include(FeatureSummary)
