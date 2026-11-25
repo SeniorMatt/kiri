@@ -66,11 +66,6 @@ sudo zypper install cmake gcc-c++ make kf6-extra-cmake-modules kwin6-devel kdeco
 
 </details>
 
-## Limitations
-
-- Every monitor has the same list of desktops. niri gives each monitor workspaces of its own.
-- Binds on a bare modifier or on key release (e.g. tapping Mod for the overview) are not possible.
-
 ## Build
 
     make package
