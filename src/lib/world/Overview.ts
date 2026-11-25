@@ -260,6 +260,9 @@ class Overview {
             return;
         }
         if (this.gesture === null) {
+            if (plasmaEditMode() && !this.open) {
+                return;
+            }
             this.gesture = { start: this.open ? 1 : 0, pos: 0, history: [] };
             this.lastGestureValue = -1;
             this.lastLayout = this.buildLayout();

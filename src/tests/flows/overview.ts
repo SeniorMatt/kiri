@@ -416,3 +416,27 @@ tests.register("Overview: closing keeps the focus, a click activates the window 
     Assert.equal(workspaceMock.activeWindow, c);
     Assert.equal(workspaceMock.currentDesktop, desktop1);
 });
+
+tests.register("Overview: does not open in Plasma's edit mode", 1, () => {
+    const { qtMock, workspaceMock, world } = init(getDefaultConfig());
+    workspaceMock.createClients(2);
+    overviewCalls.length = 0;
+    try {
+        setPlasmaEditModeForTests(true);
+        qtMock.fireShortcut("overview");
+        qtMock.fireShortcut("overview-open");
+        const swipe = { phase: "v", end: false, f: 4, ev: [[0, -100], [10, -100], [20, -100]] };
+        world.gestureRaw(JSON.stringify(swipe));
+        world.gestureRaw(JSON.stringify({ ...swipe, end: true }));
+        Assert.equal(overviewCalls.filter(c => c.member === "toggle" || c.member === "gesture").length, 0);
+        setPlasmaEditModeForTests(false);
+        qtMock.fireShortcut("overview");
+        Assert.equal(overviewCalls[overviewCalls.length - 1].member, "toggle");
+        // an open overview can still be closed
+        setPlasmaEditModeForTests(true);
+        qtMock.fireShortcut("overview");
+        Assert.equal(overviewCalls.filter(c => c.member === "toggle").length, 2);
+    } finally {
+        setPlasmaEditModeForTests(false);
+    }
+});

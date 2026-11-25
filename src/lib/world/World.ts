@@ -707,6 +707,10 @@ class World {
     }
 
     public toggleOverview() {
+        // an open overview can still be closed
+        if (plasmaEditMode() && !this.overview.isOpen()) {
+            return;
+        }
         if (!this.overview.toggle()) {
             kglobalaccel.call("/component/kwin", "org.kde.kglobalaccel.Component", "invokeShortcut", ["s"], ["Overview"], () => {});
         }
