@@ -28,6 +28,11 @@ Grab the latest tarball from [Releases](https://github.com/SeniorMatt/kiri/relea
 
 It shows what it's going to change and asks first. `./uninstall.sh` does the same to remove Kiri.
 
+**Atomic distros** (Kinoite, Bazzite, Aurora, Kalpa, KDE Linux): `./install.sh` notices the read-only `/usr` and
+builds the effects in a toolbox/distrobox container named `kiri-build` (about 1 GB, no sudo), then installs them
+into `~/.local` and tells KWin where to look (`~/.config/environment.d/kiri.conf`). Log out and in once. If the
+container's KWin doesn't match yours, Kiri installs without the compiled effects and draws its rings itself.
+
 `kiri-mode toggle` switches between Kiri and plain Plasma.
 
 Already on niri? `./niri2kiri.py ~/.config/niri/config.kdl --apply`

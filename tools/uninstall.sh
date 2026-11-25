@@ -1,6 +1,7 @@
 #!/bin/sh
 # Removes what install.sh put on this machine: the Kiri script, the kiri_animations effect, the compiled
 # effects (kiri_decorations, kiri_desktop_switch, kiri_motion, kiri_swipe, kiri_overview) and the build cache, and turns Plasma's own effects back on.
+# On atomic distros it also removes the effects in ~/.local/lib/qt6/plugins, the QT_PLUGIN_PATH files and the kiri-build container.
 # It lists what it is going to do and asks first, then asks again whether to delete your Kiri settings and
 # shortcuts too. Keep them if you only want Kiri gone for a while: installing it again brings everything back as
 # it was. At the end it asks to log out when KWin needs a new session.
@@ -26,11 +27,15 @@ ask() {
 }
 
 data=${XDG_DATA_HOME:-$HOME/.local/share}
+config_dir=${XDG_CONFIG_HOME:-$HOME/.config}
 echo "This removes Kiri. It will:"
 echo "  - switch back to Plasma mode: Plasma's effects, your focus policy, wrap-around and desktop rows come back"
 echo "  - give back the keys Kiri put on KWin's own actions (keys you set yourself stay)"
 echo "  - remove the Kiri KWin script, the kiri-mode command and its shortcut"
 echo "  - remove Kiri's compiled effects and settings page from Qt's plugin folder (sudo) and the build files in ~/.cache/kiri-build"
+own_plugins=$HOME/.local/lib/qt6/plugins
+[ -n "$(find "$own_plugins/kwin" -name 'kiri_*.so' -o -name 'kcm_kiri.so' 2>/dev/null | head -1)" ] || [ -f "$config_dir/environment.d/kiri.conf" ] &&
+    echo "  - remove the effects in $own_plugins, the QT_PLUGIN_PATH files for them and the kiri-build container"
 ls "$data"/applications/kiri-bind-*.desktop >/dev/null 2>&1 &&
     echo "  - remove the command shortcuts niri2kiri.py made from niri's spawn binds"
 if [ "$purge" = true ]; then
@@ -161,6 +166,20 @@ fi
 settings_pages=$(find "$plugindir/kwin/effects/configs" /usr/lib/qt6/plugins/kwin/effects/configs /usr/lib64/qt6/plugins/kwin/effects/configs /usr/lib/*/qt6/plugins/kwin/effects/configs -name 'kcm_kiri.so' 2>/dev/null | sort -u || true)
 for f in $settings_pages; do $SUDO rm -f "$f"; done
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/kiri-build"
+# atomic distros: effects in the home dir, the plugin path files and the build container
+home_effects=$(find "$own_plugins/kwin" -name 'kiri_*.so' -o -name 'kcm_kiri.so' 2>/dev/null)
+if [ -n "$home_effects" ]; then
+    for f in $home_effects; do rm -f "$f"; done
+    rm -f "$data"/kwin/shaders/kiri_*
+    relogin=true
+fi
+rm -f "$config_dir/environment.d/kiri.conf" "$config_dir/plasma-workspace/env/kiri.sh"
+if command -v toolbox >/dev/null 2>&1 && toolbox list -c 2>/dev/null | awk '$2 == "kiri-build" { f = 1 } END { exit !f }'; then
+    toolbox rm --force kiri-build >/dev/null 2>&1 && echo "Removed the kiri-build toolbox."
+fi
+if command -v distrobox >/dev/null 2>&1 && distrobox list 2>/dev/null | awk -F'|' '{ gsub(/ /, "", $2) } $2 == "kiri-build" { f = 1 } END { exit !f }'; then
+    distrobox rm --force kiri-build >/dev/null 2>&1 && echo "Removed the kiri-build distrobox."
+fi
 for icon in "$data/icons/hicolor/scalable/apps/kiri.svg" "$data/icons/hicolor/48x48/apps/kiri.png"; do
     [ -L "$icon" ] && rm -f "$icon"
 done
