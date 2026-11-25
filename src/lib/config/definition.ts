@@ -187,6 +187,16 @@ const configDef = [
         default: "#262626",
     },
     {
+        name: "overviewBackdropBlur",
+        type: "Bool",
+        default: false,
+    },
+    {
+        name: "overviewBackdropBlurRadius",
+        type: "UInt",
+        default: 48,
+    },
+    {
         name: "overviewShadowEnabled",
         type: "Bool",
         default: true,

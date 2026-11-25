@@ -179,6 +179,8 @@ FIELDS = [
     F("hotCornerBottomRight", "Gestures & Overview", "Hot corners", "", "", label_text="Bottom-right corner"),
     F("overviewZoom", "Gestures & Overview", "Overview", "Zoom", "How far the overview zooms out: 0.5 shows every desktop at half size (niri's overview zoom, 0 to 1)", lo=0.0, hi=1.0, step=0.05),
     F("overviewBackdropColor", "Gestures & Overview", "Overview", "Backdrop color", "Color behind the desktops in the overview (niri's backdrop-color)", placeholder="#262626"),
+    F("overviewBackdropBlur", "Gestures & Overview", "Overview", "", "Shows this screen's wallpaper, blurred and enlarged to fill the screen, behind the desktops. The backdrop color then tints it when it has an alpha (#RRGGBBAA). The wallpaper is blurred once, at a quarter of the screen size, and kept while the overview is open; the cost is one small texture per screen and one blur each time the overview opens", label_text="Blurred wallpaper behind the desktops (instead of the plain backdrop color)"),
+    F("overviewBackdropBlurRadius", "Gestures & Overview", "Overview", "Wallpaper blur radius", "How strong the wallpaper blur is, 0 to 64 (about that many pixels at a quarter of the screen size, so 48 is a strong blur)", suffix="px", hi=64),
     F("overviewShadowEnabled", "Gestures & Overview", "Desktop shadow", "", "A shadow under every desktop in the overview (niri's workspace-shadow)", label_text="Draw desktop shadows in the overview"),
     F("overviewShadowSoftness", "Gestures & Overview", "Desktop shadow", "Softness", "Blur radius of the shadow", suffix="px", hi=1024),
     F("overviewShadowSpread", "Gestures & Overview", "Desktop shadow", "Spread", "How far the shadow grows past the desktop", suffix="px", lo=-1024, hi=1024),

@@ -274,3 +274,11 @@ tests.register("Shortcut keys from settings or a niri config apply at once", 1, 
     Assert.assert(accel.registered.get("focus-left")!.includes(parseKeySequence("Meta+Alt+H")!));
     Assert.equal(accel.registered.get("focus-left")!.includes(parseKeySequence("Meta+Alt+J")!), false);
 });
+
+tests.register("Overview blurred wallpaper option", 3, () => {
+    // off by default; the settings page and the overview effect read these keys from kwinrc
+    const defaults = (name: string) => getConfigDef().find(entry => entry.name === name)!.default;
+    Assert.equal(defaults("overviewBackdropBlur"), false);
+    Assert.equal(defaults("overviewBackdropBlurRadius"), 48);
+    Assert.equal(defaults("overviewBackdropColor"), "#262626");
+});

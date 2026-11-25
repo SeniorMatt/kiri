@@ -8,6 +8,7 @@
     The search field and the wallpaper under each desktop are Plasma's.
 */
 import QtQuick
+import QtQuick.Effects
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
 import org.kde.plasma.extras as PlasmaExtras
@@ -313,6 +314,62 @@ FocusScope {
         color: root.backdropColor
         opacity: root.pc
         // niri: a click on no desktop and no window does nothing
+    }
+
+    // The wallpaper, blurred once into a small texture that is kept while the overview is open. Not created at all when off.
+    Loader {
+        anchors.fill: parent
+        active: root.effect.backdropBlur && root.mine
+        opacity: root.pc
+        sourceComponent: Item {
+            // a quarter of the screen size, so the blur is cheap and happens once
+            readonly property real quarter: 0.25
+            Item {
+                id: wall
+                width: root.width
+                height: root.height
+                KWinComponents.DesktopBackground {
+                    // a little larger than the screen, so the blurred edges stay off screen
+                    anchors.centerIn: parent
+                    width: parent.width * 1.1
+                    height: parent.height * 1.1
+                    activity: KWinComponents.Workspace.currentActivity
+                    desktop: root.currentDesktop
+                    outputName: root.outName
+                }
+            }
+            ShaderEffectSource {
+                id: snapshot
+                sourceItem: wall
+                live: false
+                hideSource: true
+                textureSize: Qt.size(Math.max(1, root.width * quarter), Math.max(1, root.height * quarter))
+                // one capture, once the wallpaper item has its content
+                Timer {
+                    interval: 150
+                    running: true
+                    onTriggered: snapshot.scheduleUpdate()
+                }
+            }
+            MultiEffect {
+                anchors.fill: parent
+                source: snapshot
+                blurEnabled: true
+                blurMax: 64
+                blur: Math.min(1, root.effect.backdropBlurRadius / 64)
+                autoPaddingEnabled: false
+                // the blurred result is kept as one small texture, so nothing is blurred again while the overview animates
+                layer.enabled: true
+                layer.smooth: true
+                layer.textureSize: snapshot.textureSize
+            }
+            // the backdrop colour on top: a tint when it has an alpha, nothing when it is fully transparent
+            Rectangle {
+                anchors.fill: parent
+                color: root.backdropColor
+                opacity: root.backdropColor.a < 1 ? 1 : 0
+            }
+        }
     }
 
     Repeater {

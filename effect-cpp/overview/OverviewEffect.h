@@ -49,6 +49,8 @@ class OverviewEffect : public QuickSceneEffect
     Q_PROPERTY(QVariantMap dnd READ dnd NOTIFY optionsChanged)
     Q_PROPERTY(QColor backdropColor READ backdropColor NOTIFY optionsChanged)
     Q_PROPERTY(bool shadowOn READ shadowOn NOTIFY optionsChanged)
+    Q_PROPERTY(bool backdropBlur READ backdropBlur NOTIFY optionsChanged)
+    Q_PROPERTY(int backdropBlurRadius READ backdropBlurRadius NOTIFY optionsChanged)
     Q_PROPERTY(qreal shadowSoftness READ shadowSoftness NOTIFY optionsChanged)
     Q_PROPERTY(qreal shadowSpread READ shadowSpread NOTIFY optionsChanged)
     Q_PROPERTY(qreal shadowOffsetX READ shadowOffsetX NOTIFY optionsChanged)
@@ -83,6 +85,8 @@ public:
     // niri's output { backdrop-color }: the backdrop of the overview on one output
     Q_INVOKABLE QColor backdropFor(const QString &outputName) const;
     bool shadowOn() const { return m_shadowOn; }
+    bool backdropBlur() const { return m_backdropBlur; }
+    int backdropBlurRadius() const { return m_backdropBlurRadius; }
     qreal shadowSoftness() const { return m_shadowSoftness; }
     qreal shadowSpread() const { return m_shadowSpread; }
     qreal shadowOffsetX() const { return m_shadowOffsetX; }
@@ -200,6 +204,8 @@ private:
     qreal m_zoom = 0.5, m_zoomConfig = 0.5;
     QColor m_backdrop = QColor(0x26, 0x26, 0x26);
     bool m_shadowOn = true;
+    bool m_backdropBlur = false;
+    int m_backdropBlurRadius = 48;
     qreal m_shadowSoftness = 40, m_shadowSpread = 10, m_shadowOffsetX = 0, m_shadowOffsetY = 10;
     QColor m_shadowColor = QColor(0, 0, 0, 0x50);
     // the focus ring and insert hint of the normal view, as set in Kiri's settings

@@ -163,6 +163,8 @@ void OverviewEffect::loadHotCorner()
     }
     const qreal zoom = std::clamp(kiri.readEntry("overviewZoom", 0.5), 0.0, 1.0);
     m_backdrop = kiriColor(kiri.readEntry("overviewBackdropColor", QStringLiteral("#262626")), QColor(0x26, 0x26, 0x26));
+    m_backdropBlur = kiri.readEntry("overviewBackdropBlur", false);
+    m_backdropBlurRadius = std::clamp(kiri.readEntry("overviewBackdropBlurRadius", 48), 0, 64);
     m_shadowOn = kiri.readEntry("overviewShadowEnabled", true);
     m_shadowSoftness = kiri.readEntry("overviewShadowSoftness", 40.0);
     m_shadowSpread = kiri.readEntry("overviewShadowSpread", 10.0);
