@@ -9,6 +9,9 @@ import "../code/main.js" as Karousel
 Item {
     id: qmlBase
 
+    // the Plasma accent colour, for the rings when the decorations effect is not there
+    SystemPalette { id: accentPalette }
+
     property var karouselInstance
     property var ringConfig: ({})
     property var borderRings: ({})
@@ -49,7 +52,7 @@ Item {
         target: Workspace.activeWindow
         ringWidth: qmlBase.ringConfig.focusRingWidth ?? 0
         inset: qmlBase.ringInset
-        ringColor: qmlBase.ringConfig.focusRingActiveColor
+        ringColor: qmlBase.ringConfig.focusRingUseAccent === true ? accentPalette.highlight : qmlBase.ringConfig.focusRingActiveColor
     }
 
     Component {
@@ -67,7 +70,7 @@ Item {
             }
             wanted: qmlBase.ringConfig.borderEnabled === true && !coveredByActive && !qmlBase.decorationsEffect
             ringWidth: qmlBase.ringConfig.borderWidth ?? 0
-            ringColor: isActive ? qmlBase.ringConfig.borderActiveColor : qmlBase.ringConfig.borderInactiveColor
+            ringColor: isActive ? (qmlBase.ringConfig.borderUseAccent === true ? accentPalette.highlight : qmlBase.ringConfig.borderActiveColor) : qmlBase.ringConfig.borderInactiveColor
         }
     }
 

@@ -52,6 +52,12 @@ AUTO_TABS = [
 def F(key, tab, group, label, tip="", **o):
     return (key, tab, group, label, tip, o)
 
+# the accent check boxes grey out the active color button next to them
+ACCENT_LINKS = "".join(
+    f"<connection><sender>kcfg_{b}UseAccent</sender><signal>toggled(bool)</signal>"
+    f"<receiver>kcfg_{b}ActiveColor</receiver><slot>setDisabled(bool)</slot></connection>"
+    for b in ("focusRing", "border"))
+
 FMT = " Format: off, or spring DAMPING STIFFNESS EPSILON (niri's spring: 1 800 0.0001), or CURVE MS with the curve one of linear, ease-out-quad, ease-out-cubic, ease-out-expo (ease-out-expo 150), or cubic-bezier MS X1 Y1 X2 Y2"
 
 FIELDS = [
@@ -111,6 +117,7 @@ FIELDS = [
     F("offScreenOpacity", "Appearance", "Windows", "Off-screen opacity", "Opacity of windows that are not fully visible", suffix="%", hi=100),
     F("focusRingEnabled", "Appearance", "Focus ring", "", "Draw a ring around the focused window", label_text="Show a focus ring around the focused window"),
     F("focusRingWidth", "Appearance", "Focus ring", "Width", "Thickness of the ring", suffix="px", hi=99),
+    F("focusRingUseAccent", "Appearance", "Focus ring", "", "The active color follows the accent color chosen in System Settings. A gradient below still wins", label_text="Use the Plasma accent color"),
     F("focusRingActiveColor", "Appearance", "Focus ring", "Active color", "Ring color on the active screen", color=True),
     F("focusRingInactiveColor", "Appearance", "Focus ring", "Inactive color", "Ring color when the screen is not active", color=True),
     F("focusRingUrgentColor", "Appearance", "Focus ring", "Urgent color", "Ring color of a window that asks for attention", placeholder="#9b0000"),
@@ -119,6 +126,7 @@ FIELDS = [
     F("focusRingUrgentGradient", "Appearance", "Focus ring", "Urgent gradient", "Overrides the urgent color. Format: from=COLOR to=COLOR [angle=DEG] [relative-to=workspace-view] [in=oklch longer hue]", placeholder="from=#80c8ff to=#bbddff angle=45"),
     F("borderEnabled", "Appearance", "Border", "", "Always-visible border, drawn inside the window frame", label_text="Show a border around every window"),
     F("borderWidth", "Appearance", "Border", "Width", "Thickness of the border", suffix="px", hi=99),
+    F("borderUseAccent", "Appearance", "Border", "", "The active color follows the accent color chosen in System Settings. A gradient below still wins", label_text="Use the Plasma accent color"),
     F("borderActiveColor", "Appearance", "Border", "Active color", "Border color of the focused window", color=True),
     F("borderInactiveColor", "Appearance", "Border", "Inactive color", "Border color of other windows", color=True),
     F("borderUrgentColor", "Appearance", "Border", "Urgent color", "Border color of a window that asks for attention", placeholder="#9b0000"),
@@ -487,7 +495,7 @@ def main():
            '<layout class="QVBoxLayout" name="layout_main"><item><widget class="QTabWidget" name="tabContainer">'
            + "".join(pages) +
            '</widget></item></layout></widget>\n'
-           '<resources/><connections><connection><sender>list_shortcutGroups</sender><signal>currentRowChanged(int)</signal>'
+           '<resources/><connections>' + ACCENT_LINKS + '<connection><sender>list_shortcutGroups</sender><signal>currentRowChanged(int)</signal>'
            '<receiver>stack_shortcuts</receiver><slot>setCurrentIndex(int)</slot></connection></connections></ui>\n')
     open(PATH, "w", encoding="utf-8").write(doc)
     for line in auto:

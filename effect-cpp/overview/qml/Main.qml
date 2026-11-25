@@ -27,8 +27,8 @@ FocusScope {
 
     // niri's output { backdrop-color } wins over the overview's
     readonly property color backdropColor: { effect.backdropColor; return effect.backdropFor(targetScreen ? targetScreen.name : ""); }
-    readonly property color hintColor: Qt.rgba(127 / 255, 200 / 255, 255 / 255, 128 / 255)
-    readonly property color ringColor: "#7fc8ff"
+    readonly property color hintColor: effect.hintColor
+    readonly property color ringColor: effect.ringColor
     readonly property real moveThreshold: 256 // layout px of pointer travel (scaled by the zoom)
     readonly property real moveAlpha: 0.75
 
@@ -455,11 +455,11 @@ FocusScope {
             }
             Rectangle {
                 // niri: the ring belongs to the focused window and goes with it while it is dragged and dropped
-                visible: tile.active || tile.dragging || tile.held
+                visible: effect.ringOn && (tile.active || tile.dragging || tile.held)
                 anchors.fill: parent
                 anchors.margins: -border.width
                 color: "transparent"
-                border.width: Math.max(1, 4 * root.zm)
+                border.width: Math.max(1, effect.ringWidth * root.zm)
                 border.color: root.ringColor
             }
 

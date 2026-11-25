@@ -538,6 +538,11 @@ const configDef = [
         default: 4,
     },
     {
+        name: "focusRingUseAccent",
+        type: "Bool",
+        default: false,
+    },
+    {
         name: "focusRingActiveColor",
         type: "String",
         default: "#7fc8ff",
@@ -576,6 +581,11 @@ const configDef = [
         name: "borderWidth",
         type: "UInt",
         default: 4,
+    },
+    {
+        name: "borderUseAccent",
+        type: "Bool",
+        default: false,
     },
     {
         name: "borderActiveColor",

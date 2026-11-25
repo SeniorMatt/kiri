@@ -26,6 +26,7 @@
 #include <chrono>
 
 #include "AnimConfig.h"
+#include "PlasmaAccent.h"
 
 #include <memory>
 
@@ -167,6 +168,7 @@ public Q_SLOTS:
 
 private:
     void loadSettings();
+    void loadAccent();
     Settings parseSettings(const QVariantMap &map, bool kiriEnabled) const;
     Look parseLook(const QVariantMap &map) const;
     void applyOverride(Look &look, const QVariantMap &rule) const;
@@ -209,6 +211,8 @@ private:
     QHash<QUuid, TabHit> m_tabHits;
     std::unique_ptr<KWin::GLShader> m_shadowShader;
     KConfigWatcher::Ptr m_watcher;
+    KConfigWatcher::Ptr m_colorWatcher;
+    QColor m_accent;
     std::unique_ptr<KWin::GLShader> m_cornerShader;
     std::unique_ptr<KWin::GLShader> m_ringShader;
     KWin::EffectWindow *m_active = nullptr;

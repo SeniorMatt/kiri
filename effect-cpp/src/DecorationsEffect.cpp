@@ -20,6 +20,7 @@
 #include <KConfigGroup>
 #include <KSharedConfig>
 
+
 #include <QDateTime>
 #include <QDBusConnection>
 #include <QDBusMessage>
@@ -535,6 +536,7 @@ Effect::Effect()
         qCCritical(KIRI_DECO) << "Kiri decorations: shaders not found or not valid, the effect does nothing";
     }
 
+    loadAccent();
     loadSettings();
     if (!QDBusConnection::sessionBus().registerObject(QStringLiteral("/KiriDecorations"), this, QDBusConnection::ExportScriptableSlots)) {
         qCWarning(KIRI_DECO) << "could not register the debug D-Bus object";
@@ -544,6 +546,19 @@ Effect::Effect()
         if (group.name() == QLatin1String("Script-kiri") || group.name() == QLatin1String("Plugins")) {
             loadSettings();
             KWin::effects->addRepaintFull();
+        }
+    });
+
+    // the Plasma accent colour changes in kdeglobals: the General key, and the colour scheme groups it rewrites
+    m_colorWatcher = KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("kdeglobals")));
+    connect(m_colorWatcher.data(), &KConfigWatcher::configChanged, this, [this](const KConfigGroup &group) {
+        if (PlasmaAccent::isAccentGroup(group.name())) {
+            const QColor old = m_accent;
+            loadAccent();
+            if (m_accent != old) {
+                loadSettings();
+                KWin::effects->addRepaintFull();
+            }
         }
     });
 
@@ -762,6 +777,11 @@ Look Effect::parseLook(const QVariantMap &m) const
         b.enabled = flag(m, qPrintable(prefix + QLatin1String("Enabled")), enabled);
         b.width = std::max(0, integer(m, qPrintable(prefix + QLatin1String("Width")), 4));
         b.colors[0] = paint(m, prefix + QLatin1String("ActiveColor"), prefix + QLatin1String("ActiveGradient"), QColor(QLatin1String(active)));
+        // the accent replaces the plain colour only; a gradient still wins
+        Gradient unused;
+        if (flag(m, qPrintable(prefix + QLatin1String("UseAccent")), false) && !parseGradient(m.value(prefix + QLatin1String("ActiveGradient")).toString(), unused)) {
+            b.colors[0] = solid(m_accent);
+        }
         b.colors[1] = paint(m, prefix + QLatin1String("InactiveColor"), prefix + QLatin1String("InactiveGradient"), QColor(QLatin1String(inactive)));
         b.colors[2] = paint(m, prefix + QLatin1String("UrgentColor"), prefix + QLatin1String("UrgentGradient"), QColor(0x9b, 0, 0));
     };
@@ -821,6 +841,10 @@ void Effect::applyOverride(Look &look, const QVariantMap &rule) const
         b.enabled = flag(g, "enabled", b.enabled);
         b.width = std::max(0, integer(g, "width", b.width));
         static const QString names[3] = {QStringLiteral("active"), QStringLiteral("inactive"), QStringLiteral("urgent")};
+        // an explicit colour or gradient in the rule wins over the accent, in the rule or in the global setting
+        if (flag(g, "useAccent", false)) {
+            b.colors[0] = solid(m_accent);
+        }
         for (int i = 0; i < 3; ++i) {
             bool set = false;
             colors(g, names[i], set, b.colors[i]);
@@ -902,6 +926,12 @@ Settings Effect::parseSettings(const QVariantMap &m, bool kiriEnabled) const
         "Meta+Ctrl+Shift+WheelScrollDown=column-move-right\n"
         "Meta+Ctrl+Shift+WheelScrollUp=column-move-left"));
     return s;
+}
+
+void Effect::loadAccent()
+{
+    m_accent = PlasmaAccent::load();
+    qCDebug(KIRI_DECO) << "accent colour" << m_accent.name();
 }
 
 void Effect::loadSettings()

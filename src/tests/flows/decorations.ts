@@ -154,3 +154,29 @@ tests.register("Decorations: niri config import", 5, () => {
     Assert.equal(NiriImport.parseColor("rgb(255, 0, 0)"), "#ff0000");
     Assert.equal(NiriImport.parseColor("hsl(0, 100%, 50%)"), "#ff0000");
 });
+
+tests.register("Decorations: Plasma accent color options", 10, () => {
+    // off by default: the plain colours are sent as before
+    const config = getDefaultConfig();
+    Assert.equal(config.focusRingUseAccent, false);
+    Assert.equal(config.borderUseAccent, false);
+    setRingConfig(config);
+    let json = JSON.parse(lastDecorationsConfigJson);
+    Assert.equal(json.focusRingUseAccent, false);
+    Assert.equal(json.focusRingActiveColor, "#7fc8ff");
+
+    // on: the flag goes to the effect, which reads the accent itself; the saved colour and gradient stay as they are
+    setRingConfig(Object.assign({}, config, { focusRingUseAccent: true, borderUseAccent: true, borderActiveGradient: "from=#000000 to=#ffffff" }));
+    json = JSON.parse(lastDecorationsConfigJson);
+    Assert.equal(json.focusRingUseAccent, true);
+    Assert.equal(json.borderUseAccent, true);
+    Assert.equal(json.focusRingActiveColor, "#7fc8ff");
+    Assert.equal(json.borderActiveGradient, "from=#000000 to=#ffffff");
+
+    // a window rule keeps its own colour; the accent flag of a rule is passed on as it is
+    setWindowDecorations("{y}", { focusRing: { useAccent: true }, border: { activeColor: "#112233" } });
+    const rule = JSON.parse(lastWindowDecorationsJson)["{y}"];
+    Assert.equal(rule.focusRing.useAccent, true);
+    Assert.equal(rule.border.activeColor, "#112233");
+    setWindowDecorations("{y}", null);
+});

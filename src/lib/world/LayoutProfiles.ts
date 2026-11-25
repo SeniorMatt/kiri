@@ -119,7 +119,7 @@ class LayoutProfiles {
                 rule[group] = out;
             }
         };
-        const bandFields = ["enabled", "width", "activeColor", "inactiveColor", "urgentColor", "activeGradient", "inactiveGradient", "urgentGradient"];
+        const bandFields = ["enabled", "width", "useAccent", "activeColor", "inactiveColor", "urgentColor", "activeGradient", "inactiveGradient", "urgentGradient"];
         for (const band of LayoutProfiles.LOOK_BANDS) {
             take(band, band, bandFields);
         }

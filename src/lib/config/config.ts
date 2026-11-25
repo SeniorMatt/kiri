@@ -72,10 +72,12 @@ interface Config {
     cornerRadius: number;
     focusRingEnabled: boolean;
     focusRingWidth: number;
+    focusRingUseAccent: boolean;
     focusRingActiveColor: string;
     focusRingInactiveColor: string;
     borderEnabled: boolean;
     borderWidth: number;
+    borderUseAccent: boolean;
     borderActiveColor: string;
     borderInactiveColor: string;
     focusRingUrgentColor: string;

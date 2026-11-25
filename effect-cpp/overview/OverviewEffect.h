@@ -12,6 +12,7 @@
 
 #include "AnimConfig.h"
 #include "NiriSwipe.h"
+#include "PlasmaAccent.h"
 #include "effect/effectwindow.h"
 #include "effect/quickeffect.h"
 
@@ -52,6 +53,10 @@ class OverviewEffect : public QuickSceneEffect
     Q_PROPERTY(qreal shadowOffsetX READ shadowOffsetX NOTIFY optionsChanged)
     Q_PROPERTY(qreal shadowOffsetY READ shadowOffsetY NOTIFY optionsChanged)
     Q_PROPERTY(QColor shadowColor READ shadowColor NOTIFY optionsChanged)
+    Q_PROPERTY(bool ringOn READ ringOn NOTIFY optionsChanged)
+    Q_PROPERTY(qreal ringWidth READ ringWidth NOTIFY optionsChanged)
+    Q_PROPERTY(QColor ringColor READ ringColor NOTIFY optionsChanged)
+    Q_PROPERTY(QColor hintColor READ hintColor NOTIFY optionsChanged)
     Q_PROPERTY(bool closing READ isClosing NOTIFY closingChanged)
     // the invisible first build of the scene (see warm())
     Q_PROPERTY(bool warming READ isWarming NOTIFY warmingChanged)
@@ -82,6 +87,10 @@ public:
     qreal shadowOffsetX() const { return m_shadowOffsetX; }
     qreal shadowOffsetY() const { return m_shadowOffsetY; }
     QColor shadowColor() const { return m_shadowColor; }
+    bool ringOn() const { return m_ringOn; }
+    qreal ringWidth() const { return m_ringWidth; }
+    QColor ringColor() const { return m_ringColor; }
+    QColor hintColor() const { return m_hintColor; }
     bool isClosing() const { return !m_open; }
     bool isWarming() const { return m_warm; }
     QVariantMap startRects() const { return m_startRects; }
@@ -186,6 +195,12 @@ private:
     bool m_shadowOn = true;
     qreal m_shadowSoftness = 40, m_shadowSpread = 10, m_shadowOffsetX = 0, m_shadowOffsetY = 10;
     QColor m_shadowColor = QColor(0, 0, 0, 0x50);
+    // the focus ring and insert hint of the normal view, as set in Kiri's settings
+    bool m_ringOn = true;
+    qreal m_ringWidth = 4;
+    QColor m_ringColor = QColor(0x7f, 0xc8, 0xff);
+    QColor m_hintColor = QColor(127, 200, 255, 128);
+    QColor m_accent;
     // niri's hot-corners: top-left, top-right, bottom-left, bottom-right
     bool m_corners[4] = {true, false, false, false};
     bool m_cornersOn = true; // the global hot-corners are not off
@@ -202,6 +217,7 @@ private:
     const OutputOptions *optionsOf(const QString &outputName) const;
     void pointerMoved(const QPointF &pos, const QPointF &, Qt::MouseButtons buttons, Qt::MouseButtons, Qt::KeyboardModifiers, Qt::KeyboardModifiers);
     KConfigWatcher::Ptr m_watcher;
+    KConfigWatcher::Ptr m_colorWatcher;
     bool m_hotCorner = true;
     bool m_insideCorner = false;
     void holdWindow(EffectWindow *w);

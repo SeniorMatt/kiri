@@ -57,10 +57,12 @@ function setRingConfig(config: Config) {
         cornerRadius: config.cornerRadius,
         focusRingEnabled: config.focusRingEnabled,
         focusRingWidth: config.focusRingWidth,
+        focusRingUseAccent: config.focusRingUseAccent,
         focusRingActiveColor: config.focusRingActiveColor,
         focusRingInactiveColor: config.focusRingInactiveColor,
         borderEnabled: config.borderEnabled,
         borderWidth: config.borderWidth,
+        borderUseAccent: config.borderUseAccent,
         borderActiveColor: config.borderActiveColor,
         borderInactiveColor: config.borderInactiveColor,
         tabIndicatorEnabled: config.tabIndicatorEnabled,
@@ -77,8 +79,8 @@ interface WindowDecorationRule {
     fullscreenBackdropColor?: string;
     drawBorderWithBackground?: boolean;
     babaIsFloat?: boolean;
-    focusRing?: { enabled?: boolean, width?: number, activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
-    border?: { enabled?: boolean, width?: number, activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
+    focusRing?: { enabled?: boolean, width?: number, useAccent?: boolean, activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
+    border?: { enabled?: boolean, width?: number, useAccent?: boolean, activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
     shadow?: { enabled?: boolean, offsetX?: number, offsetY?: number, softness?: number, spread?: number, drawBehindWindow?: boolean, color?: string, inactiveColor?: string };
     tabIndicator?: { activeColor?: string, inactiveColor?: string, urgentColor?: string, activeGradient?: string, inactiveGradient?: string, urgentGradient?: string };
 }
