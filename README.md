@@ -10,11 +10,15 @@ Windows are tiled in columns on an endless horizontal strip. Opening a window ne
 keeps the width you gave it, and when the strip gets wider than the screen you scroll through it sideways. The focused
 column is kept in view, centered when that makes sense.
 
-Every monitor has its own strip. To switch desktops on each monitor separately, like niri's per-monitor workspaces,
-turn on "Switch desktops independently for each screen" in System Settings > Virtual Desktops.
-
 Other scrolling window managers: [niri](https://github.com/YaLTeR/niri), [PaperWM](https://github.com/paperwm/PaperWM)
 and [Cardboard](https://gitlab.com/cardboardwm/cardboard).
+
+## Multiple monitors
+
+- Every monitor has its own strip of columns, scrolled on its own.
+- `Meta+Shift+Left/Right` focuses the next monitor, `Meta+Ctrl+Shift+Left/Right` moves the column there, as in niri.
+- For niri's per-monitor workspaces, turn on "Switch desktops independently for each screen" in
+  System Settings > Virtual Desktops: each monitor then switches its own desktop.
 
 ## Install
 
