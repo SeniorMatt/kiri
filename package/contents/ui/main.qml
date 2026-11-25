@@ -82,6 +82,8 @@ Item {
     property bool overviewEffect: false
     property string overviewCall: ""
     property bool overviewPolling: false
+    // true while Plasma's panel or desktop edit mode is on: the overview does not open then
+    property bool plasmaEditMode: false
     property bool overviewPollPending: false
     property double overviewPollSince: 0
     property bool swipePollPending: false
@@ -206,6 +208,30 @@ Item {
                 if (++qmlBase.overviewPollErrors >= 25) { qmlBase.overviewPollErrors = 0; qmlBase.overviewPolling = false; }
             },
         );
+    }
+    // plasmashell sends no signal when the edit mode changes, so it is asked twice a second (no D-Bus activation exists for it)
+    Timer {
+        interval: 500
+        repeat: true
+        running: true
+        onTriggered: DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.plasmashell",
+                path: "/PlasmaShell",
+                iface: "org.freedesktop.DBus.Properties",
+                member: "Get",
+                arguments: [new DBus.string("org.kde.PlasmaShell"), new DBus.string("editMode")],
+                signature: "(ss)",
+            },
+            (reply) => {
+                let value = reply ? reply.value : undefined;
+                while (value !== undefined && value !== null && typeof value === "object" && "value" in value) {
+                    value = value.value;
+                }
+                qmlBase.plasmaEditMode = value === true;
+            },
+            (error) => { qmlBase.plasmaEditMode = false; },
+        )
     }
     Timer {
         interval: 40

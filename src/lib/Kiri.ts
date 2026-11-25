@@ -286,6 +286,16 @@ function overviewEffectLoaded() {
     return typeof qmlBase === "undefined" ? true : (qmlBase as any).overviewEffect === true;
 }
 
+// true while Plasma's panel or desktop edit mode is on (qml polls plasmashell); the overview must not open then
+let plasmaEditModeFlag = false;
+// the tests set it; the script reads it from qml
+function setPlasmaEditModeForTests(on: boolean) {
+    plasmaEditModeFlag = on;
+}
+function plasmaEditMode() {
+    return typeof qmlBase === "undefined" ? plasmaEditModeFlag : (qmlBase as any).plasmaEditMode === true;
+}
+
 // true while the overview is open: the pointer is not warped and does not give the focus away
 function overviewActive() {
     return typeof qmlBase === "undefined" ? overviewPollingFlag : (qmlBase as any).overviewPolling === true;

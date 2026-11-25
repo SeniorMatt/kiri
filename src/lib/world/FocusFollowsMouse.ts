@@ -1,5 +1,5 @@
-// niri's focus-follows-mouse, done by Kiri (KWin is set to click-to-focus); not while a Plasma popup or KRunner is open
-// or a button is held
+// niri's focus-follows-mouse, done by Kiri (KWin is set to click-to-focus); not while a Plasma popup or KRunner is open,
+// Plasma's edit mode is on, a Plasma dialog (panel settings, widget explorer) has the focus, or a button is held
 class FocusFollowsMouse {
     // where the pointer was at the previous event; the window "left" is looked up with the layout as it is now, like niri
     private prevPos: { x: number, y: number } | null = null;
@@ -20,7 +20,7 @@ class FocusFollowsMouse {
         const pos = Workspace.cursorPos;
         const prev = this.prevPos;
         this.prevPos = { x: pos.x, y: pos.y };
-        if (overviewActive()) {
+        if (overviewActive() || plasmaEditMode() || FocusFollowsMouse.shellHoldsFocus()) {
             return;
         }
         if (recentlyWarped(pos)) {
@@ -58,6 +58,13 @@ class FocusFollowsMouse {
         return 100 * Math.max(left, right) / area.width;
     }
 
+    // like a niri layer surface with exclusive keyboard focus: hovering does not take the focus from Plasma's dialogs and
+    // popups (the panel and the desktop do give it up, like niri's on-demand layers)
+    private static shellHoldsFocus() {
+        const active = Workspace.activeWindow;
+        return active !== null && !active.dock && !active.desktopWindow && Clients.isShellUi(active);
+    }
+
     private static popupOpen() {
         for (const window of Workspace.windows) {
             if (!window.minimized && (window.appletPopup || window.resourceClass === "org.kde.krunner")) {
@@ -76,7 +83,7 @@ class FocusFollowsMouse {
             if (point.x < g.x || point.x >= g.x + g.width || point.y < g.y || point.y >= g.y + g.height) {
                 continue;
             }
-            if (!window.minimized && isOnShownDesktop(window)) {
+            if (!window.minimized && !window.hidden && isOnShownDesktop(window)) {
                 return window;
             }
         }

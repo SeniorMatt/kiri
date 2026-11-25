@@ -193,3 +193,93 @@ tests.register("Focus follows mouse stops when Kiri is destroyed (the script is 
         qmlBase = originalQmlBase;
     }
 });
+
+function ffmTestSetup() {
+    const { workspaceMock } = init(getDefaultConfig());
+    const [client1, client2, client3] = workspaceMock.createClients(3);
+    workspaceMock.stackingOrder.push(client1, client2, client3);
+    return { workspaceMock, client1, client2, client3, ffm: new FocusFollowsMouse(() => false, 100) };
+}
+
+function ffmTestCenter(client: MockKwinClient) {
+    const f = client.getActualFrameGeometry();
+    return { x: Math.floor(f.x + f.width / 2), y: Math.floor(f.y + f.height / 2) };
+}
+
+tests.register("Focus follows mouse: a window hidden by KWin is not focused", 1, () => {
+    const { workspaceMock, client1, client2, ffm } = ffmTestSetup();
+    try {
+        workspaceMock.activeWindow = client1;
+        client2.hidden = true;
+        const p = ffmTestCenter(client2);
+        ffmTestHover(workspaceMock, p.x, p.y);
+        Assert.assert(workspaceMock.activeWindow === client1);
+        client2.hidden = false;
+        ffmTestHover(workspaceMock, p.x, p.y - 3000);
+        ffmTestHover(workspaceMock, p.x + 1, p.y);
+        Assert.assert(workspaceMock.activeWindow === client2);
+    } finally {
+        ffm.destroy();
+    }
+});
+
+tests.register("Focus follows mouse: a Plasma dialog with the focus keeps it", 1, () => {
+    const { workspaceMock, client1, client2, ffm } = ffmTestSetup();
+    try {
+        const dialog = new MockKwinClient(new MockQmlRect(5000, 0, 400, 400));
+        dialog.resourceClass = "org.kde.plasmashell";
+        workspaceMock.createWindows(dialog);
+        workspaceMock.stackingOrder.push(dialog);
+        workspaceMock.activeWindow = dialog;
+        const p = ffmTestCenter(client2);
+        ffmTestHover(workspaceMock, p.x, p.y);
+        Assert.assert(workspaceMock.activeWindow === dialog, { message: "hovering a window does not take the focus from the dialog" });
+        // the panel itself gives the focus up, like a niri on-demand layer
+        const panel = new MockKwinClient(new MockQmlRect(5000, 600, 400, 50));
+        panel.resourceClass = "org.kde.plasmashell";
+        (panel as any).dock = true;
+        workspaceMock.createWindows(panel);
+        workspaceMock.removeWindow(dialog);
+        workspaceMock.activeWindow = panel;
+        ffmTestHover(workspaceMock, p.x, p.y - 3000);
+        ffmTestHover(workspaceMock, p.x + 1, p.y);
+        Assert.assert(workspaceMock.activeWindow === client2);
+    } finally {
+        ffm.destroy();
+    }
+});
+
+tests.register("Focus follows mouse: a surface on top that takes no hover focus blocks the window below", 1, () => {
+    const { workspaceMock, client1, client2, ffm } = ffmTestSetup();
+    try {
+        workspaceMock.activeWindow = client1;
+        const f = client2.getActualFrameGeometry();
+        const panel = new MockKwinClient(new MockQmlRect(f.x, f.y, f.width, f.height));
+        (panel as any).dock = true;
+        (panel as any).normalWindow = false;
+        workspaceMock.stackingOrder.push(panel);
+        const p = ffmTestCenter(client2);
+        ffmTestHover(workspaceMock, p.x, p.y);
+        Assert.assert(workspaceMock.activeWindow === client1);
+    } finally {
+        ffm.destroy();
+    }
+});
+
+tests.register("Focus follows mouse: nothing happens in Plasma's edit mode", 1, () => {
+    const { workspaceMock, client1, client2, ffm } = ffmTestSetup();
+    try {
+        workspaceMock.activeWindow = client1;
+        setPlasmaEditModeForTests(true);
+        const p = ffmTestCenter(client2);
+        ffmTestHover(workspaceMock, p.x, p.y);
+        Assert.assert(workspaceMock.activeWindow === client1);
+        setPlasmaEditModeForTests(false);
+        ffmTestHover(workspaceMock, p.x, p.y - 3000);
+        ffmTestHover(workspaceMock, p.x + 1, p.y);
+        Assert.assert(workspaceMock.activeWindow === client2);
+    } finally {
+        setPlasmaEditModeForTests(false);
+        ffm.destroy();
+    }
+});

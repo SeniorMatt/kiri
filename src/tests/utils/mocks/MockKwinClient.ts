@@ -27,6 +27,7 @@ class MockKwinClient {
     public readonly dock: boolean = false;
     public readonly normalWindow: boolean = true;
     public desktopWindow = false;
+    public hidden = false;
     public readonly managed: boolean = true;
     public readonly popupWindow: boolean = false;
     public readonly appletPopup: boolean = false;

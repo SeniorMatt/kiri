@@ -86,6 +86,7 @@ interface KwinClient {
     readonly managed: boolean;
     readonly popupWindow: boolean;
     readonly appletPopup: boolean;
+    readonly hidden?: boolean; // hidden by KWin (e.g. while the desktop is shown), not minimized
     readonly dialog: boolean;
     readonly modal: boolean;
     readonly pid: number;
