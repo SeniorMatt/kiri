@@ -12,9 +12,15 @@
 
 #include <QAction>
 #include <QElapsedTimer>
+#include <QRegularExpression>
+#include <QStringList>
 #include <memory>
 #include <vector>
 #include <effect/offscreeneffect.h>
+#if __has_include(<scene/borderradius.h>)
+#include <scene/borderradius.h>
+#define KIRI_BORDER_RADIUS 1
+#endif
 
 #include <QColor>
 #include <QHash>
@@ -138,6 +144,7 @@ public:
     void postPaintScreen() override;
     KIRI_PAINT_RET paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, int mask, const KWin::Region &deviceRegion, KWin::LogicalOutput *screen) override;
     void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data) override;
+    KIRI_PAINT_RET paintWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data) override;
     KIRI_PAINT_RET drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data) override;
 
     bool isActive() const override;
@@ -203,6 +210,19 @@ private:
     bool m_anyBaba = false;
     QHash<QUuid, Look> m_looks;
     QSet<QUuid> m_urgent;
+    // windows this effect has told the blur effect to keep blurring
+    QSet<QUuid> m_forcedBlur;
+    bool blurredBehind(KWin::EffectWindow *w);
+    QElapsedTimer m_blurConfigRead;
+    QStringList m_blurClasses;
+    QList<QRegularExpression> m_blurClassPatterns;
+    bool m_blurWhitelist = true;
+#ifdef KIRI_BORDER_RADIUS
+    // the corner radius KWin had on a window before this effect gave it Kiri's, so the blur effect rounds the blur the same way
+    QHash<QUuid, KWin::BorderRadius> m_ownRadius;
+    void syncBlurRadius(KWin::EffectWindow *w);
+    void restoreBlurRadius(KWin::EffectWindow *w);
+#endif
     struct TabHit
     {
         QList<QUuid> windows;

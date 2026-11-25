@@ -441,17 +441,18 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     KWin::CrossFadeEffect::prePaintWindow(view, w, data);
 }
 
-KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
+// The offsets are applied here, not in drawWindow, so that blur effects (which blur in drawWindow) see where the window is painted
+KIRI_PAINT_RET Effect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
 {
     auto it = m_windows.find(w);
     if (m_capturing || it == m_windows.end()) {
-        return KWin::CrossFadeEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+        return KWin::effects->paintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
     }
     const WindowState &s = *it;
     const double t = m_frameTime;
     const KWin::RectF frame = w->frameGeometry();
     if (frame.isEmpty()) {
-        return KWin::CrossFadeEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+        return KWin::effects->paintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
     }
 
     const QPointF offset = moveOffset(s, t);
@@ -497,7 +498,7 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
     if (s.snapshot) {
         data.setCrossFadeProgress(s.resizing ? NiriAnim::resizeSpring().clampedValue((t - s.resizeStart) * m_speed) : 1.0);
     }
-    return KWin::CrossFadeEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+    return KWin::effects->paintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
 }
 
 void Effect::postPaintScreen()

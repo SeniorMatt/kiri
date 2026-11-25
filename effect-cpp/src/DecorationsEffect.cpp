@@ -9,6 +9,11 @@
 #include <input.h>
 #include <pointer_input.h>
 #include <virtualdesktops.h>
+#include <window.h>
+#if __has_include(<wayland/surface.h>)
+#include <wayland/surface.h>
+#define KIRI_SURFACE_BLUR 1
+#endif
 #include <core/pixelgrid.h>
 #include <core/renderviewport.h>
 #include <effect/effecthandler.h>
@@ -657,11 +662,104 @@ Effect::Effect()
         m_painted.remove(w);
         m_alpha.remove(w->internalId());
         m_expanded.remove(w);
+#ifdef KIRI_BORDER_RADIUS
+        m_ownRadius.remove(w->internalId());
+#endif
     });
 }
 
+// True when a blur effect will blur this window: the app asked for blur, or Better Blur DX is set to force blur for its class
+// (the same match as its window_manager.cpp, read from its kwinrc group)
+bool Effect::blurredBehind(KWin::EffectWindow *w)
+{
+    const bool stock = KWin::effects->isEffectLoaded(QStringLiteral("blur"));
+    const bool better = KWin::effects->isEffectLoaded(QStringLiteral("better_blur_dx"));
+    if (!stock && !better) {
+        return false;
+    }
+#ifdef KIRI_SURFACE_BLUR
+    if (const auto *surface = w->surface(); surface && !surface->blurRegion().isEmpty()) {
+        return true;
+    }
+#endif
+    if (!better || !w->window()) {
+        return false;
+    }
+    if (!m_blurConfigRead.isValid() || m_blurConfigRead.elapsed() > 2000) {
+        m_blurConfigRead.start();
+        const auto config = KSharedConfig::openConfig(QStringLiteral("kwinrc"), KConfig::NoGlobals);
+        config->reparseConfiguration();
+        const KConfigGroup group = config->group(QStringLiteral("Effect-better-blur-dx"));
+        m_blurClasses.clear();
+        m_blurClassPatterns.clear();
+        for (const QString &line : group.readEntry("WindowClasses", QStringLiteral("class1\nclass2\nclass3")).split(QLatin1Char('\n'), Qt::SkipEmptyParts)) {
+            if (line.length() >= 2 && line.startsWith(QLatin1Char('/')) && line.endsWith(QLatin1Char('/'))) {
+                const QRegularExpression regex(line.sliced(1, line.length() - 2));
+                if (regex.isValid()) {
+                    m_blurClassPatterns.append(regex);
+                }
+            } else {
+                m_blurClasses.append(line == QLatin1String("$blank") ? QString() : line);
+            }
+        }
+        m_blurWhitelist = group.readEntry("BlurMatching", true);
+    }
+    const QString resourceClass = w->window()->resourceClass();
+    const QString resourceName = w->window()->resourceName();
+    bool matches = m_blurClasses.contains(resourceClass) || m_blurClasses.contains(resourceName);
+    for (const QRegularExpression &regex : std::as_const(m_blurClassPatterns)) {
+        matches = matches || regex.match(resourceClass).hasMatch() || regex.match(resourceName).hasMatch();
+    }
+    return matches == m_blurWhitelist;
+}
+
+#ifdef KIRI_BORDER_RADIUS
+// Blur effects round their blur with the window's corner radius; give them Kiri's while the blur effect is loaded
+void Effect::syncBlurRadius(KWin::EffectWindow *w)
+{
+    const bool blur = KWin::effects->isEffectLoaded(QStringLiteral("blur")) || KWin::effects->isEffectLoaded(QStringLiteral("better_blur_dx"));
+    const double radius = blur ? radiusFor(w) : 0;
+    KWin::Window *window = w->window();
+    if (!window) {
+        return;
+    }
+    if (radius > 0) {
+        if (!m_ownRadius.contains(w->internalId())) {
+            m_ownRadius.insert(w->internalId(), window->borderRadius());
+        }
+        const KWin::BorderRadius wanted(radius);
+        if (window->borderRadius() != wanted) {
+            window->setBorderRadius(wanted);
+        }
+    } else {
+        restoreBlurRadius(w);
+    }
+}
+
+void Effect::restoreBlurRadius(KWin::EffectWindow *w)
+{
+    const auto it = m_ownRadius.find(w->internalId());
+    if (it != m_ownRadius.end()) {
+        if (w->window()) {
+            w->window()->setBorderRadius(*it);
+        }
+        m_ownRadius.erase(it);
+    }
+}
+#endif
+
 Effect::~Effect()
 {
+#ifdef KIRI_BORDER_RADIUS
+    for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
+        restoreBlurRadius(w);
+    }
+#endif
+    for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
+        if (m_forcedBlur.contains(w->internalId())) {
+            w->setData(KWin::WindowForceBlurRole, QVariant());
+        }
+    }
     QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/KiriDecorations"));
 }
 
@@ -1483,7 +1581,56 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
     } else if (w->data(ParkedOffsetRole).isValid()) {
         w->setData(ParkedOffsetRole, QVariant());
     }
+    // Blur skips a transformed window. Kiri marks decorated windows transformed to keep their ring from being clipped and
+    // moves them in paintWindow, so decorated windows are told to keep their blur. A full-screen effect that forces blur on
+    // every window itself (the desktop switch) is left alone; any other one gets no forced blur, so blur stays off in it.
+    syncBlurRadius(w);
+    {
+        const QUuid id = w->internalId();
+        const bool fullScreen = KWin::effects->activeFullScreenEffect() != nullptr;
+        const bool still = !fullScreen && decorated(w);
+        if (still) {
+            w->setData(KWin::WindowForceBlurRole, QVariant(true));
+            m_forcedBlur.insert(id);
+        } else if (m_forcedBlur.contains(id) && !(fullScreen && w->data(KWin::WindowForceBackgroundContrastRole).toBool())) {
+            m_forcedBlur.remove(id);
+            w->setData(KWin::WindowForceBlurRole, QVariant());
+        }
+    }
     OffscreenEffect::prePaintWindow(view, w, data);
+}
+
+// The offsets are applied here, not in drawWindow, so that blur effects (which blur in drawWindow) see where the window is painted
+KIRI_PAINT_RET Effect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
+{
+    if (const auto parkIt = m_park.constFind(w->internalId()); parkIt != m_park.constEnd()) {
+        const QPointF at = parkedPosition(w, *parkIt);
+        data.setXTranslation(data.xTranslation() + at.x() - w->frameGeometry().x());
+        data.setYTranslation(data.yTranslation() + at.y() - w->frameGeometry().y());
+        m_parkPainted.insert(w->internalId(), at);
+        w->setData(ParkedOffsetRole, at - w->frameGeometry().topLeft());
+    } else if (w->data(ParkedOffsetRole).isValid()) {
+        w->setData(ParkedOffsetRole, QVariant());
+    }
+    const auto visualIt = m_visualPositions.constFind(w->internalId());
+    if (visualIt != m_visualPositions.constEnd()) {
+        data.setXTranslation(data.xTranslation() + visualIt->x() - w->frameGeometry().x());
+        data.setYTranslation(data.yTranslation() + visualIt->y() - w->frameGeometry().y());
+        m_lastVisualOffset.insert(w->internalId(), QPointF(visualIt->x() - w->frameGeometry().x(), visualIt->y() - w->frameGeometry().y()));
+    } else if (const auto releaseIt = m_releasing.constFind(w->internalId()); releaseIt != m_releasing.constEnd()) {
+        const double factor = NiriAnim::timeFactor();
+        const double k = releaseIt->start < 0 ? 1.0 : (factor > 0 ? NiriAnim::moveSpring().value((m_frameTime - releaseIt->start) / factor) : 0);
+        data.setXTranslation(data.xTranslation() + releaseIt->offset.x() * k);
+        data.setYTranslation(data.yTranslation() + releaseIt->offset.y() * k);
+    }
+
+    if (m_anyBaba && !w->data(CaptureRole).toBool()) {
+        data.setYTranslation(data.yTranslation() + babaOffset(w));
+    }
+    if (!m_alpha.isEmpty()) {
+        data.multiplyOpacity(alphaOf(w->internalId()));
+    }
+    return KWin::effects->paintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
 }
 
 KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion, KWin::WindowPaintData &data)
@@ -1514,33 +1661,6 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
         unredirect(w);
     }
 
-    if (const auto parkIt = m_park.constFind(w->internalId()); parkIt != m_park.constEnd()) {
-        const QPointF at = parkedPosition(w, *parkIt);
-        data.setXTranslation(data.xTranslation() + at.x() - w->frameGeometry().x());
-        data.setYTranslation(data.yTranslation() + at.y() - w->frameGeometry().y());
-        m_parkPainted.insert(w->internalId(), at);
-        w->setData(ParkedOffsetRole, at - w->frameGeometry().topLeft());
-    } else if (w->data(ParkedOffsetRole).isValid()) {
-        w->setData(ParkedOffsetRole, QVariant());
-    }
-    const auto visualIt = m_visualPositions.constFind(w->internalId());
-    if (visualIt != m_visualPositions.constEnd()) {
-        data.setXTranslation(data.xTranslation() + visualIt->x() - w->frameGeometry().x());
-        data.setYTranslation(data.yTranslation() + visualIt->y() - w->frameGeometry().y());
-        m_lastVisualOffset.insert(w->internalId(), QPointF(visualIt->x() - w->frameGeometry().x(), visualIt->y() - w->frameGeometry().y()));
-    } else if (const auto releaseIt = m_releasing.constFind(w->internalId()); releaseIt != m_releasing.constEnd()) {
-        const double factor = NiriAnim::timeFactor();
-        const double k = releaseIt->start < 0 ? 1.0 : (factor > 0 ? NiriAnim::moveSpring().value((m_frameTime - releaseIt->start) / factor) : 0);
-        data.setXTranslation(data.xTranslation() + releaseIt->offset.x() * k);
-        data.setYTranslation(data.yTranslation() + releaseIt->offset.y() * k);
-    }
-
-    if (m_anyBaba && !w->data(CaptureRole).toBool()) {
-        data.setYTranslation(data.yTranslation() + babaOffset(w));
-    }
-    if (!m_alpha.isEmpty()) {
-        data.multiplyOpacity(alphaOf(w->internalId()));
-    }
     if (isActive() && !w->data(CaptureRole).toBool() && (w->isNormalWindow() || w->isDialog())) {
         const KWin::RectF f = w->frameGeometry();
         const KWin::RectF painted(f.x() + data.xTranslation(), f.y() + data.yTranslation(), f.width() * data.xScale(), f.height() * data.yScale());
@@ -1562,7 +1682,7 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
     }
     if (decorated(w) && !w->data(CaptureRole).toBool()) {
         const Look &fillLook = lookOf(w);
-        const bool withBackground = fillLook.background >= 0 ? fillLook.background == 1 : !w->hasDecoration();
+        const bool withBackground = fillLook.background >= 0 ? fillLook.background == 1 : (!w->hasDecoration() && !blurredBehind(w));
         if (withBackground && ((fillLook.border.enabled && fillLook.border.width > 0) || (w == m_active && fillLook.ring.enabled && fillLook.ring.width > 0))) {
             const KWin::RectF frame = w->frameGeometry();
             const KWin::RectF visual(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
