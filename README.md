@@ -61,7 +61,7 @@ sudo zypper install cmake gcc-c++ make kf6-extra-cmake-modules kwin6-devel kdeco
 
 ## Limitations
 
-- Desktops are shared by all monitors, so there are no per-monitor workspaces.
+- Desktops are shared by all monitors unless you turn on "Switch desktops independently for each screen" in System Settings > Virtual Desktops (Plasma 6.7+). With it on, each monitor switches its own desktop like niri's per-monitor workspaces, but the list of desktops is still the same on every monitor.
 - Binds on a bare modifier or on key release (e.g. tapping Mod for the overview) are not possible.
 
 ## Build
