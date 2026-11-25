@@ -3,9 +3,11 @@
 // KWin puts a QML window above every panel, but in niri panels are above windows and their rings.
 // The overlays use these helpers to leave out the parts that a panel above the window would cover.
 
-// Frame rectangles of the visible panels that are stacked above `target`.
+// Rectangles of the visible panels that are stacked above `target`.
 // Without a target: above every normal window (for overlays that belong to several windows).
-function panelsAbove(order, target) {
+// A panel window can have a transparent margin (a shadow, a floating gap) that nothing paints; the panel's strut is
+// what shows, so when `areaOf(panel)` gives the work area, only the part of the window outside of it is used.
+function panelsAbove(order, target, areaOf) {
     let from = 0;
     if (target) {
         from = -1;
@@ -19,7 +21,8 @@ function panelsAbove(order, target) {
         }
     } else {
         for (let i = 0; i < order.length; i++) {
-            if (order[i].normalWindow || order[i].dialog) {
+            // the overlays are windows too, and KWin keeps them above the panels
+            if ((order[i].normalWindow || order[i].dialog) && !order[i].caption.startsWith("kiri-ring-")) {
                 from = i + 1;
             }
         }
@@ -29,7 +32,10 @@ function panelsAbove(order, target) {
         const w = order[i];
         if (w.dock && !w.hidden && !w.minimized && !w.deleted) {
             const g = w.frameGeometry;
-            out.push({ x: g.x, y: g.y, width: g.width, height: g.height });
+            const frame = { x: g.x, y: g.y, width: g.width, height: g.height };
+            const shown = areaOf ? subtract(frame, areaOf(w)) : [];
+            // a panel that reserves no space (it floats over the windows) is not inside the work area's edge: all of it shows
+            Array.prototype.push.apply(out, shown.length > 0 ? shown : [frame]);
         }
     }
     return out;

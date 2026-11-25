@@ -51,8 +51,13 @@ QtWin.Window {
         return Qt.rect(g.x - outset, g.y - outset, g.width + 2 * outset, g.height + 2 * outset);
     }
 
+    // what the panel's strut leaves of its screen
+    function panelArea(panel) {
+        return Workspace.clientArea(Workspace.MaximizeArea, panel);
+    }
+
     // what is left of the window after the panels above the target are taken off
-    readonly property var parts: Panels.visibleParts(ringRect.x, ringRect.y, width, height, Panels.panelsAbove(Workspace.stackingOrder, target))
+    readonly property var parts: Panels.visibleParts(ringRect.x, ringRect.y, width, height, Panels.panelsAbove(Workspace.stackingOrder, target, panelArea))
 
     title: "kiri-ring-" + tag
     flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.Tool

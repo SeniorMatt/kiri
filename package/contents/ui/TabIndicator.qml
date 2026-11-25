@@ -20,8 +20,13 @@ QtWin.Window {
     property var kw: null
     property var lastActive: null
 
+    // what the panel's strut leaves of its screen
+    function panelArea(panel) {
+        return Workspace.clientArea(Workspace.MaximizeArea, panel);
+    }
+
     // what is left of the window after the panels above the windows are taken off
-    readonly property var parts: Panels.visibleParts(info.x, info.y, width, height, Panels.panelsAbove(Workspace.stackingOrder, null))
+    readonly property var parts: Panels.visibleParts(info.x, info.y, width, height, Panels.panelsAbove(Workspace.stackingOrder, null, panelArea))
 
     title: "kiri-ring-tab-" + tag + "#"
     flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.Tool
