@@ -229,4 +229,34 @@
             Assert.equalRects(client.getActualFrameGeometry(), before[i], { message: "window " + i });
         });
     });
+
+    tests.register("Multi-monitor: a floating window on the second output moves back with the monitor keys", 5, () => {
+        const { qtMock, workspaceMock } = setup();
+        const [a] = workspaceMock.createClientsWithWidths(300);
+        workspaceMock.activeWindow = a;
+        qtMock.fireShortcut("window-toggle-floating");
+        qtMock.fireShortcut("window-move-to-monitor-right");
+        inside(a, right(), "on the second output");
+        Assert.equal(workspaceMock.activeWindow, a);
+        qtMock.fireShortcut("window-move-to-monitor-left");
+        inside(a, screen, "and back");
+    });
+
+    // niri: closing the last window of the focused monitor leaves that monitor focused, with no window
+    for (const perScreen of [false, true]) {
+        tests.register("Multi-monitor: closing the last window of the focused output keeps that output focused" + (perScreen ? " (per-screen)" : ""), 5, () => {
+            const { qtMock, workspaceMock } = setup();
+            workspaceMock.setPerScreenDesktops(perScreen);
+            const [a] = workspaceMock.createClientsWithWidths(300);
+            const b = openOnRight(workspaceMock);
+            workspaceMock.activeWindow = b;
+            workspaceMock.activeScreen = workspaceMock.screens[1];
+            workspaceMock.removeWindow(b);
+            workspaceMock.activeWindow = null; // KWin focuses nothing on the empty output
+            Assert.equal(workspaceMock.activeScreen.name, "DP-2");
+            Assert.equal(workspaceMock.activeWindow, null, { message: "the empty output has no window to focus" });
+            qtMock.fireShortcut("focus-monitor-left");
+            Assert.equal(workspaceMock.activeWindow, a, { message: "the keys still start from the second output" });
+        });
+    }
 }

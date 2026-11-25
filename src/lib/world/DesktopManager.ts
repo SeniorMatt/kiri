@@ -279,7 +279,12 @@ class DesktopManager {
                 continue;
             }
             const [activity] = key.split("|");
-            const target = this.getDesktop(activity, desktop.kwinDesktop, outputName);
+            // with a desktop per screen, what another output shows now stays visible on this one
+            const source = Workspace.screens.find(screen => screen.name === desktop.outputName);
+            const shownElsewhere = source !== undefined && activity === Workspace.currentActivity
+                && desktop.kwinDesktop === currentDesktopOn(source);
+            const targetDesktop = shownElsewhere ? currentDesktopOn(Workspace.screens.find(screen => screen.name === outputName)) : desktop.kwinDesktop;
+            const target = this.getDesktop(activity, targetDesktop, outputName);
             if (target !== undefined && target !== desktop) {
                 for (const column of desktop.grid.getColumns()) {
                     column.homeOutput = undefined;

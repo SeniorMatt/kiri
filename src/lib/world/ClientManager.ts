@@ -1240,14 +1240,19 @@ class ClientManager {
             return;
         }
         const kwinDesktop = Clients.getKwinDesktopApprox(kwinClient);
+        // it follows the target output to the desktop that output shows
+        const targetDesktop = kwinClient.desktops.length === 1 ? currentDesktopOn(target) : kwinDesktop;
         const from = Workspace.clientArea(ClientAreaOption.PlacementArea, kwinClient.output, kwinDesktop);
-        const to = Workspace.clientArea(ClientAreaOption.PlacementArea, target, kwinDesktop);
+        const to = Workspace.clientArea(ClientAreaOption.PlacementArea, target, targetDesktop);
         const frame = kwinClient.frameGeometry;
         const width = Math.min(frame.width.round(), Math.round(to.width));
         const height = Math.min(frame.height.round(), Math.round(to.height));
         const x = to.x + (frame.x - from.x) / Math.max(1, from.width) * to.width;
         const y = to.y + (frame.y - from.y) / Math.max(1, from.height) * to.height;
         const pos = ClientManager.clampFloatingPosition(to, Math.round(x), Math.round(y), width, height);
+        if (kwinClient.desktops.length === 1 && kwinClient.desktops[0] !== targetDesktop) {
+            kwinClient.desktops = [targetDesktop];
+        }
         client.place(pos.x, pos.y, width, height);
         activateWindow(kwinClient, "move-to-monitor");
     }

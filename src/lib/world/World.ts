@@ -413,7 +413,11 @@ class World {
             return null;
         }
         const window = this.clientManager.findTiledWindow(active);
-        return window === null ? null : window.column.grid.desktop.outputName;
+        if (window !== null) {
+            return window.column.grid.desktop.outputName;
+        }
+        // a floating window is on the output it is on
+        return this.clientManager.isFloating(active) && active.output ? active.output.name : null;
     }
 
     private update() {

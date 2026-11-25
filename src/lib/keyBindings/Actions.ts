@@ -885,7 +885,7 @@ class Actions {
         if (output === null) {
             return;
         }
-        const newGrid = dm.getDesktopInCurrentActivity(oldGrid.desktop.kwinDesktop, output.name)?.grid;
+        const newGrid = dm.getDesktopInCurrentActivity(currentDesktopOn(output), output.name)?.grid;
         if (newGrid === undefined || newGrid === oldGrid) {
             return;
         }
@@ -906,7 +906,7 @@ class Actions {
         if (output === null) {
             return;
         }
-        const newGrid = dm.getDesktopInCurrentActivity(oldGrid.desktop.kwinDesktop, output.name)?.grid;
+        const newGrid = dm.getDesktopInCurrentActivity(currentDesktopOn(output), output.name)?.grid;
         if (newGrid === undefined || newGrid === oldGrid) {
             return;
         }

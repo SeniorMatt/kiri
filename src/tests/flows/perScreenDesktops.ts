@@ -39,6 +39,43 @@
         Assert.assert(onOutput(left, screen) && onOutput(other, right()));
     });
 
+    tests.register("Per-screen desktops: column-move-to-monitor lands on the desktop the target output shows", 3, () => {
+        const { qtMock, workspaceMock, left, right: other, d1, d2 } = setup(true);
+        workspaceMock.activeWindow = left;
+        qtMock.fireShortcut("column-move-to-desktop-2");
+        Assert.equalArrays(shown(workspaceMock), [d2, d1]);
+        qtMock.fireShortcut("column-move-to-monitor-right");
+        Assert.equalArrays(left.desktops, [d1], { message: "the desktop of the second output, not the same number" });
+        Assert.assert(onOutput(left, right()), { message: "on the second output" });
+        Assert.equal(workspaceMock.activeWindow, left);
+        Assert.equalArrays(other.desktops, [d1]);
+    });
+
+    tests.register("Per-screen desktops: a floating window follows to the desktop the target output shows", 3, () => {
+        const { qtMock, workspaceMock, left, d1, d2 } = setup(true);
+        workspaceMock.activeWindow = left;
+        qtMock.fireShortcut("window-toggle-floating");
+        qtMock.fireShortcut("desktop-2");
+        workspaceMock.activeWindow = left;
+        left.desktops = [d2];
+        qtMock.fireShortcut("window-move-to-monitor-right");
+        Assert.equalArrays(left.desktops, [d1]);
+        Assert.assert(onOutput(left, right()), { message: "on the second output" });
+    });
+
+    tests.register("Per-screen desktops: screen-switch gathers what the other output shows onto the shown desktop", 3, () => {
+        const { qtMock, workspaceMock, left, right: other, d1, d2 } = setup(true);
+        workspaceMock.activeWindow = other;
+        qtMock.fireShortcut("column-move-to-desktop-2");
+        Assert.equalArrays(shown(workspaceMock), [d1, d2]);
+        Assert.equalArrays(other.desktops, [d2]);
+        workspaceMock.activeWindow = left;
+        qtMock.fireShortcut("screen-switch");
+        Assert.equalArrays(other.desktops, [d1], { message: "it was visible on the other output, it stays visible" });
+        Assert.equalArrays(left.desktops, [d1]);
+        Assert.assert(onOutput(other, screen), { message: "on this output" });
+    });
+
     tests.register("Per-screen desktops: desktop-next, desktop-previous and back-and-forth act on one output", 3, () => {
         const { qtMock, workspaceMock, left, right: other, d1, d2 } = setup(true, config => config.desktopAutoBackAndForth = true);
         workspaceMock.activeWindow = other;
