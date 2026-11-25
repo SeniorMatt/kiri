@@ -440,3 +440,42 @@ tests.register("Overview: does not open in Plasma's edit mode", 1, () => {
         setPlasmaEditModeForTests(false);
     }
 });
+
+tests.register("Overview: dragging a window out of a column re-lays out the other one, cancel and drop restore", 1, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock, world } = init(config);
+    overviewCalls.length = 0;
+
+    const [a, b, c] = workspaceMock.createClientsWithWidths(200, 200, 200);
+    const desktop0 = workspaceMock.desktops[0];
+    qtMock.fireShortcut("overview");
+    overviewPoll(world, [{ t: "drop", w: String(b.internalId), d: desktop0.id, c: 0, i: 1 }]);
+    const half = a.getActualFrameGeometry().height;
+    const bY = b.getActualFrameGeometry().y;
+    Assert.assert(b.getActualFrameGeometry().y > a.getActualFrameGeometry().y, { message: "stacked" });
+
+    // held: the other window fills the column, the layout still shows both
+    overviewPoll(world, [{ t: "dragstart", w: String(b.internalId) }]);
+    Assert.assert(a.getActualFrameGeometry().height > half, { message: "the other window grew" });
+    const col = overviewLastLayout().desktops[0].cols[0];
+    Assert.equal(col.wins.length, 2);
+    Assert.equal(col.wins[1].id, String(b.internalId));
+    Assert.equal(overviewLastLayout().desktops[0].floats.length, 0);
+
+    // cancelled: back as before
+    overviewPoll(world, [{ t: "dragend", w: String(b.internalId) }]);
+    Assert.equal(a.getActualFrameGeometry().height, half);
+    Assert.equal(b.getActualFrameGeometry().y, bY);
+    Assert.equal(overviewLastLayout().desktops[0].cols[0].wins.length, 2);
+
+    // dropped in place: restored, and a layout is sent even though nothing changed
+    overviewPoll(world, [{ t: "dragstart", w: String(b.internalId) }]);
+    overviewCalls.length = 0;
+    overviewPoll(world, [{ t: "drop", w: String(b.internalId), d: desktop0.id, c: 0, i: 1 }]);
+    Assert.equal(a.getActualFrameGeometry().height, half);
+    Assert.equal(overviewCalls[overviewCalls.length - 1].member, "setLayout");
+    overviewCalls.length = 0;
+    overviewPoll(world, [{ t: "drop", w: String(b.internalId), d: desktop0.id, c: 0, i: 1 }]);
+    Assert.equal(overviewCalls[overviewCalls.length - 1].member, "setLayout");
+});

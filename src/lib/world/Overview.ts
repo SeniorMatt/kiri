@@ -13,6 +13,8 @@ class Overview {
     private gesture: { start: number, pos: number, history: { delta: number, time: number }[] } | null = null;
     private lastGestureValue = -1;
     private openedAt = 0;
+    // the window being dragged out of a column: the layout keeps showing it in its place
+    private dragged: { id: string, desktop: Desktop, col: number, index: number, win: any } | null = null;
 
     constructor(
         private readonly world: World,
@@ -46,6 +48,7 @@ class Overview {
 
     public close() {
         this.gesture = null;
+        this.endDrag();
         if (this.open) {
             overviewCall("close", "");
             this.open = false;
@@ -95,7 +98,11 @@ class Overview {
                 });
                 return { x: x, w: width, tab: tabbed, wins: wins };
             });
-            const floats = this.clientManager.getFloatingOnDesktop(kwinDesktop, onlyThisOutput ? output : undefined).map(kwinClient => {
+            const dragged = this.dragged;
+            if (dragged !== null && dragged.desktop === desktop && cols[dragged.col] !== undefined) {
+                cols[dragged.col].wins.splice(dragged.index, 0, dragged.win);
+            }
+            const floats = this.clientManager.getFloatingOnDesktop(kwinDesktop, onlyThisOutput ? output : undefined).filter(kwinClient => dragged === null || String(kwinClient.internalId) !== dragged.id).map(kwinClient => {
                 const g = kwinClient.frameGeometry;
                 return Overview.windowJson(kwinClient, [g.x, g.y, g.width, g.height]);
             });
@@ -110,6 +117,13 @@ class Overview {
             });
         });
         return { screen: screen, current: current, active: activeId, desktops: desktops };
+    }
+
+    private endDrag() {
+        if (this.dragged !== null) {
+            this.dragged = null;
+            this.world.do(clientManager => clientManager.overviewDragEnd());
+        }
     }
 
     private static windowJson(kwinClient: KwinClient, rect: number[]) {
@@ -148,6 +162,7 @@ class Overview {
             setOverviewPolling(false);
         }
         if (wasOpen && !this.open) {
+            this.endDrag();
             this.lastLayout = "";
         }
     }
@@ -231,12 +246,44 @@ class Overview {
             });
             return true;
         }
+        case "dragstart": {
+            const kwinClient = this.clientManager.findClientById(event.w);
+            const window = kwinClient === undefined ? null : this.clientManager.findTiledWindow(kwinClient);
+            if (kwinClient === undefined || window === null) {
+                return false;
+            }
+            this.endDrag();
+            const column = window.column;
+            const layout = this.buildOutputLayout(output, this.world.isPerScreenDesktops());
+            const id = String(kwinClient.internalId);
+            const col = column.grid.getColumns().indexOf(column);
+            const index = column.getWindows().indexOf(window);
+            let win: any;
+            for (const d of layout.desktops as any[]) {
+                for (const c of d.cols) {
+                    win = c.wins.find((w: any) => w.id === id) ?? win;
+                }
+            }
+            let started = false;
+            this.world.do(clientManager => { started = clientManager.overviewDragStart(kwinClient); });
+            if (started && win !== undefined) {
+                this.dragged = { id: id, desktop: column.grid.desktop, col: col, index: index, win: win };
+            }
+            return started;
+        }
+        case "dragend": {
+            this.endDrag();
+            return true;
+        }
         case "drop": {
             const kwinClient = this.clientManager.findClientById(event.w);
             const kwinDesktop = Workspace.desktops.find(d => d.id === event.d);
             if (kwinClient === undefined || kwinDesktop === undefined) {
                 return false;
             }
+            this.endDrag();
+            // the effect holds the dropped window until a layout arrives: send one even when nothing moved
+            this.lastLayout = "";
             this.world.do(clientManager => clientManager.overviewDrop(kwinClient, kwinDesktop, event.c, event.i, output.name));
             return true;
         }
@@ -246,6 +293,7 @@ class Overview {
             if (kwinClient === undefined || kwinDesktop === undefined) {
                 return false;
             }
+            this.lastLayout = "";
             this.world.do(clientManager => clientManager.overviewDropFloating(kwinClient, kwinDesktop, event.x, event.y));
             return true;
         }

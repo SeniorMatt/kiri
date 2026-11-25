@@ -482,6 +482,9 @@ FocusScope {
                     if (root.dragWid === "" && dist >= thr) {
                         root.dragWid = tile.wid;
                         root.dragFloating = tile.floating;
+                        if (!tile.floating) {
+                            root.effect.dragStarted(tile.wid, root.outName);
+                        }
                     }
                     const f = thr === 0 ? 1 : 0.5 + 0.5 * Math.min(1, dist / thr);
                     tile.offX = translation.x * f;
@@ -523,6 +526,7 @@ FocusScope {
                             holdTimer.interval = 700;
                             holdTimer.restart();
                         } else {
+                            root.effect.dragCancelled(tile.wid, root.outName);
                             tile.settleAnim = true;
                             tile.offX = 0;
                             tile.offY = 0;

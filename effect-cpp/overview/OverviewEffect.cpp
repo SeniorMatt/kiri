@@ -963,6 +963,17 @@ void OverviewEffect::stepDesktop(int direction, const QString &output)
     goToDesktop(int(std::lround(m_ws[output].target)) + direction, output);
 }
 
+// a tiled window is held in the overview: the script takes it out of its column so the others re-lay out
+void OverviewEffect::dragStarted(const QString &windowId, const QString &output)
+{
+    queue(jsonString({{"t", "dragstart"}, {"w", windowId}, {"o", output}}));
+}
+
+void OverviewEffect::dragCancelled(const QString &windowId, const QString &output)
+{
+    queue(jsonString({{"t", "dragend"}, {"w", windowId}, {"o", output}}));
+}
+
 void OverviewEffect::dropWindow(const QString &windowId, const QString &desktopId, int column, int tile, const QString &output)
 {
     m_noCloseUntil = now() + 700;

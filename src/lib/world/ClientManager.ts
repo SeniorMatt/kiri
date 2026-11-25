@@ -38,6 +38,7 @@ class ClientManager {
     private readonly floatingFrames = new Map<KwinClient, { x: number, y: number, width: number, height: number }>();
     private drag: ClientManager.Drag | null = null;
     private dragPending: { client: ClientWrapper, start: () => void } | null = null;
+    private overviewDragSlot: { client: ClientWrapper, grid: Grid, placement: ClientState.Tiled.Placement } | null = null;
     private readonly windowRuleEnforcer: WindowRuleEnforcer;
     private closedSlot: ClosedSlot|null = null;
     private readonly remapTimer: Delayer;
@@ -1398,6 +1399,41 @@ class ClientManager {
             }
         }
         return result;
+    }
+
+    // a window picked up in the overview leaves its column, so the others fill the column as in niri's interactive move;
+    // a window alone in its column stays (nothing else to resize)
+    public overviewDragStart(kwinClient: KwinClient) {
+        this.overviewDragEnd();
+        const client = this.clientMap.get(kwinClient);
+        const window = this.findTiledWindow(kwinClient);
+        if (client === undefined || window === null || window.column.getWindowCount() < 2) {
+            return false;
+        }
+        const column = window.column;
+        this.overviewDragSlot = {
+            client: client,
+            grid: column.grid,
+            placement: {
+                column: column,
+                after: column.getAboveWindow(window),
+                leftColumn: column.grid.getLeftColumn(column),
+            },
+        };
+        client.stateManager.setState(() => new ClientState.Floating(this.world, client, this.config, false), FocusPassing.Type.None);
+        return true;
+    }
+
+    // the overview drag ended (cancelled or dropped): the window goes back to its place in the column
+    public overviewDragEnd() {
+        const slot = this.overviewDragSlot;
+        if (slot === null) {
+            return;
+        }
+        this.overviewDragSlot = null;
+        if (slot.client.stateManager.getState() instanceof ClientState.Floating) {
+            this.tileClient(slot.client, slot.grid, slot.placement);
+        }
     }
 
     // a tiled window dropped in the overview: `columnIndex` and `tile` count the target's columns without the dragged window

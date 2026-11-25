@@ -127,6 +127,8 @@ public Q_SLOTS:
     // `output` is the name of the screen the overview scene belongs to; the events sent to the script carry it as "o"
     void activateWindow(const QString &windowId, const QString &desktopId, int desktopIndex, const QString &output);
     void activateDesktop(int desktopIndex, const QString &output);
+    void dragStarted(const QString &windowId, const QString &output);
+    void dragCancelled(const QString &windowId, const QString &output);
     void dropWindow(const QString &windowId, const QString &desktopId, int column, int tile, const QString &output);
     void dropFloating(const QString &windowId, const QString &desktopId, qreal x, qreal y, const QString &output);
     void goToDesktop(int index, const QString &output);
