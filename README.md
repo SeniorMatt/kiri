@@ -2,7 +2,7 @@
 
 [niri](https://github.com/YaLTeR/niri)'s scrolling tiling for KDE Plasma 6.
 
-https://github.com/user-attachments/assets/fbac511a-a9dd-4a8b-9beb-3909b6d4ca88
+https://github.com/user-attachments/assets/7be4d139-5198-4f73-94b6-600a1f21a36f
 
 A fork of [Karousel](https://github.com/peterfajdiga/karousel) by Peter Fajdiga.
 
