@@ -21,12 +21,12 @@ FocusScope {
     readonly property QtObject effect: KWinComponents.SceneView.effect
     readonly property QtObject targetScreen: KWinComponents.SceneView.screen
     property QtObject currentDesktop: KWinComponents.SceneView.currentDesktop
-    readonly property string outName: targetScreen.name
+    readonly property string outName: targetScreen ? targetScreen.name : ""
     // this screen's own position among the desktops (each screen has one when the desktops are per screen)
     readonly property real wsIndex: { effect.wsIndex; return effect.wsIndexOf(outName); }
 
     // niri's output { backdrop-color } wins over the overview's
-    readonly property color backdropColor: { effect.backdropColor; return effect.backdropFor(targetScreen.name); }
+    readonly property color backdropColor: { effect.backdropColor; return effect.backdropFor(targetScreen ? targetScreen.name : ""); }
     readonly property color hintColor: Qt.rgba(127 / 255, 200 / 255, 255 / 255, 128 / 255)
     readonly property color ringColor: "#7fc8ff"
     readonly property real moveThreshold: 256 // layout px of pointer travel (scaled by the zoom)
@@ -40,7 +40,7 @@ FocusScope {
     readonly property real wsH: height * zm
     readonly property real gap: height * 0.1 * zm
     readonly property real x0: (width - wsW) / 2
-    readonly property bool mine: lay.desktops.length > 0
+    readonly property bool mine: lay.desktops.length > 0 && targetScreen !== null
         && Math.round(targetScreen.geometry.x) === Math.round(lay.screen.x)
         && Math.round(targetScreen.geometry.y) === Math.round(lay.screen.y)
     readonly property string query: effect.searchText.toLowerCase()
@@ -341,7 +341,7 @@ FocusScope {
                 anchors.fill: parent
                 activity: KWinComponents.Workspace.currentActivity
                 desktop: ws.desktop
-                outputName: root.targetScreen.name
+                outputName: root.targetScreen ? root.targetScreen.name : ""
             }
             TapHandler {
                 acceptedButtons: Qt.LeftButton
@@ -683,7 +683,7 @@ FocusScope {
     Repeater {
         model: KWinComponents.WindowFilterModel {
             desktop: root.currentDesktop
-            screenName: root.targetScreen.name
+            screenName: root.targetScreen ? root.targetScreen.name : ""
             windowModel: stackModel
             windowType: KWinComponents.WindowFilterModel.Dock
         }
