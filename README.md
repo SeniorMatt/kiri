@@ -10,6 +10,9 @@ Windows are tiled in columns on an endless horizontal strip. Opening a window ne
 keeps the width you gave it, and when the strip gets wider than the screen you scroll through it sideways. The focused
 column is kept in view, centered when that makes sense.
 
+Every monitor has its own strip. To switch desktops on each monitor separately, like niri's per-monitor workspaces,
+turn on "Switch desktops independently for each screen" in System Settings > Virtual Desktops.
+
 Other scrolling window managers: [niri](https://github.com/YaLTeR/niri), [PaperWM](https://github.com/paperwm/PaperWM)
 and [Cardboard](https://gitlab.com/cardboardwm/cardboard).
 
@@ -61,7 +64,7 @@ sudo zypper install cmake gcc-c++ make kf6-extra-cmake-modules kwin6-devel kdeco
 
 ## Limitations
 
-- Desktops are shared by all monitors unless you turn on "Switch desktops independently for each screen" in System Settings > Virtual Desktops (Plasma 6.7+). With it on, each monitor switches its own desktop like niri's per-monitor workspaces, but the list of desktops is still the same on every monitor.
+- Every monitor has the same list of desktops. niri gives each monitor workspaces of its own.
 - Binds on a bare modifier or on key release (e.g. tapping Mod for the overview) are not possible.
 
 ## Build
