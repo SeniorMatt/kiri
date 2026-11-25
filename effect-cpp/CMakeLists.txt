@@ -51,6 +51,7 @@ add_subdirectory(switch)
 add_subdirectory(motion)
 add_subdirectory(swipe)
 add_subdirectory(overview)
+add_subdirectory(config)
 add_subdirectory(shaders)
 
 feature_summary(WHAT ALL FATAL_ON_MISSING_REQUIRED_PACKAGES)

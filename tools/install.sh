@@ -64,14 +64,14 @@ distro=
 dep_hint() {
     case " $distro " in
         *" arch "*|*" cachyos "*|*" manjaro "*|*" endeavouros "*)
-            echo "sudo pacman -S --needed base-devel cmake extra-cmake-modules kwin libepoxy qt6-base qt6-tools kconfig kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers" ;;
+            echo "sudo pacman -S --needed base-devel cmake extra-cmake-modules kwin libepoxy qt6-base qt6-tools kconfig kconfigwidgets kcmutils kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers" ;;
         *" fedora "*|*" rhel "*)
-            echo "sudo dnf install cmake gcc-c++ make extra-cmake-modules kwin-devel kdecoration-devel kf6-kconfig-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel qt6-qtbase-devel qt6-qttools kf6-kpackage" ;;
+            echo "sudo dnf install cmake gcc-c++ make extra-cmake-modules kwin-devel kdecoration-devel kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcmutils-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel qt6-qtbase-devel qt6-qttools-devel kf6-kpackage" ;;
         *" suse "*|*" opensuse "*|*" opensuse-tumbleweed "*)
-            echo "sudo zypper install cmake gcc-c++ make kf6-extra-cmake-modules kwin6-devel kdecoration6-devel kf6-kconfig-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel qt6-base-devel qt6-declarative-devel kf6-kwindowsystem-devel qt6-tools-qdbus kf6-kpackage kwin6" ;;
+            echo "sudo zypper install cmake gcc-c++ make kf6-extra-cmake-modules kwin6-devel kdecoration6-devel kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcmutils-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel qt6-base-devel qt6-uitools-devel qt6-declarative-devel kf6-kwindowsystem-devel qt6-tools-qdbus kf6-kpackage kwin6" ;;
         *" debian "*|*" ubuntu "*|*" neon "*)
-            echo "sudo apt install build-essential cmake extra-cmake-modules kwin-dev libkdecorations3-dev libkf6config-dev libkf6coreaddons-dev libepoxy-dev libdrm-dev pkgconf qt6-base-dev kpackagetool6 qdbus-qt6" ;;
-        *) echo "install cmake, a C++ compiler, extra-cmake-modules, the KWin and KDecoration development packages, KF6 Config and CoreAddons, libepoxy and Qt6 base development files" ;;
+            echo "sudo apt install build-essential cmake extra-cmake-modules kwin-dev libkdecorations3-dev libkf6config-dev libkf6configwidgets-dev libkf6kcmutils-dev libkf6coreaddons-dev libepoxy-dev libdrm-dev pkgconf qt6-base-dev qt6-tools-dev kpackagetool6 qdbus-qt6" ;;
+        *) echo "install cmake, a C++ compiler, extra-cmake-modules, the KWin and KDecoration development packages, KF6 Config, ConfigWidgets, KCMUtils and CoreAddons, libepoxy and Qt6 base and UiTools development files" ;;
     esac
 }
 
@@ -105,7 +105,7 @@ data=${XDG_DATA_HOME:-$HOME/.local/share}
 if [ -d "$data/kwin/scripts/kiri" ]; then echo "This updates Kiri. It will:"; else echo "This installs Kiri. It will:"; fi
 if $build && [ -d "$cpp" ] && { [ -z "$missing" ] || command -v pacman >/dev/null 2>&1; }; then
     [ -n "$missing" ] && echo "  - install the build tools and KWin headers it needs with pacman (sudo)"
-    echo "  - build Kiri's effects (borders, animations, gestures, overview, desktop switch) for your KWin"
+    echo "  - build Kiri's effects (borders, animations, gestures, overview, desktop switch, settings page) for your KWin"
     echo "    and put them in ${plugindir:-Qt's plugin folder}/kwin/effects/plugins (sudo)"
 elif $build && [ -d "$cpp" ]; then
     echo "  - skip Kiri's compiled effects, these are missing:$missing"
@@ -127,7 +127,7 @@ if $build && [ -d "$cpp" ]; then
     if [ -n "$missing" ]; then
         if command -v pacman >/dev/null 2>&1; then
             echo "Installing build tools and KWin headers (sudo pacman -S --needed) ..."
-            $SUDO pacman -S --needed --noconfirm base-devel cmake extra-cmake-modules kwin libepoxy qt6-base qt6-tools kconfig kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers
+            $SUDO pacman -S --needed --noconfirm base-devel cmake extra-cmake-modules kwin libepoxy qt6-base qt6-tools kconfig kconfigwidgets kcmutils kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers
             plugindir=$(qt_plugins)
             effectdir=$plugindir/kwin/effects/plugins
         else
@@ -149,7 +149,7 @@ if $build && [ -d "$cpp" ]; then
             qd org.kde.KWin /Effects org.kde.kwin.Effects.unloadEffect $e >/dev/null 2>&1 || true
         done
         # remove first: a new file instead of overwriting one KWin may have mapped
-        for f in $(find "$effectdir" -name 'kiri_*.so' 2>/dev/null); do
+        for f in $(find "$effectdir" -name 'kiri_*.so' 2>/dev/null) "$plugindir/kwin/effects/configs/kcm_kiri.so"; do
             $SUDO rm -f "$f"
         done
         $SUDO cmake --install "$builddir" >>"$builddir/log.txt" 2>&1
@@ -166,6 +166,10 @@ d() { kwriteconfig6 --file kwinrc --group "$1" --key "$2" --delete; }
 
 # ---- the script and the animation effect ---------------------------------------------------------------
 kpackagetool6 --type=KWin/Script --upgrade "$root/package" >/dev/null 2>&1 || kpackagetool6 --type=KWin/Script --install "$root/package"
+# the settings page with reset buttons is a compiled plugin; without it KWin's generic page shows the same settings
+if [ -f "$data/kwin/scripts/kiri/metadata.json" ] && [ ! -f "$plugindir/kwin/effects/configs/kcm_kiri.so" ]; then
+    sed -i 's#kwin/effects/configs/kcm_kiri#kwin/effects/configs/kcm_kwin4_genericscripted#' "$data/kwin/scripts/kiri/metadata.json"
+fi
 if $compiled; then
     # kiri_motion replaces the kiri_animations script effect; with both on every window animates twice, so the
     # fallback is not installed at all and doesn't show up in Desktop Effects

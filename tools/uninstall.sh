@@ -30,7 +30,7 @@ echo "This removes Kiri. It will:"
 echo "  - switch back to Plasma mode: Plasma's effects, your focus policy, wrap-around and desktop rows come back"
 echo "  - give back the keys Kiri put on KWin's own actions (keys you set yourself stay)"
 echo "  - remove the Kiri KWin script, the kiri-mode command and its shortcut"
-echo "  - remove Kiri's compiled effects from Qt's plugin folder (sudo) and the build files in ~/.cache/kiri-build"
+echo "  - remove Kiri's compiled effects and settings page from Qt's plugin folder (sudo) and the build files in ~/.cache/kiri-build"
 ls "$data"/applications/kiri-bind-*.desktop >/dev/null 2>&1 &&
     echo "  - remove the command shortcuts niri2kiri.py made from niri's spawn binds"
 if [ "$purge" = true ]; then
@@ -158,6 +158,8 @@ if [ -n "$plugins" ]; then
     for f in $plugins; do $SUDO rm -f "$f"; done
     relogin=true
 fi
+settings_pages=$(find "$plugindir/kwin/effects/configs" /usr/lib/qt6/plugins/kwin/effects/configs /usr/lib64/qt6/plugins/kwin/effects/configs /usr/lib/*/qt6/plugins/kwin/effects/configs -name 'kcm_kiri.so' 2>/dev/null | sort -u || true)
+for f in $settings_pages; do $SUDO rm -f "$f"; done
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/kiri-build"
 for icon in "$data/icons/hicolor/scalable/apps/kiri.svg" "$data/icons/hicolor/48x48/apps/kiri.png"; do
     [ -L "$icon" ] && rm -f "$icon"
