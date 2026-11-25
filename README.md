@@ -6,6 +6,13 @@ https://github.com/user-attachments/assets/7be4d139-5198-4f73-94b6-600a1f21a36f
 
 A fork of [Karousel](https://github.com/peterfajdiga/karousel) by Peter Fajdiga.
 
+Windows are tiled in columns on an endless horizontal strip. Opening a window never squeezes the others: each column
+keeps the width you gave it, and when the strip gets wider than the screen you scroll through it sideways. The focused
+column is kept in view, centered when that makes sense.
+
+Other scrolling window managers: [niri](https://github.com/YaLTeR/niri), [PaperWM](https://github.com/paperwm/PaperWM)
+and [Cardboard](https://gitlab.com/cardboardwm/cardboard).
+
 ## Install
 
 Grab the latest tarball from [Releases](https://github.com/SeniorMatt/kiri/releases), then
