@@ -21,6 +21,9 @@ FocusScope {
     readonly property QtObject effect: KWinComponents.SceneView.effect
     readonly property QtObject targetScreen: KWinComponents.SceneView.screen
     property QtObject currentDesktop: KWinComponents.SceneView.currentDesktop
+    readonly property string outName: targetScreen.name
+    // this screen's own position among the desktops (each screen has one when the desktops are per screen)
+    readonly property real wsIndex: { effect.wsIndex; return effect.wsIndexOf(outName); }
 
     // niri's output { backdrop-color } wins over the overview's
     readonly property color backdropColor: { effect.backdropColor; return effect.backdropFor(targetScreen.name); }
@@ -43,10 +46,10 @@ FocusScope {
     readonly property string query: effect.searchText.toLowerCase()
 
     function wsY(i) {
-        return (height - wsH) / 2 + (i - effect.wsIndex) * (wsH + gap);
+        return (height - wsH) / 2 + (i - wsIndex) * (wsH + gap);
     }
     function offsetOf(did, scroll) {
-        const o = effect.viewOffsets[did];
+        const o = effect.viewOffsets[outName + "/" + did];
         return o === undefined ? scroll : o;
     }
 
@@ -115,7 +118,13 @@ FocusScope {
         const held = dropHold !== "" ? tileOf(dropHold) : null;
         const hx = held ? held.x : 0, hy = held ? held.y : 0;
         try {
-            const l = JSON.parse(effect.layout);
+            let l = JSON.parse(effect.layout);
+            if (l.screens) {
+                // one layout per screen: this scene shows the one of its own screen
+                const g = targetScreen.geometry;
+                l = l.screens.find(s => Math.round(s.screen.x) === Math.round(g.x) && Math.round(s.screen.y) === Math.round(g.y))
+                    || { screen: { x: 0, y: 0, w: 1, h: 1 }, current: 0, active: "", desktops: [] };
+            }
             lay = l;
             syncModel();
         } catch (e) {
@@ -336,7 +345,7 @@ FocusScope {
             }
             TapHandler {
                 acceptedButtons: Qt.LeftButton
-                onTapped: root.effect.activateDesktop(ws.index)
+                onTapped: root.effect.activateDesktop(ws.index, root.outName)
             }
         }
     }
@@ -457,7 +466,7 @@ FocusScope {
             TapHandler {
                 gesturePolicy: TapHandler.ReleaseWithinBounds
                 acceptedButtons: Qt.LeftButton
-                onTapped: root.effect.activateWindow(tile.wid, tile.did, tile.di)
+                onTapped: root.effect.activateWindow(tile.wid, tile.did, tile.di, root.outName)
             }
             DragHandler {
                 id: dh
@@ -499,7 +508,7 @@ FocusScope {
                                 root.dropPending = true;
                                 root.effect.dropFloating(tile.wid, fd.id,
                                     (tile.x - root.x0) / root.zm + root.lay.screen.x,
-                                    (tile.y - root.wsY(fdi)) / root.zm + root.lay.screen.y);
+                                    (tile.y - root.wsY(fdi)) / root.zm + root.lay.screen.y, root.outName);
                                 holdTimer.interval = 700;
                                 holdTimer.restart();
                             } else {
@@ -510,7 +519,7 @@ FocusScope {
                         } else if (h !== null) {
                             root.dropHold = tile.wid;
                             root.dropPending = true;
-                            root.effect.dropWindow(tile.wid, h.did, h.col, h.tile);
+                            root.effect.dropWindow(tile.wid, h.did, h.col, h.tile, root.outName);
                             holdTimer.interval = 700;
                             holdTimer.restart();
                         } else {
@@ -541,7 +550,7 @@ FocusScope {
             viewSince = 0;
             wsSince = 0;
             if (!running) {
-                root.effect.dndEdgeEnd();
+                root.effect.dndEdgeEnd(root.outName);
             }
         }
         onTriggered: {
@@ -574,7 +583,7 @@ FocusScope {
                     }
                     moved = true;
                     if (t - wsSince >= o.wsDelay) {
-                        root.effect.dndEdgeWorkspace(d * dt * o.wsSpeed / 1500);
+                        root.effect.dndEdgeWorkspace(d * dt * o.wsSpeed / 1500, root.outName);
                     }
                 }
             }
@@ -597,7 +606,7 @@ FocusScope {
                         viewSince = t;
                     }
                     if (t - viewSince >= o.viewDelay) {
-                        root.effect.scrollView(root.lay.desktops[di].id, d * dt * o.viewSpeed);
+                        root.effect.scrollView(root.lay.desktops[di].id, d * dt * o.viewSpeed, root.outName);
                         root.updateHint();
                     }
                 }
@@ -652,9 +661,9 @@ FocusScope {
             } else if (t - since >= 750) {
                 target = "";
                 if (hit !== null) {
-                    root.effect.activateWindow(hit.wid, hit.did, hit.di);
+                    root.effect.activateWindow(hit.wid, hit.did, hit.di, root.outName);
                 } else {
-                    root.effect.activateDesktop(root.desktopAt(py));
+                    root.effect.activateDesktop(root.desktopAt(py), root.outName);
                 }
             }
         }
@@ -718,7 +727,7 @@ FocusScope {
             const underId = under >= 0 ? root.lay.desktops[under].id : "";
             if (event.pixelDelta.x !== 0 || event.pixelDelta.y !== 0) {
                 if (mods === Qt.NoModifier && underId !== "") {
-                    root.effect.touchpadScroll(-inv * event.pixelDelta.x * root.width / 1200, -inv * event.pixelDelta.y, underId);
+                    root.effect.touchpadScroll(-inv * event.pixelDelta.x * root.width / 1200, -inv * event.pixelDelta.y, underId, root.outName);
                 }
                 return;
             }
@@ -738,14 +747,14 @@ FocusScope {
                 const t = Date.now();
                 if (t - root.wheelLast >= 50) {
                     root.wheelLast = t;
-                    root.effect.stepDesktop(dir);
+                    root.effect.stepDesktop(dir, root.outName);
                 }
             }
             while (Math.abs(root.wheelX) >= 120) {
                 const dir = root.wheelX > 0 ? 1 : -1;
                 root.wheelX -= dir * 120;
                 if (underId !== "") {
-                    root.effect.focusColumn(underId, dir);
+                    root.effect.focusColumn(underId, dir, root.outName);
                 }
             }
         }
@@ -762,7 +771,7 @@ FocusScope {
             }
             const i = root.desktopAt(centroid.position.y);
             if (i >= 0) {
-                root.effect.scrollView(root.lay.desktops[i].id, -(translation.x - last) / root.zm);
+                root.effect.scrollView(root.lay.desktops[i].id, -(translation.x - last) / root.zm, root.outName);
             }
             last = translation.x;
         }
@@ -797,7 +806,7 @@ FocusScope {
             for (let i = 0; i < winModel.count; i++) {
                 const w = winModel.get(i);
                 if (w.wid === a && (root.query === "" || w.title.toLowerCase().indexOf(root.query) !== -1)) {
-                    root.effect.activateWindow(w.wid, w.did, w.di);
+                    root.effect.activateWindow(w.wid, w.did, w.di, root.outName);
                     break;
                 }
             }

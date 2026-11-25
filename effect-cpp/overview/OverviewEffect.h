@@ -36,9 +36,9 @@ class OverviewEffect : public QuickSceneEffect
     Q_PROPERTY(QString layout READ layout NOTIFY layoutChanged)
     // 0 = normal view, 1 = fully zoomed out
     Q_PROPERTY(qreal progress READ progress NOTIFY progressChanged)
-    // the (fractional) index of the desktop in the middle
+    // changes whenever a screen's (fractional) desktop index moves; the index itself is wsIndexOf()
     Q_PROPERTY(qreal wsIndex READ wsIndex NOTIFY wsIndexChanged)
-    // desktop id -> horizontal view offset being shown (springs to the layout's scroll)
+    // "output name/desktop id" -> horizontal view offset being shown (springs to the layout's scroll)
     Q_PROPERTY(QVariantMap viewOffsets READ viewOffsets NOTIFY viewOffsetsChanged)
     // niri's overview { zoom; backdrop-color; workspace-shadow } from the Kiri settings
     Q_PROPERTY(qreal zoom READ zoom NOTIFY optionsChanged)
@@ -67,7 +67,9 @@ public:
 
     QString layout() const { return m_layout; }
     qreal progress() const { return m_progress; }
-    qreal wsIndex() const { return m_wsIndex; }
+    qreal wsIndex() const { return m_wsTick; }
+    // the (fractional) index of the desktop in the middle of one output
+    Q_INVOKABLE qreal wsIndexOf(const QString &outputName) const;
     QVariantMap viewOffsets() const { return m_viewOffsets; }
     qreal zoom() const { return m_zoom; }
     QVariantMap dnd() const { return m_dnd; }
@@ -96,7 +98,8 @@ public:
 
 public Q_SLOTS:
     // ---- from the Kiri script (D-Bus), every argument a JSON string
-    // opens, or closes when it is open; `layout` is the layout JSON
+    // opens, or closes when it is open; `layout` is the layout JSON: one screen's layout, or {"screens":[layout,...]}
+    // with one layout per screen (the desktops of each screen, with that screen's own current one)
     Q_SCRIPTABLE QString toggle(const QString &layout);
     Q_SCRIPTABLE QString open(const QString &layout);
     // builds the scene invisibly for a moment so that the first real open is smooth
@@ -109,24 +112,25 @@ public Q_SLOTS:
     Q_SCRIPTABLE QString poll();
 
     // ---- from the QML scene
-    void activateWindow(const QString &windowId, const QString &desktopId, int desktopIndex);
-    void activateDesktop(int desktopIndex);
-    void dropWindow(const QString &windowId, const QString &desktopId, int column, int tile);
-    void dropFloating(const QString &windowId, const QString &desktopId, qreal x, qreal y);
-    void goToDesktop(int index);
-    void stepDesktop(int direction);
-    void scrollView(const QString &desktopId, qreal delta);
+    // `output` is the name of the screen the overview scene belongs to; the events sent to the script carry it as "o"
+    void activateWindow(const QString &windowId, const QString &desktopId, int desktopIndex, const QString &output);
+    void activateDesktop(int desktopIndex, const QString &output);
+    void dropWindow(const QString &windowId, const QString &desktopId, int column, int tile, const QString &output);
+    void dropFloating(const QString &windowId, const QString &desktopId, qreal x, qreal y, const QString &output);
+    void goToDesktop(int index, const QString &output);
+    void stepDesktop(int direction, const QString &output);
+    void scrollView(const QString &desktopId, qreal delta, const QString &output);
     void requestClose();
     // niri focus-column-left/right-under-mouse (wheel, Shift+wheel in the overview)
-    void focusColumn(const QString &desktopId, int direction);
+    void focusColumn(const QString &desktopId, int direction, const QString &output);
     // niri overview_scroll_swipe_gesture: two-finger touchpad scroll. `down` is towards the next desktop, `right`
     // scrolls the view of `desktopId` (the one under the pointer) in layout px
-    void touchpadScroll(qreal right, qreal down, const QString &desktopId);
+    void touchpadScroll(qreal right, qreal down, const QString &desktopId, const QString &output);
     // runs a Kiri action by name (the keys niri hardcodes in the overview: Left/Right/Up/Down)
     void invokeKiriAction(const QString &action);
     // niri dnd-edge-workspace-switch: moves the desktops by `delta` indices while a window is dragged at the top/bottom edge
-    void dndEdgeWorkspace(qreal delta);
-    void dndEdgeEnd();
+    void dndEdgeWorkspace(qreal delta, const QString &output);
+    void dndEdgeEnd(const QString &output);
     // the pointer in global logical coordinates (the QML scene polls it during a drag-and-drop, which sends it no events)
     QPointF cursorPosition() const;
 
@@ -167,11 +171,13 @@ private:
     qint64 m_dndHoldSince = 0;
     QPointF m_dndHoldPos;
     bool m_dndWs = false;
+    QString m_dndOutput;
     // niri overview_scroll_swipe_gesture (two-finger touchpad scroll in the overview)
     bool m_swipeOn = false;
     bool m_swipeVertical = false;
     double m_swipeStart = 0;
     QString m_swipeDesktop;
+    QString m_swipeOutput;
     NiriSwipe::SwipeTracker m_swipeTracker;
     QTimer m_swipeEnd;
     void endTouchpadScroll();
@@ -205,7 +211,23 @@ private:
     void startOpen();
     double progressVelocity() const;
     void startProgress(double to, double velocity);
-    void startWorkspace(double to);
+    // where the desktops of one output are: it moves on its own with the screen's desktops, so each output has its own
+    struct Ws
+    {
+        double index = 0;
+        double target = 0;
+        NiriAnim::Anim spring;
+        qint64 start = 0;
+        bool animating = false;
+        int count = 0;
+        int layoutCurrent = -1;
+        int pendingCurrent = -1;
+        qint64 pendingUntil = 0;
+    };
+    void startWorkspace(Ws &ws, double to);
+    QString outputNameAt(double x, double y) const;
+    void resetLayoutCurrent();
+    bool pendingSwitch(qint64 t) const;
     void applyLayout(const QString &layout);
     void queue(const QString &json);
     bool tick();
@@ -225,15 +247,8 @@ private:
     qint64 m_progressStart = 0;
     bool m_progressAnimating = false;
 
-    double m_wsIndex = 0;
-    double m_wsTarget = 0;
-    NiriAnim::Anim m_wsSpring;
-    qint64 m_wsStart = 0;
-    bool m_wsAnimating = false;
-    int m_desktopCount = 0;
-    int m_layoutCurrent = -1;
-    int m_pendingCurrent = -1;
-    qint64 m_pendingUntil = 0;
+    QHash<QString, Ws> m_ws; // by output name
+    double m_wsTick = 0;
 
     QHash<QString, Scroll> m_scrolls;
     QVariantMap m_viewOffsets;

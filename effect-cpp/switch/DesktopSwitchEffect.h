@@ -24,6 +24,7 @@
 #include "effect/timeline.h"
 
 #include <QObject>
+#include <QPointer>
 #include <QString>
 
 namespace KWin
@@ -76,6 +77,7 @@ public:
     void windowDeleted(EffectWindow *w);
     void finishedSwitching();
     QPointF visualPosition() const;
+    LogicalOutput *output() const { return m_screen; }
     // niri's workspace switch swipe: follow the fingers, then spring to a row with the release velocity
     void niriGesture(double row);
     void startNiriAnimation(double fromRow, int toRow, double velocity);
@@ -200,6 +202,7 @@ private:
     QPointF m_swipeCumulative;
     NiriSwipe::WorkspaceGesture m_swipeGesture;
     int m_swipeCenter = 0;
+    QPointer<LogicalOutput> m_swipeOutput; // the screen the vertical gesture acts on
     bool m_swipeNatural = false;
     NiriSwipe::WorkspaceGesture::Release m_swipeRelease{};
     bool m_swipeReleasePending = false;

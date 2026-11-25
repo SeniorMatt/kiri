@@ -353,13 +353,46 @@ void OverviewEffect::startProgress(double to, double velocity)
     effects->addRepaintFull();
 }
 
-void OverviewEffect::startWorkspace(double to)
+void OverviewEffect::startWorkspace(Ws &ws, double to)
 {
-    m_wsTarget = to;
-    m_wsSpring = makeWorkspace(m_wsIndex, to, 0);
-    m_wsStart = m_anim;
-    m_wsAnimating = true;
+    ws.target = to;
+    ws.spring = makeWorkspace(ws.index, to, 0);
+    ws.start = m_anim;
+    ws.animating = true;
     effects->addRepaintFull();
+}
+
+qreal OverviewEffect::wsIndexOf(const QString &outputName) const
+{
+    const auto it = m_ws.constFind(outputName);
+    return it == m_ws.constEnd() ? 0.0 : it->index;
+}
+
+// the name of the output whose geometry starts at (x, y), which is how a layout names its screen
+QString OverviewEffect::outputNameAt(double x, double y) const
+{
+    for (LogicalOutput *output : effects->screens()) {
+        const auto g = output->geometry();
+        if (std::lround(g.x()) == std::lround(x) && std::lround(g.y()) == std::lround(y)) {
+            return output->name();
+        }
+    }
+    return QString();
+}
+
+void OverviewEffect::resetLayoutCurrent()
+{
+    for (Ws &ws : m_ws) {
+        ws.layoutCurrent = -1;
+    }
+}
+
+// a desktop switch asked for by the user has not yet shown up in the layout
+bool OverviewEffect::pendingSwitch(qint64 t) const
+{
+    return std::any_of(m_ws.cbegin(), m_ws.cend(), [t](const Ws &ws) {
+        return ws.pendingCurrent >= 0 && t < ws.pendingUntil;
+    });
 }
 
 // seconds on a spring that started at `start`, scaled by the global animation speed
@@ -410,15 +443,23 @@ bool OverviewEffect::tick()
         }
     }
 
-    if (m_wsAnimating) {
-        const double s = seconds(m_wsStart);
-        if (m_wsSpring.isDone(s)) {
-            m_wsAnimating = false;
-            m_wsIndex = m_wsSpring.to();
+    bool wsMoved = false;
+    for (Ws &ws : m_ws) {
+        if (!ws.animating) {
+            continue;
+        }
+        const double s = seconds(ws.start);
+        if (ws.spring.isDone(s)) {
+            ws.animating = false;
+            ws.index = ws.spring.to();
         } else {
-            m_wsIndex = m_wsSpring.value(s);
+            ws.index = ws.spring.value(s);
             more = true;
         }
+        wsMoved = true;
+    }
+    if (wsMoved) {
+        m_wsTick++;
         Q_EMIT wsIndexChanged();
     }
 
@@ -447,7 +488,7 @@ bool OverviewEffect::tick()
         Q_EMIT viewOffsetsChanged();
     }
     // closed, but the script has not yet moved to the chosen desktop: wait for it, or the real screen would jump
-    if (m_closedZoom && !m_open && !m_gesture && m_pendingCurrent >= 0 && t < m_pendingUntil) {
+    if (m_closedZoom && !m_open && !m_gesture && pendingSwitch(t)) {
         more = true;
     }
     if (m_closedZoom && !more && !m_open && !m_gesture && !m_warm) {
@@ -498,7 +539,7 @@ void OverviewEffect::prePaintScreen(ScreenPrePaintData &data)
         static const bool trace = qEnvironmentVariableIsSet("KIRI_OVERVIEW_TRACE");
         if (trace) {
             qCInfo(KIRI_OVERVIEW).nospace() << "TRACE frame running=" << isRunning() << " open=" << m_open << " closedZoom=" << m_closedZoom << " progress=" << m_progress
-                                            << " ws=" << m_wsIndex << "->" << m_wsTarget << " layoutCurrent=" << m_layoutCurrent << " pending=" << m_pendingCurrent;
+                                            << " ws=" << m_wsTick << " pending=" << pendingSwitch(t);
         }
     } else {
         m_moving = false;
@@ -511,7 +552,7 @@ void OverviewEffect::prePaintWindow(RenderView *view, EffectWindow *w, WindowPre
     static const bool trace = qEnvironmentVariableIsSet("KIRI_OVERVIEW_TRACE");
     if (trace && w->isNormalWindow() && !w->isOnCurrentDesktop()) {
         qCInfo(KIRI_OVERVIEW).nospace() << "TRACE other-desktop window painted: " << w->caption() << " running=" << isRunning() << " open=" << m_open
-                                        << " closedZoom=" << m_closedZoom << " progress=" << m_progress << " ws=" << m_wsIndex << " refs=" << m_visibleRefs.size();
+                                        << " closedZoom=" << m_closedZoom << " progress=" << m_progress << " ws=" << m_wsTick << " refs=" << m_visibleRefs.size();
     }
     QuickSceneEffect::prePaintWindow(view, w, data);
 }
@@ -541,37 +582,67 @@ void OverviewEffect::applyLayout(const QString &layout)
     }
     const QJsonObject obj = doc.object();
     const qint64 t = now();
-    const int current = obj.value(QStringLiteral("current")).toInt(0);
-    const QJsonArray desktops = obj.value(QStringLiteral("desktops")).toArray();
-    m_desktopCount = desktops.size();
+    // one layout, or one per screen when the desktops are per screen
+    QJsonArray screens = obj.value(QStringLiteral("screens")).toArray();
+    if (screens.isEmpty()) {
+        screens.append(obj);
+    }
 
     const bool idle = !isRunning() || (m_warm && !m_open && !m_gesture);
     QStringList seen;
-    for (const QJsonValue &v : desktops) {
-        const QJsonObject d = v.toObject();
-        const QString id = d.value(QStringLiteral("id")).toString();
-        const double scroll = d.value(QStringLiteral("scroll")).toDouble();
-        seen << id;
-        auto it = m_scrolls.find(id);
-        if (it == m_scrolls.end()) {
-            Scroll sc;
-            sc.shown = sc.target = scroll;
-            it = m_scrolls.insert(id, sc);
-            m_viewOffsets.insert(id, scroll);
-        } else if (idle) {
-            // nothing of the overview is on screen: the first frame must show the strip where the script put it
-            it->target = it->shown = scroll;
-            it->animating = false;
-            it->localUntil = 0;
-            m_viewOffsets.insert(id, scroll);
-        } else if (std::abs(scroll - it->target) > 0.5) {
-            it->target = scroll;
-            if (t >= it->localUntil) {
-                it->spring = makeView(it->shown, scroll, 0);
-                it->start = m_anim;
-                it->animating = true;
+    for (const QJsonValue &sv : std::as_const(screens)) {
+        const QJsonObject lay = sv.toObject();
+        const QJsonObject rect = lay.value(QStringLiteral("screen")).toObject();
+        const QString output = outputNameAt(rect.value(QStringLiteral("x")).toDouble(), rect.value(QStringLiteral("y")).toDouble());
+        const int current = lay.value(QStringLiteral("current")).toInt(0);
+        const QJsonArray desktops = lay.value(QStringLiteral("desktops")).toArray();
+        Ws &ws = m_ws[output];
+        ws.count = desktops.size();
+
+        for (const QJsonValue &v : desktops) {
+            const QJsonObject d = v.toObject();
+            const QString id = output + QLatin1Char('/') + d.value(QStringLiteral("id")).toString();
+            const double scroll = d.value(QStringLiteral("scroll")).toDouble();
+            seen << id;
+            auto it = m_scrolls.find(id);
+            if (it == m_scrolls.end()) {
+                Scroll sc;
+                sc.shown = sc.target = scroll;
+                it = m_scrolls.insert(id, sc);
+                m_viewOffsets.insert(id, scroll);
+            } else if (idle) {
+                // nothing of the overview is on screen: the first frame must show the strip where the script put it
+                it->target = it->shown = scroll;
+                it->animating = false;
+                it->localUntil = 0;
+                m_viewOffsets.insert(id, scroll);
+            } else if (std::abs(scroll - it->target) > 0.5) {
+                it->target = scroll;
+                if (t >= it->localUntil) {
+                    it->spring = makeView(it->shown, scroll, 0);
+                    it->start = m_anim;
+                    it->animating = true;
+                }
             }
         }
+
+        const bool first = ws.layoutCurrent < 0;
+        if (ws.pendingCurrent >= 0 && t < ws.pendingUntil) {
+            if (current == ws.pendingCurrent) {
+                ws.pendingCurrent = -1;
+            }
+        } else if (first || current != ws.layoutCurrent) {
+            ws.pendingCurrent = -1;
+            if (first && !isRunning()) {
+                ws.index = ws.target = current;
+                ws.animating = false;
+                m_wsTick++;
+                Q_EMIT wsIndexChanged();
+            } else {
+                startWorkspace(ws, current);
+            }
+        }
+        ws.layoutCurrent = current;
     }
     for (auto it = m_scrolls.begin(); it != m_scrolls.end();) {
         if (!seen.contains(it.key())) {
@@ -581,23 +652,6 @@ void OverviewEffect::applyLayout(const QString &layout)
             ++it;
         }
     }
-
-    const bool first = m_layoutCurrent < 0;
-    if (m_pendingCurrent >= 0 && t < m_pendingUntil) {
-        if (current == m_pendingCurrent) {
-            m_pendingCurrent = -1;
-        }
-    } else if (first || current != m_layoutCurrent) {
-        m_pendingCurrent = -1;
-        if (first && !isRunning()) {
-            m_wsIndex = m_wsTarget = current;
-            m_wsAnimating = false;
-            Q_EMIT wsIndexChanged();
-        } else {
-            startWorkspace(current);
-        }
-    }
-    m_layoutCurrent = current;
 
     m_layout = layout;
     Q_EMIT layoutChanged();
@@ -629,15 +683,30 @@ bool OverviewEffect::acquire()
     m_openCall = now();
     m_closedZoom = false;
     m_events.clear();
-    m_pendingCurrent = -1;
+    for (Ws &ws : m_ws) {
+        ws.pendingCurrent = -1;
+    }
     run(true);
     if (!isRunning()) {
         return false;
     }
-    if (visual.isValid()) {
-        m_wsIndex = visual.toDouble();
+    // each output starts from where its own desktops were; without a per-output position, all from the one there is
+    const QVariantMap visuals = effects->property("kiriSwitchVisuals").toMap();
+    effects->setProperty("kiriSwitchVisuals", QVariant());
+    if (visual.isValid() || !visuals.isEmpty()) {
+        for (auto it = m_ws.begin(); it != m_ws.end(); ++it) {
+            const auto v = visuals.constFind(it.key());
+            if (v != visuals.constEnd()) {
+                it->index = v->toDouble();
+            } else if (visual.isValid() && visuals.isEmpty()) {
+                it->index = visual.toDouble();
+            } else {
+                continue;
+            }
+            startWorkspace(*it, it->target);
+        }
+        m_wsTick++;
         Q_EMIT wsIndexChanged();
-        startWorkspace(m_wsTarget);
     }
     m_startRects = rects;
     Q_EMIT startRectsChanged();
@@ -677,7 +746,7 @@ QString OverviewEffect::warm(const QString &layout)
     if (isRunning() || effects->isScreenLocked() || effects->hasActiveFullScreenEffect()) {
         return QStringLiteral("busy");
     }
-    m_layoutCurrent = -1;
+    resetLayoutCurrent();
     applyLayout(layout);
     m_open = false;
     m_gesture = false;
@@ -705,7 +774,7 @@ QString OverviewEffect::warm(const QString &layout)
 QString OverviewEffect::open(const QString &layout)
 {
     if (!isRunning()) {
-        m_layoutCurrent = -1;
+        resetLayoutCurrent();
     }
     applyLayout(layout);
     // not running counts as closed whatever m_open says
@@ -752,7 +821,7 @@ QString OverviewEffect::gesture(const QString &json)
     if (obj.contains(QStringLiteral("layout"))) {
         const QJsonValue l = obj.value(QStringLiteral("layout"));
         if (!isRunning()) {
-            m_layoutCurrent = -1;
+            resetLayoutCurrent();
         }
         applyLayout(l.isString() ? l.toString() : jsonString(l.toObject()));
     }
@@ -810,66 +879,70 @@ QString OverviewEffect::poll()
 }
 
 
-void OverviewEffect::activateWindow(const QString &windowId, const QString &desktopId, int desktopIndex)
+void OverviewEffect::activateWindow(const QString &windowId, const QString &desktopId, int desktopIndex, const QString &output)
 {
     if (now() < m_noCloseUntil) {
         return;
     }
-    queue(jsonString({{"t", "activate"}, {"w", windowId}, {"d", desktopId}}));
-    m_pendingCurrent = desktopIndex;
-    m_pendingUntil = now() + 600;
-    if (std::abs(m_wsTarget - desktopIndex) > 1e-6) {
-        startWorkspace(desktopIndex);
+    queue(jsonString({{"t", "activate"}, {"w", windowId}, {"d", desktopId}, {"o", output}}));
+    Ws &ws = m_ws[output];
+    ws.pendingCurrent = desktopIndex;
+    ws.pendingUntil = now() + 600;
+    if (std::abs(ws.target - desktopIndex) > 1e-6) {
+        startWorkspace(ws, desktopIndex);
     }
     close();
 }
 
-void OverviewEffect::activateDesktop(int desktopIndex)
+void OverviewEffect::activateDesktop(int desktopIndex, const QString &output)
 {
     if (now() < m_noCloseUntil) {
         return;
     }
-    queue(jsonString({{"t", "goto"}, {"i", desktopIndex}}));
-    m_pendingCurrent = desktopIndex;
-    m_pendingUntil = now() + 600;
-    if (std::abs(m_wsTarget - desktopIndex) > 1e-6) {
-        startWorkspace(desktopIndex);
+    queue(jsonString({{"t", "goto"}, {"i", desktopIndex}, {"o", output}}));
+    Ws &ws = m_ws[output];
+    ws.pendingCurrent = desktopIndex;
+    ws.pendingUntil = now() + 600;
+    if (std::abs(ws.target - desktopIndex) > 1e-6) {
+        startWorkspace(ws, desktopIndex);
     }
     close();
 }
 
-void OverviewEffect::goToDesktop(int index)
+void OverviewEffect::goToDesktop(int index, const QString &output)
 {
-    index = std::clamp(index, 0, std::max(0, m_desktopCount - 1));
-    if (index == m_pendingCurrent || (m_pendingCurrent < 0 && index == m_layoutCurrent)) {
+    Ws &ws = m_ws[output];
+    index = std::clamp(index, 0, std::max(0, ws.count - 1));
+    if (index == ws.pendingCurrent || (ws.pendingCurrent < 0 && index == ws.layoutCurrent)) {
         return;
     }
-    queue(jsonString({{"t", "goto"}, {"i", index}}));
-    m_pendingCurrent = index;
-    m_pendingUntil = now() + 600;
-    startWorkspace(index);
+    queue(jsonString({{"t", "goto"}, {"i", index}, {"o", output}}));
+    ws.pendingCurrent = index;
+    ws.pendingUntil = now() + 600;
+    startWorkspace(ws, index);
 }
 
-void OverviewEffect::stepDesktop(int direction)
+void OverviewEffect::stepDesktop(int direction, const QString &output)
 {
-    goToDesktop(int(std::lround(m_wsTarget)) + direction);
+    goToDesktop(int(std::lround(m_ws[output].target)) + direction, output);
 }
 
-void OverviewEffect::dropWindow(const QString &windowId, const QString &desktopId, int column, int tile)
-{
-    m_noCloseUntil = now() + 700;
-    queue(jsonString({{"t", "drop"}, {"w", windowId}, {"d", desktopId}, {"c", column}, {"i", tile}}));
-}
-
-void OverviewEffect::dropFloating(const QString &windowId, const QString &desktopId, qreal x, qreal y)
+void OverviewEffect::dropWindow(const QString &windowId, const QString &desktopId, int column, int tile, const QString &output)
 {
     m_noCloseUntil = now() + 700;
-    queue(jsonString({{"t", "dropf"}, {"w", windowId}, {"d", desktopId}, {"x", x}, {"y", y}}));
+    queue(jsonString({{"t", "drop"}, {"w", windowId}, {"d", desktopId}, {"c", column}, {"i", tile}, {"o", output}}));
 }
 
-void OverviewEffect::scrollView(const QString &desktopId, qreal delta)
+void OverviewEffect::dropFloating(const QString &windowId, const QString &desktopId, qreal x, qreal y, const QString &output)
 {
-    auto it = m_scrolls.find(desktopId);
+    m_noCloseUntil = now() + 700;
+    queue(jsonString({{"t", "dropf"}, {"w", windowId}, {"d", desktopId}, {"x", x}, {"y", y}, {"o", output}}));
+}
+
+void OverviewEffect::scrollView(const QString &desktopId, qreal delta, const QString &output)
+{
+    const QString key = output + QLatin1Char('/') + desktopId;
+    auto it = m_scrolls.find(key);
     if (it == m_scrolls.end()) {
         return;
     }
@@ -877,8 +950,8 @@ void OverviewEffect::scrollView(const QString &desktopId, qreal delta)
     it->shown = it->target;
     it->animating = false;
     it->localUntil = now() + 400;
-    m_viewOffsets.insert(desktopId, it->shown);
-    queue(jsonString({{"t", "scroll"}, {"d", desktopId}, {"x", it->target}}));
+    m_viewOffsets.insert(key, it->shown);
+    queue(jsonString({{"t", "scroll"}, {"d", desktopId}, {"x", it->target}, {"o", output}}));
     Q_EMIT viewOffsetsChanged();
     effects->addRepaintFull();
 }
@@ -891,25 +964,31 @@ void OverviewEffect::requestClose()
     close();
 }
 
-void OverviewEffect::focusColumn(const QString &desktopId, int direction)
+void OverviewEffect::focusColumn(const QString &desktopId, int direction, const QString &output)
 {
-    queue(jsonString({{"t", "focuscol"}, {"d", desktopId}, {"dir", direction}}));
+    queue(jsonString({{"t", "focuscol"}, {"d", desktopId}, {"dir", direction}, {"o", output}}));
 }
 
 // niri's overview_scroll_swipe_gesture for a touchpad: a vertical scroll drags the desktops, a horizontal one scrolls the view; a scroll ends after a pause in the events
-void OverviewEffect::touchpadScroll(qreal right, qreal down, const QString &desktopId)
+void OverviewEffect::touchpadScroll(qreal right, qreal down, const QString &desktopId, const QString &output)
 {
-    if (!m_open || m_desktopCount < 1) {
+    Ws &ws = m_ws[output];
+    if (!m_open || ws.count < 1) {
         return;
+    }
+    if (m_swipeOn && m_swipeOutput != output) {
+        // fingers moved to another screen: the scroll on the first one is over
+        endTouchpadScroll();
     }
     if (!m_swipeOn) {
         m_swipeOn = true;
         m_swipeVertical = down != 0;
         m_swipeTracker = NiriSwipe::SwipeTracker();
-        m_swipeStart = m_wsIndex;
+        m_swipeStart = ws.index;
         m_swipeDesktop = desktopId;
-        m_wsAnimating = false;
-        m_wsTarget = m_wsIndex;
+        m_swipeOutput = output;
+        ws.animating = false;
+        ws.target = ws.index;
         m_swipeEnd.setSingleShot(true);
         m_swipeEnd.setInterval(120);
         disconnect(&m_swipeEnd, nullptr, this, nullptr);
@@ -923,12 +1002,13 @@ void OverviewEffect::touchpadScroll(qreal right, qreal down, const QString &desk
         m_swipeTracker.push(down / scale, now());
         NiriSwipe::RubberBand band = NiriSwipe::WorkspaceGesture::Band;
         band.limit /= zoom;
-        m_wsIndex = band.clamp(0, std::max(0, m_desktopCount - 1), m_swipeStart + m_swipeTracker.pos() / NiriSwipe::WorkspaceGesture::Movement);
-        m_wsTarget = m_wsIndex;
+        ws.index = band.clamp(0, std::max(0, ws.count - 1), m_swipeStart + m_swipeTracker.pos() / NiriSwipe::WorkspaceGesture::Movement);
+        ws.target = ws.index;
+        m_wsTick++;
         Q_EMIT wsIndexChanged();
         effects->addRepaintFull();
     } else {
-        scrollView(m_swipeDesktop, right);
+        scrollView(m_swipeDesktop, right, output);
     }
 }
 
@@ -941,53 +1021,58 @@ void OverviewEffect::endTouchpadScroll()
     if (!m_swipeVertical) {
         return;
     }
+    Ws &ws = m_ws[m_swipeOutput];
     // like niri's workspace_switch_gesture_end
     m_swipeTracker.push(0.0, now());
     const double zoom = m_zoom;
     NiriSwipe::RubberBand band = NiriSwipe::WorkspaceGesture::Band;
     band.limit /= zoom;
     const double movement = NiriSwipe::WorkspaceGesture::Movement;
-    const double hi = std::max(0, m_desktopCount - 1);
+    const double hi = std::max(0, ws.count - 1);
     double velocity = m_swipeTracker.velocity() / movement;
     const double currentPos = m_swipeTracker.pos() / movement;
     const double end = std::clamp(m_swipeStart + m_swipeTracker.projectedEndPos() / movement, 0.0, hi);
     velocity *= band.clampDerivative(0, hi, m_swipeStart + currentPos);
     const int target = int(std::lround(end));
-    m_wsTarget = target;
-    m_wsSpring = makeWorkspace(m_wsIndex, target, velocity);
-    m_wsStart = m_anim;
-    m_wsAnimating = true;
-    queue(jsonString({{"t", "goto"}, {"i", target}}));
-    m_pendingCurrent = target;
-    m_pendingUntil = now() + 600;
+    ws.target = target;
+    ws.spring = makeWorkspace(ws.index, target, velocity);
+    ws.start = m_anim;
+    ws.animating = true;
+    queue(jsonString({{"t", "goto"}, {"i", target}, {"o", m_swipeOutput}}));
+    ws.pendingCurrent = target;
+    ws.pendingUntil = now() + 600;
     effects->addRepaintFull();
 }
 
 // like niri's dnd_scroll_gesture_scroll: the desktops follow the drag at the top/bottom edge
-void OverviewEffect::dndEdgeWorkspace(qreal delta)
+void OverviewEffect::dndEdgeWorkspace(qreal delta, const QString &output)
 {
-    if (m_desktopCount < 1) {
+    Ws &ws = m_ws[output];
+    if (ws.count < 1) {
         return;
     }
-    m_wsAnimating = false;
-    m_wsIndex = std::clamp(m_wsIndex + delta, 0.0, double(m_desktopCount - 1));
-    m_wsTarget = m_wsIndex;
+    ws.animating = false;
+    ws.index = std::clamp(ws.index + delta, 0.0, double(ws.count - 1));
+    ws.target = ws.index;
     m_dndWs = true;
+    m_dndOutput = output;
+    m_wsTick++;
     Q_EMIT wsIndexChanged();
     effects->addRepaintFull();
 }
 
-void OverviewEffect::dndEdgeEnd()
+void OverviewEffect::dndEdgeEnd(const QString &)
 {
     if (!m_dndWs) {
         return;
     }
     m_dndWs = false;
-    const int target = int(std::lround(m_wsIndex));
-    startWorkspace(target);
-    queue(jsonString({{"t", "goto"}, {"i", target}}));
-    m_pendingCurrent = target;
-    m_pendingUntil = now() + 600;
+    Ws &ws = m_ws[m_dndOutput];
+    const int target = int(std::lround(ws.index));
+    startWorkspace(ws, target);
+    queue(jsonString({{"t", "goto"}, {"i", target}, {"o", m_dndOutput}}));
+    ws.pendingCurrent = target;
+    ws.pendingUntil = now() + 600;
 }
 
 } // namespace KWin

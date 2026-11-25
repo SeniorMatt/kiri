@@ -13,6 +13,7 @@
 
 // own
 #include "DesktopSwitchEffect.h"
+#include "PerScreen.h"
 #include "../common/PointerGrab.h"
 #include "core/output.h"
 #include "core/renderviewport.h"
@@ -492,13 +493,21 @@ bool DesktopSwitchEffect::eventFilter(QObject *watched, QEvent *event)
 {
     if (watched == effects && event->type() == QEvent::DynamicPropertyChange
         && static_cast<QDynamicPropertyChangeEvent *>(event)->propertyName() == "kiriOverviewOpening" && effects->property("kiriOverviewOpening").toBool() && isActive()) {
+        // the first animating screen, and (per-screen desktops) every one by output name
+        QVariantMap visuals;
+        bool first = true;
         for (const DesktopSwitchScreen &screen : std::as_const(m_slideEffectScreens)) {
             if (screen.isActive()) {
                 const QPointF p = screen.visualPosition();
-                effects->setProperty("kiriSwitchVisual", p.y() * effects->desktopGridWidth() + p.x());
-                break;
+                const double index = p.y() * effects->desktopGridWidth() + p.x();
+                if (first) {
+                    effects->setProperty("kiriSwitchVisual", index);
+                    first = false;
+                }
+                visuals.insert(screen.output()->name(), index);
             }
         }
+        effects->setProperty("kiriSwitchVisuals", visuals);
         finishedSwitching(true);
         effects->addRepaintFull();
     }
@@ -880,7 +889,8 @@ void DesktopSwitchEffect::swipeGestureUpdate(PointerSwipeGestureUpdateEvent *eve
             return;
         }
         m_swipePhase = SwipePhase::Vertical;
-        LogicalOutput *output = effects->activeScreen();
+        m_swipeOutput = PerScreen::gestureOutput();
+        LogicalOutput *output = m_swipeOutput;
         const int row = effects->desktopGridCoords(effects->currentDesktop(output)).y();
         double current = row;
         if (DesktopSwitchScreen *screen = getDesktopSwitchScreen(output); screen && screen->isActive()) {
@@ -935,7 +945,8 @@ void DesktopSwitchEffect::pointerMotion(PointerMotionEvent *event)
             return;
         }
         m_swipePhase = SwipePhase::Vertical;
-        LogicalOutput *output = effects->activeScreen();
+        m_swipeOutput = PerScreen::gestureOutput();
+        LogicalOutput *output = m_swipeOutput;
         const int row = effects->desktopGridCoords(effects->currentDesktop(output)).y();
         double current = row;
         if (DesktopSwitchScreen *screen = getDesktopSwitchScreen(output); screen && screen->isActive()) {
@@ -951,7 +962,7 @@ void DesktopSwitchEffect::pointerMotion(PointerMotionEvent *event)
 
 void DesktopSwitchEffect::swipeUpdateScreen(double row)
 {
-    LogicalOutput *output = effects->activeScreen();
+    LogicalOutput *output = m_swipeOutput ? m_swipeOutput.data() : effects->activeScreen();
     if (effects->hasActiveFullScreenEffect() && effects->activeFullScreenEffect() != this) {
         return;
     }
@@ -989,7 +1000,7 @@ void DesktopSwitchEffect::swipeFinish(std::chrono::microseconds time)
         return;
     }
     m_swipeRelease = m_swipeGesture.end(time.count() / 1000.0);
-    qCDebug(KIRI_SWITCH) << "swipe end: niri picks row" << m_swipeRelease.target << "from" << m_swipeRelease.from << "current desktop" << effects->desktopGridCoords(effects->currentDesktop(effects->activeScreen())).y();
+    qCDebug(KIRI_SWITCH) << "swipe end: niri picks row" << m_swipeRelease.target << "from" << m_swipeRelease.from << "current desktop" << effects->desktopGridCoords(effects->currentDesktop(m_swipeOutput.data())).y();
     m_swipeReleasePending = true;
     // KWin's own release handling runs after the spies; the desktop niri picks is then put right, animating from where the desktops are now
     QTimer::singleShot(60, this, &DesktopSwitchEffect::swipeApplyRelease);
@@ -1003,11 +1014,11 @@ void DesktopSwitchEffect::swipeApplyRelease()
     m_swipeReleasePending = false;
     m_swipePhase = SwipePhase::Idle;
     const auto release = m_swipeRelease;
-    LogicalOutput *output = effects->activeScreen();
+    LogicalOutput *output = m_swipeOutput ? m_swipeOutput.data() : effects->activeScreen();
     VirtualDesktop *target = effects->desktopAtCoords(QPoint(0, release.target));
     qCDebug(KIRI_SWITCH) << "apply release: target row" << release.target << "current row" << effects->desktopGridCoords(effects->currentDesktop(output)).y();
     if (target && effects->currentDesktop(output) != target) {
-        effects->setCurrentDesktop(target);
+        effects->setCurrentDesktop(target, output);
     }
     auto result = m_slideEffectScreens.tryEmplace(output, this, output);
     result.iterator->startNiriAnimation(release.from, release.target, release.velocity);
