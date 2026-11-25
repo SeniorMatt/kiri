@@ -1,10 +1,12 @@
 import QtQuick 6.0
 import QtQuick.Window 6.0 as QtWin
 import org.kde.kwin 3.0
+import "Panels.js" as Panels
 
 // A rectangular outline drawn around a KWin window, outside of its frame.
 // It is a real (frameless, transparent, input-transparent) window that is kept
-// just around the target and below every other window.
+// just around the target and below every other window. KWin draws it above panels, so the parts that a panel
+// above the target covers are left out.
 QtWin.Window {
     id: ring
 
@@ -49,6 +51,9 @@ QtWin.Window {
         return Qt.rect(g.x - outset, g.y - outset, g.width + 2 * outset, g.height + 2 * outset);
     }
 
+    // what is left of the window after the panels above the target are taken off
+    readonly property var parts: Panels.visibleParts(ringRect.x, ringRect.y, width, height, Panels.panelsAbove(Workspace.stackingOrder, target))
+
     title: "kiri-ring-" + tag
     flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.Tool
     color: "transparent"
@@ -57,12 +62,24 @@ QtWin.Window {
     width: Math.max(1, ringRect.width)
     height: Math.max(1, ringRect.height)
 
-    Rectangle {
-        anchors.fill: parent
-        color: "transparent"
-        border.width: ring.ringWidth
-        border.color: ring.ringColor
-        visible: ring.shown
+    Repeater {
+        model: ring.shown ? ring.parts : []
+        Item {
+            x: modelData.x
+            y: modelData.y
+            width: modelData.width
+            height: modelData.height
+            clip: true
+            Rectangle {
+                x: -modelData.x
+                y: -modelData.y
+                width: ring.width
+                height: ring.height
+                color: "transparent"
+                border.width: ring.ringWidth
+                border.color: ring.ringColor
+            }
+        }
     }
 
     onWantedChanged: wanted ? show() : hide()

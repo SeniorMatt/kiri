@@ -1,9 +1,11 @@
 import QtQuick 6.0
 import QtQuick.Window 6.0 as QtWin
 import org.kde.kwin 3.0
+import "Panels.js" as Panels
 
 // niri's tab indicator of a tabbed column: a strip beside the column, split into one segment per tab.
-// Like Ring, it is a frameless, transparent, input-transparent window that sits below every other window.
+// Like Ring, it is a frameless, transparent, input-transparent window that sits below every other window,
+// and it leaves out the parts that a panel above the windows covers.
 QtWin.Window {
     id: indicator
 
@@ -18,6 +20,9 @@ QtWin.Window {
     property var kw: null
     property var lastActive: null
 
+    // what is left of the window after the panels above the windows are taken off
+    readonly property var parts: Panels.visibleParts(info.x, info.y, width, height, Panels.panelsAbove(Workspace.stackingOrder, null))
+
     title: "kiri-ring-tab-" + tag + "#"
     flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.Tool
     color: "transparent"
@@ -27,14 +32,26 @@ QtWin.Window {
     height: Math.max(1, info.height)
 
     Repeater {
-        model: indicator.info.tabs ?? []
-        Rectangle {
-            x: modelData.x - indicator.info.x
-            y: modelData.y - indicator.info.y
-            width: modelData.width
-            height: modelData.height
-            radius: indicator.cornerRadius
-            color: index === indicator.info.active ? indicator.activeColor : indicator.inactiveColor
+        model: indicator.parts
+        Item {
+            id: part
+            readonly property var area: modelData
+            x: area.x
+            y: area.y
+            width: area.width
+            height: area.height
+            clip: true
+            Repeater {
+                model: indicator.info.tabs ?? []
+                Rectangle {
+                    x: modelData.x - indicator.info.x - part.area.x
+                    y: modelData.y - indicator.info.y - part.area.y
+                    width: modelData.width
+                    height: modelData.height
+                    radius: indicator.cornerRadius
+                    color: index === indicator.info.active ? indicator.activeColor : indicator.inactiveColor
+                }
+            }
         }
     }
 
