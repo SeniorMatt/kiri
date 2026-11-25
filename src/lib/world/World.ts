@@ -23,9 +23,12 @@ class World {
     public readonly dynamicDesktops: DynamicDesktops;
     public readonly desktopAutoBackAndForth: boolean;
     public readonly desktopBindNames: string[];
-    private currentDesktop: KwinDesktop|null = null;
+    // the desktop each output showed at the last change, and the one before it (niri's back-and-forth, per monitor)
+    private readonly shownDesktops = new Map<string, KwinDesktop>();
+    private readonly previousDesktops = new Map<string, KwinDesktop>();
+    // set once two outputs show different desktops: the per-screen setting is on (a script cannot read the setting)
+    private perScreenSeen = false;
     private overview!: Overview;
-    public previousDesktop: KwinDesktop|null = null;
     private readonly shortcutKeys: Record<string, string[]>;
     private readonly layoutProfiles: LayoutProfiles;
 
@@ -125,15 +128,22 @@ class World {
             desktop => this.clientManager.isDesktopOccupied(desktop),
             layout?.namedDesktops ?? [],
             (oldDesktop, newDesktop) => {
-                if (this.previousDesktop === oldDesktop) {
-                    this.previousDesktop = newDesktop;
+                for (const [name, desktop] of this.previousDesktops) {
+                    if (desktop === oldDesktop) {
+                        this.previousDesktops.set(name, newDesktop);
+                    }
                 }
             },
         );
         this.desktopAutoBackAndForth = config.desktopAutoBackAndForth;
         this.desktopBindNames = DynamicDesktops.parseNames(config.desktopBindNames);
         if (layout?.previousDesktop !== undefined) {
-            this.previousDesktop = Workspace.desktops.find(desktop => desktop.id === layout.previousDesktop) ?? null;
+            const previous = Workspace.desktops.find(desktop => desktop.id === layout.previousDesktop);
+            if (previous !== undefined) {
+                for (const output of Workspace.screens) {
+                    this.previousDesktops.set(output.name, previous);
+                }
+            }
         }
         this.overview = new Overview(this, this.clientManager, this.desktopManager);
         if (layout !== null) {
@@ -151,7 +161,7 @@ class World {
         if (layout !== null) {
             this.restoreViews(layout);
         }
-        this.currentDesktop = Workspace.currentDesktop;
+        this.rememberShownDesktops();
         this.update();
         this.clientManager.armStartupTimer();
     }
@@ -303,10 +313,11 @@ class World {
             });
         }
         const floating = this.clientManager.captureFloating();
+        const previousDesktop = this.getPreviousDesktop(this.getFocusedOutput());
         return {
             columns, views, floating: floating.floating, manual: floating.manual, floatingFrames: floating.floatingFrames,
             namedDesktops: this.dynamicDesktops.captureNamed(),
-            previousDesktop: this.previousDesktop !== null && Workspace.desktops.includes(this.previousDesktop) ? this.previousDesktop.id : undefined,
+            previousDesktop: previousDesktop !== null && Workspace.desktops.includes(previousDesktop) ? previousDesktop.id : undefined,
         };
     }
 
@@ -435,10 +446,11 @@ class World {
             return;
         }
         const colors: Record<string, string> = {};
-        for (const desktop of this.desktopManager.getOutputDesktops(Workspace.currentActivity, Workspace.currentDesktop)) {
-            const color = desktop.profile.backgroundColor;
+        for (const output of Workspace.screens) {
+            const desktop = this.desktopManager.getDesktopInCurrentActivity(currentDesktopOn(output), output.name);
+            const color = desktop?.profile.backgroundColor;
             if (color !== undefined) {
-                colors[desktop.outputName] = color;
+                colors[output.name] = color;
             }
         }
         setOutputBackgrounds(colors);
@@ -808,9 +820,9 @@ class World {
         if (!this.gestureDesktopSwitch) {
             return;
         }
-        const index = Workspace.desktops.indexOf(Workspace.currentDesktop) + offset;
+        const index = Workspace.desktops.indexOf(this.getFocusedKwinDesktop()) + offset;
         if (index >= 0 && index < Workspace.desktops.length) {
-            gotoDesktop(Workspace.desktops[index], "swipe");
+            gotoDesktop(Workspace.desktops[index], "swipe", this.getFocusedOutput());
         }
     }
 
@@ -837,11 +849,41 @@ class World {
     }
 
     public onDesktopChanged() {
-        if (this.currentDesktop !== Workspace.currentDesktop) {
-            this.previousDesktop = this.currentDesktop;
-            this.currentDesktop = Workspace.currentDesktop;
-        }
+        this.rememberShownDesktops();
         this.dynamicDesktops.onDesktopChanged();
+    }
+
+    public isPerScreenDesktops() {
+        if (!this.perScreenSeen && Workspace.screens.length > 1) {
+            const first = currentDesktopOn(Workspace.screens[0]);
+            this.perScreenSeen = Workspace.screens.some(output => currentDesktopOn(output) !== first);
+        }
+        return this.perScreenSeen;
+    }
+
+    private rememberShownDesktops() {
+        this.isPerScreenDesktops();
+        for (const output of Workspace.screens) {
+            const now = currentDesktopOn(output);
+            const before = this.shownDesktops.get(output.name);
+            if (before !== undefined && before !== now) {
+                this.previousDesktops.set(output.name, before);
+            }
+            this.shownDesktops.set(output.name, now);
+        }
+    }
+
+    public getPreviousDesktop(output: Output) {
+        return this.previousDesktops.get(output.name) ?? null;
+    }
+
+    public getFocusedOutput() {
+        return this.desktopManager.getFocusedOutput();
+    }
+
+    // the desktop shown on the focused output
+    public getFocusedKwinDesktop() {
+        return this.desktopManager.getCurrentKwinDesktop();
     }
 
     public onScreenResized(outputChanged = false) {

@@ -53,17 +53,27 @@ class Overview {
     }
 
 
+    // one layout when every output shows the same desktop; one per output (same desktop order) with per-screen desktops
     public buildLayout() {
+        if (!this.world.isPerScreenDesktops()) {
+            return JSON.stringify(this.buildOutputLayout(this.desktopManager.getFocusedOutput(), false));
+        }
+        return JSON.stringify({ screens: Workspace.screens.map(output => this.buildOutputLayout(output, true)) });
+    }
+
+    private buildOutputLayout(output: Output, onlyThisOutput: boolean) {
         const desktops: unknown[] = [];
-        let screen = { x: 0, y: 0, w: 0, h: 0 };
+        const full0 = Workspace.clientArea(ClientAreaOption.FullScreenArea, output, currentDesktopOn(output));
+        let screen = { x: full0.x, y: full0.y, w: full0.width, h: full0.height };
         let current = 0;
         const activeWindow = Workspace.activeWindow;
         const activeId = activeWindow === null ? "" : String(activeWindow.internalId);
+        const shown = currentDesktopOn(output);
         Workspace.desktops.forEach((kwinDesktop, index) => {
-            if (kwinDesktop === Workspace.currentDesktop) {
+            if (kwinDesktop === shown) {
                 current = index;
             }
-            const desktop = this.desktopManager.getDesktopInCurrentActivity(kwinDesktop);
+            const desktop = this.desktopManager.getDesktopInCurrentActivity(kwinDesktop, output.name);
             if (desktop === undefined) {
                 desktops.push({ id: kwinDesktop.id, scroll: 0, gapH: 0, gapV: 0, area: [0, 0, 0, 0], cols: [], floats: [] });
                 return;
@@ -85,7 +95,7 @@ class Overview {
                 });
                 return { x: x, w: width, tab: tabbed, wins: wins };
             });
-            const floats = this.clientManager.getFloatingOnDesktop(kwinDesktop).map(kwinClient => {
+            const floats = this.clientManager.getFloatingOnDesktop(kwinDesktop, onlyThisOutput ? output : undefined).map(kwinClient => {
                 const g = kwinClient.frameGeometry;
                 return Overview.windowJson(kwinClient, [g.x, g.y, g.width, g.height]);
             });
@@ -99,7 +109,7 @@ class Overview {
                 floats: floats,
             });
         });
-        return JSON.stringify({ screen: screen, current: current, active: activeId, desktops: desktops });
+        return { screen: screen, current: current, active: activeId, desktops: desktops };
     }
 
     private static windowJson(kwinClient: KwinClient, rect: number[]) {
@@ -150,10 +160,22 @@ class Overview {
         }
     }
 
+    // the output an event of the effect is about ("o"); the focused one when it is missing or unknown
+    private eventOutput(event: Record<string, any>) {
+        if (typeof event.o === "string") {
+            const found = Workspace.screens.find(output => output.name === event.o);
+            if (found !== undefined) {
+                return found;
+            }
+        }
+        return this.desktopManager.getFocusedOutput();
+    }
+
     private apply(event: { t: string, [key: string]: any }) {
         if (event === null || typeof event !== "object") {
             return false;
         }
+        const output = this.eventOutput(event);
         switch (event.t) {
         case "activate": {
             const kwinClient = this.clientManager.findClientById(event.w);
@@ -161,8 +183,8 @@ class Overview {
                 return false;
             }
             this.world.do(() => {
-                if (kwinClient.desktops.length === 1 && kwinClient.desktops[0] !== Workspace.currentDesktop) {
-                    gotoDesktop(kwinClient.desktops[0], "overview-window");
+                if (kwinClient.desktops.length === 1 && kwinClient.desktops[0] !== currentDesktopOn(output)) {
+                    gotoDesktop(kwinClient.desktops[0], "overview-window", output);
                 }
                 activateWindow(kwinClient, "overview");
             });
@@ -170,14 +192,14 @@ class Overview {
         }
         case "goto": {
             const kwinDesktop = Workspace.desktops[event.i];
-            if (kwinDesktop !== undefined && kwinDesktop !== Workspace.currentDesktop) {
-                gotoDesktop(kwinDesktop, "overview-desktop");
+            if (kwinDesktop !== undefined && kwinDesktop !== currentDesktopOn(output)) {
+                gotoDesktop(kwinDesktop, "overview-desktop", output);
             }
             return true;
         }
         case "scroll": {
             const kwinDesktop = Workspace.desktops.find(d => d.id === event.d);
-            const desktop = kwinDesktop === undefined ? undefined : this.desktopManager.getDesktopInCurrentActivity(kwinDesktop);
+            const desktop = kwinDesktop === undefined ? undefined : this.desktopManager.getDesktopInCurrentActivity(kwinDesktop, output.name);
             if (desktop === undefined) {
                 return false;
             }
@@ -186,7 +208,7 @@ class Overview {
         }
         case "focuscol": {
             const kwinDesktop = Workspace.desktops.find(d => d.id === event.d);
-            const desktop = kwinDesktop === undefined ? undefined : this.desktopManager.getDesktopInCurrentActivity(kwinDesktop);
+            const desktop = kwinDesktop === undefined ? undefined : this.desktopManager.getDesktopInCurrentActivity(kwinDesktop, output.name);
             if (kwinDesktop === undefined || desktop === undefined) {
                 return false;
             }
@@ -200,7 +222,7 @@ class Overview {
                 return true;
             }
             this.world.do(() => {
-                if (kwinDesktop === Workspace.currentDesktop) {
+                if (kwinDesktop === currentDesktopOn(output)) {
                     target.getWindowToFocus().focus();
                 } else {
                     grid.setActiveColumn(target);
@@ -215,7 +237,7 @@ class Overview {
             if (kwinClient === undefined || kwinDesktop === undefined) {
                 return false;
             }
-            this.world.do(clientManager => clientManager.overviewDrop(kwinClient, kwinDesktop, event.c, event.i));
+            this.world.do(clientManager => clientManager.overviewDrop(kwinClient, kwinDesktop, event.c, event.i, output.name));
             return true;
         }
         case "dropf": {

@@ -65,7 +65,7 @@ namespace FocusPassing {
 
             const target = this.currentRequest.target;
             if (this.currentRequest.isExpired() || !Workspace.windows.includes(target) ||
-                (target.desktops.length > 0 && !target.desktops.includes(Workspace.currentDesktop))) {
+                (target.desktops.length > 0 && !isOnShownDesktop(target))) {
                 // a desktop switch also leaves no window focused for a moment; activating the window from the old
                 // desktop then would switch straight back to it
                 this.clear();

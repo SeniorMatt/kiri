@@ -319,7 +319,7 @@ namespace ClientState {
                     const moved = kwinClient.move ? null : client.getMovedByKwinFrom(newGeometry, oldGeometry);
                     if (moved !== null) {
                         // the position is not Kiri's: put the window back
-                        if (Clients.isOnVirtualDesktop(kwinClient, Workspace.currentDesktop)) {
+                        if (isOnShownDesktop(kwinClient)) {
                             client.place(moved.rect.x, moved.rect.y, moved.rect.width, moved.rect.height);
                         } else {
                             window.column.grid.desktop.onLayoutChanged();

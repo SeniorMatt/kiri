@@ -51,7 +51,7 @@ class FocusFollowsMouse {
     }
 
     private static scrollAmount(window: KwinClient) {
-        const area = Workspace.clientArea(ClientAreaOption.PlacementArea, window.output, Workspace.currentDesktop);
+        const area = Workspace.clientArea(ClientAreaOption.PlacementArea, window.output, currentDesktopOn(window.output));
         const g = window.frameGeometry;
         const left = Math.max(0, area.x - g.x);
         const right = Math.max(0, g.x + g.width - (area.x + area.width));
@@ -76,7 +76,7 @@ class FocusFollowsMouse {
             if (point.x < g.x || point.x >= g.x + g.width || point.y < g.y || point.y >= g.y + g.height) {
                 continue;
             }
-            if (!window.minimized && (window.desktops.length === 0 || window.desktops.indexOf(Workspace.currentDesktop) >= 0)) {
+            if (!window.minimized && isOnShownDesktop(window)) {
                 return window;
             }
         }

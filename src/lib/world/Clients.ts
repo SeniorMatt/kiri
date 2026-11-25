@@ -45,7 +45,7 @@ namespace Clients {
             kwinClient.minimized = false;
         }
         if (kwinClient.desktops.length !== 1) {
-            kwinClient.desktops = [Workspace.currentDesktop];
+            kwinClient.desktops = [currentDesktopOn(kwinClient.output)];
         }
         if (kwinClient.activities.length !== 1) {
             kwinClient.activities = [Workspace.currentActivity];
@@ -55,12 +55,12 @@ namespace Clients {
     export function getKwinDesktopApprox(kwinClient: KwinClient) {
         switch (kwinClient.desktops.length) {
         case 0:
-            return Workspace.currentDesktop;
+            return currentDesktopOn(kwinClient.output);
         case 1:
             return kwinClient.desktops[0];
         default:
-            if (kwinClient.desktops.includes(Workspace.currentDesktop)) {
-                return Workspace.currentDesktop;
+            if (kwinClient.desktops.includes(currentDesktopOn(kwinClient.output))) {
+                return currentDesktopOn(kwinClient.output);
             } else {
                 return kwinClient.desktops[0];
             }

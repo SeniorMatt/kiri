@@ -20,7 +20,7 @@ interface Workspace {
 
     activeWindow: KwinClient|null;
 
-    readonly currentDesktopChanged: QSignal<[]>;
+    readonly currentDesktopChanged: QSignal<[KwinDesktop|undefined, KwinDesktop|undefined, Output|undefined]>;
     readonly windowAdded: QSignal<[KwinClient]>;
     readonly windowRemoved: QSignal<[KwinClient]>;
     readonly windowActivated: QSignal<[KwinClient|null]>;
@@ -32,6 +32,9 @@ interface Workspace {
 
     clientArea(option: ClientAreaOption, output: Output, kwinDesktop: KwinDesktop): QmlRect;
     raiseWindow(kwinClient: KwinClient): void;
+    // Plasma 6.7 and later
+    currentDesktopForScreen?(output: Output): KwinDesktop;
+    setCurrentDesktopForScreen?(desktop: KwinDesktop, output: Output): void;
     createDesktop(position: number, name: string): void;
     removeDesktop(desktop: KwinDesktop): void;
 }

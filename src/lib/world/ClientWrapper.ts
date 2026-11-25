@@ -394,7 +394,7 @@ class ClientWrapper {
     }
 
     public ensureVisible(screenSize: QmlRect) {
-        if (!Clients.isOnVirtualDesktop(this.kwinClient, Workspace.currentDesktop)) {
+        if (!isOnShownDesktop(this.kwinClient)) {
             return;
         }
         const frame = roundQtRect(this.kwinClient.frameGeometry);

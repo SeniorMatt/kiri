@@ -86,8 +86,22 @@ class DesktopManager {
         }
     }
 
+    public getOutputByName(name: string) {
+        return this.resolveScreen(name);
+    }
+
+    // the focused output, as an output
+    public getFocusedOutput() {
+        return this.resolveScreen(this.activeOutputName());
+    }
+
+    // the KWin desktop shown on the focused output
+    public getCurrentKwinDesktop() {
+        return currentDesktopOn(this.getFocusedOutput());
+    }
+
     public getCurrentDesktop() {
-        return this.getDesktop(Workspace.currentActivity, Workspace.currentDesktop);
+        return this.getDesktop(Workspace.currentActivity, this.getCurrentKwinDesktop());
     }
 
     public getDesktopInCurrentActivity(kwinDesktop: KwinDesktop, outputName?: string) {
@@ -151,8 +165,8 @@ class DesktopManager {
 
     // niri's focus-monitor-*: the output next to the active one in a direction
     public getOutputInDirection(fromName: string, dx: number, dy: number) {
-        const kwinDesktop = Workspace.currentDesktop;
         const center = (screen: Output) => {
+            const kwinDesktop = currentDesktopOn(screen);
             const area = Workspace.clientArea(ClientAreaOption.ScreenArea, screen, kwinDesktop);
             return { x: area.x + area.width / 2, y: area.y + area.height / 2 };
         };

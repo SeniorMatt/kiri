@@ -268,7 +268,7 @@ class ClientManager {
         if (kwinClient.dock) {
             return;
         }
-        const elsewhere = wantedDesktop !== undefined && wantedDesktop !== Workspace.currentDesktop;
+        const elsewhere = wantedDesktop !== undefined && wantedDesktop !== currentDesktopOn(kwinClient.output);
         if (open.focused === true) {
             if (Workspace.activeWindow !== kwinClient) {
                 KiriFocus.mark(kwinClient);
@@ -277,7 +277,7 @@ class ClientManager {
         } else if (open.focused === false || elsewhere) {
             const previous = kwinClient === this.lastFocusedClient ? this.focusedBefore : this.lastFocusedClient;
             if (previous !== null && previous !== kwinClient && this.clientMap.has(previous) && !previous.minimized &&
-                Clients.isOnVirtualDesktop(previous, Workspace.currentDesktop) && Workspace.activeWindow === kwinClient) {
+                isOnShownDesktop(previous) && Workspace.activeWindow === kwinClient) {
                 KiriFocus.mark(previous);
                 activateWindow(previous, "open-focused false");
             }
@@ -577,7 +577,7 @@ class ClientManager {
         // like niri, the focus goes back to the layout's active window
         const previous = this.lastFocusedClient;
         const target = previous !== null && this.clientMap.has(previous) && !previous.minimized &&
-            Clients.isOnVirtualDesktop(previous, Workspace.currentDesktop) ? previous : null;
+            isOnShownDesktop(previous) ? previous : null;
         if (target !== null && target !== active) {
             activateWindow(target, "shell-return");
         }
@@ -1093,7 +1093,7 @@ class ClientManager {
         this.warpedToTiled = null;
         if (warped !== null && warped.client !== kwinClient && Date.now() - warped.time < 800 &&
             // not after a switch to another desktop or a minimize, where KWin's pick is the user's
-            Clients.isOnVirtualDesktop(warped.client, Workspace.currentDesktop) && !warped.client.minimized &&
+            isOnShownDesktop(warped.client) && !warped.client.minimized &&
 
             this.isFloating(kwinClient) && !KiriFocus.peek(kwinClient) && this.clientMap.has(warped.client)) {
             KiriFocus.mark(warped.client);
@@ -1191,7 +1191,7 @@ class ClientManager {
     private isFloatingOnCurrentDesktop(kwinClient: KwinClient) {
         return this.isUserFloating(kwinClient) &&
             !kwinClient.minimized &&
-            kwinClient.desktops.includes(Workspace.currentDesktop) &&
+            kwinClient.desktops.includes(currentDesktopOn(kwinClient.output)) &&
             (kwinClient.activities.length === 0 || kwinClient.activities.includes(Workspace.currentActivity)) &&
             kwinClient.output === Workspace.activeScreen;
     }
@@ -1378,13 +1378,16 @@ class ClientManager {
         return undefined;
     }
 
-    public getFloatingOnDesktop(kwinDesktop: KwinDesktop) {
+    public getFloatingOnDesktop(kwinDesktop: KwinDesktop, output?: Output) {
         const result: KwinClient[] = [];
         for (const kwinClient of this.clientMap.keys()) {
             if (!this.isFloating(kwinClient) || kwinClient.minimized || !(kwinClient.normalWindow || kwinClient.dialog)) {
                 continue;
             }
-            const there = kwinClient.desktops.length === 0 ? kwinDesktop === Workspace.currentDesktop : kwinClient.desktops.includes(kwinDesktop);
+            if (output !== undefined && kwinClient.output.name !== output.name) {
+                continue;
+            }
+            const there = kwinClient.desktops.length === 0 ? kwinDesktop === currentDesktopOn(kwinClient.output) : kwinClient.desktops.includes(kwinDesktop);
             if (there) {
                 result.push(kwinClient);
             }
@@ -1393,9 +1396,9 @@ class ClientManager {
     }
 
     // a tiled window dropped in the overview: `columnIndex` and `tile` count the target's columns without the dragged window
-    public overviewDrop(kwinClient: KwinClient, kwinDesktop: KwinDesktop, columnIndex: number, tile: number) {
+    public overviewDrop(kwinClient: KwinClient, kwinDesktop: KwinDesktop, columnIndex: number, tile: number, outputName?: string) {
         const window = this.findTiledWindow(kwinClient);
-        const desktop = this.desktopManager.getDesktopInCurrentActivity(kwinDesktop);
+        const desktop = this.desktopManager.getDesktopInCurrentActivity(kwinDesktop, outputName);
         if (window === null || desktop === undefined) {
             return;
         }

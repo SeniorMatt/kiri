@@ -340,7 +340,7 @@ function flushCursorWarp() {
         warpBoth = false;
         return;
     }
-    if (active !== null && active.desktops.length > 0 && !active.desktops.includes(Workspace.currentDesktop)) {
+    if (active !== null && active.desktops.length > 0 && !isOnShownDesktop(active)) {
         return;
     }
     // niri does not warp while the overview is up
@@ -357,7 +357,7 @@ function flushCursorWarp() {
     warpPending = false;
     warpBoth = false;
     const frame = placed ?? active.frameGeometry;
-    const view = Workspace.clientArea(ClientAreaOption.ScreenArea, active.output, Workspace.currentDesktop);
+    const view = Workspace.clientArea(ClientAreaOption.ScreenArea, active.output, currentDesktopOn(active.output));
     const x1 = Math.max(frame.x, view.x);
     const y1 = Math.max(frame.y, view.y);
     const x2 = Math.min(frame.x + frame.width, view.x + view.width);

@@ -683,13 +683,13 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
             name: "desktop-next",
             description: "Desktop: go to next",
             defaultKeys: ["Meta+PgDown", "Meta+U"],
-            action: () => switchToDesktop(currentDesktopIndex() + 1),
+            action: () => switchToDesktop(world, currentDesktopIndex(world) + 1),
         },
         {
             name: "desktop-previous",
             description: "Desktop: go to previous",
             defaultKeys: ["Meta+PgUp", "Meta+I"],
-            action: () => switchToDesktop(currentDesktopIndex() - 1),
+            action: () => switchToDesktop(world, currentDesktopIndex(world) - 1),
         },
         {
             name: "desktop-move-down",
@@ -870,20 +870,21 @@ function setWindowedFullScreen(world: World, windowed: boolean) {
 }
 
 function switchToPreviousDesktop(world: World) {
-    const previous = world.previousDesktop;
+    const output = world.getFocusedOutput();
+    const previous = world.getPreviousDesktop(output);
     if (previous !== null && Workspace.desktops.includes(previous)) {
-        gotoDesktop(previous, "previous-desktop");
+        gotoDesktop(previous, "previous-desktop", output);
     }
 }
 
-function currentDesktopIndex() {
-    return Workspace.desktops.indexOf(Workspace.currentDesktop);
+function currentDesktopIndex(world: World) {
+    return Workspace.desktops.indexOf(world.getFocusedKwinDesktop());
 }
 
-function switchToDesktop(index: number) {
+function switchToDesktop(world: World, index: number) {
     const desktop = Workspace.desktops[index];
     if (desktop !== undefined) {
-        gotoDesktop(desktop, shortcutEvent === null ? "focus-desktop" : "focus-desktop " + shortcutEvent);
+        gotoDesktop(desktop, shortcutEvent === null ? "focus-desktop" : "focus-desktop " + shortcutEvent, world.getFocusedOutput());
     }
 }
 
@@ -893,10 +894,10 @@ function focusDesktop(world: World, index: number) {
     if (desktop === undefined) {
         return;
     }
-    if (world.desktopAutoBackAndForth && desktop === Workspace.currentDesktop) {
+    if (world.desktopAutoBackAndForth && desktop === world.getFocusedKwinDesktop()) {
         switchToPreviousDesktop(world);
     } else {
-        switchToDesktop(index);
+        switchToDesktop(world, index);
     }
 }
 

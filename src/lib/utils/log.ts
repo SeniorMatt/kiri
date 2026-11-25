@@ -19,7 +19,8 @@ function runShortcutEvent(name: string, kind: string, action: () => void) {
         shortcutEvent = null;
     }
 }
-let lastDesktopLabel: string|null = null;
+// the desktop each output showed at the last logged change
+const lastDesktopLabels = new Map<string, string>();
 
 function desktopLabel(desktop: KwinDesktop) {
     const index = Workspace.desktops.indexOf(desktop);
@@ -27,17 +28,19 @@ function desktopLabel(desktop: KwinDesktop) {
 }
 
 function initDesktopLog() {
-    lastDesktopLabel = desktopLabel(Workspace.currentDesktop);
+    for (const output of Workspace.screens) {
+        lastDesktopLabels.set(output.name, desktopLabel(currentDesktopOn(output)));
+    }
 }
 
 // the only way for Kiri to switch the desktop, so that the journal can say why
-function gotoDesktop(desktop: KwinDesktop, cause: string) {
-    if (desktop === Workspace.currentDesktop) {
+function gotoDesktop(desktop: KwinDesktop, cause: string, output: Output = Workspace.activeScreen) {
+    if (desktop === currentDesktopOn(output)) {
         return;
     }
     desktopCause = cause;
     try {
-        Workspace.currentDesktop = desktop;
+        setCurrentDesktopOn(desktop, output);
     } finally {
         desktopCause = null;
     }
@@ -46,19 +49,22 @@ function gotoDesktop(desktop: KwinDesktop, cause: string) {
 // Workspace.activeWindow = ..., logged when the window is on another desktop: KWin then switches to that desktop,
 // which can undo a desktop switch that is still running
 function activateWindow(kwinClient: KwinClient, cause: string) {
-    if (kwinClient.desktops.length > 0 && !kwinClient.desktops.includes(Workspace.currentDesktop)) {
-        log("activating a window of another desktop:", cause, "desktop", desktopLabel(kwinClient.desktops[0]), "now on", desktopLabel(Workspace.currentDesktop));
+    if (!isOnShownDesktop(kwinClient)) {
+        log("activating a window of another desktop:", cause, "desktop", desktopLabel(kwinClient.desktops[0]), "now on", desktopLabel(currentDesktopOn(kwinClient.output)));
     }
     Workspace.activeWindow = kwinClient;
 }
 
-function logDesktopChange() {
-    const now = desktopLabel(Workspace.currentDesktop);
-    if (now === lastDesktopLabel) {
+function logDesktopChange(output: Output|undefined) {
+    const outputName = output?.name ?? "";
+    const now = desktopLabel(currentDesktopOn(output));
+    const last = lastDesktopLabels.get(outputName);
+    const on = output === undefined || Workspace.screens.length < 2 ? "" : " on " + outputName;
+    if (now === last) {
         // every emission is logged, so that a switch that is undone inside the same signal cascade shows up
-        log("desktop", now, "->", now, "(" + (desktopCause ?? "KWin") + ", unchanged, of", Workspace.desktops.length, "desktops)");
+        log("desktop", now, "->", now + on, "(" + (desktopCause ?? "KWin") + ", unchanged, of", Workspace.desktops.length, "desktops)");
         return;
     }
-    log("desktop", lastDesktopLabel ?? "?", "->", now, "(" + (desktopCause ?? "KWin") + ")");
-    lastDesktopLabel = now;
+    log("desktop", last ?? "?", "->", now + on, "(" + (desktopCause ?? "KWin") + ")");
+    lastDesktopLabels.set(outputName, now);
 }

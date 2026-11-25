@@ -141,7 +141,7 @@ class Actions {
         if (below !== null) {
             below.focus();
         } else {
-            Actions.switchDesktop(1);
+            Actions.switchDesktop(1, dm);
         }
     };
 
@@ -150,14 +150,15 @@ class Actions {
         if (above !== null) {
             above.focus();
         } else {
-            Actions.switchDesktop(-1);
+            Actions.switchDesktop(-1, dm);
         }
     };
 
-    public static switchDesktop(step: number) {
-        const target = Workspace.desktops[Workspace.desktops.indexOf(Workspace.currentDesktop) + step];
+    public static switchDesktop(step: number, dm: DesktopManager) {
+        const output = dm.getFocusedOutput();
+        const target = Workspace.desktops[Workspace.desktops.indexOf(currentDesktopOn(output)) + step];
         if (target !== undefined) {
-            gotoDesktop(target, "switch-desktop");
+            gotoDesktop(target, "switch-desktop", output);
         }
     }
 
@@ -863,7 +864,7 @@ class Actions {
         if (output === null) {
             return;
         }
-        const window = dm.getDesktopInCurrentActivity(Workspace.currentDesktop, output.name)?.grid.getLastFocusedWindow() ?? null;
+        const window = dm.getDesktopInCurrentActivity(currentDesktopOn(output), output.name)?.grid.getLastFocusedWindow() ?? null;
         if (window !== null) {
             window.focus();
             return;
@@ -874,7 +875,7 @@ class Actions {
             return;
         }
         dm.setForcedOutput(output.name);
-        const area = Workspace.clientArea(ClientAreaOption.ScreenArea, output, Workspace.currentDesktop);
+        const area = Workspace.clientArea(ClientAreaOption.ScreenArea, output, currentDesktopOn(output));
         warpPointerTo(Math.round(area.x + area.width / 2), Math.round(area.y + area.height / 2));
     };
 
@@ -968,7 +969,7 @@ class Actions {
         const wasFocused = window.isFocused();
         column.moveToGrid(newGrid, newGrid.getLastFocusedColumn() ?? newGrid.getLastColumn());
         if (wasFocused && follow) {
-            gotoDesktop(newGrid.desktop.kwinDesktop, "move-window-follow");
+            gotoDesktop(newGrid.desktop.kwinDesktop, "move-window-follow", dm.getOutputByName(newGrid.desktop.outputName));
             window.focus();
         }
     };
@@ -988,7 +989,7 @@ class Actions {
         window.moveToColumn(newColumn, true, wasFocused ? FocusPassing.Type.Immediate : FocusPassing.Type.None);
         window.client.kwinClient.desktops = [newGrid.desktop.kwinDesktop];
         if (wasFocused && follow) {
-            gotoDesktop(newGrid.desktop.kwinDesktop, "move-window-follow");
+            gotoDesktop(newGrid.desktop.kwinDesktop, "move-window-follow", dm.getOutputByName(newGrid.desktop.outputName));
             window.focus();
         }
     };

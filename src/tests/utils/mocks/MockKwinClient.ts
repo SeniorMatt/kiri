@@ -80,7 +80,7 @@ class MockKwinClient {
     ) {
         this.windowedFrameGeometry = _frameGeometry.clone();
         this.transient = transientFor !== null;
-        this._desktops = [Workspace.currentDesktop];
+        this._desktops = [(Workspace as MockWorkspace).currentDesktopForScreen(this.output)];
         this.activities = [Workspace.currentActivity];
     }
 
@@ -104,7 +104,7 @@ class MockKwinClient {
             ),
         );
 
-        const area = Workspace.clientArea(ClientAreaOption.MaximizeArea, this.output, Workspace.currentDesktop);
+        const area = Workspace.clientArea(ClientAreaOption.MaximizeArea, this.output, (Workspace as MockWorkspace).currentDesktopForScreen(this.output));
         this.frameGeometry = new MockQmlRect(
             horizontally ? area.x        : this.windowedFrameGeometry.x,
             vertically   ? area.y        : this.windowedFrameGeometry.y,

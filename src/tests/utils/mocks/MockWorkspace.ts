@@ -13,9 +13,12 @@ class MockWorkspace {
     public cursorPos = new MockQmlPoint(0, 0);
 
     private _currentDesktop = this.desktops[0];
+    // Plasma 6.7's "switch desktops independently for each screen": every output has its own current desktop
+    private perScreenDesktops = false;
+    private readonly outputDesktops = new Map<string, KwinDesktop>();
     private _activeWindow: KwinClient|null = null;
 
-    public readonly currentDesktopChanged = new MockQSignal<[]>();
+    public readonly currentDesktopChanged = new MockQSignal<[KwinDesktop|undefined, KwinDesktop|undefined, Output|undefined]>();
     public readonly windowAdded = new MockQSignal<[KwinClient]>();
     public readonly windowRemoved = new MockQSignal<[KwinClient]>();
     public readonly windowActivated = new MockQSignal<[KwinClient|null]>();
@@ -129,9 +132,17 @@ class MockWorkspace {
                 }
             }
         }
-        if (this._currentDesktop === desktop) {
+        if (this.perScreenDesktops) {
+            for (const output of this.screens) {
+                if (this.currentDesktopForScreen(output) === desktop) {
+                    const next = this.desktops[Math.max(0, index - 1)];
+                    this.outputDesktops.set(output.name, next);
+                    this.currentDesktopChanged.fire(desktop, next, output);
+                }
+            }
+        } else if (this._currentDesktop === desktop) {
             this._currentDesktop = this.desktops[Math.max(0, index - 1)];
-            this.currentDesktopChanged.fire();
+            this.fireDesktopChanged(desktop, this._currentDesktop);
         }
         this.desktopsChanged.fire();
     }
@@ -270,13 +281,54 @@ class MockWorkspace {
         window.interactiveMoveResizeFinished.fire();
     }
 
+    // turn the per-screen desktops on (every output starts on the current desktop) or off again
+    public setPerScreenDesktops(enabled: boolean) {
+        if (enabled === this.perScreenDesktops) {
+            return;
+        }
+        this.perScreenDesktops = enabled;
+        this.outputDesktops.clear();
+        if (!enabled) {
+            this._currentDesktop = this.currentDesktopForScreen(this.activeOutput());
+        }
+    }
+
+    // like KWin: the output of the active window, or the one the pointer was last on
+    private activeOutput() {
+        return this.perScreenDesktops && this._activeWindow !== null ? this._activeWindow.output : this.activeScreen;
+    }
+
+    public currentDesktopForScreen(output: Output) {
+        return this.perScreenDesktops ? this.outputDesktops.get(output.name) ?? this._currentDesktop : this._currentDesktop;
+    }
+
+    // switches that output only; without the per-screen setting it switches them all, like KWin
+    public setCurrentDesktopForScreen(desktop: KwinDesktop, output: Output) {
+        if (this.perScreenDesktops) {
+            const old = this.currentDesktopForScreen(output);
+            if (old !== desktop) {
+                this.outputDesktops.set(output.name, desktop);
+                this.currentDesktopChanged.fire(old, desktop, output);
+            }
+            return;
+        }
+        const old = this._currentDesktop;
+        this._currentDesktop = desktop;
+        this.fireDesktopChanged(old, desktop);
+    }
+
+    private fireDesktopChanged(old: KwinDesktop, desktop: KwinDesktop) {
+        for (const output of this.screens) {
+            this.currentDesktopChanged.fire(old, desktop, output);
+        }
+    }
+
     public get currentDesktop() {
-        return this._currentDesktop;
+        return this.currentDesktopForScreen(this.activeOutput());
     }
 
     public set currentDesktop(currentDesktop: KwinDesktop) {
-        this._currentDesktop = currentDesktop;
-        this.currentDesktopChanged.fire();
+        this.setCurrentDesktopForScreen(currentDesktop, this.activeOutput());
     }
 
     public get activeWindow() {

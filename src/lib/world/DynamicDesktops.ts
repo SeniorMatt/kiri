@@ -161,7 +161,7 @@ class DynamicDesktops {
         const desktops = Workspace.desktops;
         const result: KwinDesktop[] = [];
         for (let i = desktops.length - 2; i >= (this.config.emptyAbove ? 1 : 0); i--) {
-            if (desktops[i] !== Workspace.currentDesktop && this.isEmpty(desktops[i]) && !this.isReserved(desktops[i])) {
+            if (!isDesktopShownAnywhere(desktops[i]) && this.isEmpty(desktops[i]) && !this.isReserved(desktops[i])) {
                 result.push(desktops[i]);
             }
         }
@@ -214,8 +214,10 @@ class DynamicDesktops {
             }
             if (this.allEmptyAboveFirst()) {
                 const [first, second] = Workspace.desktops;
-                if (Workspace.currentDesktop === second) {
-                    gotoDesktop(first, "dynamic-desktops");
+                for (const output of Workspace.screens) {
+                    if (currentDesktopOn(output) === second) {
+                        gotoDesktop(first, "dynamic-desktops", output);
+                    }
                 }
                 Workspace.removeDesktop(second);
             }
