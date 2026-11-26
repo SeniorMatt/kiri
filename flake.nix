@@ -25,7 +25,7 @@
               pkg-config
               gnumake
               gcc
-              extra-cmake-modules
+              kde.extra-cmake-modules
               libepoxy
               libdrm
               vulkan-headers
