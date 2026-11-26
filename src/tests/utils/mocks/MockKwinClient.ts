@@ -1,3 +1,7 @@
+function fixedByRefusal(asked: MockQmlRect, old: MockQmlRect) {
+    return Math.round(asked.width) === Math.round(old.width) && Math.round(asked.height) === Math.round(old.height);
+}
+
 class MockKwinClient {
     public readonly __brand = "KwinClient";
 
@@ -261,6 +265,11 @@ class MockKwinClient {
 
     private committing = false;
 
+    // like Chromium: a new size is committed in two steps, the position at the old size first, then the size
+    public twoStep = false;
+    // like a fixed-size window that is moved but keeps its size
+    public refusesSize = false;
+
     // a client that commits a height other than the asked one (a terminal that snaps to whole cells)
     public heightStep: number | null = null;
     // like KWin, which keeps 100 px of a window on the screen whenever it commits an answer to a configure
@@ -311,6 +320,18 @@ class MockKwinClient {
                 this.requestedGeometries.push(new MockQmlRect(frameGeometry.x, frameGeometry.y, frameGeometry.width, frameGeometry.height));
             }
             return;
+        }
+        if (this.refusesSize && !byKwin && !fixedByRefusal(frameGeometry, this._frameGeometry)) {
+            frameGeometry = new MockQmlRect(frameGeometry.x, frameGeometry.y, this._frameGeometry.width, this._frameGeometry.height);
+        }
+        if (this.twoStep && !byKwin) {
+            const old = this._frameGeometry;
+            const resized = Math.round(frameGeometry.width) !== Math.round(old.width) || Math.round(frameGeometry.height) !== Math.round(old.height);
+            const moved = Math.round(frameGeometry.x) !== Math.round(old.x) || Math.round(frameGeometry.y) !== Math.round(old.y);
+            if (resized && moved) {
+                this._frameGeometry = new MockQmlRect(frameGeometry.x, frameGeometry.y, old.width, old.height, this.frameGeometryChanged.fire.bind(this.frameGeometryChanged));
+                this.frameGeometryChanged.fire(old);
+            }
         }
         const oldFrameGeometry = this._frameGeometry;
         if (!byKwin && (this.heightStep !== null || this.keepsVisible)) {

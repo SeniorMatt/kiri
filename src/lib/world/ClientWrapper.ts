@@ -30,6 +30,11 @@ class ClientWrapper {
     private answeredSizeRequest = false;
     private static readonly maxConfigureWaitMs = 100;
     private askedSize: { width: number, height: number } | null = null;
+    private sizeBeforeAsk: { width: number, height: number } | null = null;
+    // a window that commits the new position at its old size first (Chromium) is not refusing; one that stays at its
+    // old size (a fixed-size window) is, once this has passed without another answer
+    private static readonly partialCommitWaitMs = 500;
+    private readonly partialCommitDelayer: Delayer;
     private lastAnswer: ClientWrapper.Answer | null = null;
     private static readonly maxAnswerDelayMs = 1500;
     private refusal: ClientWrapper.Answer | null = null;
@@ -57,6 +62,7 @@ class ClientWrapper {
         this.rulesSignalManager = rulesSignalManager;
         this.preferredWidth = kwinClient.frameGeometry.width.round();
         this.manipulatingGeometry = new Doer();
+        this.partialCommitDelayer = new Delayer(ClientWrapper.partialCommitWaitMs, () => this.onPartialCommitWaitOver());
         this.lastPlacement = null;
         this.stateManager = new ClientState.Manager(constructInitialState(this));
     }
@@ -193,6 +199,10 @@ class ClientWrapper {
             this.awaitingCommit = current.width !== frameWidth || current.height !== frameHeight;
             if (this.awaitingCommit) {
                 this.askedSize = { width: frameWidth, height: frameHeight };
+                this.sizeBeforeAsk = { width: Math.round(current.width), height: Math.round(current.height) };
+                this.partialCommitDelayer.run();
+            } else {
+                this.partialCommitDelayer.stop();
             }
             const frame = frameWidth === width && frameHeight === height ? this.lastPlacement : Qt.rect(x, y, frameWidth, frameHeight);
             this.kwinClient.frameGeometry = frame;
@@ -203,6 +213,45 @@ class ClientWrapper {
                 this.kwinClient.frameGeometry = frame;
             }
         });
+    }
+
+    private isPartialCommit(frame: { width: number, height: number }) {
+        const before = this.sizeBeforeAsk;
+        const asked = this.askedSize;
+        const placed = this.lastPlacement;
+        if (before === null || asked === null || placed === null) {
+            return false;
+        }
+        const position = this.kwinClient.frameGeometry;
+        return frame.width === before.width && frame.height === before.height &&
+            (before.width !== asked.width || before.height !== asked.height) &&
+            Math.round(position.x) === Math.round(placed.x) && Math.round(position.y) === Math.round(placed.y);
+    }
+
+    private recordAnswer(frame: { width: number, height: number }) {
+        const asked = this.askedSize;
+        if (asked === null || (frame.width === asked.width && frame.height === asked.height)) {
+            return;
+        }
+        const answer = { askedWidth: asked.width, askedHeight: asked.height, width: frame.width, height: frame.height };
+        const last = this.lastAnswer;
+        if (last !== null && last.askedWidth === answer.askedWidth && last.askedHeight === answer.askedHeight && last.width === answer.width && last.height === answer.height) {
+            this.refusal = answer;
+            this.learnHeight(answer);
+        }
+        this.lastAnswer = answer;
+    }
+
+    private onPartialCommitWaitOver() {
+        if (!this.awaitingCommit || this.askedSize === null || this.sizeBeforeAsk === null ||
+            Date.now() - this.lastPlacementTime < ClientWrapper.partialCommitWaitMs) {
+            return;
+        }
+        const frame = { width: this.kwinClient.frameGeometry.width.round(), height: this.kwinClient.frameGeometry.height.round() };
+        if (frame.width === this.sizeBeforeAsk.width && frame.height === this.sizeBeforeAsk.height) {
+            this.awaitingCommit = false;
+            this.recordAnswer(frame);
+        }
     }
 
     public setFrame(rect: QmlRect) {
@@ -406,6 +455,7 @@ class ClientWrapper {
     }
 
     public destroy(passFocus: FocusPassing.Type) {
+        this.partialCommitDelayer.destroy();
         setParkedPosition(String(this.kwinClient.internalId), null);
         setWindowUrgent(String(this.kwinClient.internalId), false);
         setWindowDecorations(String(this.kwinClient.internalId), null);
@@ -460,15 +510,10 @@ class ClientWrapper {
             // KWin may show the asked size for a moment: only another size right after the ask counts
             if (client.askedSize !== null && Date.now() - client.lastPlacementTime < ClientWrapper.maxAnswerDelayMs) {
                 const frame = { width: client.kwinClient.frameGeometry.width.round(), height: client.kwinClient.frameGeometry.height.round() };
-                if (frame.width !== client.askedSize.width || frame.height !== client.askedSize.height) {
-                    const answer = { askedWidth: client.askedSize.width, askedHeight: client.askedSize.height, width: frame.width, height: frame.height };
-                    const last = client.lastAnswer;
-                    if (last !== null && last.askedWidth === answer.askedWidth && last.askedHeight === answer.askedHeight && last.width === answer.width && last.height === answer.height) {
-                        client.refusal = answer;
-                        client.learnHeight(answer);
-                    }
-                    client.lastAnswer = answer;
+                if (client.awaitingCommit && client.isPartialCommit(frame)) {
+                    return; // the position came first and the size follows
                 }
+                client.recordAnswer(frame);
             }
             client.awaitingCommit = false;
         });
