@@ -10,6 +10,7 @@
 #include <pointer_input.h>
 #include <virtualdesktops.h>
 #include <window.h>
+#include <core/colorspace.h>
 #include <core/pixelgrid.h>
 #include <core/renderviewport.h>
 #include <effect/effecthandler.h>
@@ -226,6 +227,13 @@ QMatrix4x4 logicalProjection(const KWin::RenderViewport &viewport)
     return m;
 }
 
+// Kiri's colours are sRGB; the shaders convert them to the encoding and gamut of the output being painted, like KWin's own
+// effects do (matters under HDR or a wide-gamut ICC profile).
+void setOutputColorspace(KWin::GLShader *shader, const KWin::RenderTarget &renderTarget)
+{
+    shader->setColorspaceUniforms(KWin::ColorDescription::sRGB, renderTarget.colorDescription(), KWin::RenderingIntent::Perceptual);
+}
+
 void appendQuads(std::vector<QVector2D> &vertices, const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion, const KWin::RectF &rect)
 {
     for (const KWin::Rect &deviceRect : deviceRegion.rects()) {
@@ -415,6 +423,7 @@ void Effect::warmShaders()
     texture->render(QSizeF(64, 64));
     KWin::ShaderManager::instance()->popShader();
     KWin::ShaderManager::instance()->pushShader(m_ringShader.get());
+    m_ringShader->setColorspaceUniforms(KWin::ColorDescription::sRGB, KWin::ColorDescription::sRGB, KWin::RenderingIntent::Perceptual); // the texture is sRGB: no conversion
     m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, projection);
     m_ringShader->setUniform("rect", QVector4D(8, 8, 48, 48));
     m_ringShader->setUniform("radii", QVector4D(8, 8, 8, 8));
@@ -432,6 +441,7 @@ void Effect::warmShaders()
     vbo->render(GL_TRIANGLES);
     KWin::ShaderManager::instance()->popShader();
     KWin::ShaderManager::instance()->pushShader(m_shadowShader.get());
+    m_shadowShader->setColorspaceUniforms(KWin::ColorDescription::sRGB, KWin::ColorDescription::sRGB, KWin::RenderingIntent::Perceptual); // the texture is sRGB: no conversion
     m_shadowShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, projection);
     m_shadowShader->setUniform("box", QVector4D(8, 8, 48, 48));
     m_shadowShader->setUniform("boxRadius", 8.0f);
@@ -1185,7 +1195,7 @@ void Effect::setInsertHint(const QString &json)
 }
 
 // niri's insert hint: filled with a colour or gradient, drawn like a focus ring of width 0
-void Effect::drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion)
+void Effect::drawInsertHint(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion)
 {
     if (m_insertHint.isEmpty() || deviceRegion.isEmpty() || !m_settings.insertHintEnabled) {
         return;
@@ -1194,6 +1204,7 @@ void Effect::drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Re
     const double radius = std::min<double>(look.cornerRadius + (look.border.enabled ? look.border.width : 0),
                                            std::min(m_insertHint.width(), m_insertHint.height()) / 2);
     KWin::ShaderManager::instance()->pushShader(m_ringShader.get());
+    setOutputColorspace(m_ringShader.get(), renderTarget);
     m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, logicalProjection(viewport));
     m_ringShader->setUniform("rect", QVector4D(m_insertHint.x(), m_insertHint.y(), m_insertHint.width(), m_insertHint.height()));
     m_ringShader->setUniform("radii", QVector4D(radius, radius, radius, radius));
@@ -1250,7 +1261,7 @@ KIRI_PAINT_RET Effect::paintScreen(const KWin::RenderTarget &renderTarget, const
                 }
             }
         }
-        drawInsertHint(viewport, region);
+        drawInsertHint(renderTarget, viewport, region);
     }
     KIRI_RET(result);
 }
@@ -1644,7 +1655,7 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
         background = m_settings.outputBackgrounds.value(w->screen()->name(), background);
     }
     if (w->isDesktop() && isActive() && background.isValid() && !w->data(CaptureRole).toBool()) {
-        fillRect(viewport, KWin::RectF(w->frameGeometry()), background, deviceRegion, data.opacity());
+        fillRect(renderTarget, viewport, KWin::RectF(w->frameGeometry()), background, deviceRegion, data.opacity());
         KIRI_RET(true);
     }
     const double radius = radiusFor(w);
@@ -1668,13 +1679,13 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
     if (isActive() && !w->data(CaptureRole).toBool() && (w->isNormalWindow() || w->isDialog())) {
         const KWin::RectF f = w->frameGeometry();
         const KWin::RectF painted(f.x() + data.xTranslation(), f.y() + data.yTranslation(), f.width() * data.xScale(), f.height() * data.yScale());
-        drawBackdrop(viewport, w, painted, deviceRegion, data.opacity());
+        drawBackdrop(renderTarget, viewport, w, painted, deviceRegion, data.opacity());
         if (decorated(w) && lookOf(w).shadow.on) {
-            drawShadow(viewport, w, painted, deviceRegion, data.opacity() * (1.0 - expandedProgress(w)));
+            drawShadow(renderTarget, viewport, w, painted, deviceRegion, data.opacity() * (1.0 - expandedProgress(w)));
         }
     }
     if (!m_insertHint.isEmpty() && !m_hintWindow.isNull() && w->internalId() == m_hintWindow && isActive() && !w->data(CaptureRole).toBool()) {
-        drawInsertHint(viewport, deviceRegion);
+        drawInsertHint(renderTarget, viewport, deviceRegion);
     }
     if (KIRI_PAINT().isDebugEnabled() && w->isNormalWindow() && !w->data(CaptureRole).toBool()) {
         const KWin::RectF f = w->frameGeometry();
@@ -1691,7 +1702,7 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
             const KWin::RectF frame = w->frameGeometry();
             const KWin::RectF visual(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
                                      frame.width() * data.xScale(), frame.height() * data.yScale());
-            drawRing(viewport, w, visual, deviceRegion, data.opacity() * (1.0 - expandedProgress(w)), true);
+            drawRing(renderTarget, viewport, w, visual, deviceRegion, data.opacity() * (1.0 - expandedProgress(w)), true);
         }
     }
     const bool result = KIRI_CALL(OffscreenEffect::drawWindow(renderTarget, viewport, w, mask, deviceRegion, data));
@@ -1719,7 +1730,7 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
         const KWin::RectF frame = w->frameGeometry();
         const KWin::RectF visual(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
                                  frame.width() * data.xScale(), frame.height() * data.yScale());
-        drawRing(viewport, w, visual, deviceRegion, data.opacity() * fade);
+        drawRing(renderTarget, viewport, w, visual, deviceRegion, data.opacity() * fade);
     }
     if (m_settings.tabEnabled && isActive() && fade > 0) {
         if (const TabGroup *group = tabGroupOf(w); group && group->windows.value(group->active) == w->internalId()
@@ -1727,13 +1738,13 @@ KIRI_PAINT_RET Effect::drawWindow(const KWin::RenderTarget &renderTarget, const 
             const KWin::RectF frame = w->frameGeometry();
             const KWin::RectF visual(frame.x() + data.xTranslation(), frame.y() + data.yTranslation(),
                                      frame.width() * data.xScale(), frame.height() * data.yScale());
-            drawTabIndicator(viewport, *group, w, visual, deviceRegion, data.opacity() * fade, tabProgress(*group));
+            drawTabIndicator(renderTarget, viewport, *group, w, visual, deviceRegion, data.opacity() * fade, tabProgress(*group));
         }
     }
     KIRI_RET(result);
 }
 
-void Effect::fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &rect, const QColor &color, const KWin::Region &deviceRegion, double opacity)
+void Effect::fillRect(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, const KWin::RectF &rect, const QColor &color, const KWin::Region &deviceRegion, double opacity)
 {
     std::vector<QVector2D> vertices;
     for (const KWin::Rect &deviceRect : deviceRegion.rects()) {
@@ -1751,7 +1762,8 @@ void Effect::fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &r
         return;
     }
     const double alpha = color.alphaF() * opacity;
-    KWin::GLShader *shader = KWin::ShaderManager::instance()->pushShader(KWin::ShaderTrait::UniformColor);
+    KWin::GLShader *shader = KWin::ShaderManager::instance()->pushShader(KWin::ShaderTrait::UniformColor | KWin::ShaderTrait::TransformColorspace);
+    setOutputColorspace(shader, renderTarget);
     shader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, logicalProjection(viewport));
     shader->setUniform(KWin::GLShader::ColorUniform::Color, QVector4D(color.redF() * alpha, color.greenF() * alpha, color.blueF() * alpha, alpha));
     KWin::GLVertexBuffer *vbo = KWin::GLVertexBuffer::streamingBuffer();
@@ -1765,7 +1777,7 @@ void Effect::fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &r
 }
 
 // niri's tab indicator: one rectangle per window beside the column, in the gradient of its state, dimmed when the column is not active; `frame` is where the shown window is painted
-void Effect::drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, KWin::EffectWindow *active, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, double progress)
+void Effect::drawTabIndicator(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, const TabGroup &group, KWin::EffectWindow *active, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, double progress)
 {
     const int count = group.windows.size();
     const double scale = active->screen() ? active->screen()->scale() : 1.0;
@@ -1784,6 +1796,7 @@ void Effect::drawTabIndicator(const KWin::RenderViewport &viewport, const TabGro
     }
 
     KWin::ShaderManager::instance()->pushShader(m_ringShader.get());
+    setOutputColorspace(m_ringShader.get(), renderTarget);
     m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, logicalProjection(viewport));
     m_ringShader->setUniform("bands", QVector2D(0, 0));
     m_ringShader->setUniform("layers", QVector3D(0, 0, 1));
@@ -1849,7 +1862,7 @@ void Effect::clickOnTab(const QPointF &pos)
 }
 
 // niri's focus ring and border: the border is a band along the window's rounded frame, the ring a band around it
-void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, bool fill)
+void Effect::drawRing(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, bool fill)
 {
     const Look &look = lookOf(w);
     const bool active = w == m_active;
@@ -1877,6 +1890,7 @@ void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *
     }
 
     KWin::ShaderManager::instance()->pushShader(m_ringShader.get());
+    setOutputColorspace(m_ringShader.get(), renderTarget);
     m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, logicalProjection(viewport));
     m_ringShader->setUniform("rect", QVector4D(frame.x(), frame.y(), frame.width(), frame.height()));
     m_ringShader->setUniform("radii", QVector4D(radius, radius, radius, radius));
@@ -1909,7 +1923,7 @@ void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *
     KWin::ShaderManager::instance()->popShader();
 }
 
-void Effect::drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity)
+void Effect::drawShadow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity)
 {
     const Look &look = lookOf(w);
     const ShadowStyle &sh = look.shadow;
@@ -1945,6 +1959,7 @@ void Effect::drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow
     }
 
     KWin::ShaderManager::instance()->pushShader(m_shadowShader.get());
+    setOutputColorspace(m_shadowShader.get(), renderTarget);
     m_shadowShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, logicalProjection(viewport));
     m_shadowShader->setUniform("box", QVector4D(box.x(), box.y(), box.width(), box.height()));
     m_shadowShader->setUniform("boxRadius", float(boxRadius));
@@ -1976,7 +1991,7 @@ void Effect::drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow
 }
 
 // niri's fullscreen-backdrop-color: a solid rectangle behind a full-screen window, the size of the window's own tile
-void Effect::drawBackdrop(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &painted, const KWin::Region &deviceRegion, double opacity)
+void Effect::drawBackdrop(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &painted, const KWin::Region &deviceRegion, double opacity)
 {
     const QColor &color = lookOf(w).fullscreenBackdrop.isValid() ? lookOf(w).fullscreenBackdrop : m_settings.fullscreenBackdrop;
     if (!w->isFullScreen() || !w->screen() || color.alphaF() <= 0) {
@@ -1991,7 +2006,7 @@ void Effect::drawBackdrop(const KWin::RenderViewport &viewport, KWin::EffectWind
     const KWin::RectF tile(painted.x() + painted.width() / 2 - tw / 2, painted.y() + painted.height() / 2 - th / 2, tw, th);
     const auto mix = [progress](double a, double b) { return a + (b - a) * progress; };
     const KWin::RectF rect(mix(painted.x(), tile.x()), mix(painted.y(), tile.y()), mix(painted.width(), tile.width()), mix(painted.height(), tile.height()));
-    fillRect(viewport, rect, color, deviceRegion, opacity * progress);
+    fillRect(renderTarget, viewport, rect, color, deviceRegion, opacity * progress);
 }
 
 } // namespace KiriDecorations

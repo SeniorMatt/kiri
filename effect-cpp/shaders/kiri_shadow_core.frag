@@ -6,6 +6,8 @@
 in vec2 pos;
 out vec4 fragColor;
 
+#include "colormanagement.glsl"
+
 uniform vec4 box;          // x, y, width, height of the box that casts the shadow (the window grown by the spread, moved by the offset)
 uniform float boxRadius;   // corner radius of the box
 uniform float sigma;       // blur: half the softness
@@ -113,5 +115,6 @@ void main() {
         }
     }
 
-    fragColor = c;
+    // premultiplied sRGB -> the output's colour space and encoding, as KWin's own shaders do
+    fragColor = nitsToDestinationEncoding(sourceEncodingToNitsInDestinationColorspace(c));
 }

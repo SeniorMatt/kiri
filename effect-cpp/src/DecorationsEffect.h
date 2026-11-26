@@ -197,13 +197,13 @@ private:
     void repaintAround(KWin::EffectWindow *w);
     double reach() const;
     const TabGroup *tabGroupOf(KWin::EffectWindow *w) const;
-    void drawTabIndicator(const KWin::RenderViewport &viewport, const TabGroup &group, KWin::EffectWindow *active, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, double progress);
-    void drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity);
-    void drawBackdrop(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &painted, const KWin::Region &deviceRegion, double opacity);
+    void drawTabIndicator(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, const TabGroup &group, KWin::EffectWindow *active, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, double progress);
+    void drawShadow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity);
+    void drawBackdrop(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &painted, const KWin::Region &deviceRegion, double opacity);
     void setGradient(KWin::GLShader *shader, int layer, const Gradient &gradient, const QRectF &area) const;
     void clickOnTab(const QPointF &pos);
-    void fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &rect, const QColor &color, const KWin::Region &deviceRegion, double opacity);
-    void drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, bool fill = false);
+    void fillRect(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, const KWin::RectF &rect, const QColor &color, const KWin::Region &deviceRegion, double opacity);
+    void drawRing(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, KWin::EffectWindow *w, const KWin::RectF &frame, const KWin::Region &deviceRegion, double opacity, bool fill = false);
 
     Settings m_settings;
     double m_reach = 12;
@@ -269,7 +269,7 @@ private:
     QHash<QUuid, AlphaAnim> m_alpha;
     double alphaOf(const QUuid &id) const;
     void fadeTo(const QUuid &id, double to);
-    void drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion);
+    void drawInsertHint(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion);
     QHash<KWin::EffectWindow *, KWin::RectF> m_painted;
     void repaintPainted(KWin::EffectWindow *w);
     mutable QHash<KWin::EffectWindow *, ExpandedState> m_expanded;

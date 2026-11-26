@@ -8,6 +8,8 @@
 in vec2 pos;
 out vec4 fragColor;
 
+#include "colormanagement.glsl"
+
 uniform vec4 rect;        // x, y, width, height of the rectangle (the window frame, a tab, the insert hint)
 uniform vec4 radii;       // corner radii: top-left, top-right, bottom-right, bottom-left
 uniform vec2 bands;       // border width, ring width: the border starts at the rectangle, the ring where the border ends
@@ -217,5 +219,6 @@ void main()
         if (f > 0.0)
             color += gradient_color(2, pos) * f;
     }
-    fragColor = color * alpha;
+    // premultiplied sRGB -> the output's colour space and encoding, as KWin's own shaders do
+    fragColor = nitsToDestinationEncoding(sourceEncodingToNitsInDestinationColorspace(color * alpha));
 }
