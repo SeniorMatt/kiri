@@ -70,6 +70,19 @@ sudo zypper install cmake gcc-c++ make kf6-extra-cmake-modules kwin6-devel kdeco
 ```
 
 </details>
+<details><summary>NixOS / Nix</summary>
+
+Use the included flake dev shell or `shell.nix`:
+
+```
+nix develop
+# or
+nix-shell
+```
+
+Then build/install as usual (`make package`, `./install.sh`, etc.).
+
+</details>
 
 ## Build
 
