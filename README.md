@@ -37,10 +37,20 @@ container's KWin doesn't match yours, Kiri installs without the compiled effects
 
 Already on niri? `./niri2kiri.py ~/.config/niri/config.kdl --apply`
 
+## Settings and shortcuts
+
+There is no separate config file. Open System Settings > Window Management > KWin Scripts and press the settings
+button next to Kiri. The Shortcuts tab there lists every shortcut and lets you change it; they are also under "Kiri"
+in System Settings > Keyboard > Shortcuts. If a changed shortcut doesn't work right away, log out and in once.
+
+Kiri saves its settings in `~/.config/kwinrc` (group `[Script-kiri]`) and its shortcuts in
+`~/.config/kglobalshortcutsrc` (group `[kiri]`).
+
 ## Dependencies
 
 Plasma 6.7 or newer. `install.sh` builds the effects against your KWin, so it needs these packages
-(on Arch it installs them itself). Run it again after KWin updates.
+(on Arch it installs them itself). Run it again after KWin updates, then log out and in: KWin keeps the old
+effects loaded until the session restarts.
 
 <details><summary>Arch / CachyOS</summary>
 
