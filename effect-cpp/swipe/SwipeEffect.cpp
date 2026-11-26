@@ -178,9 +178,44 @@ void SwipeEffect::pointerButton(PointerButtonEvent *event)
         m_pointer = false;
         if (m_phase == Phase::Horizontal) {
             finish(event->timestamp);
+        } else if (m_phase == Phase::Pending) {
+            m_phase = Phase::Idle;
+            performClick(); // never got to 8 px: the click that the grab took from Plasma's window actions
         } else {
             m_phase = Phase::Idle; // never got to 8 px, or went vertical (the workspace switch is kiri_desktop_switch's)
         }
+    }
+}
+
+// Plasma's Mod+middle click ([MouseBindings] CommandAll2) for the window under the pointer, as far as an effect can: the
+// window menu (the "Window Operations Menu" shortcut acts on the active window, so it is activated first), the activating
+// commands and Minimize. Raising and lowering have no effect API; the rest does nothing, as before.
+void SwipeEffect::performClick()
+{
+    const QString command = PointerGrab::clickCommand();
+    const QPointF pos = effects->cursorPos();
+    EffectWindow *target = nullptr;
+    const auto stack = effects->stackingOrder();
+    for (auto it = stack.crbegin(); it != stack.crend(); ++it) {
+        EffectWindow *w = *it;
+        if (w->isOnCurrentDesktop() && w->isOnCurrentActivity() && !w->isMinimized() && w->isVisible() && !w->isDeleted() && w->isNormalWindow() && w->frameGeometry().contains(pos)) {
+            target = w;
+            break;
+        }
+    }
+    if (!target) {
+        return;
+    }
+    if (command == QLatin1String("operations menu")) {
+        effects->activateWindow(target);
+        QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kglobalaccel"), QStringLiteral("/component/kwin"),
+                                                              QStringLiteral("org.kde.kglobalaccel.Component"), QStringLiteral("invokeShortcut"));
+        message << QStringLiteral("Window Operations Menu");
+        QDBusConnection::sessionBus().asyncCall(message);
+    } else if (command.startsWith(QLatin1String("activate"))) {
+        effects->activateWindow(target);
+    } else if (command == QLatin1String("minimize")) {
+        target->minimize();
     }
 }
 

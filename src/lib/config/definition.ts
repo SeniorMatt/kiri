@@ -418,6 +418,13 @@ const configDef = [
         default: "",
     },
     {
+        // the compiled effect reads it (kwinrc [Script-kiri]): niri's Mod+middle-button drag that scrolls the view; off
+        // gives Mod+middle click back to Plasma's window actions
+        name: "middleDragScroll",
+        type: "Bool",
+        default: true,
+    },
+    {
         // the wheel and mouse button binds of the compiled effect, one per line (";" works too, older configs have it):
         // "Meta+WheelScrollDown=desktop-next@150", each "<modifiers>+<trigger>=<Kiri action>[@<cooldown ms>]" like
         // niri's binds (the default is niri's default wheel binds)

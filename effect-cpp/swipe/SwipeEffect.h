@@ -73,6 +73,7 @@ private:
     enum class Phase { Idle, Pending, Horizontal, Vertical };
     struct Sample { double ms; double dx; };
     void finish(std::chrono::microseconds time);
+    void performClick();
 
     // what is painted: every scrolling window at its frame x when the swipe locked + shift()
     enum class Visual { Off, Drag, Held, Settle };

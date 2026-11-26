@@ -66,12 +66,27 @@ inline bool middleIsBound(Qt::KeyboardModifier mod)
     return false;
 }
 
+// kiri's `middleDragScroll` setting (kwinrc [Script-kiri], default on): off gives Mod+middle back to Plasma's window actions
+inline bool enabled()
+{
+    auto config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
+    config->reparseConfiguration();
+    return config->group(QStringLiteral("Script-kiri")).readEntry("middleDragScroll", true);
+}
+
+// the name of what Plasma does on Mod+middle click ([MouseBindings] CommandAll2)
+inline QString clickCommand()
+{
+    auto config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
+    return config->group(QStringLiteral("MouseBindings")).readEntry("CommandAll2", QStringLiteral("Toggle raise and lower")).toLower();
+}
+
 // niri starts it when no grab is going (a window being moved or resized is one) and the overview, the screenshot UI and
 // the lock screen are not up
 inline bool mayStart(Qt::KeyboardModifiers modifiers)
 {
     const Qt::KeyboardModifier mod = modifier();
-    if (!modifiers.testFlag(mod) || KWin::effects->isScreenLocked()) {
+    if (!modifiers.testFlag(mod) || KWin::effects->isScreenLocked() || !enabled()) {
         return false;
     }
     if (KWin::effects->hasActiveFullScreenEffect()) {
