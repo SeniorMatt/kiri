@@ -44,9 +44,12 @@ class Window {
     }
 
     public arrange(x: number, y: number, width: number, height: number, parked = false) {
+        const id = String(this.client.kwinClient.internalId);
         if (this.skipArrange) {
+            setWindowOutput(id, null);
             return;
         }
+        setWindowOutput(id, Workspace.screens.length > 1 ? this.column.grid.desktop.outputName : null);
 
         if (this.isFocused() && this.shouldReMaximize()) {
             // do this here rather than in `onFocused` to ensure it happens after placement
@@ -314,6 +317,7 @@ class Window {
     }
 
     public destroy(passFocus: FocusPassing.Type) {
+        setWindowOutput(String(this.client.kwinClient.internalId), null);
         this.column.onWindowRemoved(this, passFocus);
     }
 }

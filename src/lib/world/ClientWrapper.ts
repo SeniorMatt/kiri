@@ -457,6 +457,7 @@ class ClientWrapper {
     public destroy(passFocus: FocusPassing.Type) {
         this.partialCommitDelayer.destroy();
         setParkedPosition(String(this.kwinClient.internalId), null);
+        setWindowOutput(String(this.kwinClient.internalId), null);
         setWindowUrgent(String(this.kwinClient.internalId), false);
         setWindowDecorations(String(this.kwinClient.internalId), null);
         this.stateManager.destroy(passFocus);

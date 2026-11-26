@@ -187,6 +187,32 @@ let lastVisualPositionsJson = "{}";
 const parkedPositions = new Map<string, [number, number]>();
 let lastParkedPositionsJson = "{}";
 
+// the output whose strip a tiled window belongs to (id -> output name), only sent when there is more than one output:
+// the decorations effect clips the window to that output, like niri clips a workspace to its monitor
+const windowOutputs = new Map<string, string>();
+let lastWindowOutputsJson = "{}";
+
+function setWindowOutput(id: string, name: string | null) {
+    if (name === null ? !windowOutputs.has(id) : windowOutputs.get(id) === name) {
+        return;
+    }
+    if (name === null) {
+        windowOutputs.delete(id);
+    } else {
+        windowOutputs.set(id, name);
+    }
+    if (typeof qmlBase === "undefined") {
+        return;
+    }
+    const obj: Record<string, string> = {};
+    windowOutputs.forEach((v, k) => { obj[k] = v; });
+    const json = JSON.stringify(obj);
+    if (json !== lastWindowOutputsJson) {
+        lastWindowOutputsJson = json;
+        (qmlBase as any).windowOutputs = json;
+    }
+}
+
 function canParkWindows() {
     return typeof qmlBase === "undefined" || (qmlBase as any).decorationsEffect === true;
 }

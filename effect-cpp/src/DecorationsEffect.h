@@ -160,6 +160,8 @@ public Q_SLOTS:
     Q_SCRIPTABLE void setVisualPositions(const QString &json);
     // where Kiri wants full-screen X11 windows painted while their real place is parked in the corner: {"{uuid}": [x, y]}
     Q_SCRIPTABLE void setParkedPositions(const QString &json);
+    // the output each tiled window's strip is on (only sent with more than one output): {"{uuid}": "DP-3"}; the window is clipped to it when painted
+    Q_SCRIPTABLE void setWindowOutputs(const QString &json);
     // Kiri's resolved appearance settings as JSON; until the first call the effect reads kwinrc itself
     Q_SCRIPTABLE void setConfig(const QString &json);
     // per-window overrides from niri's window rules, by window id; a missing field keeps the global setting; see WindowDecorationRule in src/lib/Kiri.ts
@@ -251,6 +253,7 @@ private:
         double start = 0;
     };
     QHash<QUuid, ParkAnim> m_park;
+    QHash<QUuid, QString> m_windowOutputs;
     QHash<QUuid, QPointF> m_parkPainted;
     QPointF parkedPosition(KWin::EffectWindow *w, const ParkAnim &anim) const;
     bool isParked(KWin::EffectWindow *w) const;

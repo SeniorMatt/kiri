@@ -259,4 +259,48 @@
             Assert.equal(workspaceMock.activeWindow, a, { message: "the keys still start from the second output" });
         });
     }
+    // the decorations effect clips each tiled window to the output of its strip; the script tells it which that is
+    tests.register("Multi-monitor: each tiled window's output name is sent to the effect, and cleared when it goes", 5, () => {
+        const { workspaceMock } = setup();
+        const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
+        const c = openOnRight(workspaceMock);
+        const outputOf = (client: MockKwinClient) => windowOutputs.get(String(client.internalId));
+        Assert.equal(outputOf(a), "DP-1");
+        Assert.equal(outputOf(b), "DP-1");
+        Assert.equal(outputOf(c), "DP-2");
+        workspaceMock.removeWindow(c);
+        Assert.equal(outputOf(c), undefined, { message: "a closed window is forgotten" });
+        Assert.equal(outputOf(a), "DP-1");
+    });
+
+    tests.register("Multi-monitor: a window moved to the other output is sent with the new name", 5, () => {
+        const { qtMock, workspaceMock } = setup();
+        const [a] = workspaceMock.createClientsWithWidths(300);
+        workspaceMock.activeWindow = a;
+        qtMock.fireShortcut("window-move-to-monitor-right");
+        Assert.equal(windowOutputs.get(String(a.internalId)), "DP-2");
+    });
+
+    tests.register("Multi-monitor: a floating window is not clipped to an output", 5, () => {
+        const { qtMock, workspaceMock } = setup();
+        const [a] = workspaceMock.createClientsWithWidths(300);
+        workspaceMock.activeWindow = a;
+        Assert.equal(windowOutputs.get(String(a.internalId)), "DP-1");
+        qtMock.fireShortcut("window-toggle-floating");
+        Assert.equal(windowOutputs.get(String(a.internalId)), undefined);
+    });
+
+    tests.register("A single output sends no window outputs", 5, () => {
+        const { workspaceMock } = init(getDefaultConfig());
+        const [a] = workspaceMock.createClientsWithWidths(300);
+        Assert.equal(windowOutputs.get(String(a.internalId)), undefined);
+    });
+
+    tests.register("Going back to one output clears the window outputs", 5, () => {
+        const { workspaceMock } = setup();
+        const [a] = workspaceMock.createClientsWithWidths(300);
+        Assert.equal(windowOutputs.get(String(a.internalId)), "DP-1");
+        workspaceMock.setOutputs(["DP-1", screen]);
+        Assert.equal(windowOutputs.get(String(a.internalId)), undefined);
+    });
 }

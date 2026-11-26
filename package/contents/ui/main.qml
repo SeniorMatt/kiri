@@ -21,6 +21,7 @@ Item {
     property string tabGroups: "[]"
     property string visualPositions: "{}"
     property string parkedPositions: "{}"
+    property string windowOutputs: "{}"
     property string insertHint: "null"
     // JSON for the compiled effect: every appearance setting as the script resolves it (niri import included), the per-window
     // overrides of niri's window rules, and the ids of the windows that ask for attention
@@ -491,7 +492,23 @@ Item {
         );
     }
 
+    function sendWindowOutputs() {
+        DBus.SessionBus.asyncCall(
+            {
+                service: "org.kde.KWin",
+                path: "/KiriDecorations",
+                iface: "org.kde.kiri.Decorations",
+                member: "setWindowOutputs",
+                arguments: [new DBus.string(qmlBase.windowOutputs)],
+                signature: "(s)",
+            },
+            () => {},
+            (error) => {},
+        );
+    }
+
     onParkedPositionsChanged: if (decorationsEffect) sendParkedPositions()
+    onWindowOutputsChanged: if (decorationsEffect) sendWindowOutputs()
     onTabGroupsChanged: if (decorationsEffect) sendTabGroups()
     onVisualPositionsChanged: if (decorationsEffect) sendVisualPositions()
     onInsertHintChanged: if (decorationsEffect) sendInsertHint()
@@ -508,7 +525,7 @@ Item {
     onWindowDecorationsChanged: if (decorationsEffect) sendToDecorations("setWindowDecorations", windowDecorations)
     onUrgentWindowsChanged: if (decorationsEffect) sendToDecorations("setUrgentWindows", urgentWindows)
     onDecorationsEffectChanged: if (decorationsEffect) {
-        sendTabGroups(); sendVisualPositions(); sendParkedPositions();
+        sendTabGroups(); sendVisualPositions(); sendParkedPositions(); sendWindowOutputs();
         if (decorationsConfig !== "") sendToDecorations("setConfig", decorationsConfig);
         sendToDecorations("setWindowDecorations", windowDecorations);
         sendToDecorations("setUrgentWindows", urgentWindows);

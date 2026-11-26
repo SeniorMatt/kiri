@@ -663,6 +663,7 @@ Effect::Effect()
             m_active = nullptr;
         }
         m_park.remove(w->internalId());
+        m_windowOutputs.remove(w->internalId());
         m_parkPainted.remove(w->internalId());
         m_painted.remove(w);
         m_alpha.remove(w->internalId());
@@ -1363,6 +1364,22 @@ void Effect::clickOnParked(const QPointF &pos)
     }
 }
 
+void Effect::setWindowOutputs(const QString &json)
+{
+    QHash<QUuid, QString> outputs;
+    const QJsonObject object = QJsonDocument::fromJson(json.toUtf8()).object();
+    for (auto it = object.begin(); it != object.end(); ++it) {
+        const QUuid uuid(it.key());
+        if (!uuid.isNull() && it.value().isString()) {
+            outputs.insert(uuid, it.value().toString());
+        }
+    }
+    if (outputs != m_windowOutputs) {
+        m_windowOutputs = outputs;
+        KWin::effects->addRepaintFull();
+    }
+}
+
 void Effect::setParkedPositions(const QString &json)
 {
     const QJsonObject object = QJsonDocument::fromJson(json.toUtf8()).object();
@@ -1531,6 +1548,11 @@ void Effect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin:
         // KWin clips a window that is not transformed to its bounding rect, which cut the ring away
         data.setTransformed();
     }
+    if (m_windowOutputs.contains(w->internalId())) {
+        // painted clipped to its strip's output (see paintWindow); KWin's opaque-region culling would otherwise leave a hole
+        // on the neighbouring output where the clipped part of this window would have been
+        data.setTransformed();
+    }
     if (m_visualPositions.contains(w->internalId()) || m_releasing.contains(w->internalId()) || m_park.contains(w->internalId())) {
         data.setTransformed();
     }
@@ -1594,6 +1616,23 @@ KIRI_PAINT_RET Effect::paintWindow(const KWin::RenderTarget &renderTarget, const
     }
     if (!m_alpha.isEmpty()) {
         data.multiplyOpacity(alphaOf(w->internalId()));
+    }
+    // A tiled window is painted only on the output its strip belongs to (niri clips a workspace to its monitor): a column
+    // hanging past the edge, scrolling off it or coming back from the parking spot is cut off instead of showing up on the
+    // neighbouring monitor. Not for snapshots, not while a full-screen effect (overview, desktop switch) lays the windows
+    // out, not while the user drags or resizes the window, not for full-screen windows.
+    if (!m_windowOutputs.isEmpty() && KWin::effects->screens().size() > 1 && !w->data(CaptureRole).toBool()
+        && !(mask & PAINT_SCREEN_TRANSFORMED) && !KWin::effects->activeFullScreenEffect()
+        && !w->isUserMove() && !w->isUserResize() && !w->isFullScreen()) {
+        if (const auto it = m_windowOutputs.constFind(w->internalId()); it != m_windowOutputs.constEnd()) {
+            if (KWin::LogicalOutput *home = KWin::effects->findScreen(*it)) {
+                const KWin::Region clip = deviceRegion & viewport.mapToDeviceCoordinatesAligned(KWin::RectF(home->geometry()));
+                if (clip.isEmpty()) {
+                    KIRI_RET(true); // nothing of this window belongs on the output being painted
+                }
+                return KWin::effects->paintWindow(renderTarget, viewport, w, mask, clip, data);
+            }
+        }
     }
     return KWin::effects->paintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
 }
