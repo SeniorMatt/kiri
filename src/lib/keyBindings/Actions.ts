@@ -547,6 +547,16 @@ class Actions {
     public readonly columnWidthMaximize = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         const desktop = grid.desktop;
         const fullWidth = Math.min(Math.max(desktop.tilingArea.width, column.getMinWidth()), column.getMaxWidth());
+        const mode = window.client.getMaximizedMode() ?? MaximizedMode.Unmaximized;
+        if (window.fillsWidth() && mode !== MaximizedMode.Unmaximized) {
+            // KWin keeps the window maximized in the grid and the full area pins its frame: niri has no such state, so
+            // the column goes back to its own width first
+            window.client.setMaximize(false, false);
+            if (column.getWidth() !== fullWidth) {
+                desktop.scrollCenterVisible(column);
+                return;
+            }
+        }
         if (column.getWidth() === fullWidth && column.widthBeforeMaximize !== undefined) {
             const restoreWidth = column.widthBeforeMaximize;
             column.widthBeforeMaximize = undefined;
@@ -554,6 +564,21 @@ class Actions {
         } else if (column.getWidth() !== fullWidth) {
             column.widthBeforeMaximize = column.getWidth();
             column.setWidth(fullWidth, true);
+        } else if (!window.fillsWidth()) {
+            // full width and nothing to go back to: niri's default column width
+            const area = desktop.tilingArea.width;
+            const getDefault = desktop.profile.defaultColumnWidth;
+            let target = getDefault === null ? null : getDefault(area);
+            if (target === null && window.client.preferredWidth !== fullWidth) {
+                target = window.client.preferredWidth;
+            }
+            if (target === null) {
+                target = Math.floor((area - grid.config.gapsInnerHorizontal) / 2);
+            }
+            target = Math.min(Math.max(target, column.getMinWidth()), column.getMaxWidth());
+            if (target !== fullWidth) {
+                column.setWidth(target, true, false, true);
+            }
         }
         desktop.scrollCenterVisible(column);
     };

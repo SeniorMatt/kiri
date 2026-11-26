@@ -447,6 +447,14 @@ class ClientWrapper {
             }
         });
 
+        manager.connect(client.kwinClient.interactiveMoveResizeStarted, () => {
+            // the sizes the user drags the window to are not answers to Kiri's last ask
+            client.askedSize = null;
+            client.awaitingCommit = false;
+            client.lastAnswer = null;
+            client.refusal = null;
+        });
+
         manager.connect(client.kwinClient.frameGeometryChanged, () => {
             client.answeredSizeRequest = client.awaitingCommit;
             // KWin may show the asked size for a moment: only another size right after the ask counts
