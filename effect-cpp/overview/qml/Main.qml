@@ -372,9 +372,18 @@ FocusScope {
                 textureSize: Qt.size(Math.max(1, root.width * quarter), Math.max(1, root.height * quarter))
                 // one capture, once the wallpaper item has its content
                 Timer {
+                    id: backdropCapture
                     interval: 150
                     running: true
                     onTriggered: snapshot.scheduleUpdate()
+                }
+            }
+            // the view is kept between openings and the wallpaper may have changed since: each opening captures again
+            readonly property bool shown: root.p > 0
+            onShownChanged: {
+                if (shown) {
+                    snapshot.scheduleUpdate();
+                    backdropCapture.restart();
                 }
             }
             MultiEffect {
