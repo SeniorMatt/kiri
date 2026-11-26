@@ -217,6 +217,15 @@ Gradient paint(const QVariantMap &m, const QString &colorKey, const QString &gra
     return solid(colorOr(m.value(colorKey).toString(), fallback));
 }
 
+// The vertices Kiri hands to its shaders are in logical pixels, but viewport.projectionMatrix() maps device pixels (KWin's
+// item renderer multiplies the scale in itself); without the scale everything lands at frame / scale.
+QMatrix4x4 logicalProjection(const KWin::RenderViewport &viewport)
+{
+    QMatrix4x4 m = viewport.projectionMatrix();
+    m.scale(viewport.scale());
+    return m;
+}
+
 void appendQuads(std::vector<QVector2D> &vertices, const KWin::RenderViewport &viewport, const KWin::Region &deviceRegion, const KWin::RectF &rect)
 {
     for (const KWin::Rect &deviceRect : deviceRegion.rects()) {
@@ -1184,7 +1193,7 @@ void Effect::drawInsertHint(const KWin::RenderViewport &viewport, const KWin::Re
     const double radius = std::min<double>(look.cornerRadius + (look.border.enabled ? look.border.width : 0),
                                            std::min(m_insertHint.width(), m_insertHint.height()) / 2);
     KWin::ShaderManager::instance()->pushShader(m_ringShader.get());
-    m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, viewport.projectionMatrix());
+    m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, logicalProjection(viewport));
     m_ringShader->setUniform("rect", QVector4D(m_insertHint.x(), m_insertHint.y(), m_insertHint.width(), m_insertHint.height()));
     m_ringShader->setUniform("radii", QVector4D(radius, radius, radius, radius));
     m_ringShader->setUniform("bands", QVector2D(0, 0));
@@ -1704,7 +1713,7 @@ void Effect::fillRect(const KWin::RenderViewport &viewport, const KWin::RectF &r
     }
     const double alpha = color.alphaF() * opacity;
     KWin::GLShader *shader = KWin::ShaderManager::instance()->pushShader(KWin::ShaderTrait::UniformColor);
-    shader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, viewport.projectionMatrix());
+    shader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, logicalProjection(viewport));
     shader->setUniform(KWin::GLShader::ColorUniform::Color, QVector4D(color.redF() * alpha, color.greenF() * alpha, color.blueF() * alpha, alpha));
     KWin::GLVertexBuffer *vbo = KWin::GLVertexBuffer::streamingBuffer();
     vbo->reset();
@@ -1736,7 +1745,7 @@ void Effect::drawTabIndicator(const KWin::RenderViewport &viewport, const TabGro
     }
 
     KWin::ShaderManager::instance()->pushShader(m_ringShader.get());
-    m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, viewport.projectionMatrix());
+    m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, logicalProjection(viewport));
     m_ringShader->setUniform("bands", QVector2D(0, 0));
     m_ringShader->setUniform("layers", QVector3D(0, 0, 1));
     m_ringShader->setUniform("pixel", float(1.0 / viewport.scale()));
@@ -1829,7 +1838,7 @@ void Effect::drawRing(const KWin::RenderViewport &viewport, KWin::EffectWindow *
     }
 
     KWin::ShaderManager::instance()->pushShader(m_ringShader.get());
-    m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, viewport.projectionMatrix());
+    m_ringShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, logicalProjection(viewport));
     m_ringShader->setUniform("rect", QVector4D(frame.x(), frame.y(), frame.width(), frame.height()));
     m_ringShader->setUniform("radii", QVector4D(radius, radius, radius, radius));
     m_ringShader->setUniform("bands", QVector2D(borderWidth, ringWidth));
@@ -1897,7 +1906,7 @@ void Effect::drawShadow(const KWin::RenderViewport &viewport, KWin::EffectWindow
     }
 
     KWin::ShaderManager::instance()->pushShader(m_shadowShader.get());
-    m_shadowShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, viewport.projectionMatrix());
+    m_shadowShader->setUniform(KWin::GLShader::Mat4Uniform::ModelViewProjectionMatrix, logicalProjection(viewport));
     m_shadowShader->setUniform("box", QVector4D(box.x(), box.y(), box.width(), box.height()));
     m_shadowShader->setUniform("boxRadius", float(boxRadius));
     m_shadowShader->setUniform("sigma", float(sigma));
