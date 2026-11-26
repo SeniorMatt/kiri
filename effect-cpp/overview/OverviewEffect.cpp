@@ -5,6 +5,7 @@
 
 #include "effect/effecthandler.h"
 #include "effect/effectwindow.h"
+#include "window.h"
 
 #include "core/output.h"
 #include "wayland/seat.h"
@@ -21,6 +22,7 @@
 #include <QLoggingCategory>
 #include <QRegularExpression>
 #include <algorithm>
+#include <cmath>
 #include <QTimer>
 #include <QUrl>
 
@@ -161,22 +163,22 @@ void OverviewEffect::loadHotCorner()
     if (!m_hotCorner) {
         m_insideCorner = false;
     }
-    const qreal zoom = std::clamp(kiri.readEntry("overviewZoom", 0.5), 0.0, 1.0);
-    m_backdrop = kiriColor(kiri.readEntry("overviewBackdropColor", QStringLiteral("#262626")), QColor(0x26, 0x26, 0x26));
-    m_backdropBlur = kiri.readEntry("overviewBackdropBlur", false);
-    m_backdropBlurRadius = std::clamp(kiri.readEntry("overviewBackdropBlurRadius", 48), 0, 64);
-    m_shadowOn = kiri.readEntry("overviewShadowEnabled", true);
-    m_shadowSoftness = kiri.readEntry("overviewShadowSoftness", 40.0);
-    m_shadowSpread = kiri.readEntry("overviewShadowSpread", 10.0);
-    m_shadowOffsetX = kiri.readEntry("overviewShadowOffsetX", 0.0);
-    m_shadowOffsetY = kiri.readEntry("overviewShadowOffsetY", 10.0);
-    m_shadowColor = kiriColor(kiri.readEntry("overviewShadowColor", QStringLiteral("#00000050")), QColor(0, 0, 0, 0x50));
     // niri's overview shows the layout zoomed, so the ring is the normal one, scaled; off when the focus ring is off.
     // A gradient has no single colour here: its first colour stands in for it
     // the script's look (setStyle) wins over kwinrc, which is only the first guess: the settings page saves without telling KWin's watchers
     const auto style = [&](const char *key, const QVariant &fallback) {
         return m_styleSet && m_style.contains(QLatin1String(key)) ? m_style.value(QLatin1String(key)).toVariant() : kiri.readEntry(key, fallback);
     };
+    const qreal zoom = std::clamp(style("overviewZoom", 0.5).toDouble(), 0.0, 1.0);
+    m_backdrop = kiriColor(style("overviewBackdropColor", QStringLiteral("#262626")).toString(), QColor(0x26, 0x26, 0x26));
+    m_backdropBlur = style("overviewBackdropBlur", false).toBool();
+    m_backdropBlurRadius = std::clamp(style("overviewBackdropBlurRadius", 48).toInt(), 0, 64);
+    m_shadowOn = style("overviewShadowEnabled", true).toBool();
+    m_shadowSoftness = style("overviewShadowSoftness", 40.0).toDouble();
+    m_shadowSpread = style("overviewShadowSpread", 10.0).toDouble();
+    m_shadowOffsetX = style("overviewShadowOffsetX", 0.0).toDouble();
+    m_shadowOffsetY = style("overviewShadowOffsetY", 10.0).toDouble();
+    m_shadowColor = kiriColor(style("overviewShadowColor", QStringLiteral("#00000050")).toString(), QColor(0, 0, 0, 0x50));
     m_ringOn = style("focusRingEnabled", true).toBool();
     m_ringWidth = style("focusRingWidth", 4).toInt();
     m_ringColor = kiriColor(style("focusRingActiveColor", QStringLiteral("#7fc8ff")).toString(), QColor(0x7f, 0xc8, 0xff));
@@ -187,6 +189,7 @@ void OverviewEffect::loadHotCorner()
     if (const auto g = fromColor.match(style("focusRingActiveGradient", QString()).toString()); g.hasMatch()) {
         m_ringColor = kiriColor(g.captured(1), m_ringColor);
     }
+    m_cornerRadius = std::max(0, style("cornerRadius", 0).toInt());
     m_hintColor = kiriColor(style("insertHintColor", QStringLiteral("#7fc8ff80")).toString(), QColor(127, 200, 255, 128));
     // the accent gives the colour, the configured colour keeps its transparency; a gradient still wins
     if (style("insertHintUseAccent", false).toBool() && m_accent.isValid() && style("insertHintGradient", QString()).toString().isEmpty()) {
@@ -1003,6 +1006,48 @@ void OverviewEffect::scrollView(const QString &desktopId, qreal delta, const QSt
     queue(jsonString({{"t", "scroll"}, {"d", desktopId}, {"x", it->target}, {"o", output}}));
     Q_EMIT viewOffsetsChanged();
     effects->addRepaintFull();
+}
+
+// like the normal view: full-screen and maximized windows have square corners
+QVariantMap OverviewEffect::tileLook(const QString &windowId)
+{
+    QVariantMap look{{QStringLiteral("blur"), false}, {QStringLiteral("round"), m_cornerRadius > 0}};
+    EffectWindow *w = effects->findWindow(QUuid::fromString(windowId));
+    if (!w) {
+        return look;
+    }
+    look[QStringLiteral("blur")] = m_blur.blurs(w);
+    // the thumbnail's texture holds the whole visible window, shadow included: where the frame is in it (0..1)
+    const RectF visible = w->window()->visibleGeometry();
+    const qreal left = std::floor(visible.left()), top = std::floor(visible.top());
+    const qreal texW = std::ceil(visible.right()) - left, texH = std::ceil(visible.bottom()) - top;
+    const RectF frame = w->frameGeometry();
+    if (texW > 0 && texH > 0) {
+        look[QStringLiteral("crop")] = QVariantList{(frame.left() - left) / texW, (frame.top() - top) / texH, frame.width() / texW, frame.height() / texH};
+    }
+    if (m_cornerRadius > 0) {
+        bool round = !w->isSpecialWindow() && (w->isNormalWindow() || w->isDialog()) && !w->isFullScreen();
+        if (round) {
+            if (const auto *output = w->screen()) {
+                const auto screen = output->geometry();
+                const auto frame = w->frameGeometry();
+                bool expanded = frame.width() >= screen.width() - 0.5 && frame.height() >= screen.height() - 0.5;
+                if (!expanded && w->isNormalWindow()) {
+                    const auto area = effects->clientArea(MaximizeArea, w);
+                    expanded = area.width() > 0 && frame.width() >= area.width() - 0.5 && frame.height() >= area.height() - 0.5
+                        && frame.left() <= area.left() + 0.5 && frame.top() <= area.top() + 0.5;
+                }
+                round = !expanded;
+            }
+        }
+        look[QStringLiteral("round")] = round;
+    }
+    return look;
+}
+
+int OverviewEffect::blurRadius() const
+{
+    return std::clamp(BlurMatch::strength() * 10, 16, 128);
 }
 
 QString OverviewEffect::setStyle(const QString &json)

@@ -32,6 +32,7 @@
 #include <chrono>
 
 #include "AnimConfig.h"
+#include "BlurMatch.h"
 #include "PlasmaAccent.h"
 
 #include <memory>
@@ -213,10 +214,7 @@ private:
     // windows this effect has told the blur effect to keep blurring
     QSet<QUuid> m_forcedBlur;
     bool blurredBehind(KWin::EffectWindow *w);
-    QElapsedTimer m_blurConfigRead;
-    QStringList m_blurClasses;
-    QList<QRegularExpression> m_blurClassPatterns;
-    bool m_blurWhitelist = true;
+    KWin::BlurMatch m_blur;
 #ifdef KIRI_BORDER_RADIUS
     // the corner radius KWin had on a window before this effect gave it Kiri's, so the blur effect rounds the blur the same way
     QHash<QUuid, KWin::BorderRadius> m_ownRadius;

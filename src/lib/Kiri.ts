@@ -11,11 +11,11 @@ function loadConfig(): Config {
     return config;
 }
 
-// the appearance settings and the wheel and mouse button binds as JSON for the compiled effect
+// the appearance settings, the overview's look and the wheel and mouse button binds as JSON for the compiled effects
 function decorationsConfig(config: Config) {
     const out: Record<string, any> = {};
     for (const [name, value] of Object.entries(config)) {
-        if (/^(cornerRadius|focusRing|border|shadow|insertHint|tabIndicator|fullscreenBackdropColor|backgroundColor|pointerBinds)/.test(name)) {
+        if (/^(cornerRadius|focusRing|border|shadow|insertHint|tabIndicator|fullscreenBackdropColor|backgroundColor|pointerBinds|overview(Zoom|Backdrop|Shadow))/.test(name)) {
             out[name] = value;
         }
     }

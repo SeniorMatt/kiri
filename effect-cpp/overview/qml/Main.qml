@@ -54,21 +54,47 @@ FocusScope {
         return o === undefined ? scroll : o;
     }
 
+    // the corner radius or the blur setting changed: look at every window again
+    Connections {
+        target: root.effect
+        function onOptionsChanged() { root.syncModel(); }
+    }
+
     ListModel { id: winModel }
     property var modelIndex: ({})
 
+    // the desktops (by index) that have a window to blur behind
+    property var blurDesktops: []
+
     function flatten(l) {
         const out = [];
+        const blurs = [];
+        const look = w => {
+            const k = effect.tileLook(w.id);
+            const c = k.crop || [0, 0, 1, 1];
+            return { blur: k.blur, round: k.round, cx: c[0], cy: c[1], cw: c[2], ch: c[3] };
+        };
         l.desktops.forEach((d, di) => {
             d.cols.forEach((c, ci) => {
-                c.wins.forEach((w, wi) => out.push({ wid: w.id, did: d.id, di: di, lscroll: d.scroll,
-                    rx: w.x - l.screen.x, ry: w.y - l.screen.y, rw: w.w, rh: w.h, col: ci, row: wi,
-                    colw: c.w, floating: false, shown: !c.tab || w.top === true, active: w.id === l.active, title: w.t || "", cls: w.c || "" }));
+                c.wins.forEach((w, wi) => {
+                    const k = look(w);
+                    out.push({ wid: w.id, did: d.id, di: di, lscroll: d.scroll,
+                        rx: w.x - l.screen.x, ry: w.y - l.screen.y, rw: w.w, rh: w.h, col: ci, row: wi,
+                        colw: c.w, floating: false, shown: !c.tab || w.top === true, active: w.id === l.active, title: w.t || "", cls: w.c || "",
+                        blur: k.blur, round: k.round, cx: k.cx, cy: k.cy, cw: k.cw, ch: k.ch });
+                    blurs[di] = blurs[di] || (k.blur && (!c.tab || w.top === true));
+                });
             });
-            (d.floats || []).forEach((w, wi) => out.push({ wid: w.id, did: d.id, di: di, lscroll: d.scroll,
-                rx: w.x - l.screen.x, ry: w.y - l.screen.y, rw: w.w, rh: w.h, col: -1, row: wi,
-                colw: 0, floating: true, shown: true, active: w.id === l.active, title: w.t || "", cls: w.c || "" }));
+            (d.floats || []).forEach((w, wi) => {
+                const k = look(w);
+                out.push({ wid: w.id, did: d.id, di: di, lscroll: d.scroll,
+                    rx: w.x - l.screen.x, ry: w.y - l.screen.y, rw: w.w, rh: w.h, col: -1, row: wi,
+                    colw: 0, floating: true, shown: true, active: w.id === l.active, title: w.t || "", cls: w.c || "",
+                    blur: k.blur, round: k.round, cx: k.cx, cy: k.cy, cw: k.cw, ch: k.ch });
+                blurs[di] = blurs[di] || k.blur;
+            });
         });
+        blurDesktops = blurs;
         return out;
     }
 
@@ -373,6 +399,7 @@ FocusScope {
     }
 
     Repeater {
+        id: wsRows
         model: root.mine ? desktopModel : null
         delegate: Item {
             id: ws
@@ -395,10 +422,94 @@ FocusScope {
                 shadow.color: Qt.rgba(root.effect.shadowColor.r, root.effect.shadowColor.g, root.effect.shadowColor.b, root.effect.shadowColor.a * root.pc)
             }
             KWinComponents.DesktopBackground {
+                id: wallpaper
                 anchors.fill: parent
                 activity: KWinComponents.Workspace.currentActivity
                 desktop: ws.desktop
                 outputName: root.targetScreen ? root.targetScreen.name : ""
+            }
+            // The wallpaper of this desktop blurred once into a small texture, for the windows a blur effect blurs in the normal
+            // view: each of their tiles shows its part of it. Not created at all while no tile needs it.
+            property Item blurTex: blurLoader.item ? blurLoader.item.blurred : null
+            property bool blurReady: blurLoader.item ? blurLoader.item.ready : false
+            Loader {
+                id: blurLoader
+                active: root.mine && root.blurDesktops[ws.index] === true
+                sourceComponent: Item {
+                    id: blurSet
+                    property alias blurred: blurred
+                    property bool ready: false
+                    // half the desktop's size at the overview's zoom
+                    readonly property size texSize: Qt.size(Math.max(1, Math.round(root.width * root.effect.zoom * 0.5)),
+                                                            Math.max(1, Math.round(root.height * root.effect.zoom * 0.5)))
+                    // the blur effect's radius at the normal size, in this texture's pixels
+                    readonly property real radiusPx: root.effect.blurRadius() * root.effect.zoom * 0.5
+                    // capture in steps: the wallpaper, then its blur; again a little later in case the wallpaper came in late
+                    function capture() {
+                        copy.scheduleUpdate();
+                        blurStep.restart();
+                    }
+                    ShaderEffectSource {
+                        id: copy
+                        sourceItem: wallpaper
+                        live: false
+                        textureSize: blurSet.texSize
+                        visible: false
+                    }
+                    MultiEffect {
+                        id: blurFx
+                        width: blurSet.texSize.width
+                        height: blurSet.texSize.height
+                        source: copy
+                        blurEnabled: true
+                        blurMax: 64
+                        // MultiEffect's blur reaches its full strength at about half of blurMax
+                        blur: Math.min(1, blurSet.radiusPx / 32)
+                        autoPaddingEnabled: false
+                        visible: false
+                    }
+                    ShaderEffectSource {
+                        id: blurred
+                        sourceItem: blurFx
+                        live: false
+                        hideSource: true
+                        textureSize: blurSet.texSize
+                        visible: false
+                    }
+                    Timer {
+                        id: blurStep
+                        interval: 50
+                        onTriggered: {
+                            blurred.scheduleUpdate();
+                            blurDone.restart();
+                        }
+                    }
+                    Timer {
+                        id: blurDone
+                        interval: 50
+                        onTriggered: blurSet.ready = true
+                    }
+                    Timer {
+                        id: again
+                        interval: 450
+                        running: true
+                        onTriggered: blurSet.capture()
+                    }
+                    // the first capture waits for the wallpaper item to have its content; each opening captures again
+                    readonly property bool shown: root.p > 0
+                    onShownChanged: {
+                        if (shown) {
+                            captureLater.restart();
+                            again.restart();
+                        }
+                    }
+                    Timer {
+                        id: captureLater
+                        interval: 40
+                        running: true
+                        onTriggered: blurSet.capture()
+                    }
+                }
             }
             TapHandler {
                 acceptedButtons: Qt.LeftButton
@@ -428,6 +539,19 @@ FocusScope {
             required property bool active
             required property string title
             required property string cls
+            required property bool blur
+            required property bool round
+            // where the frame is in the thumbnail's texture, which also holds the shadow
+            required property real cx
+            required property real cy
+            required property real cw
+            required property real ch
+
+            // the corner radius of the normal view; the tile is a plain thumbnail (no extra pass) with neither a radius nor a blur
+            readonly property real rad: round ? Math.min(root.effect.cornerRadius * root.zm, Math.min(width, height) / 2) : 0
+            readonly property Item wsRow: { wsRows.count; return wsRows.itemAt(di); }
+            readonly property bool blurOn: blur && wsRow !== null && wsRow.blurReady
+            readonly property bool shaded: rad > 0 || blurOn
 
             property bool ready: false
             Component.onCompleted: Qt.callLater(() => { ready = true; })
@@ -508,14 +632,36 @@ FocusScope {
             visible: root.mine && (shown || dragging || held) && x < root.width && x + width > 0 && y < root.height && y + height > 0
 
             KWinComponents.WindowThumbnail {
+                id: thumb
                 anchors.fill: parent
                 wId: tile.wid
+                visible: !tile.shaded
+            }
+            // rounds the corners and draws the blurred wallpaper behind a translucent window, in one pass
+            Loader {
+                anchors.fill: parent
+                active: tile.shaded
+                sourceComponent: ShaderEffect {
+                    property var source: thumb
+                    property var blurred: tile.blurOn ? tile.wsRow.blurTex : null
+                    property vector2d tileSize: Qt.vector2d(width, height)
+                    property real radius: tile.rad
+                    property real blurMix: tile.blurOn ? 1 : 0
+                    // where this tile is in the desktop's texture
+                    property vector4d blurRect: tile.blurOn
+                        ? Qt.vector4d((tile.x - tile.wsRow.x) / tile.wsRow.width, (tile.y - tile.wsRow.y) / tile.wsRow.height,
+                                      tile.width / tile.wsRow.width, tile.height / tile.wsRow.height)
+                        : Qt.vector4d(0, 0, 1, 1)
+                    property vector4d crop: Qt.vector4d(tile.cx, tile.cy, tile.cw, tile.ch)
+                    fragmentShader: "tile.frag.qsb"
+                }
             }
             Rectangle {
                 // niri: the ring belongs to the focused window and goes with it while it is dragged and dropped
                 visible: effect.ringOn && (tile.active || tile.dragging || tile.held)
                 anchors.fill: parent
                 anchors.margins: -border.width
+                radius: tile.rad > 0 ? tile.rad + border.width : 0
                 color: "transparent"
                 border.width: Math.max(1, effect.ringWidth * root.zm)
                 border.color: root.ringColor
@@ -734,7 +880,7 @@ FocusScope {
     Rectangle {
         visible: root.hint !== null && root.hint.rect !== null
         color: root.hintColor
-        radius: 8 * root.zm
+        radius: root.effect.cornerRadius * root.zm
         x: root.hint && root.hint.rect ? root.x0 + (root.hint.rect.x + root.hint.shift) * root.zm : 0
         y: root.hint && root.hint.rect ? root.wsY(root.hint.di) + root.hint.rect.y * root.zm : 0
         width: root.hint && root.hint.rect ? root.hint.rect.w * root.zm : 0

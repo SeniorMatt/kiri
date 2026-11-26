@@ -11,6 +11,7 @@
 #pragma once
 
 #include "AnimConfig.h"
+#include "BlurMatch.h"
 #include "NiriSwipe.h"
 #include "PlasmaAccent.h"
 #include "effect/effectwindow.h"
@@ -51,6 +52,8 @@ class OverviewEffect : public QuickSceneEffect
     Q_PROPERTY(bool shadowOn READ shadowOn NOTIFY optionsChanged)
     Q_PROPERTY(bool backdropBlur READ backdropBlur NOTIFY optionsChanged)
     Q_PROPERTY(int backdropBlurRadius READ backdropBlurRadius NOTIFY optionsChanged)
+    // the corner radius of the normal view (the Kiri setting), in layout px
+    Q_PROPERTY(qreal cornerRadius READ cornerRadius NOTIFY optionsChanged)
     Q_PROPERTY(qreal shadowSoftness READ shadowSoftness NOTIFY optionsChanged)
     Q_PROPERTY(qreal shadowSpread READ shadowSpread NOTIFY optionsChanged)
     Q_PROPERTY(qreal shadowOffsetX READ shadowOffsetX NOTIFY optionsChanged)
@@ -87,6 +90,12 @@ public:
     bool shadowOn() const { return m_shadowOn; }
     bool backdropBlur() const { return m_backdropBlur; }
     int backdropBlurRadius() const { return m_backdropBlurRadius; }
+    qreal cornerRadius() const { return m_cornerRadius; }
+    // How the normal view draws one window: {blur: a blur effect blurs what is behind it, round: it has rounded corners
+    // (not full screen or maximized)}
+    Q_INVOKABLE QVariantMap tileLook(const QString &windowId);
+    // the radius, in px at full size, of the blur the blur effect gives windows
+    Q_INVOKABLE int blurRadius() const;
     qreal shadowSoftness() const { return m_shadowSoftness; }
     qreal shadowSpread() const { return m_shadowSpread; }
     qreal shadowOffsetX() const { return m_shadowOffsetX; }
@@ -206,6 +215,8 @@ private:
     bool m_shadowOn = true;
     bool m_backdropBlur = false;
     int m_backdropBlurRadius = 48;
+    qreal m_cornerRadius = 0;
+    BlurMatch m_blur;
     qreal m_shadowSoftness = 40, m_shadowSpread = 10, m_shadowOffsetX = 0, m_shadowOffsetY = 10;
     QColor m_shadowColor = QColor(0, 0, 0, 0x50);
     // the focus ring and insert hint of the normal view, as set in Kiri's settings

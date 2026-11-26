@@ -6,7 +6,7 @@ kcoreaddons_add_plugin(kiri_overview
 
 qt_add_resources(kiri_overview kiri_overview_qml
     PREFIX "/kiri/overview"
-    FILES qml/Main.qml)
+    FILES qml/Main.qml qml/tile.frag.qsb)
 
 target_include_directories(kiri_overview PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../common)
 target_link_libraries(kiri_overview PRIVATE

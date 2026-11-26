@@ -10,10 +10,6 @@
 #include <pointer_input.h>
 #include <virtualdesktops.h>
 #include <window.h>
-#if __has_include(<wayland/surface.h>)
-#include <wayland/surface.h>
-#define KIRI_SURFACE_BLUR 1
-#endif
 #include <core/pixelgrid.h>
 #include <core/renderviewport.h>
 #include <effect/effecthandler.h>
@@ -668,49 +664,9 @@ Effect::Effect()
     });
 }
 
-// True when a blur effect will blur this window: the app asked for blur, or Better Blur DX is set to force blur for its class
-// (the same match as its window_manager.cpp, read from its kwinrc group)
 bool Effect::blurredBehind(KWin::EffectWindow *w)
 {
-    const bool stock = KWin::effects->isEffectLoaded(QStringLiteral("blur"));
-    const bool better = KWin::effects->isEffectLoaded(QStringLiteral("better_blur_dx"));
-    if (!stock && !better) {
-        return false;
-    }
-#ifdef KIRI_SURFACE_BLUR
-    if (const auto *surface = w->surface(); surface && !surface->blurRegion().isEmpty()) {
-        return true;
-    }
-#endif
-    if (!better || !w->window()) {
-        return false;
-    }
-    if (!m_blurConfigRead.isValid() || m_blurConfigRead.elapsed() > 2000) {
-        m_blurConfigRead.start();
-        const auto config = KSharedConfig::openConfig(QStringLiteral("kwinrc"), KConfig::NoGlobals);
-        config->reparseConfiguration();
-        const KConfigGroup group = config->group(QStringLiteral("Effect-better-blur-dx"));
-        m_blurClasses.clear();
-        m_blurClassPatterns.clear();
-        for (const QString &line : group.readEntry("WindowClasses", QStringLiteral("class1\nclass2\nclass3")).split(QLatin1Char('\n'), Qt::SkipEmptyParts)) {
-            if (line.length() >= 2 && line.startsWith(QLatin1Char('/')) && line.endsWith(QLatin1Char('/'))) {
-                const QRegularExpression regex(line.sliced(1, line.length() - 2));
-                if (regex.isValid()) {
-                    m_blurClassPatterns.append(regex);
-                }
-            } else {
-                m_blurClasses.append(line == QLatin1String("$blank") ? QString() : line);
-            }
-        }
-        m_blurWhitelist = group.readEntry("BlurMatching", true);
-    }
-    const QString resourceClass = w->window()->resourceClass();
-    const QString resourceName = w->window()->resourceName();
-    bool matches = m_blurClasses.contains(resourceClass) || m_blurClasses.contains(resourceName);
-    for (const QRegularExpression &regex : std::as_const(m_blurClassPatterns)) {
-        matches = matches || regex.match(resourceClass).hasMatch() || regex.match(resourceName).hasMatch();
-    }
-    return matches == m_blurWhitelist;
+    return m_blur.blurs(w);
 }
 
 #ifdef KIRI_BORDER_RADIUS
