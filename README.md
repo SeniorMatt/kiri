@@ -34,6 +34,16 @@ unpack it and run:
 
 It shows what it will change and asks first. `./uninstall.sh` removes Kiri again.
 
+### KDE Store
+
+Kiri is also on the [KDE Store](https://store.kde.org/p/2382878/), so you can get it from the Get New page in KWin
+Scripts.
+
+> [!WARNING]
+> The store version is a lite version: only the KWin script. The overview, touchpad gestures, Kiri's own animations,
+> the rounded focus rings, `kiri-mode` and `niri2kiri` are missing, because the store can only ship the script. For
+> the full Kiri, use the AUR package or `install.sh` above.
+
 ### After installing
 
 `kiri-mode toggle` switches between Kiri and plain Plasma. Coming from niri?
