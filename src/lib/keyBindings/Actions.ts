@@ -879,8 +879,9 @@ class Actions {
         dm.gatherOnOutput(dm.getActiveOutputName());
     };
 
-    private getMonitor(dm: DesktopManager, direction: Actions.MonitorDirection) {
-        const from = dm.getActiveOutputName();
+    // `fromName`: the monitor to count from; the move actions pass the window's own monitor, as niri does
+    private getMonitor(dm: DesktopManager, direction: Actions.MonitorDirection, fromName?: string) {
+        const from = fromName ?? dm.getActiveOutputName();
         switch (direction) {
         case "left": return dm.getOutputInDirection(from, -1, 0);
         case "right": return dm.getOutputInDirection(from, 1, 0);
@@ -914,7 +915,7 @@ class Actions {
 
     // niri's move-column-to-monitor-*
     public readonly columnMoveToMonitor = (direction: Actions.MonitorDirection, cm: ClientManager, dm: DesktopManager, window: Window, column: Column, oldGrid: Grid) => {
-        const output = this.getMonitor(dm, direction);
+        const output = this.getMonitor(dm, direction, oldGrid.desktop.outputName);
         if (output === null) {
             return;
         }
@@ -935,7 +936,7 @@ class Actions {
             this.columnMoveToMonitor(direction, cm, dm, window, column, oldGrid);
             return;
         }
-        const output = this.getMonitor(dm, direction);
+        const output = this.getMonitor(dm, direction, oldGrid.desktop.outputName);
         if (output === null) {
             return;
         }
@@ -952,7 +953,7 @@ class Actions {
     };
 
     public readonly floatingMoveToMonitor = (direction: Actions.MonitorDirection, cm: ClientManager, dm: DesktopManager, active: KwinClient) => {
-        const output = this.getMonitor(dm, direction);
+        const output = this.getMonitor(dm, direction, active.output?.name);
         if (output !== null) {
             cm.moveFloatingToOutput(active, output);
         }

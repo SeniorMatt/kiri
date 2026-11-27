@@ -114,6 +114,22 @@
         inside(b, right(), "the window is on the second output");
     });
 
+    tests.register("Multi-monitor: move-to-monitor counts from the window's own monitor (#89)", 5, () => {
+        const { qtMock, workspaceMock } = setup();
+        const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
+        workspaceMock.activeWindow = a;
+        // focusing the empty second output makes it the active one, but the window stays where it is
+        qtMock.fireShortcut("focus-monitor-right");
+        Assert.equal(workspaceMock.activeWindow, a);
+        qtMock.fireShortcut("column-move-to-monitor-right");
+        inside(a, right(), "the column moved right although the active output is the right one");
+        inside(b, screen, "the other column stays");
+
+        qtMock.fireShortcut("focus-monitor-left");
+        qtMock.fireShortcut("window-move-to-monitor-right");
+        inside(b, right(), "window-move-to-monitor too");
+    });
+
     tests.register("Multi-monitor: columns that are out of the view are not on the other output", 5, () => {
         const { qtMock, workspaceMock } = setup();
         const clients = workspaceMock.createClientsWithWidths(500, 500, 500, 500);
