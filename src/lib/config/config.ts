@@ -47,6 +47,7 @@ interface Config {
     scrollingOnOverflow: boolean;
     centerGridWhenFits: boolean;
     alwaysCenterSingleColumn: boolean;
+    maximizeSingleColumn: boolean;
     defaultColumnWidth: string;
     presetHeights: string;
     columnWidthSet: string;

@@ -398,6 +398,11 @@ const configDef = [
         default: false,
     },
     {
+        name: "maximizeSingleColumn", // a lone column fills the tiling area, unless its width was set by hand
+        type: "Bool",
+        default: false,
+    },
+    {
         name: "defaultColumnWidth",
         type: "String",
         default: "50%",

@@ -303,7 +303,8 @@ class Window {
         const newGeometry = this.client.kwinClient.frameGeometry;
         // while outputs come and go KWin squeezes windows into the screen that is left; those widths must not replace
         // the column's
-        if (!Clients.isFrameFullScreenSize(this.client.kwinClient) && !this.column.grid.desktop.isScreenSettling()) {
+        // a lone column at full width because of maximizeSingleColumn: that frame is Kiri's own, not the column's width
+        if (!Clients.isFrameFullScreenSize(this.client.kwinClient) && !this.column.grid.desktop.isScreenSettling() && !this.column.isAutoFullWidth()) {
             this.column.setWidth(newGeometry.width.round(), true, true);
         }
     }

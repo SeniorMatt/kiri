@@ -228,6 +228,7 @@ class World {
                 scroller: World.createScroller(config),
                 clamper: (config.scrollingLazy || config.scrollingOnOverflow) ? new EdgeClamper(config.centerGridWhenFits) : new CenterClamper(),
                 alwaysCenterSingleColumn: config.alwaysCenterSingleColumn,
+                maximizeSingleColumn: config.maximizeSingleColumn,
                 gestureScroll: config.gestureScroll,
                 gestureScrollInvert: config.gestureScrollInvert,
                 gestureScrollStep: config.gestureScrollStep,

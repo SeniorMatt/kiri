@@ -256,13 +256,18 @@ class Grid {
         }
     }
 
+    // maximizeSingleColumn: with one or two columns, adding or removing one changes the width of the other
+    private lonelinessChanges() {
+        return this.desktop.profile.desktop.maximizeSingleColumn && this.columns.length() <= 2;
+    }
+
     public onColumnAdded(column: Column, leftColumn: Column|null) {
         if (leftColumn === null) {
             this.columns.insertStart(column);
         } else {
             this.columns.insertAfter(column, leftColumn);
         }
-        this.columnsSetX(column);
+        this.columnsSetX(this.lonelinessChanges() ? this.columns.getFirst() : column);
         if (this.getLastFocusedColumn() === null) {
             this.lastFocusedColumn = column;
         }
@@ -307,7 +312,7 @@ class Grid {
         }
 
         this.columns.remove(column);
-        this.columnsSetX(rightColumn);
+        this.columnsSetX(this.lonelinessChanges() ? this.columns.getFirst() : rightColumn);
 
         this.desktop.onLayoutChanged();
         if (returnTo !== null) {

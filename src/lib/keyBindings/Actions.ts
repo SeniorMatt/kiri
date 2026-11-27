@@ -205,7 +205,7 @@ class Actions {
         const other = target.getWindowToFocus();
         const windowAbove = column.getAboveWindow(window);
         const otherAbove = target.getAboveWindow(other);
-        const width = column.getWidth();
+        const width = column.getRegularWidth();
         if (column.getWindowCount() === 1) {
             other.moveToColumn(column, true, FocusPassing.Type.None, window);
             column.setWidth(width, false);
@@ -367,7 +367,7 @@ class Actions {
             }
             window.moveToColumn(neighbour, true, FocusPassing.Type.None);
         } else {
-            const width = column.getWidth();
+            const width = column.getRegularWidth();
             const newColumn = new Column(grid, newColumnLeftOf);
             newColumn.setWidth(width, false);
             window.moveToColumn(newColumn, true, FocusPassing.Type.None);
@@ -397,7 +397,7 @@ class Actions {
             }
         }
         const newColumn = new Column(grid, column);
-        newColumn.setWidth(column.getWidth(), false);
+        newColumn.setWidth(column.getRegularWidth(), false);
         expelled.moveToColumn(newColumn, true, FocusPassing.Type.None);
         grid.desktop.autoAdjustScroll();
     };
@@ -547,6 +547,14 @@ class Actions {
     public readonly columnWidthMaximize = (cm: ClientManager, dm: DesktopManager, window: Window, column: Column, grid: Grid) => {
         const desktop = grid.desktop;
         const fullWidth = Math.min(Math.max(desktop.tilingArea.width, column.getMinWidth()), column.getMaxWidth());
+        if (column.isAutoFullWidth()) {
+            // maximizeSingleColumn made it full width: the shortcut takes it back to its own width, which counts as the
+            // user's choice from now on
+            column.widthBeforeMaximize = undefined;
+            column.setWidth(column.getRegularWidth(), true, false, true);
+            desktop.scrollCenterVisible(column);
+            return;
+        }
         const mode = window.client.getMaximizedMode() ?? MaximizedMode.Unmaximized;
         if (window.fillsWidth() && mode !== MaximizedMode.Unmaximized) {
             // KWin keeps the window maximized in the grid and the full area pins its frame: niri has no such state, so

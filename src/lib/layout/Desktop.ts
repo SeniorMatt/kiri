@@ -453,6 +453,7 @@ namespace Desktop {
         marginLeft: number;
         marginRight: number;
         alwaysCenterSingleColumn: boolean;
+        maximizeSingleColumn: boolean;
         gestureScroll: boolean;
         gestureScrollInvert: boolean;
         gestureScrollStep: number;

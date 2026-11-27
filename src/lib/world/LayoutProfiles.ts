@@ -15,7 +15,7 @@ interface LayoutProfile {
 }
 
 class LayoutProfiles {
-    public static readonly KEYS = /^(gapsInnerHorizontal|gapsInnerVertical|gapsOuter(Top|Bottom|Left|Right)|presetWidths|presetHeights|defaultColumnWidth|scrolling(Lazy|Centered|Grouped|OnOverflow)|alwaysCenterSingleColumn|tabbedColumnsByDefault|tabIndicator.*|focusRing.*|border.*|shadow.*|backgroundColor|fullscreenBackdropColor)$/;
+    public static readonly KEYS = /^(gapsInnerHorizontal|gapsInnerVertical|gapsOuter(Top|Bottom|Left|Right)|presetWidths|presetHeights|defaultColumnWidth|scrolling(Lazy|Centered|Grouped|OnOverflow)|alwaysCenterSingleColumn|maximizeSingleColumn|tabbedColumnsByDefault|tabIndicator.*|focusRing.*|border.*|shadow.*|backgroundColor|fullscreenBackdropColor)$/;
     private static readonly LOOK_BANDS = ["focusRing", "border"] as const;
 
     private readonly base: LayoutProfile;

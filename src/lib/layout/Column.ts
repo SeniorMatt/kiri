@@ -22,6 +22,8 @@ class Column {
     // while the user resizes: the geometry the pointer asks for, before the client has committed it
     private userResizeTarget: { window: Window, width: number, leftEdge: boolean } | null = null;
     private beyondView = false;
+    // the width was set by the user (shortcut, preset, equalize, pointer): maximizeSingleColumn leaves such a column alone
+    private widthSetByUser = false;
     private static readonly minWidth = 40;
     private static readonly maxWidthBeyondView = 4;
     private static readonly minHeight = 40;
@@ -101,7 +103,25 @@ class Column {
     }
 
     public getWidth() {
+        if (this.fillsWidth()) {
+            return this.grid.desktop.tilingArea.width;
+        }
+        // maximizeSingleColumn: the lone column is shown at full width; `width` (and the windows' preferred width) stay
+        // the column's own, so it goes back to them when another column appears
+        return this.isAutoFullWidth() ? this.getMaxWidth() : this.width;
+    }
+
+    // the width the column has apart from maximizeSingleColumn
+    public getRegularWidth() {
         return this.fillsWidth() ? this.grid.desktop.tilingArea.width : this.width;
+    }
+
+    public isAutoFullWidth() {
+        return this.grid.desktop.profile.desktop.maximizeSingleColumn &&
+            !this.widthSetByUser &&
+            this.grid.getFirstColumn() === this &&
+            this.grid.getLastColumn() === this &&
+            !this.fillsWidth();
     }
 
     private fillsWidth() {
@@ -170,6 +190,11 @@ class Column {
 
     // the width was asked for by a width step and may exceed the screen
     public setWidth(width: number, setPreferred: boolean, keepPreset = false, beyondView = false) {
+        const wasAutoFull = this.isAutoFullWidth();
+        if (setPreferred && !keepPreset) {
+            // every width the user asks for; keepPreset is only used by the client adopting its own frame width
+            this.widthSetByUser = true;
+        }
         const viewMax = this.getMaxWidth();
         if (beyondView) {
             this.beyondView = width > viewMax;
@@ -183,6 +208,9 @@ class Column {
             this.presetWidth = undefined;
         }
         if (width === this.width) {
+            if (wasAutoFull && !this.isAutoFullWidth()) {
+                this.grid.onColumnWidthChanged(this);
+            }
             return;
         }
 

@@ -348,7 +348,7 @@ class ClientManager {
         if (limitsChanged) {
             const window = this.findTiledWindow(client.kwinClient);
             if (window !== null) {
-                window.column.setWidth(window.column.getWidth(), false, true);
+                window.column.setWidth(window.column.getRegularWidth(), false, true);
                 window.column.resizeWindows();
             }
         }
