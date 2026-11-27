@@ -43,7 +43,7 @@ package: build
 	cd ./package && zip -qr ../kiri_${subst .,_,${VERSION}}.kwinscript .
 
 # builds and installs everything on this machine, including the compiled effects
-install-all:
+install-all: build
 	./tools/install.sh
 
 docs-key-bindings-bbcode:

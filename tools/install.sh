@@ -17,6 +17,15 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$here
 [ -d "$root/package" ] || root=$(dirname "$here")
 [ -d "$root/package" ] || { echo "install.sh: can't find the package/ directory next to this script" >&2; exit 1; }
+# GitHub's "Source code" downloads and git clones don't have the built script, settings or settings page
+for f in contents/code/main.js contents/config/main.xml contents/ui/config.ui; do
+    if [ ! -f "$root/package/$f" ]; then
+        echo "install.sh: this is Kiri's source code, not a release (package/$f is missing)." >&2
+        echo "Download kiri_<version>.tar.gz from https://github.com/SeniorMatt/kiri/releases (not \"Source code\")," >&2
+        echo "or build it first with: make package" >&2
+        exit 1
+    fi
+done
 effect=$root/effect
 cpp=$root/effect-cpp
 build=true

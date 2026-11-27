@@ -165,6 +165,10 @@ if [ -n "$plugins" ]; then
 fi
 settings_pages=$(find "$plugindir/kwin/effects/configs" /usr/lib/qt6/plugins/kwin/effects/configs /usr/lib64/qt6/plugins/kwin/effects/configs /usr/lib/*/qt6/plugins/kwin/effects/configs -name 'kcm_kiri.so' 2>/dev/null | sort -u || true)
 for f in $settings_pages; do $SUDO rm -f "$f"; done
+# the effects built into /usr (install.sh outside atomic distros) put their shaders there too; left behind, they block
+# a package (the AUR's kwin-kiri) from installing
+shaders=$(find /usr/share/kwin/shaders /usr/local/share/kwin/shaders -name 'kiri_*' 2>/dev/null || true)
+for f in $shaders; do $SUDO rm -f "$f"; done
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/kiri-build"
 # atomic distros: effects in the home dir, the plugin path files and the build container
 home_effects=$(find "$own_plugins/kwin" -name 'kiri_*.so' -o -name 'kcm_kiri.so' 2>/dev/null)

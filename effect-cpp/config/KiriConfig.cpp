@@ -177,8 +177,12 @@ private:
         }
         QFile xml(root + QStringLiteral("/contents/config/main.xml"));
         QFile ui(root + QStringLiteral("/contents/ui/config.ui"));
-        if (!xml.exists() || !ui.open(QFile::ReadOnly)) {
-            return fail(tr("Could not read %1").arg(root));
+        const QString missing = !xml.exists() ? xml.fileName() : !ui.open(QFile::ReadOnly) ? ui.fileName() : QString();
+        if (!missing.isEmpty()) {
+            // the usual cause: Kiri was installed from GitHub's "Source code" download or a git clone, which is not built
+            return fail(tr("Could not read %1\n\nThis happens when Kiri is installed from the source code instead of a release.\n"
+                           "Install kiri_<version>.tar.gz from https://github.com/SeniorMatt/kiri/releases with ./install.sh.")
+                            .arg(missing));
         }
 
         KConfigGroup group = KSharedConfig::openConfig(QStringLiteral("kwinrc"))->group(QStringLiteral("Script-") + m_id);
