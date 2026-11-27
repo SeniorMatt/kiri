@@ -191,6 +191,13 @@ class ClientWrapper {
                 frameHeight = refusal.height;
             }
             this.lastPlacement = Qt.rect(x, y, width, height);
+            if (current.width === width && current.height === height) {
+                // the window already has the size: an earlier ask for another one is superseded, and what answers it
+                // later (or a move at this size) is not a refusal
+                this.askedSize = null;
+                this.awaitingCommit = false;
+                this.partialCommitDelayer.stop();
+            }
             if (current.x === x && current.y === y && current.width === frameWidth && current.height === frameHeight) {
                 // a repeated set makes some Xwayland clients redraw
                 return;

@@ -499,3 +499,83 @@ tests.register("Overview: a tabbed column draws only the shown tab", 1, () => {
     wins = overviewLastLayout().desktops[0].cols[0].wins;
     Assert.equal(wins.filter((w: any) => w.top).map((w: any) => w.id).join(","), String(a.internalId));
 });
+
+tests.register("Overview: a window dragged out of a column and dropped back gets its share of the height", 1, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock, world } = init(config);
+    overviewCalls.length = 0;
+
+    const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
+    const desktop0 = workspaceMock.desktops[0];
+    qtMock.fireShortcut("overview");
+    overviewPoll(world, [{ t: "drop", w: String(b.internalId), d: desktop0.id, c: 0, i: 1 }]);
+    const half = a.getActualFrameGeometry().height;
+    Assert.equal(b.getActualFrameGeometry().height, half, { message: "first drop: even" });
+
+    // no read jitter: the stale ask only shows when the size read equals the asked one
+    const random = Math.random;
+    const realNow = Date.now;
+    let now = realNow();
+    Math.random = () => 0.9;
+    Date.now = () => now;
+    MockQmlTimer.deferIntervals.add(500);
+    try {
+        // a is slow: the drop asks half and then full again before it commits the half
+        a.slowClient = true;
+        overviewPoll(world, [{ t: "dragstart", w: String(b.internalId) }]);
+        a.commitRequestedGeometry(); // full
+        overviewPoll(world, [{ t: "drop", w: String(b.internalId), d: desktop0.id, c: 1, i: -1 }]);
+        // the wait for a partial commit is over and the client still has its old size, twice
+        now += 600;
+        MockQmlTimer.flush();
+        a.frameGeometryChanged.fire(a.getRealFrameGeometry());
+        a.commitRequestedGeometry();
+
+        a.slowClient = false;
+        overviewPoll(world, [{ t: "drop", w: String(b.internalId), d: desktop0.id, c: 0, i: 0 }]);
+        Assert.equal(b.getActualFrameGeometry().height, half, { message: "second drop: even" });
+        Assert.equal(a.getActualFrameGeometry().height, half);
+    } finally {
+        Math.random = random;
+        Date.now = realNow;
+        MockQmlTimer.deferIntervals.clear();
+        MockQmlTimer.flush();
+    }
+});
+
+tests.register("Overview: a window dragged out to the left and dropped back gets its share of the height", 1, () => {
+    const config = getDefaultConfig();
+    config.centerGridWhenFits = false;
+    const { qtMock, workspaceMock, world } = init(config);
+    overviewCalls.length = 0;
+
+    const [a, b] = workspaceMock.createClientsWithWidths(300, 300);
+    const desktop0 = workspaceMock.desktops[0];
+    qtMock.fireShortcut("overview");
+    overviewPoll(world, [{ t: "drop", w: String(b.internalId), d: desktop0.id, c: 0, i: 1 }]);
+    const half = a.getActualFrameGeometry().height;
+
+    const random = Math.random;
+    Math.random = () => 0.9;
+    try {
+        // a is slow: the drag asks it full, the drop half and then full again
+        a.slowClient = true;
+        overviewPoll(world, [{ t: "dragstart", w: String(b.internalId) }]);
+        a.commitRequestedGeometry(); // full
+        const x = a.getRealFrameGeometry().x;
+        overviewPoll(world, [{ t: "drop", w: String(b.internalId), d: desktop0.id, c: 0, i: -1 }]);
+        Assert.assert(a.getRealFrameGeometry().x > x, { message: "a moved right at its full height" });
+        // the moves of a's column (the scroll) are not answers to the superseded ask for half
+        a.frameGeometryChanged.fire(a.getRealFrameGeometry());
+        a.frameGeometryChanged.fire(a.getRealFrameGeometry());
+        a.commitRequestedGeometry();
+
+        a.slowClient = false;
+        overviewPoll(world, [{ t: "drop", w: String(b.internalId), d: desktop0.id, c: 0, i: 0 }]);
+        Assert.equal(b.getActualFrameGeometry().height, half, { message: "second drop: even" });
+        Assert.equal(a.getActualFrameGeometry().height, half);
+    } finally {
+        Math.random = random;
+    }
+});
