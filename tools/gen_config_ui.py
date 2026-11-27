@@ -108,8 +108,8 @@ FIELDS = [
 
     F("animationsOff", "Animations", "All animations", "", "Like niri's `off` in the animations block: every animation ends at once", label_text="Turn off all animations"),
     F("animationsSlowdown", "Animations", "All animations", "Slow down by", "Like niri's `slowdown`: all animations take this many times as long. Below 1 they are faster. It comes on top of Plasma's animation speed", lo=0.0, hi=100.0, step=0.1, decimals=2, suffix="x"),
-    F("animWindowOpen", "Animations", "Windows", "Open", "niri's window-open (a new window scales up and fades in)."+FMT, placeholder="ease-out-expo 150"),
-    F("animWindowClose", "Animations", "Windows", "Close", "niri's window-close (a closing window shrinks and fades out)."+FMT, placeholder="ease-out-quad 150"),
+    F("animWindowOpen", "Animations", "Windows", "Open", "niri's window-open (a new window scales up and fades in)."+FMT+" Off: Kiri does not animate it, so the window open/close effect chosen in System Settings > Animations plays instead.", placeholder="ease-out-expo 150"),
+    F("animWindowClose", "Animations", "Windows", "Close", "niri's window-close (a closing window shrinks and fades out)."+FMT+" Off: Kiri does not animate it, so the window open/close effect chosen in System Settings > Animations plays instead.", placeholder="ease-out-quad 150"),
     F("animWindowMovement", "Animations", "Windows", "Movement", "niri's window-movement (windows that move to a new place; a move that only goes sideways uses the view movement below)."+FMT, placeholder="spring 1 800 0.0001"),
     F("animWindowResize", "Animations", "Windows", "Resize", "niri's window-resize (the old contents cross-fade into the new ones)."+FMT, placeholder="spring 1 800 0.0001"),
     F("animHorizontalViewMovement", "Animations", "View and desktops", "View movement", "niri's horizontal-view-movement (the columns scroll sideways, also where a touchpad swipe settles)."+FMT, placeholder="spring 1 800 0.0001"),
