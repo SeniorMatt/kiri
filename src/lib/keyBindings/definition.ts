@@ -123,12 +123,12 @@ function getKeyBindings(world: World, actions: Actions): KeyBinding[] {
         {
             name: "focus-window-or-desktop-down",
             description: "Focus: window or desktop down",
-            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowOrDesktopDown),
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowOrDesktopDown, 1),
         },
         {
             name: "focus-window-or-desktop-up",
             description: "Focus: window or desktop up",
-            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowOrDesktopUp),
+            action: () => world.doIfTiledFocusedOrEnterGrid(actions.focusWindowOrDesktopUp, -1),
         },
         {
             name: "focus-window-previous",

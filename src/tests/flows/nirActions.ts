@@ -71,6 +71,16 @@ tests.register("niri window-or-desktop actions", 5, () => {
     Assert.equal(workspaceMock.activeWindow, a);
 });
 
+tests.register("focus-window-or-desktop on an empty desktop switches desktop (#88)", 5, () => {
+    const { qtMock, workspaceMock } = init(getDefaultConfig());
+    workspaceMock.createClients(1);
+    qtMock.fireShortcut("focus-window-or-desktop-down");
+    Assert.equal(workspaceMock.currentDesktop, workspaceMock.desktops[1]);
+    workspaceMock.activeWindow = null;
+    qtMock.fireShortcut("focus-window-or-desktop-up");
+    Assert.equal(workspaceMock.currentDesktop, workspaceMock.desktops[0], { message: "up from an empty desktop" });
+});
+
 tests.register("niri swap-window", 10, () => {
     const config = getDefaultConfig();
     const { qtMock, workspaceMock, world } = init(config);

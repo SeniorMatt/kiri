@@ -543,8 +543,10 @@ class World {
     }
 
     // like `doIfTiledFocused`, but the focus moves into the grid when no tiled window has it
+    // (`desktopStep`: on an empty desktop switch that many desktops instead)
     public doIfTiledFocusedOrEnterGrid(
         f: (clientManager: ClientManager, desktopManager: DesktopManager, window: Window, column: Column, grid: Grid) => void,
+        desktopStep?: number,
     ) {
         const active = Workspace.activeWindow;
         if (active === null || this.clientManager.findTiledWindow(active) === null) {
@@ -553,6 +555,9 @@ class World {
                 const window = desktop === undefined ? null : desktop.grid.getLastFocusedWindow();
                 if (window !== null) {
                     window.focus();
+                } else if (desktopStep !== undefined) {
+                    // an empty desktop: nothing to enter, so switch desktop, as niri's focus-window-or-workspace does
+                    Actions.switchDesktop(desktopStep, desktopManager);
                 }
             });
             return;
