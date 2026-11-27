@@ -96,14 +96,14 @@ dep_hint() {
         *" arch "*|*" cachyos "*|*" manjaro "*|*" endeavouros "*)
             echo "sudo pacman -S --needed base-devel cmake extra-cmake-modules kwin libepoxy qt6-base qt6-tools kconfig kconfigwidgets kcmutils kcoreaddons kwindowsystem qt6-declarative wayland libdrm vulkan-headers" ;;
         *" fedora "*|*" rhel "*)
-            echo "sudo dnf install cmake gcc-c++ make extra-cmake-modules kwin-devel kdecoration-devel kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcmutils-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel qt6-qtbase-devel qt6-qttools-devel kf6-kpackage" ;;
+            echo "sudo dnf install cmake gcc-c++ make extra-cmake-modules kwin-devel kdecoration-devel kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcmutils-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel vulkan-headers qt6-qtbase-devel qt6-qttools-devel kf6-kpackage" ;;
         *" suse "*|*" opensuse "*|*" opensuse-tumbleweed "*)
-            echo "sudo zypper install cmake gcc-c++ make kf6-extra-cmake-modules kwin6-devel kdecoration6-devel kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcmutils-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel qt6-base-devel qt6-uitools-devel qt6-declarative-devel kf6-kwindowsystem-devel qt6-tools-qdbus kf6-kpackage kwin6" ;;
+            echo "sudo zypper install cmake gcc-c++ make kf6-extra-cmake-modules kwin6-devel kdecoration6-devel kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcmutils-devel kf6-kcoreaddons-devel libepoxy-devel libdrm-devel vulkan-headers qt6-base-devel qt6-uitools-devel qt6-declarative-devel kf6-kwindowsystem-devel qt6-tools-qdbus kf6-kpackage kwin6" ;;
         *" debian "*|*" ubuntu "*|*" neon "*)
-            echo "sudo apt install build-essential cmake extra-cmake-modules kwin-dev libkdecorations3-dev libkf6config-dev libkf6configwidgets-dev libkf6kcmutils-dev libkf6coreaddons-dev libepoxy-dev libdrm-dev pkgconf qt6-base-dev qt6-tools-dev kpackagetool6 qdbus-qt6" ;;
+            echo "sudo apt install build-essential cmake extra-cmake-modules kwin-dev libkdecorations3-dev libkf6config-dev libkf6configwidgets-dev libkf6kcmutils-dev libkf6coreaddons-dev libepoxy-dev libdrm-dev libvulkan-dev pkgconf qt6-base-dev qt6-tools-dev kpackagetool6 qdbus-qt6" ;;
         *" nixos "*)
             echo "use nix develop or nix-shell in the repo (flake.nix / shell.nix provided)" ;;
-        *) echo "install cmake, a C++ compiler, extra-cmake-modules, the KWin and KDecoration development packages, KF6 Config, ConfigWidgets, KCMUtils and CoreAddons, libepoxy and Qt6 base and UiTools development files" ;;
+        *) echo "install cmake, a C++ compiler, extra-cmake-modules, the KWin and KDecoration development packages, KF6 Config, ConfigWidgets, KCMUtils and CoreAddons, libepoxy, the Vulkan headers and Qt6 base and UiTools development files" ;;
     esac
 }
 
@@ -154,6 +154,12 @@ elif $build && [ -d "$cpp" ]; then
     [ -d /usr/share/ECM ] || missing="$missing extra-cmake-modules"
     [ -f /usr/include/kwin/effect/effecthandler.h ] || missing="$missing kwin-headers"
     [ -f /usr/include/epoxy/gl.h ] || missing="$missing libepoxy"
+    # KWin 6.8's CMake files need the Vulkan headers
+    for c in /usr/lib*/cmake/KWin/KWinConfig.cmake /usr/lib/*/cmake/KWin/KWinConfig.cmake; do
+        [ -f "$c" ] || continue
+        grep -q Vulkan "$c" && [ ! -f /usr/include/vulkan/vulkan.h ] && missing="$missing vulkan-headers"
+        break
+    done
     [ -n "$plugindir" ] || missing="$missing qtpaths6/qmake6"
 fi
 # effects of an earlier install: KWin keeps the loaded ones until the next login
