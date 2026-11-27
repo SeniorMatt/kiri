@@ -1020,12 +1020,19 @@ FocusScope {
             event.accepted = true;
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             const a = root.lay.active;
+            let activated = false;
             for (let i = 0; i < winModel.count; i++) {
                 const w = winModel.get(i);
                 if (w.wid === a && (root.query === "" || w.title.toLowerCase().indexOf(root.query) !== -1)) {
                     root.effect.activateWindow(w.wid, w.did, w.di, root.outName);
+                    activated = true;
                     break;
                 }
+            }
+            // nothing to activate (an empty desktop reached with Up/Down): close the overview there, as niri does;
+            // with a search typed, a miss just does nothing
+            if (!activated && root.query === "") {
+                root.effect.requestClose();
             }
             event.accepted = true;
         }
