@@ -56,9 +56,10 @@ class Overview {
     }
 
 
-    // one layout when every output shows the same desktop; one per output (same desktop order) with per-screen desktops
+    // one layout for a single output; with several outputs each one gets its own (same desktop order), because
+    // every output has its own strip and the effect only fills the view of an output that has a layout of its own
     public buildLayout() {
-        if (!this.world.isPerScreenDesktops()) {
+        if (Workspace.screens.length < 2) {
             return JSON.stringify(this.buildOutputLayout(this.desktopManager.getFocusedOutput(), false));
         }
         return JSON.stringify({ screens: Workspace.screens.map(output => this.buildOutputLayout(output, true)) });
@@ -260,7 +261,7 @@ class Overview {
             }
             this.endDrag();
             const column = window.column;
-            const layout = this.buildOutputLayout(output, this.world.isPerScreenDesktops());
+            const layout = this.buildOutputLayout(output, Workspace.screens.length > 1);
             const id = String(kwinClient.internalId);
             const col = column.grid.getColumns().indexOf(column);
             const index = column.getWindows().indexOf(window);

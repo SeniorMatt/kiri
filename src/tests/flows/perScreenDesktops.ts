@@ -229,6 +229,18 @@
         Assert.equalArrays(ids(layout.screens[1]), [String(other.internalId)], { message: "the window of the second output is on its first desktop" });
     });
 
+    tests.register("Overview: both outputs get a layout even when they show the same desktop (#92)", 3, () => {
+        const { qtMock, left, other } = setup(false);
+        qtMock.fireShortcut("overview");
+        const layout = overviewLastLayout();
+        Assert.equal(layout.screens.length, 2);
+        Assert.equal(layout.screens[0].screen.x, 0);
+        Assert.equal(layout.screens[1].screen.x, 800);
+        const ids = (one: any) => one.desktops.flatMap((d: any) => d.cols.flatMap((c: any) => c.wins.map((w: any) => w.id)));
+        Assert.equalArrays(ids(layout.screens[0]), [String(left.internalId)]);
+        Assert.equalArrays(ids(layout.screens[1]), [String(other.internalId)], { message: "no window is shown twice" });
+    });
+
     tests.register("Per-screen desktops: the overview events switch and act on the named output", 3, () => {
         const { qtMock, workspaceMock, world, left, other, d1, d2 } = setup(true);
         qtMock.fireShortcut("overview");
@@ -254,12 +266,4 @@
         Assert.equalArrays(shown(workspaceMock), [d2, d2]);
     });
 
-    tests.register("Per-screen desktops: without the setting the overview sends the single layout", 3, () => {
-        const { qtMock, workspaceMock } = setup(false);
-        qtMock.fireShortcut("overview");
-        const layout = overviewLastLayout();
-        Assert.equal(layout.screens, undefined);
-        Assert.equal(layout.desktops.length, workspaceMock.desktops.length);
-        Assert.equal(layout.current, 0);
-    });
 }
