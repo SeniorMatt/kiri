@@ -40,7 +40,12 @@ package: build
 	tar -czf ./kiri_${subst .,_,${VERSION}}.tar.gz -C ./kiri-pkg-tmp kiri_${subst .,_,${VERSION}}
 	rm -rf ./kiri-pkg-tmp
 	rm -f ./kiri_${subst .,_,${VERSION}}.kwinscript
-	cd ./package && zip -qr ../kiri_${subst .,_,${VERSION}}.kwinscript .
+	# the .kwinscript (KDE Store) has no compiled settings page, so it uses KWin's generic one, like install.sh does
+	# when kcm_kiri is missing; the Configure button is gone otherwise
+	cp -r ./package ./kiri-pkg-tmp
+	sed -i 's#kwin/effects/configs/kcm_kiri#kwin/effects/configs/kcm_kwin4_genericscripted#' ./kiri-pkg-tmp/metadata.json
+	cd ./kiri-pkg-tmp && zip -qr ../kiri_${subst .,_,${VERSION}}.kwinscript .
+	rm -rf ./kiri-pkg-tmp
 
 # builds and installs everything on this machine, including the compiled effects
 install-all: build
