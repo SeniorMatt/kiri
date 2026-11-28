@@ -56,8 +56,15 @@ QtWin.Window {
         return Workspace.clientArea(Workspace.MaximizeArea, panel);
     }
 
-    // what is left of the window after the panels above the target are taken off
-    readonly property var parts: Panels.visibleParts(ringRect.x, ringRect.y, width, height, Panels.panelsAbove(Workspace.stackingOrder, target, panelArea))
+    // KWin sends no signal when Workspace.stackingOrder changes: this counts the windows added and removed, so that
+    // `parts` is worked out again when a notification or a popup comes or goes
+    property int windowsTick: 0
+
+    // what is left of the window after the panels (and notifications, popups) above the target are taken off
+    readonly property var parts: {
+        windowsTick;
+        return Panels.visibleParts(ringRect.x, ringRect.y, width, height, Panels.panelsAbove(Workspace.stackingOrder, target, panelArea));
+    }
 
     title: "kiri-ring-" + tag
     flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus | Qt.Tool
@@ -111,11 +118,13 @@ QtWin.Window {
             if (w.caption === ring.title || w.caption.indexOf(ring.title + " <") === 0) {
                 ring.attach(w);
             }
+            ring.windowsTick++;
         }
         function onWindowRemoved(w) {
             if (w === ring.kw) {
                 ring.kw = null;
             }
+            ring.windowsTick++;
         }
         function onWindowActivated(w) {
             if (w === null || w !== ring.kw) {
